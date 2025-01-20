@@ -136,14 +136,14 @@ def create_new_logger():
 
         # Define a logger
         logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.WARNING)
 
         date = str(time.time()).split(".")[0]
 
         # Add a file handler
         path = path + "pyAF_" + date + ".log"
         fh = logging.FileHandler(path, mode="w")
-        fh.setLevel(logging.DEBUG)
+        fh.setLevel(logging.WARNING)
 
         # Create a formatter and set the formatter for the handler.
         fstring = "%(asctime)s, %(module)s, Line : %(lineno)s, %(message)s"

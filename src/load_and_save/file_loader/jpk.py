@@ -796,7 +796,7 @@ class LoaderJPK:
             curves_modulation = tf.get_node(dt + "/curves", "modulation")
 
         shape = [self.data.nbr_pixels_x, self.data.nbr_pixels_y, 1]
-        temp_piezo_image = numpy.zeros(shape, numpy.float_)
+        temp_piezo_image = numpy.zeros(shape, numpy.float64)
 
         ch_1 = "channels/" + self.height_channel_name + ".dat"
         ch_2 = "channels/vDeflection.dat"

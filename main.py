@@ -41,7 +41,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from pyAF.src.pyaf import main as pyaf_main
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.WARNING)
     logger = logging.getLogger(__name__)
 
     logger.debug("Starting main.py")
