@@ -297,7 +297,7 @@ class PlotResults(MainPlot):
                     box.set(xlabel=None)
                     box.set(ylabel=None)
 
-                    print(dataframe)
+                    #print(dataframe)
 
         elif shared.exp.results_type == "loading_rates"\
                 and self.data_x is not None:

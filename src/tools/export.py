@@ -375,10 +375,31 @@ def export_results_r(folder, stats_flag=True):
             results_util = results_sorting.GetResults(export="r_format")
 
             if data.stiffness_calculated:
+                print("Shape of data.indentation:", data.indentation.shape)
+
+                # Convert CArray to a NumPy array and flatten it
+                flattened_indentation = np.array(data.indentation).flatten()
+                print("Length of flattened indentation:", flattened_indentation.shape)
+
+                # Get the filtered stiffness data (ROI only)
                 stiffness_array = results_util.get_results_single(result_id=row, force_type="stiffness")
                 stiffness = pd.DataFrame(stiffness_array, columns=["curve_index", "x_pos", "y_pos", "stiffness"])
-                stiffness["indentation"] = data.indentation[::].flatten()
-                print(len(stiffness["indentation"]))
+
+                # Filter the indentation data to match the ROI
+                # Assuming stiffness_array contains the ROI-filtered data, we need to filter indentation accordingly
+                # Create a mask for the ROI
+                roi_mask = np.zeros(data.indentation.shape, dtype=bool)
+                for curve in stiffness_array:
+                    i, j = int(curve[1]), int(curve[2])  # x_pos and y_pos
+                    roi_mask[i, j] = True
+
+                # Flatten the mask and filter the indentation data
+                flattened_mask = roi_mask.flatten()
+                roi_indentation = flattened_indentation[flattened_mask]
+
+                # Assign the filtered indentation data to the stiffness DataFrame
+                stiffness["indentation"] = roi_indentation
+                print("Length of stiffness indentation:", len(stiffness["indentation"]))
 
                 if stats_flag:
                     stiffness_stats = stiffness.describe()
@@ -387,6 +408,7 @@ def export_results_r(folder, stats_flag=True):
 
                 row_df = merge_dfs(row_df, stiffness)
 
+            # Repeat the same logic for other data types (work, rupture_force, etc.)
             if data.work_and_rupture_force1_calculated:
                 work_array = results_util.get_results_single(result_id=row, force_type="work")
                 work = pd.DataFrame(work_array, columns=["curve_index", "x_pos", "y_pos", "work"])
@@ -403,7 +425,7 @@ def export_results_r(folder, stats_flag=True):
                 rupture_force = pd.DataFrame(rupture_force_array, columns=["curve_index", "x_pos", "y_pos", "rupture_force"])
 
                 if stats_flag:
-                    rupture_force_stats = rupture_force .describe()
+                    rupture_force_stats = rupture_force.describe()
                     ft_stats = export_descriptive_stats(rupture_force_stats, "rupture_force")
                     row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
 
