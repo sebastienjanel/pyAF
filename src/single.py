@@ -305,14 +305,14 @@ class SingleFile:
         # Information for the models
         self.stiffness_mode = 0  # 0 Calculus 1 Fit
         self.stiffness_model_selected = 1  # Select Sneddon by default
-        self.tip_radius = 20
+        self.tip_radius = 75
         self.tip_angle = 15  # Note : this is in fact the half-opening angle
         self.poisson_ratio = 0.5
         self.indentation_start = 0
         self.indentation_stop = 0
         self.indentation_step = 0
-        self.force_start = 35
-        self.force_stop = 90
+        self.force_start = 0
+        self.force_stop = 100
         self.strict_stop = 1
         self.tomography = 0
         self.lr_coef = 0.33
