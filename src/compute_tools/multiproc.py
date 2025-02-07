@@ -491,6 +491,7 @@ class DataProcessor(multiprocessing.Process):
                 "trig_threshold": self.dt["trig_threshold"],
                 "poisson_ratio": self.dt["poisson_ratio"],
                 "tip_radius": self.dt["tip_radius"],
+                "tip_angle": self.dt["tip_angle"],
                 "fit_range_type": self.dt["fit_range_type"]}
 
         elif self.mode == "work":

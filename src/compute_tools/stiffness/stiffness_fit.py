@@ -47,7 +47,6 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
 
     if model_selected == 0:
         # Hertz with sphere
-        # Calculate coeff using tip radius in meters.
         fit_model = sm.hertz_sphere
         fit_model_lmfit = sm.hertz_sphere_lmfit
         div = numpy.sqrt(fit_params["tip_radius"] * 1e-9)
@@ -57,13 +56,16 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         # Sneddon (cone)
         fit_model = sm.sneddon_cone
         fit_model_lmfit = sm.sneddon_cone_lmfit
-        sm.coeff = o_params["coeff"]
+        div = numpy.tan(fit_params["tip_angle"] * numpy.pi / 180)
+        sm.coeff = (2.0 / numpy.pi) * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
     elif model_selected == 2:
         # Bilodeau (Pyramid)
+        print("fit_params:", fit_params)
         fit_model = sm.bilodeau_pyramid
         fit_model_lmfit = sm.bilodeau_pyramid_lmfit
-        sm.coeff = o_params["coeff"]
+        div = numpy.tan(fit_params["tip_angle"] * numpy.pi / 180)
+        sm.coeff = (1.0 / numpy.sqrt(2)) * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
     # Get approach curve.
     app, _, _, _, _, smoothing_error = curve_tools.get_curve(None, [i, j], app, ret,
