@@ -217,21 +217,21 @@ class SingleFile:
         # Fitting parameters for the pocs
         self.fitparam_poc_skip_start = 100  # nm
         self.fitparam_poc_fit_length = 500  # nm
-        self.fitparam_poc_refit_option = 0  # nm
+        self.fitparam_poc_refit_option = 500  # nm
         self.fitparam_poc_noise_multiplicator = 5.0
-        self.fitparam_poc_refit_times = 1
+        self.fitparam_poc_refit_times = 2
         # Fitting parameters for the jocs
         self.fitparam_joc_skip_start = 100  # nm
         self.fitparam_joc_fit_length = 500  # nm
-        self.fitparam_joc_refit_option = 0  # nm
+        self.fitparam_joc_refit_option = 500  # nm
         self.fitparam_joc_noise_multiplicator = 5.0
-        self.fitparam_joc_refit_times = 1
+        self.fitparam_joc_refit_times = 2
         # Fitting parameters for the jocs (events)
         self.fitparam_events_joc_skip_start = 100  # nm
         self.fitparam_events_joc_fit_length = 500  # nm
-        self.fitparam_events_joc_refit_option = 0  # nm
+        self.fitparam_events_joc_refit_option = 500  # nm
         self.fitparam_events_joc_noise_multiplicator = 5.0
-        self.fitparam_events_joc_refit_times = 1
+        self.fitparam_events_joc_refit_times = 2
 
         # Used values
         # Fitting parameters for the pocs
@@ -303,10 +303,10 @@ class SingleFile:
         self.events_results_filter_slope_max = 0
 
         # Information for the models
-        self.stiffness_mode = 0  # 0 Calculus 1 Fit
-        self.stiffness_model_selected = 1  # Select Sneddon by default
+        self.stiffness_mode = 1  # 0 Calculus 1 Fit
+        self.stiffness_model_selected = 0  # Select Hertz by default
         self.tip_radius = 75
-        self.tip_angle = 15  # Note : this is in fact the half-opening angle
+        self.tip_angle = 35  # Note : this is in fact the half-opening angle
         self.poisson_ratio = 0.5
         self.indentation_start = 0
         self.indentation_stop = 0
