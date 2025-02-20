@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -51,6 +52,7 @@ class StiffnessCorrection:
     The coefficient chosen depends on the model chosen (Dimitriadis, Chadwick),
     depending if the stiffness was computed with the Hertz model or the Sneddon
     model.
+    2024 -> BEC models have been updated to Garcia Garcia 2018.
 
     Note on the units:
     indentation, tip_radius, height (h) are all kept in nm as they are divided
@@ -149,13 +151,20 @@ class StiffnessCorrection:
                     model = data.used_stiffness_model_selected
 
                     if model == 0:
-                        # Hertz (Sphere)
+                        # Hertz (paraboloid)
 
                         if h >= 0:
-                            X = math.sqrt(indentation * tip_radius) / h
-                            o2 = 1.133 * X + 1.283 * X ** 2
-                            o4 = 0.769 * X ** 3 + 0.0975 * X ** 4
-                            coeff = 1.0 / (1 + o2 + o4)
+                            # Old Chadwick/Dimitriadis correction
+                            # X = math.sqrt(indentation * tip_radius) / h
+                            # o2 = 1.133 * X + 1.283 * X ** 2
+                            # o4 = 0.769 * X ** 3 + 0.0975 * X ** 4
+                            # Updated correction according to Garcia 2018
+                            o1 = (1.133 * math.sqrt(indentation * tip_radius)) / h
+                            o2 = (1.497 * indentation * tip_radius) / h ** 2
+                            o3 = (1.469 * indentation * tip_radius * math.sqrt(indentation * tip_radius)) / h ** 3
+                            o4 = (0.755 * indentation ** 2 * tip_radius ** 2) / h ** 4
+                            coeff = 1.0 / (1 + o1 + o2 + o3 + o4)
+
                         else:
                             # Don't correct if we are "under" the glass
                             coeff = 1.0
@@ -164,10 +173,16 @@ class StiffnessCorrection:
                         # Sneddon (Cone and Pyramid)
 
                         if h >= 0:
-                            X = (indentation) / h
-                            o1 = 1.7795 * (2 * tan_angle / math.pi ** 2) * X
-                            o2 = 16.0 * (1.7795) ** 2 * tan_angle ** 2 * X ** 2
-                            coeff = 1.0 / (1 + o1 + o2)
+                            # Old Chadwick/Dimitriadis correction
+                            # X = (indentation) / h
+                            # o1 = 1.7795 * (2 * tan_angle / math.pi ** 2) * X
+                            # o2 = 16.0 * (1.7795) ** 2 * tan_angle ** 2 * X ** 2
+                            # Updated correction according to Garcia 2018
+                            o1 = (0.721 * indentation * tan_angle) / h
+                            o2 = (0.650 * indentation ** 2 * tan_angle ** 2) / h ** 2
+                            o3 = (0.491 * indentation ** 3 * tan_angle ** 3) / h ** 3
+                            o4 = (0.225 * indentation ** 4 * tan_angle ** 4) / h ** 4
+                            coeff = 1.0 / (1 + o1 + o2 + o3 + o4)
                         else:
                             # Don't correct if we are "under" the glass
                             coeff = 1.0
