@@ -1,3 +1,7 @@
+# setup.py is used by py2app to build a standalone application
+# but version 0.28 fails in bundling ITK correctly
+# pyintaller is the alternative
+
 from setuptools import setup
 
 APP = ['src/pyAF.py']  # Entry point of your application
