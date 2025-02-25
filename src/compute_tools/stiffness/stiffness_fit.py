@@ -62,7 +62,7 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
 
     elif model_selected == 2:
         # Bilodeau (Pyramid)
-        print("fit_params:", fit_params)
+        #print("fit_params:", fit_params)
         fit_model = sm.bilodeau_pyramid
         fit_model_lmfit = sm.bilodeau_pyramid_lmfit
         div = numpy.tan(fit_params["tip_angle"] * numpy.pi / 180)

@@ -44,7 +44,7 @@ QtGui has to be loaded everytime because the MainWindow class subclasses
 a QtWidgets.QMainWindow.
 """
 
-from pyAF.src import consts
+from src import consts
 
 
 class FetchStderr:
@@ -90,7 +90,7 @@ if multiprocessing.current_process().name == "MainProcess":
     from packaging.version import Version
     import tables
     import platform
-    from pyAF.src.tools.utils import module_exists
+    from src.tools.utils import module_exists
 
     """if Version(tables.__version__) < Version("3.0"):
         message = "PyTables version is " + tables.__version__ + "." \
@@ -138,32 +138,32 @@ if multiprocessing.current_process().name == "MainProcess":
             consts.ALLOW_ITK = False
         sys.stderr = original_stderr  # Set back STDERR
 
-    from pyAF.src.utils import menu
-    from pyAF.src.widgets_main.data import DataWidget
-    from pyAF.src.widgets_main.compute import ComputeWidget
-    from pyAF.src.widgets_main.results import ResultsWidget
-    from pyAF.src.widgets_main.results_single import ResultsSingleWidget
-    from pyAF.src.widgets_main.results_groups import ResultsGroupsWidget
-    from pyAF.src.widgets_main.results_experiment import ResultsExperimentWidget
-    from pyAF.src.widgets.entry import EntryWidget
-    from pyAF.src.widgets.log_sender import LogSenderWidget
-    from pyAF.src.widgets.about import AboutWidget
-    from pyAF.src.tools import apply_to_all
-    from pyAF.src.tools import misc_tools
-    from pyAF.src.tools import math_tools as mt
-    from pyAF.src.tools import temp_file
-    from pyAF.src.widgets.progressbar import Progressbar
-    from pyAF.src.experiment import Experiment
-    from pyAF.src.load_and_save.load import Load
+    from src.utils import menu
+    from src.widgets_main.data import DataWidget
+    from src.widgets_main.compute import ComputeWidget
+    from src.widgets_main.results import ResultsWidget
+    from src.widgets_main.results_single import ResultsSingleWidget
+    from src.widgets_main.results_groups import ResultsGroupsWidget
+    from src.widgets_main.results_experiment import ResultsExperimentWidget
+    from src.widgets.entry import EntryWidget
+    from src.widgets.log_sender import LogSenderWidget
+    from src.widgets.about import AboutWidget
+    from src.tools import apply_to_all
+    from src.tools import misc_tools
+    from src.tools import math_tools as mt
+    from src.tools import temp_file
+    from src.widgets.progressbar import Progressbar
+    from src.experiment import Experiment
+    from src.load_and_save.load import Load
     import random
     random.seed()  # Will use current system time
-    from pyAF.src import widgets_list as wl
-    from pyAF.src import shared
-    from pyAF.src.load_and_save.pre_check import CheckFiles
-    from pyAF.src.widgets.plugins import PluginsWidget
-    from pyAF.src.widgets.preferences import PreferencesWidget
-    from pyAF.src.utils import discarding
-    from pyAF.src.gui_styles.theme_handler import theme_handler
+    from src import widgets_list as wl
+    from src import shared
+    from src.load_and_save.pre_check import CheckFiles
+    from src.widgets.plugins import PluginsWidget
+    from src.widgets.preferences import PreferencesWidget
+    from src.utils import discarding
+    from src.gui_styles.theme_handler import theme_handler
 
 
 class MainWindow(QtWidgets.QMainWindow):

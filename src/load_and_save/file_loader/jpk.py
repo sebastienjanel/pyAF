@@ -752,6 +752,17 @@ class LoaderJPK:
         # Scan rate
         self.data.scan_rate = 1.0 / (time_approach + time_retraction)
 
+    def pad_curve(self, ext, defl, fill_value=0):
+        """
+        Ensure that curve data has three rows.
+        Returns a NumPy array of shape (3, len(ext)).
+        """
+        nbr_points = len(ext)
+        padded = numpy.full((3, nbr_points), fill_value, dtype=numpy.float64)
+        padded[0, :] = numpy.array(ext)
+        padded[1, :] = numpy.array(defl)
+        return padded
+
     def fetch_curves(self):
         """Loads the curves from the zip file to the tmp hdf5 file.
 
@@ -1135,13 +1146,19 @@ class LoaderJPK:
             nbr_points = self.nbr_points_array_approach[index_nbr]
             defl = numpy.zeros(nbr_points).tolist()
             ext = list(range(nbr_points))
-            curves_approach[self.pos_x, self.pos_y, :, :] = [ext, defl]
+            #print(f"curves_approach shape: {curves_approach.shape}")
+            padded_approach = self.pad_curve(ext, defl, fill_value=0)
+            curves_approach[self.pos_x, self.pos_y, :, :] = padded_approach
 
-            # Retraciton
-            nbr_points = self.nbr_points_array_retraciton[index_nbr]
+            #curves_approach[self.pos_x, self.pos_y, :, :] = [ext, defl]
+
+            # Retraction
+            nbr_points = self.nbr_points_array_retraction[index_nbr]
             defl = numpy.zeros(nbr_points).tolist()
             ext = list(range(nbr_points))
-            curves_retraction[self.pos_x, self.pos_y, :, :] = [ext, defl]
+            #curves_retraction[self.pos_x, self.pos_y, :, :] = [ext, defl]
+            padded_retraction = self.pad_curve(ext, defl, fill_value=0)
+            curves_retraction[self.pos_x, self.pos_y, :, :] = padded_retraction
 
             self.update_positions()
 
