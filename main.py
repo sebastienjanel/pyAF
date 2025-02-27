@@ -35,9 +35,27 @@ import sys
 import os
 import logging
 
-# Ajouter le répertoire parent au chemin de recherche des modules
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+if getattr(sys, 'frozen', False):
+    # Running in a bundle
+    base_path = sys._MEIPASS
+else:
+    # Running in normal Python
+    base_path = os.path.abspath(os.path.dirname(__file__))
 
+# Assuming your folder structure is like:
+# pyAF/
+# ├── main.py
+# └── pyAF/
+#     └── src/
+#         ├── __init__.py
+#         └── pyaf.py
+#
+# We need to add the parent folder of the inner "pyAF" package.
+parent_path = os.path.abspath(os.path.join(base_path, '..'))
+if parent_path not in sys.path:
+    sys.path.insert(0, parent_path)
+
+# Now import using the absolute package path:
 from pyAF.src.pyaf import main as pyaf_main
 
 if __name__ == "__main__":
