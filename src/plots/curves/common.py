@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -34,7 +35,6 @@
 import math
 import numpy
 import copy
-import pandas as pd
 from ...tools import math_tools
 from ...tools import events_tools
 from ...tools import curve_tools
@@ -314,7 +314,7 @@ class CommonCurveTools:
         Most of the code here is the same as in :
         compute_tools.stiffness.stiffness_compute
         """
-        # Display the segements if asked (or if needed for the fits)
+        # Display the segments if asked (or if needed for the fits)
         if self.data.display_segments or self.data.display_fits_stiffness:
             curve_x = self.curve_approach[0]
             curve_y = self.curve_approach[1]
@@ -374,21 +374,20 @@ class CommonCurveTools:
                 positions_x = []
                 fitcurve_y = []
 
-                if dt.used_indentation_start:
-                    xoffset = self.segments[i][0]
-                    yoffset = self.segments[i][1]
-                else:  # Weird case with y interpolation at PoC
-                    xoffset = 0
-                    yoffset = 0
-
                 if dt.used_tomography:
                     # Tomography
+                    xoffset = self.segments[i][0]
+                    yoffset = self.segments[i][1]
                     length = dt.used_indentation_step + 1
                 elif dt.used_indentation_step:
                     # Start all segments at zero
+                    xoffset = 0
+                    yoffset = 0
                     length = (i + 1) * dt.used_indentation_step + 1
                 else:
                     # One segment, to max
+                    xoffset = 0
+                    yoffset = 0
                     length = self.segments[-1][0] - xoffset
 
                 # Get a value each nm
