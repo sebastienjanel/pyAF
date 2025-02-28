@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -34,6 +35,7 @@
 import numpy
 import copy
 import math
+from itertools import zip_longest
 from matplotlib.collections import PolyCollection, LineCollection
 from ...tools.colortables import ColorTables
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -41,11 +43,12 @@ from ... import shared
 from ..plot_main import MainPlot
 
 
+
 class PlotSlices(MainPlot):
     """Plots a slice in the stiffness tomography.
 
     A matplotlib PolyCollection is used to have fast plotting. All the sizes of
-    the different voxels are taken into acount (for example for diagonal slices
+    the different voxels are taken into account (for example for diagonal slices
     you have three voxel sizes : x, y, and xydiagonal).
     """
 
@@ -287,6 +290,12 @@ class PlotSlices(MainPlot):
 
             # Invert positions in this case
             X_array = X_array[::-1]
+
+        # Pad shorter lists with NaN
+        E_array_padded = list(zip_longest(*E_array, fillvalue=numpy.nan))
+        E_array = numpy.array(E_array_padded).T  # Transpose back
+        Z_array_padded = list(zip_longest(*Z_array, fillvalue=numpy.nan))
+        Z_array = numpy.array(Z_array_padded).T  # Transpose back
 
         self.x_size = x_size
         self.z_size = z_size

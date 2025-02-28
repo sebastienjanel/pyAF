@@ -373,6 +373,8 @@ class CommonCurveTools:
                 fitcurve_x = []
                 positions_x = []
                 fitcurve_y = []
+                xoffset = 0
+                yoffset = 0
 
                 if dt.used_tomography:
                     # Tomography
@@ -381,14 +383,10 @@ class CommonCurveTools:
                     length = dt.used_indentation_step + 1
                 elif dt.used_indentation_step:
                     # Start all segments at zero
-                    xoffset = 0
-                    yoffset = 0
                     length = (i + 1) * dt.used_indentation_step + 1
                 else:
                     # One segment, to max
-                    xoffset = 0
-                    yoffset = 0
-                    length = self.segments[-1][0] - xoffset
+                    length = self.segments[-1][0]
 
                 # Get a value each nm
                 for j in range(int(length)):
