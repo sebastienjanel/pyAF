@@ -173,7 +173,7 @@ def segment_curve(curve_x, curve_y, start, stop, step):
 def compute_stiffness(parts, coeff, model_selected, tomography, curve):
     """Computes the actual stiffness for each segment.
 
-    Returns an array of Young moduluses.
+    Returns an array of Young moduli.
     """
     parts_x = parts[0]
     parts_y = parts[1]

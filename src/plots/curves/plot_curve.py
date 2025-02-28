@@ -116,7 +116,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
         self.events_fit_vert = None
 
         # If the data is only made of a single curve, there is no need to
-        # have a particuliar position on the meshgrid, and the only curve to be
+        # have a particular position on the meshgrid, and the only curve to be
         # displayed is stored at the position 0,0 in the arrays.
         if self.data.is_single:
             self.xpos = 0
@@ -529,7 +529,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 color=col,
                 linestyle='--')
 
-        # Plot a red line for discared curves
+        # Plot a red line for discarded curves
         self.red_line()
 
         # Set limits for the zooming in
@@ -564,7 +564,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 width1 = abs(size[0] - seg1[1])
                 width2 = abs(seg2[0])
 
-                # Left rectangle, near beggining of the curve
+                # Left rectangle, near beginning of the curve
                 rect1 = Rectangle(
                     (size[0], size[2]),
                     width1,

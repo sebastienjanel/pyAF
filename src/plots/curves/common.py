@@ -217,7 +217,7 @@ class CommonCurveTools:
     def setup_lines(self, params, app_or_ret, mode):
         """Gets the lines for the fits.
 
-        The fits are defined only on the non corrupted part of the curve.
+        The fits are defined only on the non-corrupted part of the curve.
         """
         if params is None:
             # If no params are found (no fit is found), then do not display
@@ -459,7 +459,7 @@ class CommonCurveTools:
             k = dt.spring_constant * 1e9
 
             fcapp = curve_tools.get_force_curves(
-                app[0], app[1], poc_pos, k)  # Point of contact position is sustracted to set F = 0 and zheight = 0
+                app[0], app[1], poc_pos, k)  # Point of contact position is subtracted to set F = 0 and zheight = 0
             app[0] = app[0] * 1e-09  # scaling zheight
             app[1] = app[1] * 1e-09  # scaling deflection
             fcapp[0] = fcapp[0] * 1e-09  # scaling force data
@@ -473,13 +473,13 @@ class CommonCurveTools:
             elif dt.used_stiffness_model_selected == 1:
                 # Sneddon (cone)
                 fitforce = self.sneddon_cone
-                a = 2.0 * math.tan(math.radians(dt.used_tip_angle))
-                coeff = (math.pi * (1.0 - dt.used_poisson_ratio ** 2)) / a
+                div = numpy.tan(dt.used_tip_angle * numpy.pi / 180)
+                coeff = (2.0 / numpy.pi) * div / (1.0 - dt.used_poisson_ratio ** 2)
             elif dt.used_stiffness_model_selected == 2:
                 # Bilodeau (pyramid)
                 fitforce = self.bilodeau_pyramid
-                a = (4.0 / 3.0) * (1.0 - dt.used_poisson_ratio ** 2)
-                coeff = a / math.tan(math.radians(dt.used_tip_angle))
+                div = numpy.tan(dt.used_tip_angle * numpy.pi / 180)
+                coeff = (1.0 / numpy.sqrt(2)) * div / (1.0 - dt.used_poisson_ratio ** 2)
 
             E = dt.stiffness_array[self.xpos][self.ypos][0]
 
