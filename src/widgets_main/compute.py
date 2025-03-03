@@ -406,7 +406,7 @@ class ComputeWidget(PYAFWidget):
         self.list_roi_glass = PYAFComboBox(self, "roi")
         self.list_roi_glass.setFixedSize(100, 26)
 
-        # Sample height value inputed by the user. Used for elasticity corrections.
+        # Sample height value input by the user. Used for elasticity corrections.
         # Value set in update_GUI
         self.IN_user_h = PYAFInput(self, "user_h", "Sample height [nm]", width=50)
         self.IN_user_h.input.setValidator(misc_tools.validator("UF"))
