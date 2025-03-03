@@ -435,7 +435,7 @@ class ComputeWidget(PYAFWidget):
         # --- Set up page -----------------------------------------------------
 
         self.tabs.addTab(self.widget_app, "Elasticity")
-        self.tabs.addTab(self.widget_stiff_corr, "Elasticity correction")
+        self.tabs.addTab(self.widget_stiff_corr, "B.E.C.")
         self.tabs.addTab(self.widget_ret, "Work, Rupture force")
         self.tabs.addTab(self.widget_events, "Events")
         self.tabs.addTab(self.widget_loading_rates, "Loading rates")

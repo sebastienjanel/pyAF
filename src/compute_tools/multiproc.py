@@ -257,7 +257,7 @@ def make_queues(
 def compute(mode, calc_id, params, path):
     """Function called to start the computation.
 
-    Will create the queus and go through the data for the computations.
+    Will create the queues and go through the data for the computations.
     The mode defines the type if computation to do.
     """
     list_of_smoothing_errors = []
@@ -386,7 +386,7 @@ def compute(mode, calc_id, params, path):
         # to the disk
         file_access.join()
 
-        widgets_list.widget_progressbar.set_label("Getting stiffness")
+        widgets_list.widget_progressbar.set_label("Getting elasticity")
 
     return list_of_smoothing_errors
 

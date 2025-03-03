@@ -99,7 +99,7 @@ class Stiffness:
         if data.stiffness_model_selected == 3:
             widgets_list.widget_progressbar.set_label("Getting slopes")
         else:
-            widgets_list.widget_progressbar.set_label("Getting stiffness")
+            widgets_list.widget_progressbar.set_label("Getting elasticity")
         nbr_pixels = data.nbr_pixels_x * data.nbr_pixels_y
         widgets_list.widget_progressbar.set_range(0, nbr_pixels)
 
