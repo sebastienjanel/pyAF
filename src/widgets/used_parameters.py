@@ -47,7 +47,7 @@ class UsedParametersWidget(PYAFWidget):
         HL = QtWidgets.QHBoxLayout()
 
         box_curve_modif = QtWidgets.QGroupBox("General informations")
-        box_elasticity = QtWidgets.QGroupBox("Elasticity")
+        box_elasticity = QtWidgets.QGroupBox("Computation method")
         box_work_and_rupture_force = QtWidgets.QGroupBox("Work and rupture force")
         box_events = QtWidgets.QGroupBox("Events")
 

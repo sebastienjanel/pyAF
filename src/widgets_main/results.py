@@ -156,9 +156,9 @@ class ResultsWidget(PYAFWidget):
         self.RBT_mesh_stiffness = QtWidgets.QRadioButton()
         self.RBT_mesh_stiffness_slice = QtWidgets.QRadioButton()
         self.RBT_mesh_stiffness_corr = QtWidgets.QRadioButton(
-            "Elasticity (Indentation) (Corr.)")
+            "Elasticity (BEC)")
         self.RBT_mesh_stiffness_slice_corr = QtWidgets.QRadioButton(
-            "Elasticity (Slice) (Corr.)")
+            "Elasticity (Slice) (BEC)")
         self.RBT_mesh_work = QtWidgets.QRadioButton("Work")
         self.RBT_mesh_rupture_force1 = QtWidgets.QRadioButton("Rupture force")
         self.RBT_mesh_events_per_curve = QtWidgets.QRadioButton("Events per curve")
@@ -414,7 +414,7 @@ class ResultsWidget(PYAFWidget):
                 self.RBT_mesh_stiffness.setText("Slope (Indentation)")
                 self.RBT_mesh_stiffness_slice.setText("Slope (Slice)")
             else:
-                self.RBT_mesh_stiffness.setText("Elasticity (Indentation)")
+                self.RBT_mesh_stiffness.setText("Elasticity")
                 self.RBT_mesh_stiffness_slice.setText("Elasticity (Slice)")
 
         if element == "button_display_in_3D" or element == "all":

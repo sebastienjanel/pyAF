@@ -183,8 +183,8 @@ class ComputeWidget(PYAFWidget):
 
         W_stiff_exp_params = QtWidgets.QWidget()
         W_stiff_segments = QtWidgets.QWidget()
-        self.Box_stiff_exp_params = QtWidgets.QGroupBox("Parameters")
-        self.Box_stiff_segments = QtWidgets.QGroupBox("Elasticity")
+        self.Box_stiff_exp_params = QtWidgets.QGroupBox("Model parameters")
+        self.Box_stiff_segments = QtWidgets.QGroupBox("Computation method")
 
         # Options
         label = "Tip Radius (nm)"
@@ -234,7 +234,7 @@ class ComputeWidget(PYAFWidget):
         self.GRP_stiffness_params.addButton(self.RBT_calculus_params, 0)
         self.GRP_stiffness_params.addButton(self.RBT_fitting_params, 1)
 
-        BOX_stiffness_mode = QtWidgets.QGroupBox("Elasticity")
+        BOX_stiffness_mode = QtWidgets.QGroupBox("Computation method")
         HL_stiffness_mode = QtWidgets.QHBoxLayout()
         HL_stiffness_mode.addStretch(1)
         HL_stiffness_mode.addWidget(self.RBT_calculus_params)
@@ -401,14 +401,14 @@ class ComputeWidget(PYAFWidget):
         self.BT_height_corr = PYAFButton(self, "height_correction", "Compute")
         self.BT_height_corr.setFixedSize(100, 100)
 
-        self.label_list_roi = QtWidgets.QLabel("Roi (Glass)")
+        self.label_list_roi = QtWidgets.QLabel("ROI of substrate")
         # Values for the list are set in update_GUI
         self.list_roi_glass = PYAFComboBox(self, "roi")
         self.list_roi_glass.setFixedSize(100, 26)
 
         # Sample height value inputed by the user. Used for elasticity corrections.
         # Value set in update_GUI
-        self.IN_user_h = PYAFInput(self, "user_h", "Sample height (nm)", width=50)
+        self.IN_user_h = PYAFInput(self, "user_h", "Sample height [nm]", width=50)
         self.IN_user_h.input.setValidator(misc_tools.validator("UF"))
 
         self.stiff_corr_opts = QtWidgets.QHBoxLayout()

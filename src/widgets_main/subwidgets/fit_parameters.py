@@ -71,15 +71,15 @@ class FitParamsWidget(PYAFWidget):
 
         BOX = QtWidgets.QGroupBox(title)
         self.GL = QtWidgets.QGridLayout()
-        label = "Fit skip (start) (nm)"
+        label = "Fit skip (start) [nm]"
 
         self.IN_skip_start = PYAFInput(self, "skip_start", label)
         self.IN_fit_length = PYAFInput(
-            self, "fit_length", "Fit length (nm)")
+            self, "fit_length", "Fit length [nm]")
         self.IN_noise_multi = PYAFInput(self, "noise_multi", "Fit noise")
-        self.IN_refit = PYAFInput(self, "refit", "Fit refit (nm)")
+        self.IN_refit = PYAFInput(self, "refit", "Fit refit [nm]")
         self.IN_refit_times = PYAFInput(
-            self, "refit_times", "Refit (times)")
+            self, "refit_times", "Refit [times]")
         self.IN_skip_start.input.setValidator(misc_tools.validator("UI"))
         self.IN_fit_length.input.setValidator(misc_tools.validator("UI"))
         self.IN_noise_multi.input.setValidator(misc_tools.validator("UF"))
