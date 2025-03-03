@@ -344,7 +344,7 @@ class PlotResults(MainPlot):
             if self.data_x is not None and self.pdfs is not None and \
                     self.pdfs != []:
                 for pdf_x, pdf_y, factor in self.pdfs:
-                    if pdf_x != []:
+                    if isinstance(pdf_x, numpy.ndarray) and pdf_x.size > 0:
                         self.axes.plot(
                             pdf_x, pdf_y * factor, "r-", linewidth=3)
 

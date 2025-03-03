@@ -215,7 +215,7 @@ def update_counts(mode):
 
         for i in range(len(shared.single_data)):
             data = shared.single_data[i]
-            if data != []:
+            if isinstance(data, numpy.ndarray) and data.size > 0:
                 # PDFS are computed on the whole range
                 hist_normed, _ = \
                     numpy.histogram(data, bins=bins, density=True)
@@ -256,7 +256,7 @@ def update_counts(mode):
 
         for i in range(len(shared.groups_data)):
             data = shared.groups_data[i]
-            if data != []:
+            if isinstance(data, numpy.ndarray) and data.size > 0:
                 # PDFS are computed on the whole range
                 hist_normed, _ = \
                     numpy.histogram(data, bins=bins, density=True)
@@ -297,7 +297,7 @@ def update_counts(mode):
 
         for i in range(len(shared.conditions_data)):
             data = shared.conditions_data[i]
-            if data != []:
+            if isinstance(data, numpy.ndarray) and data.size > 0:
                 # PDFS are computed on the whole range
                 hist_normed, _ = \
                     numpy.histogram(data, bins=bins, density=True)
@@ -340,11 +340,13 @@ def get_pdfs_and_modes(mode):
             themin = 0
             themax = 0
             if shared.exp.results_type != "loading_rates":
-                if data != []:
+                #if data != []:
+                if isinstance(data, numpy.ndarray) and data.size > 0:
                     themin = numpy.amin(data)
                     themax = numpy.amax(data)
             else:
-                if data != [[], []]:
+                #if data != [[], []]:
+                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
                     themin = numpy.amin(data[1])
                     themax = numpy.amax(data[1])
             prog_range += int(themax - themin)
@@ -357,9 +359,9 @@ def get_pdfs_and_modes(mode):
             data = shared.single_data[i]
 
             if shared.exp.results_type != "loading_rates":
-                if data != []:
+                #if data != []:
+                if isinstance(data, numpy.ndarray) and data.size > 0:
                     pdf_x, pdf_y, mode_index = get_pdf_and_mode(data, "single")
-
                     shared.single_pdfs_x.append(pdf_x)
                     shared.single_pdfs_y.append(pdf_y)
                     shared.single_values[i][3] = mode_index
@@ -369,7 +371,8 @@ def get_pdfs_and_modes(mode):
                     shared.single_pdfs_y.append([])
 
             else:
-                if data != [[], []]:
+                #if data != [[], []]:
+                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
                     # 0 = forces, 1 = lr
                     pdf_x, pdf_y, mode_index = get_pdf_and_mode(
                         data[1], "single")
@@ -396,11 +399,13 @@ def get_pdfs_and_modes(mode):
             themin = 0
             themax = 0
             if shared.exp.results_type != "loading_rates":
-                if data != []:
+                #if data != []:
+                if isinstance(data, numpy.ndarray) and data.size > 0:
                     themin = numpy.amin(data)
                     themax = numpy.amax(data)
             else:
-                if data != [] and data != [[], []]:
+                #if data != [] and data != [[], []]:
+                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
                     themin = numpy.amin(data[1])
                     themax = numpy.amax(data[1])
             prog_range += int(themax - themin)
@@ -413,9 +418,9 @@ def get_pdfs_and_modes(mode):
             data = shared.groups_data[i]
 
             if shared.exp.results_type != "loading_rates":
-                if data != []:
+                #if data != []:
+                if isinstance(data, numpy.ndarray) and data.size > 0:
                     pdf_x, pdf_y, mode_index = get_pdf_and_mode(data, "groups")
-
                     shared.groups_pdfs_x.append(pdf_x)
                     shared.groups_pdfs_y.append(pdf_y)
                     shared.groups_values[i][3] = mode_index
@@ -425,7 +430,8 @@ def get_pdfs_and_modes(mode):
                     shared.groups_pdfs_y.append([])
 
             else:
-                if data != [] and data != [[], []]:
+                #if data != [] and data != [[], []]:
+                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
                     # 0 = forces, 1 = lr
                     pdf_x, pdf_y, mode_index = get_pdf_and_mode(
                         data[1], "groups")
@@ -452,11 +458,13 @@ def get_pdfs_and_modes(mode):
             themin = 0
             themax = 0
             if shared.exp.results_type != "loading_rates":
-                if data != []:
+                #if data != []:
+                if isinstance(data, numpy.ndarray) and data.size > 0:
                     themin = numpy.amin(data)
                     themax = numpy.amax(data)
             else:
-                if data != [] and data != [[], []]:
+                #if data != [] and data != [[], []]:
+                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
                     themin = numpy.amin(data[1])
                     themax = numpy.amax(data[1])
             prog_range += int(themax - themin)
@@ -481,7 +489,10 @@ def get_pdfs_and_modes(mode):
                     shared.conditions_pdfs_y.append([])
 
             else:
-                if data != [] and data != [[], []]:
+                #if data != [] and data != [[], []]:
+                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[
+                        1].size > 0:
+
                     # 0 = forces, 1 = lr
                     pdf_x, pdf_y, mode_index = get_pdf_and_mode(
                         data[1], "experiment")

@@ -583,16 +583,25 @@ class ComputeWidget(PYAFWidget):
                 self.IN_tip_radius.input.setText(str(data.tip_radius))
                 self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
+                # Enable fit options
+                self.RBT_fitting_params.setChecked(True)
+                self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 1:
                 self.IN_tip_radius.setParent(None)
                 self.IN_tip_angle.input.setText(str(data.tip_angle))
                 self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
+                # Enable fit options
+                self.RBT_fitting_params.setChecked(True)
+                self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 2:
                 self.IN_tip_radius.setParent(None)
                 self.IN_tip_angle.input.setText(str(data.tip_angle))
                 self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
+                # Enable fit options
+                self.RBT_fitting_params.setChecked(True)
+                self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 3:
                 self.IN_tip_radius.setParent(None)
                 self.IN_tip_angle.setParent(None)
@@ -605,6 +614,9 @@ class ComputeWidget(PYAFWidget):
                 self.IN_tip_radius.input.setText(str(data.tip_radius))
                 self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
+                # Enable fit options
+                self.RBT_fitting_params.setChecked(True)
+                self.RBT_fitting_params.setEnabled(True)
 
             self.IN_poisson.input.setText(str(data.poisson_ratio))
 
