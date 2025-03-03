@@ -140,7 +140,7 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         if consts.ALLOW_ITK is False:
             self.BT_load_stack.setEnabled(False)
         self.BT_load_hr = PYAFButton(self, "load_hr", "Load HR")
-        self.BT_add_glass = PYAFButton(self, "add_glass", "Add glass")
+        self.BT_add_glass = PYAFButton(self, "add_glass", "Add substrate")
         self.BT_fiducials = PYAFButton(self, "fiducials", "Fiducials")
         self.BT_lock_top = PYAFButton(self, "lock_top", "View from top")
         self.BT_draw_square = PYAFButton(self, "draw_square", "Draw square")

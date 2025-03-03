@@ -95,7 +95,7 @@ class RoiManagerWidget(PYAFWidget):
         self.button_add = PYAFButton(self, "add", "Add ROI")
         self.button_remove = PYAFButton(self, "remove", "Remove")
         self.button_invert = PYAFButton(self, "invert", "Invert to new")
-        self.BT_glass = PYAFButton(self, "glass", "Define as glass")
+        self.BT_glass = PYAFButton(self, "glass", "Define as substrate")
         self.BT_discard = PYAFButton(self, "discard", "Discard from ROI")
 
         self.VL_options.addWidget(self.input_size)
@@ -429,9 +429,9 @@ class RoiManagerWidget(PYAFWidget):
                         self.BT_glass.setEnabled(True)
 
                 if roi.glass_coeffs is None:
-                    self.BT_glass.setText("Define as glass")
+                    self.BT_glass.setText("Define as substrate")
                 else:
-                    self.BT_glass.setText("No glass")
+                    self.BT_glass.setText("No substrate")
 
         if not found_item:
             # No Roi defined, disable glass button

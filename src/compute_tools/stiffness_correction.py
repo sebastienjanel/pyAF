@@ -68,12 +68,12 @@ class StiffnessCorrection:
         """Method called by PYAF to do the actual stiffness correction."""
         data = shared.exp.list[calc_id]
 
-        self.logger.debug("Correctiong stiffness, file %s", calc_id)
+        self.logger.debug("Correcting stiffness, file %s", calc_id)
         self.logger.debug("Using ROI %s", data.roi_glass_id)
 
         # Create a progressbar which is displayed during the computations
         Progressbar(os.path.basename(data.filename))
-        widgets_list.widget_progressbar.set_label("Correcting stiffness")
+        widgets_list.widget_progressbar.set_label("Correcting elasticity")
         nbr_pts = data.nbr_pixels_x * data.nbr_pixels_y
         widgets_list.widget_progressbar.set_range(0, nbr_pts)
 

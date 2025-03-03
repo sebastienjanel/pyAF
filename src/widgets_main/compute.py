@@ -1112,7 +1112,7 @@ class ComputeWidget(PYAFWidget):
                 for calc_id in calc_list:
                     data = shared.exp.list[calc_id]
                     if data.stiffness_calculated:
-                        self.logger.debug("Correcting Stiffness %s", data.filename)
+                        self.logger.debug("Correcting Elasticity %s", data.filename)
                         self.stiffness_correction.correct_stiffness(calc_id)
 
             self.finish_computation()

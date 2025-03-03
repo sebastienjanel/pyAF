@@ -805,11 +805,9 @@ class GetResults:
     def remove_zeros(self, array):
         """Removes zeros and negatives from a results array."""
         if self.export != "single" and self.export != "r_format":
-            #if self.type == "loading_rates" and array[0] == []:
-            if self.type == "loading_rates" and array.size == 0:
+            if self.type == "loading_rates" and numpy.array(array).size == 0:
                 return [[], []]
-            #elif self.type != "loading_rates" and array == []:
-            elif self.type != "loading_rates" and array.size == 0:
+            elif self.type != "loading_rates" and numpy.array(array).size == 0:
                 return []
 
         if shared.exp.hist_remove_zeros:

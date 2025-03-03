@@ -145,7 +145,7 @@ def load_layers(parent, path=None):
                 layer.update_actor()
 
             elif layer_type == "glass":
-                print("No glass loading")
+                print("No substrate loading")
 
             layer = shared.layer_list[i]
 

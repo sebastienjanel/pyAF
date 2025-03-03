@@ -54,7 +54,7 @@ class VTKGlassChoserWidget(PYAFWidget):
 
         # Label
         label = QtWidgets.QLabel()
-        label.setText("Choose the ROI used for the glass layer :")
+        label.setText("Choose the ROI used for the substrate layer :")
 
         # Display a list of checkboxes with the names in a scroll area
         scroll_area = QtWidgets.QScrollArea()

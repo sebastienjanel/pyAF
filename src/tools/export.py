@@ -120,8 +120,8 @@ def export_results(folder):
 
             # Stiffness
             if data.stiffness_calculated:
-                newfile = open(pre + "_stiffness.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tSlice\tStiffness (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
+                newfile = open(pre + "_elasticity.txt", "wb")
+                newfile.write("Index\tXpos\tYpos\tSlice\tElasticity (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
                 index = 0
                 for i in range(len(data.stiffness_array[0])):
                     for j in range(len(data.stiffness_array[0])):
@@ -277,9 +277,9 @@ def export_results(folder):
             pre = folder + "/filtered/" + name
             # Stiffness
             if data.stiffness_calculated:
-                newfile = open(pre + "_stiffness.txt", "wb")
+                newfile = open(pre + "_elasticity.txt", "wb")
                 results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tSlice\tStiffness (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
+                newfile.write("Index\tXpos\tYpos\tSlice\tElasticity (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
                 array = results_util.get_results_single(
                     result_id=row, force_type="stiffness")
                 write_single_filtered(array, newfile, "stiffness")
@@ -384,7 +384,7 @@ def export_results_r(folder, stats_flag=True):
 
                 # Get the filtered stiffness data (ROI only)
                 stiffness_array = results_util.get_results_single(result_id=row, force_type="stiffness")
-                stiffness = pd.DataFrame(stiffness_array, columns=["curve_index", "x_pos", "y_pos", "stiffness"])
+                stiffness = pd.DataFrame(stiffness_array, columns=["curve_index", "x_pos", "y_pos", "elasticity"])
 
                 # Filter the indentation data to match the ROI
                 # Assuming stiffness_array contains the ROI-filtered data, we need to filter indentation accordingly
@@ -400,11 +400,11 @@ def export_results_r(folder, stats_flag=True):
 
                 # Assign the filtered indentation data to the stiffness DataFrame
                 stiffness["indentation"] = roi_indentation
-                print("Length of stiffness indentation:", len(stiffness["indentation"]))
+                print("Length of elasticity indentation:", len(stiffness["indentation"]))
 
                 if stats_flag:
                     stiffness_stats = stiffness.describe()
-                    ft_stats = export_descriptive_stats(stiffness_stats, "stiffness")
+                    ft_stats = export_descriptive_stats(stiffness_stats, "elasticity")
                     row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
 
                 row_df = merge_dfs(row_df, stiffness)

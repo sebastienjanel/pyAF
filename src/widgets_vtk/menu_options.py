@@ -104,7 +104,7 @@ class MenuOptionsWidget(QtWidgets.QWidget):
             self.tab_HR.update_widget()
         elif shared.layer_list[row].type == "glass":
             self.tab_glass = WidgetGlass(self)
-            self.tabs.addTab(self.tab_glass, "Glass")
+            self.tabs.addTab(self.tab_glass, "Substrate")
             self.tab_glass.update_widget()
         elif shared.layer_list[row].type == "isosurface":
             self.tab_isosurface = WidgetIsoSurface(self)
@@ -589,7 +589,7 @@ class WidgetOptics(QtWidgets.QWidget):
 
 
 class WidgetGlass(QtWidgets.QWidget):
-    """Widget with options for the glass layers."""
+    """Widget with options for the substrate layers."""
 
     def __init__(self, parent):
         super().__init__()
