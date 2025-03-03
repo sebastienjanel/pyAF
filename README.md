@@ -18,6 +18,5 @@ This software is governed by the CeCILL license under French law and abiding by 
 Main coding made by Michka Popoff (https://theses.fr/api/v1/document/2014LIL10220).
 Modified by Antoine Dujardin, Simone Bovio, Javier Lopez-Alonso, Nuno Duarte, Sébastien Janel.
 
-When using the program, cite the original article : Stiffness tomography of eukaryotic intracellular compartments by atomic force microscopy.
-Reference : Nanoscale, 2019,11, 10320-10328.
+When using the program, cite the original article : Stiffness tomography of eukaryotic intracellular compartments by atomic force microscopy (Nanoscale, 2019,11, 10320-10328).
 DOI	https://doi.org/10.1039/C8NR08955H
