@@ -68,6 +68,13 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         div = numpy.tan(fit_params["tip_angle"] * numpy.pi / 180)
         sm.coeff = (1.0 / numpy.sqrt(2)) * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
+    elif model_selected == 4:
+        # Flat punch
+        fit_model = sm.flat_punch
+        fit_model_lmfit = sm.flat_punch_lmfit
+        div = fit_params["tip_radius"] * 1e-9
+        sm.coeff = 2 * div / (1.0 - fit_params["poisson_ratio"] ** 2)
+
     # Get approach curve.
     app, _, _, _, _, smoothing_error = curve_tools.get_curve(None, [i, j], app, ret,
                                                              mode="compute", dt=dt, get_time=False)

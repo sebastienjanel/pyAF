@@ -414,11 +414,16 @@ class CommonCurveTools:
                     coeff = (math.pi * (1.0 - dt.used_poisson_ratio ** 2)) / a
                 elif dt.used_stiffness_model_selected == 2:
                     # Bilodeau (pyramid)
-                    a = (4.0 / 3.0) * (1.0 - dt.used_poisson_ratio ** 2)
+                    a = math.sqrt(2) * (1.0 - dt.used_poisson_ratio ** 2)
                     coeff = a / math.tan(math.radians(dt.used_tip_angle))
                 elif dt.used_stiffness_model_selected == 3:
                     # Slope
                     coeff = 1.0
+                if dt.used_stiffness_model_selected == 4:
+                    # Flat punch
+                    a = 1.0 - dt.used_poisson_ratio ** 2
+                    b = dt.used_tip_radius * 10 ** -9
+                    coeff = (1 / 2) * (a / b)
 
                 yo = yoffset
 
@@ -429,7 +434,7 @@ class CommonCurveTools:
                     elif dt.used_stiffness_model_selected in (1, 2):
                         fitcurve_y.append(
                             (((E * (x * 1e-9) ** 2) / coeff)) * 1e9 + yo)
-                    elif dt.used_stiffness_model_selected == 3:
+                    elif dt.used_stiffness_model_selected in (3,4):
                         fitcurve_y.append(((E * x * 1e-9) / coeff) * 1e9 + yo)
 
                 y = numpy.array(fitcurve_y) * self.force_factor
@@ -480,6 +485,11 @@ class CommonCurveTools:
                 fitforce = self.bilodeau_pyramid
                 div = numpy.tan(dt.used_tip_angle * numpy.pi / 180)
                 coeff = (1.0 / numpy.sqrt(2)) * div / (1.0 - dt.used_poisson_ratio ** 2)
+            if dt.used_stiffness_model_selected == 4:
+                # Flat punch
+                fitforce = self.flat_punch
+                div = dt.used_tip_radius * 1e-9
+                coeff = 2 * div / (1.0 - dt.used_poisson_ratio ** 2)
 
             E = dt.stiffness_array[self.xpos][self.ypos][0]
 
@@ -533,6 +543,14 @@ class CommonCurveTools:
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
             y[i] = coeff * e0 * numpy.power((delta[i]), 2)
+
+        return data - y
+
+    def flat_punch(self, e0, coeff, delta, data):
+
+        y = numpy.zeros(delta.shape)
+        for i in range(len(y)):
+            y[i] = coeff * e0 * numpy.power((delta[i]), 1)
 
         return data - y
 

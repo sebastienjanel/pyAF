@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -120,10 +121,14 @@ class Stiffness:
         elif data.stiffness_model_selected == 2:
             # Bilodeau (Pyramid)
             div = math.tan(math.radians(data.tip_angle))
-            coeff = (4.0 / 3.0) * ((1.0 - data.poisson_ratio ** 2) / div)
+            coeff = math.sqrt(2) * ((1.0 - data.poisson_ratio ** 2) / div)
         elif data.stiffness_model_selected == 3:
             # Slope
             coeff = 1.0
+        elif data.stiffness_model_selected == 4:
+            # Flat punch
+            div = 2 * data.tip_radius * pow(10, -9)
+            coeff = (1.0 - data.poisson_ratio ** 2) / div
 
         # Piezo image (last position of the extended piezo)
         piezo_image = \

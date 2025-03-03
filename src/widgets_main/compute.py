@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -197,10 +198,10 @@ class ComputeWidget(PYAFWidget):
 
         # Model
         self.HL_list_stiff = QtWidgets.QHBoxLayout()
-        self.label_models_list = QtWidgets.QLabel("Elasticity Model : ")
+        self.label_models_list = QtWidgets.QLabel("Model : ")
         self.list_models = PYAFComboBox(self, "list_models")
         self.models = [
-            "Hertz (Sphere)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Slope"]
+            "Hertz (Paraboloid)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Stiffness Tomography", "Flat punch"]
         for model in self.models:
             self.list_models.addItem(str(model))
 
@@ -599,6 +600,11 @@ class ComputeWidget(PYAFWidget):
                 # Disable fit options
                 self.RBT_fitting_params.setChecked(False)
                 self.RBT_fitting_params.setEnabled(False)
+            if data.stiffness_model_selected == 4:
+                self.IN_tip_angle.setParent(None)
+                self.IN_tip_radius.input.setText(str(data.tip_radius))
+                self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
+                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
 
             self.IN_poisson.input.setText(str(data.poisson_ratio))
 

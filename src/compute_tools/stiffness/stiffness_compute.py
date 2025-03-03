@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -198,6 +199,9 @@ def compute_stiffness(parts, coeff, model_selected, tomography, curve):
                 elif model_selected == 2:
                     # Pyramid
                     young_modulus = coeff * (delta_F / (delta_x ** 2))
+                elif model_selected == 4:
+                    # Flat punch
+                    young_modulus = coeff * (delta_F / (delta_x))
 
                 stiffness_array.append(young_modulus)
 

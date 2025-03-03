@@ -11,6 +11,6 @@ Version 3: Javier Lopez-Alonso, PhD work.
 -> export to r for data plotting
 
 Version 4: Sébastien Janel (and Nuno Duarte)
--> compatibilities with new libraries
+-> Fixes for compatibilities with new libraries
 -> Box plots
--> new models and functions
+-> New fitting and BEC models
