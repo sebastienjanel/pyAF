@@ -19,5 +19,5 @@ Main coding made by Michka Popoff (https://theses.fr/api/v1/document/2014LIL1022
 Modified by Antoine Dujardin, Simone Bovio, Javier Lopez-Alonso, Nuno Duarte, Sébastien Janel.
 
 When using the program, cite the original article : Stiffness tomography of eukaryotic intracellular compartments by atomic force microscopy.
-Reference : Nanoscale, 2019,11, 10320-10328 
+Reference : Nanoscale, 2019,11, 10320-10328.
 DOI	https://doi.org/10.1039/C8NR08955H
