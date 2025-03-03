@@ -9,6 +9,7 @@ It computes:
 - Work of detachment and rupture force
 - Unbinding events and loading rates
 - Zero-force topography
+- Tilt correction and smoothing
 - 3D rendering
 - Statistics, export to R
 - Multi files and multiprocessing
