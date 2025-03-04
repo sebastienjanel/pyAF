@@ -772,20 +772,21 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
     def display_events_values(self):
         # Annotate with values (force and slopes)
-        if self.events_force_values is not None:
+        if self.events_force_values is not None and self.events_force_slopes is not None:
             y_pos = 0
-            for i in range(len(self.events_force_values)):
-                # The value of the force for event i
+            min_len = min(len(self.events_force_values), len(self.events_force_slopes))
+
+            for i in range(min_len):  # Use the smaller length
                 force = str(
                     round(self.events_force_values[i], 4) * self.force_factor)
                 deltaslope = str(self.events_force_slopes[i] * 1000.0)
 
                 unit = self.data.curve_force_units
-                text = "Event " + str(i) + ", " + force + " " + unit
-                text += ", dslope " + deltaslope
+                text = f"Event {i}, {force} {unit}, dslope {deltaslope}"
+
                 self.axes.annotate(
                     text,
                     xy=(0.015, 0.85 - y_pos),
-                    xycoords = "axes fraction",
-                    fontproperties = self.font)
+                    xycoords="axes fraction",
+                    fontproperties=self.font)
                 y_pos += 0.05

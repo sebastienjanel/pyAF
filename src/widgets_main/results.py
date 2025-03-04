@@ -227,8 +227,8 @@ class ResultsWidget(PYAFWidget):
             self, "button_group_type_of_curve")
         self.RB_defl_ext = QtWidgets.QRadioButton("Deflection - Extension curve")
         self.RB_force_ext = QtWidgets.QRadioButton("Force - Extension curve")
-        self.RB_force = QtWidgets.QRadioButton("Force curve")
-        self.RB_force_events = QtWidgets.QRadioButton("Force curve (Events)")
+        self.RB_force = QtWidgets.QRadioButton("Force - Distance curve")
+        self.RB_force_events = QtWidgets.QRadioButton("Force curve (events)")
         self.RB_indentation_curve = QtWidgets.QRadioButton("Indentation curve")
         self.RB_residuals = QtWidgets.QRadioButton("Residuals plot")
         self.BT_group_type_of_curve.addButton(self.RB_defl_ext, 0)
@@ -248,18 +248,18 @@ class ResultsWidget(PYAFWidget):
         self.BT_group_trace_or_retrace.addButton(self.radiobutton_both, 2)
         self.CB_poc = PYAFCheckBox(self, "checkbox_poc", "Point of contact")
         self.CB_fit_poc = PYAFCheckBox(
-            self, "checkbox_fit_poc", "Fit (Point of contact)")
+            self, "checkbox_fit_poc", "POC fit")
         self.CB_segments = PYAFCheckBox(
-            self, "checkbox_segments", "Segments (Elasticity)")
+            self, "checkbox_segments", "Segments")
         self.CB_display_fits = PYAFCheckBox(
-            self, "display_fits_stiffness", "Fits (Elasticity)")
+            self, "display_fits_stiffness", "Elasticity fit")
 
         self.CB_joc = PYAFCheckBox(self, "checkbox_joc", "Jump of contact")
         self.CB_fit_joc = PYAFCheckBox(
-            self, "checkbox_fit_joc", "Fit (Jump of contact)")
+            self, "checkbox_fit_joc", "JOC fit")
         self.CB_surface = PYAFCheckBox(
-            self, "checkbox_surface", "Work (Surface)")
-        self.CB_force = PYAFCheckBox(self, "force", "Force")
+            self, "checkbox_surface", "Detach. work")
+        self.CB_force = PYAFCheckBox(self, "force", "Detach. force")
 
         # Events
         self.BT_group_events = PYAFButtonGroup(self, "button_group_events")
