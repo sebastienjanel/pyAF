@@ -174,11 +174,19 @@ class PlotMeshGrid(MainPlot):
             if self.mesh_type == "events_per_curve":
                 # Discrete self.colormap for the events
                 self.colormap = matplotlib.cm.get_cmap(self.colormap)
+
+                # Adjust the number of bins to fit the colormap's size
+                ncolors = self.colormap.N
                 bounds = list(range(int(self.colortable_min_value * self.factor),
-                               int(self.colortable_max_value * self.factor)))
+                                    int(self.colortable_max_value * self.factor)))
+
+                # Ensure bounds don't exceed colormap's size
+                if len(bounds) > ncolors:
+                    # If too many bins, reduce the range or step size
+                    step_size = max(1, len(bounds) // ncolors)
+                    bounds = bounds[::step_size]
 
                 norm = matplotlib.colors.BoundaryNorm(bounds, self.colormap.N)
-
             else:
                 # Normal self.colormap for the other meshgrid types
                 self.colormap = matplotlib.cm.get_cmap(self.colormap)

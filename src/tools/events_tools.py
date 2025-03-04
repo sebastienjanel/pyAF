@@ -332,6 +332,7 @@ def find_fits_around_middle_pos(curve, positions, fit_size):
         # correct to false, and define a new effective_length
         for a in range(int(pos), int(pos + effective_length), 1):
             ref = 0
+            # print(f"Out of bounds: a={a}, pos_start={pos_start}")
             current = curve_y[a] - curve_y[pos_start]
             delta2 = abs(2 * (curve_y[pos_start] - curve_y[pos_end]))
             # Case up
