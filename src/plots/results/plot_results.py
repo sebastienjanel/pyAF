@@ -135,14 +135,14 @@ class PlotResults(MainPlot):
             else:
                 if found_slope and found_stiffness:
                     if shared.exp.hist_log is False:
-                        self.xlabel = "E [kPa] and Slope [N/m]"
+                        self.xlabel = "E [kPa] and Stiffness [N/m]"
                     else:
-                        self.xlabel = "Log(E [Pa]) and Slope Log([N/m])"
+                        self.xlabel = "Log(E [Pa]) and Log([N/m])"
                 elif found_slope and found_stiffness is False:
                     if shared.exp.hist_log is False:
-                        self.xlabel = "Slope [N/m]"
+                        self.xlabel = "Stiffness [N/m]"
                     else:
-                        self.xlabel = "Slope Log([N/m])"
+                        self.xlabel = "Log([N/m])"
                 elif found_slope is False and found_stiffness:
                         if shared.exp.hist_log is False:
                             self.xlabel = "E [kPa]"
@@ -155,12 +155,12 @@ class PlotResults(MainPlot):
             if self.plot_selected == "box":
                 self.xlabel = ""
             else:
-                self.xlabel = "Work [fJ]"
+                self.xlabel = "Detachment work [fJ]"
         elif rt == "rupture_force":
             if self.plot_selected == "box":
                 self.xlabel = ""
             else:
-                self.xlabel = "Rupture force [pN]"
+                self.xlabel = "Detachment force [pN]"
         elif rt == "events_forces":
             if self.plot_selected == "box":
                 self.xlabel = ""
@@ -175,7 +175,7 @@ class PlotResults(MainPlot):
             if self.plot_selected == "box":
                 self.xlabel = ""
             else:
-                self.xlabel = "Rupture force [pN]"
+                self.xlabel = "Detachment force [pN]"
         elif rt == "events_distance":
             if self.plot_selected == "box":
                 self.xlabel = ""
@@ -190,15 +190,15 @@ class PlotResults(MainPlot):
         if pt == "results_single":
             if self.plot_selected == "box":
                 if rt == "work":
-                    self.ylabel = "Work [fJ]"
+                    self.ylabel = "Detachment work [fJ]"
                 elif rt == "rupture_force":
-                    self.ylabel = "Rupture force [pN]"
+                    self.ylabel = "Detachment force [pN]"
                 elif rt == "events_forces":
                     self.ylabel = "Force [pN]"
                 elif rt == "events_per_curves":
                     self.ylabel = "Events per curve"
                 elif rt == "events_rupture_force":
-                    self.ylabel = "Rupture force [pN]"
+                    self.ylabel = "Detachment force [pN]"
                 elif rt == "events_distance":
                     self.ylabel = "Distance [nm]"
                 elif rt == "loading_rates":

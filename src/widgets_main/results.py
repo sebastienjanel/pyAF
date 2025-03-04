@@ -159,11 +159,11 @@ class ResultsWidget(PYAFWidget):
             "Elasticity (BEC)")
         self.RBT_mesh_stiffness_slice_corr = QtWidgets.QRadioButton(
             "Elasticity (Slice) (BEC)")
-        self.RBT_mesh_work = QtWidgets.QRadioButton("Work")
-        self.RBT_mesh_rupture_force1 = QtWidgets.QRadioButton("Rupture force")
+        self.RBT_mesh_work = QtWidgets.QRadioButton("Detachment work")
+        self.RBT_mesh_rupture_force1 = QtWidgets.QRadioButton("Detachment force")
         self.RBT_mesh_events_per_curve = QtWidgets.QRadioButton("Events per curve")
         self.RBT_mesh_rupture_force2 = QtWidgets.QRadioButton(
-            "Rupture force (Events)")
+            "Event max. force")
         self.GRP_mesh_type.addButton(self.RBT_mesh_piezo, 0)
         self.GRP_mesh_type.addButton(self.RBT_mesh_topography, 1)
         self.GRP_mesh_type.addButton(self.RBT_mesh_stiffness, 2)

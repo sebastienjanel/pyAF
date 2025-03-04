@@ -559,15 +559,15 @@ def write_group_file(res_type, folder):
     if res_type == "stiffness":
         name = "stiffness"
         factor = 1e3
-        title = "Stiffness (Pa)"
+        title = "Elasticity (Pa)"
     elif res_type == "work":
         name = "work"
         factor = 1e-15
-        title = "Work (J)"
+        title = "Detachment work (J)"
     elif res_type == "rupture_force":
         name = "rupture_force"
         factor = 1e-12
-        title = "Rupture force (N)"
+        title = "Detachment force (N)"
     elif res_type == "events_forces":
         name = "events_forces"
         factor = 1e-12

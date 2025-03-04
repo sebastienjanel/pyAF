@@ -465,7 +465,7 @@ class SingleFile:
         results_util = results_sorting.GetResults(force_type=force_type)
         results_util.load_data(data_id=self.unique_id)
 
-        empty = numpy.zeros((self.nbr_pixels_x, self.nbr_pixels_y), numpy.int)
+        empty = numpy.zeros((self.nbr_pixels_x, self.nbr_pixels_y), int)
         self._events_per_curve = empty
 
         name = "events_per_curve"

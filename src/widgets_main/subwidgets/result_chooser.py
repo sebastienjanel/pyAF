@@ -55,11 +55,11 @@ class ResultsChooserWidget(PYAFWidget):
 
         self.list_choser = PYAFComboBox(self, "list_choser")
         self.list_choser.addItem("Elasticity")
-        self.list_choser.addItem("Work (Surface)")
-        self.list_choser.addItem("Rupture force")
+        self.list_choser.addItem("Detachment work")
+        self.list_choser.addItem("Detachment force")
         self.list_choser.addItem("Events force")
         self.list_choser.addItem("Events per curve")
-        self.list_choser.addItem("Rupture force (events)")
+        self.list_choser.addItem("Event max. force")
         self.list_choser.addItem("Loading rates")
         self.list_choser.addItem("Distance to Joc")
 

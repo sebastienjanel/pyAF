@@ -47,6 +47,6 @@ class PlotWorkMeshGrid(PlotMeshGrid):
         self.temp_array[:] = self.data.work
 
         self.factor = 1e15
-        self.colorbarlabel = "Work [fJ]"
+        self.colorbarlabel = "Detachment work [fJ]"
 
         self.plot_fig()

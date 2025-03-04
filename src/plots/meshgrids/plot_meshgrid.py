@@ -33,6 +33,7 @@
 
 import numpy
 import matplotlib
+from matplotlib.colors import Normalize
 from ... import widgets_list
 from ... import shared
 from PyQt5 import QtCore
@@ -189,16 +190,18 @@ class PlotMeshGrid(MainPlot):
             if self.color_nan is not None:
                 self.colormap.set_bad(self.color_nan)
 
+            # Define norm with vmin and vmax
+            norm = Normalize(
+                vmin=self.colortable_min_value * self.factor,
+                vmax=self.colortable_max_value * self.factor
+            )
+
             mesh = self.axes.pcolormesh(
                 self.x_range,
                 self.y_range,
                 self.data_meshgrid,
                 cmap=self.colormap,
                 norm=norm,
-                vmin=self.colortable_min_value *
-                self.factor,
-                vmax=self.colortable_max_value *
-                self.factor,
                 edgecolor=edgecolor,
                 linewidth=linewidth)
 

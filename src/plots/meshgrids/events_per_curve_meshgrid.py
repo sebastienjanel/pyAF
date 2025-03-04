@@ -38,7 +38,7 @@ class PlotEventsPerCurveMeshGrid(PlotMeshGrid):
     """Plot a meshgrid with each pixel showing the number of events per curve.
 
     The events per curve can be filtered by the user. The colorbar's label
-    displays the currently selected slope an distance limit.
+    displays the currently selected slope and distance limit.
     """
 
     def __init__(self, parent):
@@ -57,6 +57,11 @@ class PlotEventsPerCurveMeshGrid(PlotMeshGrid):
         else:
             text = "(" + str(left) + " > event > " + str(right) + ")"
 
-        self.colorbarlabel = "Events per curve" + text
+        # print(left, right, middle, text)
+
+        if left != 0 and right != 0:
+            self.colorbarlabel = "Events per curve" + text
+        else:
+            self.colorbarlabel = "Events per curve"
 
         self.plot_fig()

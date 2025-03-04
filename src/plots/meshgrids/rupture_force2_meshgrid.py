@@ -49,6 +49,6 @@ class PlotRuptureForce2MeshGrid(PlotMeshGrid):
         self.temp_array[:] = self.data.rupture_force2
 
         self.factor = 1e12
-        self.colorbarlabel = "[pN]"
+        self.colorbarlabel = "Force [pN]"
 
         self.plot_fig()

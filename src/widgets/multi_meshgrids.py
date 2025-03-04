@@ -108,10 +108,10 @@ class MultiMeshgridsWidget(PYAFWidget):
         self.list_choser.addItem("Elasticity Slice")
         self.list_choser.addItem("Elasticity (BEC)")
         self.list_choser.addItem("Elasticity Slice (BEC)")
-        self.list_choser.addItem("Work")
-        self.list_choser.addItem("Rupture force")
+        self.list_choser.addItem("Detachment work")
+        self.list_choser.addItem("Detachment force")
         self.list_choser.addItem("Events per curve")
-        self.list_choser.addItem("Rupture force (events)")
+        self.list_choser.addItem("Event max. force")
 
         self.CB_display_roi = PYAFCheckBox(self, "display_roi", "Display ROIs")
 
