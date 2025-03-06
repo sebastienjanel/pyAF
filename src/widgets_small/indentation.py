@@ -51,7 +51,7 @@ class WidgetIndentation(PYAFWidget):
         self.data_id = None
 
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(9)
+        self.smallfont.setPointSize(10)
 
         self.VL = QtWidgets.QVBoxLayout()
 

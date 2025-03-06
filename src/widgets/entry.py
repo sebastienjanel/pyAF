@@ -77,7 +77,7 @@ class EntryWidget(QtWidgets.QDialog):
         self.mode = mode
 
         self.smallfont = QtWidgets.QApplication.font()  # Default font
-        self.smallfont.setPointSize(9)
+        self.smallfont.setPointSize(10)
 
         # Get the settings
         self.settings = QtCore.QSettings()

@@ -251,7 +251,7 @@ class PlotMeshGrid(MainPlot):
 
         # Plot the color bar
         if self.display_colorbar and self.noborder is False:
-            # Option for colorbar alignement to the meshgrid
+            # Option for colorbar alignment to the meshgrid
             # http://matplotlib.sourceforge.net/users/tight_layout_guide.html
             # (part on the colorbar caveat)
             divider = make_axes_locatable(self.fig.gca())

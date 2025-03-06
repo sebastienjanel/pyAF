@@ -190,12 +190,18 @@ class PlotCurve(MainPlot, CommonCurveTools):
             elif pt == "curve_dataa":
                 positions = dt.approach_positions[self.xpos][self.ypos]
                 positions = positions.astype('int32')
+                if not self.curve_approach or len(self.curve_approach) < 3 or self.curve_approach[2] is None:
+                    print("ERROR: self.curve_approach[2] is None. Skipping plot.")
+                    return
                 curve_x = self.curve_approach[2][positions[0]:positions[1]]
                 curve_y = self.curve_approach[1][positions[0]:positions[1]]
 
             elif pt == "curve_datab":
                 positions = dt.approach_positions[self.xpos][self.ypos]
                 positions = positions.astype('int32')
+                if not self.curve_approach or len(self.curve_approach) < 3 or self.curve_approach[2] is None:
+                    print("ERROR: self.curve_approach[2] is None. Skipping plot.")
+                    return
                 curve_x = self.curve_approach[2][positions[0]:positions[1]]
                 curve_y = self.curve_approach[0][positions[0]:positions[1]]
 

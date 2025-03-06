@@ -43,7 +43,7 @@ class PlotTiltPreview(PlotCurve):
 
         # Labels
         self.xlabel = "Scanner Extension [nm]"
-        self.ylabel = "Deflexion [nm]"
+        self.ylabel = "Deflection [nm]"
 
         self.curve_approach = self.approach
         self.curve_retraction = self.retraction

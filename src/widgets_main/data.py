@@ -76,9 +76,9 @@ class DataWidget(PYAFWidget):
         self.list_unsel_styles = None
 
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(12)
+        self.smallfont.setPointSize(10)
         self.smallfontbold = QtWidgets.QApplication.font()
-        self.smallfontbold.setPointSize(12)
+        self.smallfontbold.setPointSize(10)
         self.smallfontbold.setBold(True)
 
         self.VL = QtWidgets.QVBoxLayout()
@@ -175,11 +175,11 @@ class DataWidget(PYAFWidget):
         self.box_cantilever.setFixedSize(330, 200)
 
         self.IN_spring_constant = PYAFInput(
-            self, "spring_constant", "Spring constant (N/m)", 90)
+            self, "spring_constant", "Spring constant [N/m]", 90)
         self.IN_defl_sens = PYAFInput(
-            self, "defl_sens", "Deflection sensitivity (nm/V)", 90)
+            self, "defl_sens", "Deflection sensitivity [nm/V]", 90)
         self.IN_temp = PYAFInput(
-            self, "input_temp", "Temperature (C)", 90)
+            self, "input_temp", "Temperature [°C]", 90)
         self.IN_spring_constant.input.setValidator(misc_tools.validator("UF"))
         self.IN_defl_sens.input.setValidator(misc_tools.validator("UF"))
         self.IN_temp.input.setValidator(misc_tools.validator("UF"))
@@ -377,7 +377,7 @@ class DataWidget(PYAFWidget):
         self.LB_z_closed_loop.setText(
             "Z Closed Loop : " + str(data.z_closed_loop))
         self.LB_scan_rate.setText(
-            "Scan rate : " + str(data.scan_rate) + " Hz")
+            "Scan rate : {:.3f} Hz".format(data.scan_rate))
         app_vel = str(round(data.approach_velocity / 1000.0, 4))
         ret_vel = str(round(data.retraction_velocity / 1000.0, 4))
         self.LB_fwd_scan_velocity.setText(
@@ -408,8 +408,31 @@ class DataWidget(PYAFWidget):
         if len(shared.exp.list) <= 1:
             self.BT_remove_file.setEnabled(False)
 
-        # Always reupdate the fonts
+        # Always update the fonts
         self.setFont(self.smallfont)
+        self.smallfont.setPixelSize(12)  # Set small font size
+        self.LB_microscope_name.setFont(self.smallfont)
+        self.LB_scanner_file.setFont(self.smallfont)
+        self.LB_version.setFont(self.smallfont)
+        self.LB_scan_size.setFont(self.smallfont)
+        self.LB_nbr_points.setFont(self.smallfont)
+        self.LB_ramp_size.setFont(self.smallfont)
+        self.LB_nbr_points_approach.setFont(self.smallfont)
+        self.LB_nbr_points_retraction.setFont(self.smallfont)
+        self.LB_scan_angle.setFont(self.smallfont)
+        self.LB_frame_direction.setFont(self.smallfont)
+        self.LB_xy_closed_loop.setFont(self.smallfont)
+        self.LB_z_closed_loop.setFont(self.smallfont)
+        self.LB_scan_rate.setFont(self.smallfont)
+        self.LB_fwd_scan_velocity.setFont(self.smallfont)
+        self.LB_rev_scan_velocity.setFont(self.smallfont)
+        self.LB_retracted_delay.setFont(self.smallfont)
+        self.LB_extended_delay.setFont(self.smallfont)
+
+        # Other widget updates
+        self.IN_spring_constant.setFont(self.smallfont)
+        self.IN_defl_sens.setFont(self.smallfont)
+        self.IN_temp.setFont(self.smallfont)
 
         # Update the meshgrid
         self.meshgrid.update_plot()
@@ -430,6 +453,8 @@ class DataWidget(PYAFWidget):
     def update_GUI(self, what):
         """Update the GUI."""
         data = shared.exp.current_data
+        self.LB_trig_threshold.setFont(self.smallfont)
+        self.smallfont.setPixelSize(12)  # Set small font size
 
         if what == "single_or_forcevolume" or what == "all":
             if data.is_single:
@@ -488,7 +513,10 @@ class DataWidget(PYAFWidget):
             else:
                 text = str(None)
 
-            self.LB_trig_threshold.setText("Trigger threshold : " + text)
+            self.LB_trig_threshold.setFont(self.smallfont)
+            self.smallfont.setPixelSize(12)  # Set small font size
+            self.LB_trig_threshold.setText("Setpoint (click to toggle) : " + text)
+
 
         if what == "list_widget" or what == "all":
             # Redefine all the stylesheets

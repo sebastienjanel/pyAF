@@ -52,7 +52,7 @@ class ResultsDeflExt(PlotCurve):
             self.xlabel = "Scanner Extension [nm]"
         elif self.data.curve_distance_units == "um":
             self.xlabel = "Scanner Extension [\u03bcm]"
-        self.ylabel = "Deflexion [nm]"
+        self.ylabel = "Deflection [nm]"
 
         # Show or hide the curves
         if self.data.display_trace_retrace == 0:

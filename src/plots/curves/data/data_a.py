@@ -42,7 +42,7 @@ class PlotDataCurveA(PlotCurve):
 
         # Labels
         self.xlabel = "time [s]"
-        self.ylabel = "Deflexion [nm]"
+        self.ylabel = "Deflection [nm]"
 
         self.curve_approach = self.approach
         self.curve_retraction = self.retraction
