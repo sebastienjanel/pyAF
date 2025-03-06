@@ -237,7 +237,7 @@ class Save:
 
                     node = new.get_node("/data/")
                     st = "/data/_" + str(data_id)
-                    old.copyNode(st, newparent=node,
+                    old.copy_node(st, newparent=node,
                                  overwrite=True, recursive=True)
 
                 newpath = newfile.filepath

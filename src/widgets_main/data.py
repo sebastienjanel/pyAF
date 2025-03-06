@@ -655,7 +655,7 @@ class DataWidget(PYAFWidget):
             list_of_changed_ids = []
             for i in range(index + 1, len(shared.exp.list), 1):
                 # Rename nodes and set new unique ids
-                tfile.file.renameNode("/data/_" + str(i), "_" + str(i - 1))
+                tfile.file.rename_node("/data/_" + str(i), "_" + str(i - 1))
                 ind = shared.exp.list[i].unique_id
                 list_of_changed_ids.append([ind, ind - 1])
                 shared.exp.list[i].unique_id = shared.exp.list[i].unique_id - 1
