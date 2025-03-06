@@ -46,6 +46,6 @@ class PlotTopoMeshGrid(PlotMeshGrid):
         self.temp_array[:] = self.data.topography
 
         self.factor = 1.0
-        self.colorbarlabel = "[nm]"
+        self.colorbarlabel = "Zero-force topography [nm]"
 
         self.plot_fig()

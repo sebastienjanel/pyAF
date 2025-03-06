@@ -116,14 +116,14 @@ class PlotResults(MainPlot):
                 pt = None
                 if found_slope and found_stiffness:
                     if shared.exp.hist_log is False:
-                        self.ylabel = "E [kPa] and Slope [N/m]"
+                        self.ylabel = "E [kPa] and Apparent stiffness [N/m]"
                     else:
-                        self.ylabel = "Log(E [Pa]) and Slope Log([N/m])"
+                        self.ylabel = "Log(E [Pa]) and Log([N/m])"
                 elif found_slope and found_stiffness is False:
                     if shared.exp.hist_log is False:
-                        self.ylabel = "Slope [N/m]"
+                        self.ylabel = "Apparent stiffness [N/m]"
                     else:
-                        self.ylabel = "Slope Log([N/m])"
+                        self.ylabel = "Log([N/m])"
                 elif found_slope is False and found_stiffness:
                         if shared.exp.hist_log is False:
                             self.ylabel = "E [kPa]"

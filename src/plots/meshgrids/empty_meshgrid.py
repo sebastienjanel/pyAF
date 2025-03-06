@@ -47,6 +47,6 @@ class PlotEmptyMeshGrid(PlotMeshGrid):
         self.temp_array = None
 
         self.factor = 1.0
-        self.colorbarlabel = "[nm]"
+        self.colorbarlabel = "Piezo height [nm]"
 
         self.plot_fig()

@@ -82,10 +82,10 @@ class PlotOptionsWidget(PYAFWidget):
         self.input_min = PYAFInput(self, "input_min", "Min", 150)
         self.input_min.input.setValidator(misc_tools.validator("UF"))
 
-        BT_autoscale = PYAFButton(self, "autoscale", "Auto Scale")
+        BT_autoscale = PYAFButton(self, "autoscale", "Autoscale")
         BT_sat_color = PYAFButton(self, "sat_color", "Saturation color")
         BT_neg_color = PYAFButton(self, "neg_color", "Negative color")
-        BT_nan_color = PYAFButton(self, "nan_color", "Nan color")
+        BT_nan_color = PYAFButton(self, "nan_color", "NaN color")
 
         # Will be hidden for normal meshgrids; and displayed only in vtk
         # See update_widget method
@@ -161,6 +161,7 @@ class PlotOptionsWidget(PYAFWidget):
         if what == "input_max" or what == "all":
             value = self.input_max.get_str_value()
             if value != "":
+                value = value.replace(',', '.')
                 if float(value) <= data.colortable_min_value:
                     display_bad_value_message()
                     self.update_widget()

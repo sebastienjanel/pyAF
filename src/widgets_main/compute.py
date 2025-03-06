@@ -150,8 +150,7 @@ class ComputeWidget(PYAFWidget):
 
         self.HL_options = QtWidgets.QHBoxLayout()
         self.BT_flatten = PYAFButton(self, "flatten", "Flatten")
-        label = "Curve modifications"
-        self.BT_curve_mod = PYAFButton(self, "curve_mod", label, 180)
+        self.BT_curve_mod = PYAFButton(self, "curve_mod", "Curve modifications")
         self.BT_clean_up = PYAFButton(self, "clean_up", "Clean Up")
         self.HL_options.addWidget(self.BT_flatten)
         self.HL_options.addWidget(self.BT_curve_mod)

@@ -411,8 +411,8 @@ class ResultsWidget(PYAFWidget):
 
         if element == "radio_buttons" or element == "all":
             if data.used_stiffness_model_selected == 3:
-                self.RBT_mesh_stiffness.setText("Slope (Indentation)")
-                self.RBT_mesh_stiffness_slice.setText("Slope (Slice)")
+                self.RBT_mesh_stiffness.setText("Apparent stiffness")
+                self.RBT_mesh_stiffness_slice.setText("Apparent stiffness (Z-slice)")
             else:
                 self.RBT_mesh_stiffness.setText("Elasticity")
                 self.RBT_mesh_stiffness_slice.setText("Elasticity (Slice)")

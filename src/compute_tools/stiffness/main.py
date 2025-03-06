@@ -97,7 +97,7 @@ class Stiffness:
         # Create a progressbar which is displayed during the computations
         Progressbar(os.path.basename(data.filename))
         if data.stiffness_model_selected == 3:
-            widgets_list.widget_progressbar.set_label("Getting slopes")
+            widgets_list.widget_progressbar.set_label("Getting stiffness")
         else:
             widgets_list.widget_progressbar.set_label("Getting elasticity")
         nbr_pixels = data.nbr_pixels_x * data.nbr_pixels_y

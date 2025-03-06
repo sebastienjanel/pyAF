@@ -60,6 +60,6 @@ class PlotPiezoMeshGrid(PlotMeshGrid):
             self.colortable_min_value = 0
 
         self.factor = 1.0
-        self.colorbarlabel = "[nm]"
+        self.colorbarlabel = "Piezo height [nm]"
 
         self.plot_fig()

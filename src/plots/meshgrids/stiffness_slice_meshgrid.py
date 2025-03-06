@@ -61,7 +61,7 @@ class PlotStiffnessSliceMeshGrid(PlotMeshGrid):
         if self.data.used_stiffness_model_selected == 3:
             # Slope
             self.factor = 1.0
-            self.colorbarlabel = "Slope [N/m]"
+            self.colorbarlabel = "Apparent stiffness [N/m]"
         else:
             self.factor = 1e-3
             self.colorbarlabel = "E [kPa]"

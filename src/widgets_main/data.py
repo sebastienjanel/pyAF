@@ -97,10 +97,10 @@ class DataWidget(PYAFWidget):
 
         self.HL_files_options = QtWidgets.QHBoxLayout()
         label = "Rename"
-        self.BT_add_files = PYAFButton(self, "add_files", "+", size=60)
-        self.BT_remove_file = PYAFButton(self, "remove_file", "-", size=60)
+        self.BT_add_files = PYAFButton(self, "add_files", "+", size=50)
+        self.BT_remove_file = PYAFButton(self, "remove_file", "-", size=50)
         self.BT_rename_file = PYAFButton(self, "rename_file", label, size=80)
-        self.BT_copy_file = PYAFButton(self, "copy_file", "Copy", size=70)
+        self.BT_copy_file = PYAFButton(self, "copy_file", "Copy", size=80)
         self.HL_files_options.addWidget(self.BT_add_files)
         self.HL_files_options.addWidget(self.BT_remove_file)
         self.HL_files_options.addWidget(self.BT_rename_file)
@@ -113,7 +113,7 @@ class DataWidget(PYAFWidget):
 
         # General information -------------------------------------------------
         self.box_info1 = QtWidgets.QGroupBox()
-        self.box_info1.setFixedSize(500, 200)
+        self.box_info1.setFixedSize(550, 250)
         self.HL_box_info = QtWidgets.QHBoxLayout()
         self.VL_box_info1 = QtWidgets.QVBoxLayout()
         self.VL_box_info2 = QtWidgets.QVBoxLayout()
@@ -172,7 +172,7 @@ class DataWidget(PYAFWidget):
 
         # Cantilever & Microscope ---------------------------------------------
         self.box_cantilever = QtWidgets.QGroupBox()
-        self.box_cantilever.setFixedSize(330, 200)
+        self.box_cantilever.setFixedSize(350, 250)
 
         self.IN_spring_constant = PYAFInput(
             self, "spring_constant", "Spring constant [N/m]", 90)
@@ -197,10 +197,9 @@ class DataWidget(PYAFWidget):
         self.IN_defl_sens.input.installEventFilter(self)
         self.IN_temp.input.installEventFilter(self)
 
-        self.BT_reset = PYAFButton(self, "reset", "X", size=60)
-        labl = "Apply on all"
-        self.BT_apply_on_all = PYAFButton(self, "apply_on_all", labl, size=100)
-        self.BT_reset_all = PYAFButton(self, "reset_all", "Reset all", size=80)
+        self.BT_apply_on_all = PYAFButton(self, "apply_on_all", "Apply on all", size=100)
+        self.BT_reset = PYAFButton(self, "reset", "Reset", size=100)
+        self.BT_reset_all = PYAFButton(self, "reset_all", "Reset all", size=100)
 
         self.gridLayout = QtWidgets.QGridLayout()
         self.gridLayout.addWidget(self.IN_spring_constant, 0, 0, 1, 0)

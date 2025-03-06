@@ -55,13 +55,13 @@ class StiffnessParamsWidget(PYAFWidget):
         self.list_range_mode.addItem("Indentation")
 
         # Indentation start
-        self.IN_start = PYAFInput(self, "input_start_in", "Start (nm)")
+        self.IN_start = PYAFInput(self, "input_start_in", "Start [nm]")
         self.IN_start.input.setValidator(misc_tools.validator("UI"))
         # Indentation end
-        self.IN_stop = PYAFInput(self, "input_stop_in", "Stop (nm)")
+        self.IN_stop = PYAFInput(self, "input_stop_in", "Stop [nm]")
         self.IN_stop.input.setValidator(misc_tools.validator("UI"))
         # Indentation step
-        self.IN_step = PYAFInput(self, "input_step_in", "Segment size (nm)")
+        self.IN_step = PYAFInput(self, "input_step_in", "Segment size [nm]")
         self.IN_step.input.setValidator(misc_tools.validator("UI"))
         # Force start
         self.F_start = PYAFInput(self, "input_start_f", "Start (%)")
