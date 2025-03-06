@@ -157,29 +157,33 @@ def flatten(data, order=1):
 
     return numpy.array(new_data)
 
-
 def correct_tilt(approach, retraction, limit_1, limit_2, mode,
                  approach_pos, retraction_pos):
     """
-    This function corrects the tilt of the force curves.
+    Corrects the tilt of force curves by fitting a linear segment between
+    specified limits and subtracting the tilt.
 
-    The same tilt is applied on the trace and the retrace, but you can chose
-    with the mode option if the first fit is done on the trace or the retrace.
+    Handles cases where bad data (NaN, Inf) might cause computation issues.
 
-    The corrupted parts of the curve are not taken into account.
+    Parameters:
+    - approach, retraction: Lists or arrays containing the force curves.
+    - limit_1, limit_2: Bounds for the linear fit.
+    - mode: "trace" (fit approach) or "retrace" (fit retraction).
+    - approach_pos, retraction_pos: Starting positions for each curve.
 
+    Returns:
+    - Corrected approach and retraction curves, along with fit information.
     """
 
-    # Some informations on the tilt correction
+    # Default return values in case of failure
     info = {
         "is_corrected": False,
         "length_of_fit_nbr_points": 0,
-        "detected_slope": 0}
-
-    # The default, to be returned in some special cases were no tilt correction
-    # can be done
+        "detected_slope": 0
+    }
     default = (approach, retraction, info)
 
+    # Select which curve to use for fitting
     if mode == "trace":
         curve_first = approach
         curve_second = retraction
@@ -191,13 +195,15 @@ def correct_tilt(approach, retraction, limit_1, limit_2, mode,
     else:
         return default
 
-    xlimit1 = 0
-    xlimit2 = 0
+    xlimit1, xlimit2 = 0, 0
 
-    for k in range(start_pos, len(curve_first[0]), 1):
+    # Find the first limit index
+    for k in range(start_pos, len(curve_first[0])):
         if curve_first[0][k] >= limit_1:
             xlimit1 = k
             break
+
+    # Find the second limit index
     nbr_points = 0
     for k in range(xlimit1, len(curve_first[0])):
         if curve_first[0][k] >= limit_2:
@@ -205,29 +211,41 @@ def correct_tilt(approach, retraction, limit_1, limit_2, mode,
             break
         nbr_points += 1
 
-    if xlimit1 == xlimit2:
-        # No fit was found because there is no data
-        # In this case, do not apply the fit
+    if xlimit1 == xlimit2 or nbr_points < 2:
+        # No valid fit region found
         return default
 
-    # Get a fit between the two limits
+    # Extract segment for fitting
     segment = slice(xlimit1, xlimit2)
-    coeffs, _ = fit_linear(curve_first[0][segment],
-                           curve_first[1][segment])
+    x_vals = numpy.array(curve_first[0][segment])
+    y_vals = numpy.array(curve_first[1][segment])
 
-    # Get the values to substract. Curve_first can have a different
-    # length than curve_second so we get the values for the two curves.
+    # Remove NaN/Inf values
+    valid_mask = ~numpy.isnan(x_vals) & ~numpy.isnan(y_vals) & ~numpy.isinf(x_vals) & ~numpy.isinf(y_vals)
+    x_vals, y_vals = x_vals[valid_mask], y_vals[valid_mask]
+
+    if len(x_vals) < 2:
+        return default  # Not enough valid points for fitting
+
+    try:
+        # Fit linear function
+        coeffs, _ = fit_linear(x_vals, y_vals)
+    except Exception:
+        return default  # Fit failed, return original data
+
+    # Compute tilt correction for both curves
     subs_y1 = numpy.polyval([coeffs[0], coeffs[1]], curve_first[0])
     subs_y2 = numpy.polyval([coeffs[0], coeffs[1]], curve_second[0])
 
-    # Substract
+    # Apply correction
     if mode == "trace":
         result_curve_first = [curve_first[0], curve_first[1] - subs_y1]
         result_curve_second = [curve_second[0], curve_second[1] - subs_y2]
-    elif mode == "retrace":
+    else:  # mode == "retrace"
         result_curve_second = [curve_first[0], curve_first[1] - subs_y1]
         result_curve_first = [curve_second[0], curve_second[1] - subs_y2]
 
+    # Update correction info
     info["is_corrected"] = True
     info["length_of_fit_nbr_points"] = nbr_points
     info["detected_slope"] = coeffs[0]
@@ -235,25 +253,27 @@ def correct_tilt(approach, retraction, limit_1, limit_2, mode,
     return result_curve_first, result_curve_second, info
 
 
+
 def fit_linear(curve_x, curve_y):
     """Makes a linear fit on a curve.
 
     Returns the coefficients of the fit and the squared residual.
     """
-    # Fit, get the coefficients and some infos
+    if len(curve_x) == 0 or len(curve_y) == 0:
+        raise ValueError("Error in fit_linear: curve_x or curve_y is empty.")
+
+    if len(curve_x) != len(curve_y):
+        raise ValueError("Error in fit_linear: curve_x and curve_y must have the same length.")
+
+    # Fit, get the coefficients and some info
     fit = numpy.polyfit(curve_x, curve_y, 1, full=True)
     coefficients = fit[0]
 
-    # Sometimes with corrupted curves, you can get (for example) :
-    # curve_x = [100, 100, 100, 100, 100, 100, 100, 100, 100]
-    # curve_y = [50, 50, 50, 50, 50, 50, 50, 50, 50]
-    # Info is then = [], so I return None as r_squared.
-    if len(fit[1]) == 0:
-        r_squared = None
-    else:
-        r_squared = fit[1][0]
+    # Handle case where residual information is missing
+    r_squared = fit[1][0] if len(fit[1]) > 0 else None
 
     return [coefficients, r_squared]
+
 
 
 def find_non_flat(curve):
