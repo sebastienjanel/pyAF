@@ -101,7 +101,7 @@ from .curves.results.residuals import ResultsResiduals
 from .curves.results.force_events import ResultsForceEvents
 
 
-params = {"legend.fontsize": 10}
+params = {"legend.fontsize": 12}
 matplotlib.rcParams.update(params)
 
 

@@ -212,7 +212,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.default_font = QtWidgets.QApplication.font()
         self.default_font_name = self.default_font.defaultFamily()
         self.smallfont = QtWidgets.QApplication.font()  # Default font
-        self.smallfont.setPointSize(10)
+        self.smallfont.setPointSize(12)
         self.canvas_resolution = 72
         self.update_results = False
 

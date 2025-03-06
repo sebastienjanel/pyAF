@@ -294,8 +294,8 @@ class PlotMeshGrid(MainPlot):
             self.axes.get_yaxis().set_ticks([])
 
             # Add scale bar
-            # Font (use the Lucida Grande font I ship)
-            path = misc_tools.get_app_path() + "/fonts/Lucida_Grande.ttf"
+            # Font (use the font I ship)
+            path = misc_tools.get_app_path() + "/fonts/HelveticaNowText-Regular.ttf"
             ft = fm.FontProperties(fname=path, size=12)
 
             # label = u"1 \u03bcm" Label deactivated for the moment

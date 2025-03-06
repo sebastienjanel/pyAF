@@ -174,8 +174,8 @@ class SingleFile:
         self.color_opts_rupture_force1 = [4, 0, 0, 0, 0]
         self.color_opts_events_per_curve = [6, 0, 0, 0, 0]
         self.color_opts_rupture_force2 = [4, 0, 0, 0, 0]
-        self.color_saturation = [1, 0, 0, 1]
-        self.color_negative = [1, 1, 1, 1]
+        self.color_saturation = [1, 1, 1, 1]
+        self.color_negative = [0, 0, 0, 1]
         self.color_nan = [0.8, 0.8, 0.8, 1]  # grey
         self.max_piezo = None
         self.max_piezo_display = None

@@ -100,7 +100,7 @@ class AdvancedOptions(PYAFWidget):
             PYAFInput(self, "main_label", "Title label ", width=200)
 
         text = "Plots font size "
-        tip = "Is set to 10 by default"
+        tip = "Is set to 12 by default"
         self.IN_labels_font_size = PYAFInput(self, "labels", text, width=40)
 
         text = "Tick labels font size "

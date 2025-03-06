@@ -378,12 +378,10 @@ class DataWidget(PYAFWidget):
             "Z Closed Loop : " + str(data.z_closed_loop))
         self.LB_scan_rate.setText(
             "Scan rate : {:.3f} Hz".format(data.scan_rate))
-        app_vel = str(round(data.approach_velocity / 1000.0, 4))
-        ret_vel = str(round(data.retraction_velocity / 1000.0, 4))
-        self.LB_fwd_scan_velocity.setText(
-            "Forward velocity : " + app_vel + " \u03bcm/s")
-        self.LB_rev_scan_velocity.setText(
-            "Retrace velocity : " + ret_vel + " \u03bcm/s")
+        app_vel = f"{data.approach_velocity / 1000.0:.2f}"
+        ret_vel = f"{data.retraction_velocity / 1000.0:.2f}"
+        self.LB_fwd_scan_velocity.setText(f"Forward velocity : {app_vel} μm/s")
+        self.LB_rev_scan_velocity.setText(f"Retrace velocity : {ret_vel} μm/s")
 
         if data.retracted_delay is not None:
             # JPK QI files don't have these values
@@ -464,6 +462,7 @@ class DataWidget(PYAFWidget):
 
         if what == "info_selected" or what == "all":
             info = shared.exp.info_selected
+            self.smallfontbold.setPixelSize(12)
 
             if info == "spring":
                 self.IN_defl_sens.setFont(self.smallfont)

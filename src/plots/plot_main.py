@@ -73,7 +73,7 @@ class MainPlot:
             matplotlib.rcParams["savefig.directory"] = self.save_path
 
         # Font (use the Lucida Grande font I ship)
-        path = misc_tools.get_app_path() + "/fonts/Lucida_Grande.ttf"
+        path = misc_tools.get_app_path() + "/fonts/HelveticaNowText-Regular.ttf"
         font_size = shared.exp.mpl_labels_font_size
         try:
             with open(path):

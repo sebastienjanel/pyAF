@@ -64,7 +64,7 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         self.settings = QtCore.QSettings()
 
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(10)
+        self.smallfont.setPointSize(12)
 
         self.VL = QtWidgets.QVBoxLayout()
         self.VL.setContentsMargins(0, 0, 0, 0)

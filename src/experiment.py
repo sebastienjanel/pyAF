@@ -124,7 +124,7 @@ class Experiment:
                 self.conditions_list[i].color = shared.colors_list[i - 1]
 
         # Size of the matplotlibs fonts
-        self.mpl_labels_font_size = 10
+        self.mpl_labels_font_size = 12
         self.mpl_tick_labels_font_size = 8
 
         # List of curves seen by the random algorithm
