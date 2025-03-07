@@ -186,9 +186,9 @@ class ComputeWidget(PYAFWidget):
         self.Box_stiff_segments = QtWidgets.QGroupBox("Computation method")
 
         # Options
-        label = "Tip Radius (nm)"
+        label = "Tip radius [nm]"
         self.IN_tip_radius = PYAFInput(self, "tip_radius", label, 60)
-        label = "Tip Half-opening Angle (" + "\u00b0" + ")"
+        label = "Tip half-opening angle (" + "\u00b0" + ")"
         self.IN_tip_angle = PYAFInput(self, "tip_angle", label)
         self.IN_poisson = PYAFInput(self, "poisson", "Poisson ratio")
         self.IN_tip_radius.input.setValidator(misc_tools.validator("UF"))
@@ -200,7 +200,7 @@ class ComputeWidget(PYAFWidget):
         self.label_models_list = QtWidgets.QLabel("Model : ")
         self.list_models = PYAFComboBox(self, "list_models")
         self.models = [
-            "Hertz (Paraboloid)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Stiffness Tomography", "Flat punch"]
+            "Hertz (Paraboloid)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Stiffness tomography", "Flat punch"]
         for model in self.models:
             self.list_models.addItem(str(model))
 

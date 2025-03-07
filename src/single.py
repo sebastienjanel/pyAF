@@ -306,7 +306,7 @@ class SingleFile:
         self.stiffness_mode = 1  # 0 Calculus 1 Fit
         self.stiffness_model_selected = 0  # Select Hertz by default
         self.tip_radius = 75
-        self.tip_angle = 35  # Note : this is in fact the half-opening angle
+        self.tip_angle = 15  # Note : this is in fact the half-opening angle
         self.poisson_ratio = 0.5
         self.indentation_start = 0
         self.indentation_stop = 0
