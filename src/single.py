@@ -170,10 +170,10 @@ class SingleFile:
         self.color_opts_piezo = [0, 0, 0, 0, 0]
         self.color_opts_topo = [0, 0, 0, 0, 0]
         self.color_opts_stiffness = [2, 0, 0, 0, 0]
-        self.color_opts_work = [4, 0, 0, 0, 0]
-        self.color_opts_rupture_force1 = [4, 0, 0, 0, 0]
+        self.color_opts_work = [12, 0, 0, 0, 0]
+        self.color_opts_rupture_force1 = [12, 0, 0, 0, 0]
         self.color_opts_events_per_curve = [6, 0, 0, 0, 0]
-        self.color_opts_rupture_force2 = [4, 0, 0, 0, 0]
+        self.color_opts_rupture_force2 = [12, 0, 0, 0, 0]
         self.color_saturation = [1, 1, 1, 1]
         self.color_negative = [0, 0, 0, 1]
         self.color_nan = [0.8, 0.8, 0.8, 1]  # grey
