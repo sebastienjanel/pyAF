@@ -225,9 +225,9 @@ def get_color_bar():
 
     # Add the title
     if tp == "Stiffness":
-        scalar_bar.SetTitle("E (kPa)")
+        scalar_bar.SetTitle("")
     elif tp == "Topo_dots" or tp == "Topo_surf":
-        scalar_bar.SetTitle("Height \n (nm)  ")
+        scalar_bar.SetTitle("Height [nm]  ")
 
     # Default value is 64, we want a smooth scalarbar
     scalar_bar.SetMaximumNumberOfColors(512)

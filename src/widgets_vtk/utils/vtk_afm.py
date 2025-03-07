@@ -45,8 +45,8 @@ def get_surface(parent, data, mode):
 
     For the smoothing, one has to ensure that the tomography is a closed
     volume with no redundant triangles. For this, the surface and bottom
-    arrays are shifted by a z_offset value of 0.001. In fact they shoud be
-    at the same position when the indenation is maximal, but having the offset
+    arrays are shifted by a z_offset value of 0.001. In fact they should be
+    at the same position when the indentation is maximal, but having the offset
     ensures that those are two separate surfaces (surface and bottom).
     """
     colortable = ColorTables(data.colortableid, data.color_saturation,

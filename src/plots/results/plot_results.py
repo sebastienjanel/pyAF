@@ -140,7 +140,7 @@ class PlotResults(MainPlot):
                         self.xlabel = "Log(E [Pa]) and Log([N/m])"
                 elif found_slope and found_stiffness is False:
                     if shared.exp.hist_log is False:
-                        self.xlabel = "Stiffness [N/m]"
+                        self.xlabel = "Apparent stiffness [N/m]"
                     else:
                         self.xlabel = "Log([N/m])"
                 elif found_slope is False and found_stiffness:
