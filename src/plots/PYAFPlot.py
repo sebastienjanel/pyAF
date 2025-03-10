@@ -86,7 +86,7 @@ from .curves.compute.loading_rates import ComputeLoadingRates
 
 # Results tab =================================================================
 
-# Deflexion - extension
+# Deflection - extension
 from .curves.results.defl_ext import ResultsDeflExt
 # Force - extension
 from .curves.results.force_ext import ResultsForceExt
@@ -101,7 +101,7 @@ from .curves.results.residuals import ResultsResiduals
 from .curves.results.force_events import ResultsForceEvents
 
 
-params = {"legend.fontsize": 12}
+params = {"legend.fontsize": 10}
 matplotlib.rcParams.update(params)
 
 

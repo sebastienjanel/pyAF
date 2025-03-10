@@ -40,7 +40,7 @@ from ..plots.PYAFPlot import PYAFPlot
 
 
 class BoxData(QtWidgets.QWidget):
-    """A box with the piezo meshgrid and minimal informations for the data tab."""
+    """A box with the piezo meshgrid and minimal information for the data tab."""
 
     def __init__(self, i):
         super().__init__()
@@ -53,9 +53,9 @@ class BoxData(QtWidgets.QWidget):
         self.data_id = i
         data = shared.exp.list[self.data_id]
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(12)
+        self.smallfont.setPointSize(10)
         self.smallfontbold = QtWidgets.QApplication.font()
-        self.smallfontbold.setPointSize(12)
+        self.smallfontbold.setPointSize(10)
         self.smallfontbold.setBold(True)
 
         self.VL = QtWidgets.QVBoxLayout()

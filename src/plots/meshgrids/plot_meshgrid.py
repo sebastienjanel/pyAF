@@ -296,7 +296,7 @@ class PlotMeshGrid(MainPlot):
             # Add scale bar
             # Font (use the font I ship)
             path = misc_tools.get_app_path() + "/fonts/HelveticaNowText-Regular.ttf"
-            ft = fm.FontProperties(fname=path, size=12)
+            ft = fm.FontProperties(fname=path, size=10)
 
             # label = u"1 \u03bcm" Label deactivated for the moment
             label = ""
