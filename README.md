@@ -5,14 +5,14 @@ Developed at CMPI lab (https://cmpi.cnrs.fr).
 
 It computes:
 - Elasticity with several models and bottom effect correction (BEC)
-- Stiffness tomography (partly broken)
+- Stiffness tomography (PARTLY BROKEN)
 - Work of detachment and rupture force
 - Unbinding events and loading rates
 - Zero-force topography
 - Regions of interest for substrate definition and stats
 - Curve tilt correction and smoothing
 - 3D map rendering
-- Text export (to R), Statistics (unpolished)
+- Text export (to R), Statistics (UNPOLISHED)
 - Multi files and multiprocessing
 
 This software is governed by the CeCILL license under French law and abiding by the rules of distribution of free software. You can use, modify and/or redistribute the software under the terms of the CeCILL license as circulated by CEA, CNRS and INRIA at the following URL "http://www.cecill.info".
