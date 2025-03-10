@@ -76,9 +76,9 @@ class DataWidget(PYAFWidget):
         self.list_unsel_styles = None
 
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(10)
+        self.smallfont.setPointSize(12)
         self.smallfontbold = QtWidgets.QApplication.font()
-        self.smallfontbold.setPointSize(10)
+        self.smallfontbold.setPointSize(12)
         self.smallfontbold.setBold(True)
 
         self.VL = QtWidgets.QVBoxLayout()
@@ -368,7 +368,7 @@ class DataWidget(PYAFWidget):
             self.LB_scan_angle.setText("Scan Angle : None")
         else:
             self.LB_scan_angle.setText(
-                "Scan Angle : " + str(data.scan_angle) + "\u00b0")
+                "Scan Angle : " + str(data.scan_angle) + "")
         self.LB_frame_direction.setText(
             "Scan direction : " + str(data.frame_direction))
         self.LB_xy_closed_loop.setText(

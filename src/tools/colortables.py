@@ -80,7 +80,7 @@ class ColorTables:
             self.saturation_limit = float(saturation_limit)
         if middle_value is not None:
             self.middle_value = float(middle_value)
-        if mode == "scalarMap" and colortableid != 1 and colortableid != 3:
+        if mode == "scalarMap" and colortableid != 1 and colortableid != 6:
             name = self.colortables_mpl_list[self.colortableid]
             cNorm = mpl_colors.Normalize(vmin=0,
                                          vmax=self.saturation_limit)

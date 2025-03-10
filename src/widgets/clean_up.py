@@ -227,7 +227,7 @@ class CleanUpWidget(PYAFWidget):
         if corrupted_curves is not None:
             for curve in corrupted_curves:
                 label_value = QtWidgets.QLabel()
-                label_value.setFont(QtGui.QFont("defaultFamily", 10))
+                label_value.setFont(QtGui.QFont("defaultFamily", 12))
                 text = "[" + str(curve[0] + 1) + "," + str(curve[1] + 1) + "]"
                 label_value.setText(text)
                 self.gridlayout_box_labels.addWidget(label_value, u, v)
@@ -240,7 +240,7 @@ class CleanUpWidget(PYAFWidget):
             self.gridlayout_box_labels.addLayout(self.VL_empty, u + 1, 0)
         else:
             label_value = QtWidgets.QLabel()
-            label_value.setFont(QtGui.QFont("defaultFamily", 10))
+            label_value.setFont(QtGui.QFont("defaultFamily", 12))
             label_value.setText("None")
             self.gridlayout_box_labels.addWidget(label_value, 0, 0)
             self.VL_empty = QtWidgets.QVBoxLayout()

@@ -53,9 +53,9 @@ class BoxData(QtWidgets.QWidget):
         self.data_id = i
         data = shared.exp.list[self.data_id]
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(10)
+        self.smallfont.setPointSize(12)
         self.smallfontbold = QtWidgets.QApplication.font()
-        self.smallfontbold.setPointSize(10)
+        self.smallfontbold.setPointSize(12)
         self.smallfontbold.setBold(True)
 
         self.VL = QtWidgets.QVBoxLayout()

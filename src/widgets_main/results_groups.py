@@ -124,7 +124,7 @@ class ResultsGroupsWidget(PYAFWidget):
         self.tableWidget.setColumnWidth(0, 30)  # Minimal size for checkboxes
         headers.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
 
-        # Leace some blank space on the right
+        # Leave some blank space on the right
         spacer = QtWidgets.QSpacerItem(400, 10)
 
         self.HL_tableWidget_groups.addWidget(self.tableWidget)

@@ -106,13 +106,13 @@ class DetailsWidget(PYAFWidget):
 
             for ind in range(steps):
                 label_value = QtWidgets.QLabel()
-                label_value.setFont(QtGui.QFont("defaultFamily", 10))
+                label_value.setFont(QtGui.QFont("defaultFamily", 12))
                 label_value.setText(get_one_line(i, j, ind, values[ind]))
                 self.VL_stiffness_labels.addWidget(label_value)
 
             if len(values) > 20:
                 label_value = QtWidgets.QLabel()
-                label_value.setFont(QtGui.QFont("defaultFamily", 10))
+                label_value.setFont(QtGui.QFont("defaultFamily", 12))
                 label_value.setText("See more in save ... ")
                 self.VL_stiffness_labels.addWidget(label_value)
 
@@ -126,8 +126,8 @@ class DetailsWidget(PYAFWidget):
         if data.work_and_rupture_force1_calculated:
             label_work = QtWidgets.QLabel()
             label_rf1 = QtWidgets.QLabel()
-            label_work.setFont(QtGui.QFont("defaultFamily", 10))
-            label_rf1.setFont(QtGui.QFont("defaultFamily", 10))
+            label_work.setFont(QtGui.QFont("defaultFamily", 12))
+            label_rf1.setFont(QtGui.QFont("defaultFamily", 12))
             label_work.setText(str(data.work[i][j] * 1e15) + " fJ")
             value = str(data.rupture_force1[i][j] * 1e12)
             label_rf1.setText(value + " pN")
@@ -140,7 +140,7 @@ class DetailsWidget(PYAFWidget):
         if data.events_calculated:
             for a in range(len(data.events_forces[i][j])):
                 label_event = QtWidgets.QLabel()
-                label_event.setFont(QtGui.QFont("defaultFamily", 10))
+                label_event.setFont(QtGui.QFont("defaultFamily", 12))
                 val = str(data.events_forces[i][j][a] * 1e12)
                 txt = "Force : " + val + " pN"
                 label_event.setText(txt)

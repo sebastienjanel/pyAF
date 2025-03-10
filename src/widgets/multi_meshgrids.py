@@ -137,7 +137,7 @@ class MultiMeshgridsWidget(PYAFWidget):
         self.title_list = []
 
         smallfont = QtWidgets.QApplication.font()
-        smallfont.setPointSize(10)
+        smallfont.setPointSize(12)
 
         for datasetid in range(len(shared.exp.list)):
             self.qwidget_list.append(QtWidgets.QWidget())
