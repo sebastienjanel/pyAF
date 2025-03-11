@@ -121,7 +121,7 @@ def get_surface(parent, data, mode):
     bottom_array = numpy.zeros([data.nbr_pixels_x, data.nbr_pixels_y])
 
     # Z Offset for the bottom of the tomography. Ensures that those triangles
-    # are not at the exact same position as the topograhpy : this makes the
+    # are not at the exact same position as the topography : this makes the
     # smoothing algorithm segfault.
     z_offset = 0.001
 

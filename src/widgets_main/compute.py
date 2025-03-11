@@ -400,23 +400,40 @@ class ComputeWidget(PYAFWidget):
         self.BT_height_corr = PYAFButton(self, "height_correction", "Compute")
         self.BT_height_corr.setFixedSize(100, 100)
 
-        self.label_list_roi = QtWidgets.QLabel("ROI of substrate")
-        # Values for the list are set in update_GUI
-        self.list_roi_glass = PYAFComboBox(self, "roi")
-        self.list_roi_glass.setFixedSize(100, 26)
+        # Instruction label
+        self.label_info = QtWidgets.QLabel("Either select the substrate from the ROI manager (results tab) or input"
+                                           " the known height of the sample")
 
-        # Sample height value input by the user. Used for elasticity corrections.
-        # Value set in update_GUI
-        self.IN_user_h = PYAFInput(self, "user_h", "Sample height [nm]", width=50)
+        # ROI selection (Label + Dropdown)
+        self.label_list_roi = QtWidgets.QLabel("ROI of substrate:")
+        self.list_roi_glass = PYAFComboBox(self, "roi")
+        self.list_roi_glass.setFixedSize(100, 26)  # Fixed width to prevent stretching
+
+        # Sample height input (Switched Label & Input Box)
+        self.label_sample_height = QtWidgets.QLabel("Sample height [nm]:")  # Separate label
+        self.IN_user_h = PYAFInput(self, "user_h", "", width=50)  # Empty label in PYAFInput
         self.IN_user_h.input.setValidator(misc_tools.validator("UF"))
 
-        self.stiff_corr_opts = QtWidgets.QHBoxLayout()
-        self.stiff_corr_opts.addWidget(self.label_list_roi)
-        self.stiff_corr_opts.addWidget(self.list_roi_glass)
+        # Layout for ROI selection (aligns label & dropdown closely)
+        self.stiff_corr_row = QtWidgets.QHBoxLayout()
+        self.stiff_corr_row.addWidget(self.label_list_roi)
+        self.stiff_corr_row.addWidget(self.list_roi_glass)
+        self.stiff_corr_row.addStretch(1)  # Push everything to the left
+
+        # Layout for Sample Height (Label First)
+        self.stiff_corr_height_row = QtWidgets.QHBoxLayout()
+        self.stiff_corr_height_row.addWidget(self.label_sample_height)  # Label first
+        self.stiff_corr_height_row.addWidget(self.IN_user_h)  # Input box second
+        self.stiff_corr_height_row.addStretch(1)  # Push everything to the left
+
+        # Vertical layout to stack components
+        self.stiff_corr_opts = QtWidgets.QVBoxLayout()
+        self.stiff_corr_opts.addWidget(self.label_info)  # Instruction text
+        self.stiff_corr_opts.addLayout(self.stiff_corr_row)  # ROI label + dropdown
+        self.stiff_corr_opts.addLayout(self.stiff_corr_height_row)  # Sample height label + input
 
         VL_stiff_corr_opts = QtWidgets.QVBoxLayout()
         VL_stiff_corr_opts.addLayout(self.stiff_corr_opts)
-        VL_stiff_corr_opts.addWidget(self.IN_user_h)
         VL_stiff_corr_opts.addStretch(1)
 
         VL_stiff_corr = QtWidgets.QVBoxLayout()
