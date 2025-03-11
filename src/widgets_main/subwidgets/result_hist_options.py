@@ -151,26 +151,26 @@ class ResultsHistOptionsWidget(PYAFWidget):
         self.BOX_limits_y.setLayout(self.VL_limits_y)
 
         # Plots
-        self.BOX_plots = QtWidgets.QGroupBox("Plots")
-        self.VL_plots = QtWidgets.QVBoxLayout()
-        self.plot_list = PYAFComboBox(self, "plot_selector")
-        self.plot_list.addItem("Hist")
-        self.plot_list.addItem("Boxplot")
-        self.VL_plots.addWidget(self.plot_list)
-        self.BOX_plots.setLayout(self.VL_plots)
+        # self.BOX_plots = QtWidgets.QGroupBox("Plots")
+        # self.VL_plots = QtWidgets.QVBoxLayout()
+        # self.plot_list = PYAFComboBox(self, "plot_selector")
+        # self.plot_list.addItem("Hist")
+        # self.plot_list.addItem("Boxplot")
+        # self.VL_plots.addWidget(self.plot_list)
+        # self.BOX_plots.setLayout(self.VL_plots)
 
         self.BOX_general.setFixedSize(200, 210)
         self.BOX_bins.setFixedSize(200, 210)
         self.BOX_limits_x.setFixedSize(200, 160)
         self.BOX_limits_y.setFixedSize(200, 160)
-        self.BOX_plots.setFixedSize(100, 100)
+        # self.BOX_plots.setFixedSize(100, 100)
 
         # Finish layout
         self.GL.addWidget(self.BOX_general, 0, 0)
         self.GL.addWidget(self.BOX_bins, 0, 1)
         self.GL.addWidget(self.BOX_limits_x, 1, 0)
         self.GL.addWidget(self.BOX_limits_y, 1, 1)
-        self.GL.addWidget(self.BOX_plots, 0, 2)
+        # self.GL.addWidget(self.BOX_plots, 0, 2)
 
         VL_options = QtWidgets.QVBoxLayout()
         HL_options = QtWidgets.QHBoxLayout()
@@ -193,10 +193,10 @@ class ResultsHistOptionsWidget(PYAFWidget):
             if self.name == "widget_results_hist_options_single":
                 if shared.exp.norm_hist_single:
                     self.list_norm.setCurrentIndex(0)
-                    self.plot_list.setCurrentIndex(0)
+                    # self.plot_list.setCurrentIndex(0)
                 else:
                     self.list_norm.setCurrentIndex(1)
-                    self.plot_list.setCurrentIndex(1)
+                    # self.plot_list.setCurrentIndex(1)
             elif self.name == "widget_results_hist_options_groups":
                 if shared.exp.norm_hist_groups:
                     self.list_norm.setCurrentIndex(0)
@@ -341,10 +341,10 @@ class ResultsHistOptionsWidget(PYAFWidget):
             elif self.name == "widget_results_hist_options_groups":
                 plot = shared.exp.hist_groups_plot_selected
 
-            if plot == "hist":
-                self.plot_list.setCurrentIndex(0)
-            elif plot == "box":
-                self.plot_list.setCurrentIndex(1)
+            # if plot == "hist":
+            #    self.plot_list.setCurrentIndex(0)
+            # elif plot == "box":
+            #    self.plot_list.setCurrentIndex(1)
 
 
     def button_clicked(self, button):

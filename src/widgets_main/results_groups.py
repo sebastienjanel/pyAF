@@ -138,14 +138,14 @@ class ResultsGroupsWidget(PYAFWidget):
         name = "widget_results_chooser_groups"
         self.widget_result_chooser = ResultsChooserWidget(self, name)
 
-        self.list_values = PYAFComboBox(self, "values")
-        self.list_values.addItem("Values")
-        self.list_values.addItem("Frequencies")
+        # self.list_values = PYAFComboBox(self, "values")
+        # self.list_values.addItem("Values")
+        # self.list_values.addItem("Frequencies")
 
         self.BT_refresh_hist = PYAFButton(self, "refresh_hist", "Refresh")
 
         self.HL_hist_buttons.addWidget(self.widget_result_chooser)
-        self.HL_hist_buttons.addWidget(self.list_values)
+        # self.HL_hist_buttons.addWidget(self.list_values)
         self.HL_hist_buttons.addWidget(self.BT_refresh_hist)
         self.HL_hist_buttons.addStretch(1)
 
@@ -336,11 +336,11 @@ class ResultsGroupsWidget(PYAFWidget):
                     self.groups_sds_labels[i - 1].setText(std)
                     self.groups_modes_labels[i - 1].setText(mode)
 
-        if what == "list_values" or what == "all":
-            if shared.exp.hist_values_or_frequencies == "values":
-                self.list_values.setCurrentIndex(0)
-            elif shared.exp.hist_values_or_frequencies == "frequencies":
-                self.list_values.setCurrentIndex(1)
+        # if what == "list_values" or what == "all":
+        #     if shared.exp.hist_values_or_frequencies == "values":
+        #         self.list_values.setCurrentIndex(0)
+        #     elif shared.exp.hist_values_or_frequencies == "frequencies":
+        #         self.list_values.setCurrentIndex(1)
 
     def add_group(self):
         """Add a new group."""

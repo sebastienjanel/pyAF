@@ -188,12 +188,12 @@ class ResultsExperimentWidget(PYAFWidget):
         name = "widget_results_chooser_groups"
         self.widget_result_chooser = ResultsChooserWidget(self, name)
 
-        self.list_values = PYAFComboBox(self, "values")
-        self.list_values.addItem("Values")
-        self.list_values.addItem("Frequencies")
+        # self.list_values = PYAFComboBox(self, "values")
+        # self.list_values.addItem("Values")
+        # self.list_values.addItem("Frequencies")
 
         self.HL_hist_buttons.addWidget(self.widget_result_chooser)
-        self.HL_hist_buttons.addWidget(self.list_values)
+        # self.HL_hist_buttons.addWidget(self.list_values)
         self.HL_hist_buttons.addStretch(1)
 
         # Buttons for calculations/actions on stats
@@ -216,8 +216,8 @@ class ResultsExperimentWidget(PYAFWidget):
         self.GL_tableWidget_groups.addItem(spacer, 0, 2, 1, 0)
 
         # Connect header checkboxes
-        hist_headers.all_selected.connect(lambda: self.check_all(mode="hist"))
-        stats_headers.all_selected.connect(lambda: self.check_all(mode="stats"))
+        # hist_headers.all_selected.connect(lambda: self.check_all(mode="hist"))
+        # stats_headers.all_selected.connect(lambda: self.check_all(mode="stats"))
 
         self.GL_results_data = QtWidgets.QGridLayout()
         self.GL_results_data.addWidget(self.widget_options, 0, 0)
@@ -260,15 +260,15 @@ class ResultsExperimentWidget(PYAFWidget):
 
     def list_updated(self, name):
         """Called when a list is updated."""
-        if name == "values":
-            if self.list_values.currentIndex() == 0:
-                shared.exp.hist_values_or_frequencies = "values"
-            else:
-                shared.exp.hist_values_or_frequencies = "frequencies"
+        #if name == "values":
+        #    if self.list_values.currentIndex() == 0:
+        #        shared.exp.hist_values_or_frequencies = "values"
+        #    else:
+        #        shared.exp.hist_values_or_frequencies = "frequencies"
 
-            self.update_GUI("table_labels")
-            widgets_list.widget_results_groups.update_GUI("list_values")
-            widgets_list.widget_results_groups.update_GUI("table_labels")
+        self.update_GUI("table_labels")
+        widgets_list.widget_results_groups.update_GUI("list_values")
+        widgets_list.widget_results_groups.update_GUI("table_labels")
 
     def add_row_in_tablewidget_conditions(self, i):
         """Adds a row in the groups results table."""
@@ -478,11 +478,11 @@ class ResultsExperimentWidget(PYAFWidget):
         if what == "stat_table_labels" or what == "all":
             pass
 
-        if what == "list_values" or what == "all":
-            if shared.exp.hist_values_or_frequencies == "values":
-                self.list_values.setCurrentIndex(0)
-            elif shared.exp.hist_values_or_frequencies == "frequencies":
-                self.list_values.setCurrentIndex(1)
+        # if what == "list_values" or what == "all":
+        #    if shared.exp.hist_values_or_frequencies == "values":
+        #        self.list_values.setCurrentIndex(0)
+        #    elif shared.exp.hist_values_or_frequencies == "frequencies":
+        #        self.list_values.setCurrentIndex(1)
 
     def add_condition(self):
         """Add a new condition."""

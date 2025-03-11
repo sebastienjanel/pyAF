@@ -235,15 +235,15 @@ class ResultsSingleWidget(PYAFWidget):
         self.BT_events_per_scan = PYAFButton(self, "events_per_scan", label)
         self.BT_dfs = PYAFButton(self, "dfs", "DFS")
 
-        self.list_values = PYAFComboBox(self, "values")
-        self.list_values.addItem("Values")
-        self.list_values.addItem("Frequencies")
+        # self.list_values = PYAFComboBox(self, "values")
+        # self.list_values.addItem("Values")
+        # self.list_values.addItem("Frequencies")
 
         name = "widget_results_chooser_single"
         self.widget_result_chooser = ResultsChooserWidget(self, name)
 
         self.HL_hist_buttons.addWidget(self.widget_result_chooser)
-        self.HL_hist_buttons.addWidget(self.list_values)
+        # self.HL_hist_buttons.addWidget(self.list_values)
         self.HL_hist_buttons.addWidget(self.BT_refresh_hist)
         self.HL_hist_buttons.addWidget(self.BT_get_pdf)
         self.HL_hist_buttons.addWidget(self.BT_events_per_scan)
@@ -751,11 +751,11 @@ class ResultsSingleWidget(PYAFWidget):
             else:
                 self.BT_dfs.setEnabled(False)
 
-        if what == "list_values" or what == "all":
-            if shared.exp.hist_values_or_frequencies == "values":
-                self.list_values.setCurrentIndex(0)
-            elif shared.exp.hist_values_or_frequencies == "frequencies":
-                self.list_values.setCurrentIndex(1)
+        # if what == "list_values" or what == "all":
+        #     if shared.exp.hist_values_or_frequencies == "values":
+        #         self.list_values.setCurrentIndex(0)
+        #     elif shared.exp.hist_values_or_frequencies == "frequencies":
+        #         self.list_values.setCurrentIndex(1)
 
     def display_selected(self, disable_security=False):
         """Display all the selected results."""
