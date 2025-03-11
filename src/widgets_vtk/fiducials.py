@@ -159,7 +159,7 @@ class FiducialsWidget(PYAFWidget):
             # It depends which way you have selected so I need to sort the
             # index array
             indexes = numpy.sort(numpy.unique(indexes), -1)[::-1].tolist()
-            if indexes != []:
+            if indexes:
                 for index in indexes:
                     current_layer.fiducials.remove_fiducial(index)
 

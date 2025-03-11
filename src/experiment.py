@@ -327,15 +327,15 @@ class Experiment:
                 array_rupture_force2.append(self.list[i].max_rupture_force2)
 
         self.global_max_piezo = numpy.amax(array_piezo)
-        if array_topo != []:
+        if array_topo:
             self.global_max_topo = numpy.amax(array_topo)
             self.global_max_stiffness = numpy.amax(array_stiffness)
             self.global_max_indentation_index = numpy.amax(array_indentation)
-        if array_work != []:
+        if array_work:
             self.global_max_work = numpy.amax(array_work)
-        if array_rupture_force1 != []:
+        if array_rupture_force1:
             self.global_max_rupture_force1 = numpy.amax(array_rupture_force1)
-        if array_nbr_events != []:
+        if array_nbr_events:
             self.global_max_nbr_events = numpy.amax(array_nbr_events)
             self.global_max_rupture_force2 = numpy.amax(array_rupture_force2)
 

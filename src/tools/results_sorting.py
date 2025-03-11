@@ -222,7 +222,7 @@ class GetResults:
 
         if self.type != "loading_rates":
             for i in range(len(groups)):
-                if groups[i] != []:
+                if groups[i]:
                     values.append([numpy.mean(groups[i]),
                                    numpy.median(groups[i]),
                                    numpy.std(groups[i]), 0])
@@ -231,7 +231,7 @@ class GetResults:
 
         elif self.type == "loading_rates":
             for i in range(len(groups)):
-                if groups_forces[i] != []:
+                if groups_forces[i]:
                     values.append([numpy.mean(groups_lr[i]),
                                    numpy.median(groups_lr[i]),
                                    numpy.std(groups_lr[i]), 0])
@@ -287,7 +287,7 @@ class GetResults:
 
         if self.type != "loading_rates":
             for i in range(len(conditions)):
-                if conditions[i] != []:
+                if conditions[i]:
                     values.append([len(conditions[i]),
                                    numpy.mean(conditions[i]),
                                    numpy.median(conditions[i]),
@@ -297,7 +297,7 @@ class GetResults:
 
         elif self.type == "loading_rates":
             for i in range(len(conditions)):
-                if conditions_forces[i] != []:
+                if conditions_forces[i]:
                     values.append([len(conditions[i]),
                                    numpy.mean(conditions_lr[i]),
                                    numpy.median(conditions_lr[i]),
@@ -523,7 +523,7 @@ class GetResults:
                         forces = self.get_data_from_curve(
                             i, j, "forces_per_curve")
 
-                        if forces != []:
+                        if forces:
                             array.extend(forces)
 
                         if self.export == "single" or self.export == "r_format":
@@ -617,11 +617,11 @@ class GetResults:
                         res = self.get_data_from_curve(
                             i, j, "events_distance")
 
-                        if res != []:
+                        if res:
                             array.extend(res)
 
                         if self.export == "single" or self.export == "r_format":
-                            if res != []:
+                            if res:
                                 for k in range(len(res)):
                                     export_array.append(
                                         [index, i, j, f_dist[i][j][k]])
@@ -674,7 +674,7 @@ class GetResults:
                         forces, lr = self.get_data_from_curve(i, j,
                                                               "loading_rates")
 
-                        if lr != []:
+                        if lr:
                             array_forces.extend(forces)
                             array_lr.extend(lr)
 
@@ -786,7 +786,7 @@ class GetResults:
                 for z in range(len(dist_to_joc)):
                     if self.filter_event(re[0][event_pos[z]], slopes[z]):
                         result.append(dist_to_joc[z])
-                if result != []:
+                if result:
                     result = [result[0]]
 
             return result

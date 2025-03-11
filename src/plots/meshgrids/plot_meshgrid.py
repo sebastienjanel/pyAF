@@ -406,7 +406,7 @@ class PlotMeshGrid(MainPlot):
             self.draw_single_profile(profile, "k")
 
         elif mode == "all":
-            if self.data.profile_list != [] and \
+            if self.data.profile_list and \
                     self.data.profile_list is not None:
                 i = 0
                 for profile in self.data.profile_list:
@@ -463,7 +463,7 @@ class PlotMeshGrid(MainPlot):
         if mode == "all":
             if self.data.roi_list is not None:
                 for roi in self.data.roi_list:
-                    if roi.display and roi.values != []:
+                    if roi.display and roi.values:
                         color = self.data.roi_color_names[roi.color]
                         self.draw_single_roi(roi.values, color)
 

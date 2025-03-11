@@ -73,7 +73,7 @@ class Load:
             if not files_info[i]["checked"]:
                 to_delete.append(i)
 
-        if to_delete != []:
+        if to_delete:
             for i in range(len(to_delete) - 1, -1, -1):
                 del files_info[to_delete[i]]
 

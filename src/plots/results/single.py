@@ -129,7 +129,7 @@ class PlotSingleResults(PlotResults):
             self.hist_y_max = shared.exp.hist_single_max_y
 
         if shared.exp.results_type != "loading_rates":
-            if datas_x != []:
+            if datas_x:
                 hist_single_bins = stat_tools.get_bins("single")
                 norm = shared.exp.norm_hist_single
 
@@ -148,7 +148,7 @@ class PlotSingleResults(PlotResults):
             self.lr_error_x = []
             self.lr_error_y = []
 
-            if datas_x != []:
+            if datas_x:
                 for i in range(len(datas_x)):
                     data_x = datas_x[i]
                     data_y = datas_y[i]

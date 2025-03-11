@@ -318,7 +318,7 @@ class ResultsGroupsWidget(PYAFWidget):
                         factor = 1.0
                     else:
                         if shared.groups_frequencies is not None:
-                            if shared.groups_frequencies[i] != []:
+                            if shared.groups_frequencies[i]:
                                 values = shared.groups_frequencies[i]
 
                     # Write the labels

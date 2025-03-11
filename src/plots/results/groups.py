@@ -98,7 +98,7 @@ class PlotGroupedResults(PlotResults):
                 for i in range(len(shared.groups_data)):
                     result = shared.exp.groups_list[i]
 
-                    if shared.groups_data[i] != [] and result.display:
+                    if shared.groups_data[i] and result.display:
                         found_one_label_groups = True
 
                         ma = numpy.amax(shared.groups_data[i][1])
@@ -125,7 +125,7 @@ class PlotGroupedResults(PlotResults):
             self.hist_y_max = shared.exp.hist_groups_max_y
 
         if shared.exp.results_type != "loading_rates":
-            if datas_x != []:
+            if datas_x:
                 hist_groups_bins = stat_tools.get_bins("groups")
                 norm = shared.exp.norm_hist_groups
 
@@ -144,7 +144,7 @@ class PlotGroupedResults(PlotResults):
             self.lr_error_x = []
             self.lr_error_y = []
 
-            if datas_x != []:
+            if datas_x:
                 for i in range(len(datas_x)):
                     data_x = datas_x[i]
                     data_y = datas_y[i]

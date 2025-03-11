@@ -454,7 +454,7 @@ class ResultsExperimentWidget(PYAFWidget):
                         factor = 1.0
                     else:
                         if shared.conditions_frequencies is not None:
-                            if shared.conditions_frequencies[i] != []:
+                            if shared.conditions_frequencies[i]:
                                 values = shared.conditions_frequencies[i]
 
                     # Write the labels

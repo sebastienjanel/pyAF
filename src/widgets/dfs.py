@@ -188,7 +188,7 @@ class DFSWidget(PYAFWidget):
             medians_force = numpy.sort(medians_force, -1)
             medians_lr = numpy.sort(medians_lr, -1)
 
-            if medians_lr != []:
+            if medians_lr:
                 # Get a fit
                 coeffs, _ = \
                     math_tools.fit_linear(numpy.log(medians_lr), medians_force)

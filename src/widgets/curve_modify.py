@@ -416,11 +416,11 @@ class CurveModWidget(PYAFWidget):
             z_size = data.ramp_size / data.nbr_points_per_curve_retraction
         curves_txt = ""
 
-        if list_curves != []:
+        if list_curves:
             if maxposition != 0:
                 maxposition = str(round(maxposition * z_size, 2))
                 txt = "greater than ~ " + maxposition + " nm."
-                if list_curves != []:
+                if list_curves:
                     curves_txt = str(list_curves)
 
             if curves_txt != "" and mode == "approach":

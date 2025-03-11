@@ -245,7 +245,7 @@ class LayerAFM(Layer):
         self.actor.GetProperty().SetOpacity(value / 100.0)
 
         # The profile's opacity also needs to be changed
-        if self.actor_profiles != []:
+        if self.actor_profiles:
             for actor in self.actor_profiles:
                 actor.GetProperty().SetOpacity(value / 100.0)
 
@@ -257,7 +257,7 @@ class LayerAFM(Layer):
 
         Goes through the list of profiles and displays them on the surface.
         """
-        if self.actor_profiles != []:
+        if self.actor_profiles:
             # Remove the actors
             for actor in self.actor_profiles:
                 self.parent.renderer.RemoveActor(actor)
@@ -267,7 +267,7 @@ class LayerAFM(Layer):
         display = widgets_list.widget_vtk.display_profiles
         data = shared.exp.list[self.afm_id]
 
-        if display and data.profile_list != []:
+        if display and data.profile_list:
             sizes = {
                 "x_size": data.x_size,
                 "y_size": data.y_size}

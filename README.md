@@ -5,7 +5,7 @@ Developed at CMPI lab (https://cmpi.cnrs.fr).
 
 It computes:
 - Elasticity with several models and bottom effect correction (BEC)
-- Stiffness tomography (PARTLY BROKEN)
+- Stiffness tomography
 - Work of detachment and rupture force
 - Unbinding events and loading rates
 - Zero-force topography

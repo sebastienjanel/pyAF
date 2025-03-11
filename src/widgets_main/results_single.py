@@ -317,7 +317,7 @@ class ResultsSingleWidget(PYAFWidget):
         self.mode_labels = []
         self.checkboxes = []
 
-        if shared.exp.results_list != []:
+        if shared.exp.results_list:
             # Delete all the rows
             for i in range(self.tableWidget.rowCount(), -1, -1):
                 self.tableWidget.removeRow(i)
@@ -701,7 +701,7 @@ class ResultsSingleWidget(PYAFWidget):
                         factor = 1.0
                     else:
                         if shared.single_frequencies is not None:
-                            if shared.single_frequencies[i] != []:
+                            if shared.single_frequencies[i]:
                                 values = shared.single_frequencies[i]
 
                     # Write the labels

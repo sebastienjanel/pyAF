@@ -782,7 +782,7 @@ class ComputeWidget(PYAFWidget):
             list_stop_size_error = ""
             for i in range(len(stop_size_errors)):
                 item = stop_size_errors[i]
-                if item != []:
+                if item:
                     shared.exp.list[item[0]].stiffness_calculated = False
                     name = shared.exp.list[item[0]].filename
                     dist = item[1]
@@ -794,7 +794,7 @@ class ComputeWidget(PYAFWidget):
             list_no_segment_errors = ""
             for i in range(len(no_segment_errors)):
                 item = no_segment_errors[i]
-                if item != []:
+                if item:
                     shared.exp.list[item[0]].stiffness_calculated = False
                     name = shared.exp.list[item[0]].filename
                     text = "<li>" + name + "</li>"
@@ -805,7 +805,7 @@ class ComputeWidget(PYAFWidget):
             list_smoothing_warnings = ""
             text = ""
             for item in smoothing_warnings:
-                if item != []:
+                if item:
                     name = shared.exp.list[item[0]].filename
                     for values in item[1]:
                         # values[0] is set to "smoothing_error"
@@ -816,7 +816,7 @@ class ComputeWidget(PYAFWidget):
             list_strict_stop_error = ""
             for i in range(len(strict_stop_errors)):
                 item = strict_stop_errors[i]
-                if item != []:
+                if item:
                     shared.exp.list[item[0]].stiffness_calculated = False
                     name = shared.exp.list[item[0]].filename
 
@@ -1009,7 +1009,7 @@ class ComputeWidget(PYAFWidget):
                     # Store smoothing warnings to display a message at the end
                     # of the computation
                     warnings = self.compute_stiffness.list_of_smoothing_errors
-                    if warnings != []:
+                    if warnings:
                         smoothing_warnings.append([calc_id, warnings])
                     else:
                         smoothing_warnings.append([])

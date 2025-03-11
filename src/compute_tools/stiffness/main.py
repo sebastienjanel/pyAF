@@ -201,7 +201,7 @@ class Stiffness:
         stiffness = tf.get_node(st + "/results", "stiffness_array")
         topography = tf.get_node(st + "/results", "topography")
 
-        # Check for strict stop
+        # Check for strict stop (NOT USED ANYMORE)
         strict_stop_error = False
         if data.used_strict_stop and data.indentation_stop != 0:
             dist = data.used_indentation_stop - data.used_indentation_start

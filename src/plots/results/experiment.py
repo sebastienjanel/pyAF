@@ -98,7 +98,7 @@ class PlotExperimentResults(PlotResults):
                 for i in range(len(shared.conditions_data)):
                     result = shared.exp.conditions_list[i]
 
-                    if shared.conditions_data[i] != [] and result.display:
+                    if shared.conditions_data[i] and result.display:
                         found_one_label_experiment = True
 
                         ma = numpy.amax(shared.conditions_data[i][1])
@@ -125,7 +125,7 @@ class PlotExperimentResults(PlotResults):
             self.hist_y_max = shared.exp.hist_experiment_max_y
 
         if shared.exp.results_type != "loading_rates":
-            if datas_x != []:
+            if datas_x:
                 hist_experiment_bins = stat_tools.get_bins("experiment")
                 norm = shared.exp.norm_hist_groups  # Implement for experiment
 
@@ -144,7 +144,7 @@ class PlotExperimentResults(PlotResults):
             self.lr_error_x = []
             self.lr_error_y = []
 
-            if datas_x != []:
+            if datas_x:
                 for i in range(len(datas_x)):
                     data_x = datas_x[i]
                     data_y = datas_y[i]

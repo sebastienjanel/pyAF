@@ -452,12 +452,12 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
         # Plot the fits for the loading rates
         if self.loading_rates_fits is not None and \
-                self.loading_rates_fits != []:
+                self.loading_rates_fits:
             for fit in self.loading_rates_fits:
                 self.axes.plot(fit[0], fit[1], "k", linewidth=3)
 
         # Plot the events on results tab (events force curve)
-        if self.events_preview is not None and self.events_preview != []:
+        if self.events_preview is not None and self.events_preview:
             # Add annotations if asked
             self.display_events_values()
 
@@ -484,7 +484,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
             elif ct == "events" and self.curve_retraction is not None:
                 ev_prev = self.events_preview
 
-                if ev_prev is not None and ev_prev != []:
+                if ev_prev is not None and ev_prev:
                     for i in range(len(self.events_preview)):
                         """
                         positions = self.events_preview[i]
@@ -632,7 +632,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
                 if shared.exp.compute_type == "events":
                     if self.events_preview is not None and \
-                            self.events_preview != []:
+                            self.events_preview:
                         if shared.zoomed_in_element < len(self.events_preview):
                             # We zoom on an event
                             elem = shared.zoomed_in_element

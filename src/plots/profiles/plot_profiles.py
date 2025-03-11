@@ -84,7 +84,7 @@ class PlotProfiles(MainPlot):
         profiles_bar_2 = shared.exp.profiles_bar_2 / 1000.0
         self.show_profiles_bars = shared.exp.show_profiles_bars
 
-        if profile_list != []:
+        if profile_list:
             # Plot the profiles
             for profile in range(len(profile_list)):
                 self.axes.plot(profile_list[profile][0],

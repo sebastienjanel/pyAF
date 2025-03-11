@@ -173,7 +173,7 @@ class RoiManagerWidget(PYAFWidget):
 
             self.logger.debug("Removing ROI %s", indexes)
 
-            if indexes != []:
+            if indexes:
                 for i in indexes:
                     del data.roi_list[i]
                     self.TW.removeRow(i)

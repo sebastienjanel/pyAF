@@ -277,7 +277,7 @@ class Layer:
 
         # For AFM layers, we can have profiles to move
         if self.type == "afm":
-            if self.actor_profiles != []:
+            if self.actor_profiles:
                 for actor in self.actor_profiles:
                     actor.SetPosition(self.pos_x, self.pos_y, self.pos_z)
 
@@ -328,7 +328,7 @@ class Layer:
 
         # For AFM layers, we can have profiles to rotate
         if self.type == "afm":
-            if self.actor_profiles != []:
+            if self.actor_profiles:
                 for actor in self.actor_profiles:
                     actor.RotateZ(new_angle)
 

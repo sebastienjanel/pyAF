@@ -342,7 +342,7 @@ class PlotResults(MainPlot):
         # Plot the density function
         if (pt == "results_single" and sf) or (pt == "results_groups" and gf):  # Implement for experiment
             if self.data_x is not None and self.pdfs is not None and \
-                    self.pdfs != []:
+                    self.pdfs:
                 for pdf_x, pdf_y, factor in self.pdfs:
                     if isinstance(pdf_x, numpy.ndarray) and pdf_x.size > 0:
                         self.axes.plot(
@@ -356,7 +356,7 @@ class PlotResults(MainPlot):
 
     def plot_loading_rate_fits(self):
         """Plot the fit for the DFS experiment."""
-        if self.lr_fits is not None and self.lr_fits != []:
+        if self.lr_fits is not None and self.lr_fits:
             for fit in self.lr_fits:
                 if fit[4]:
                     x = [fit[2], fit[3]]
@@ -365,7 +365,7 @@ class PlotResults(MainPlot):
 
     def prepare_min_max_x(self, ranges):
         """Method used to prepare the min max values for the x axis."""
-        if ranges != []:
+        if ranges:
             ranges_min = []
             ranges_max = []
             for r in ranges:

@@ -460,7 +460,7 @@ class LoaderJPK:
                 if self.segments["pause"] is not None:
                     self.nbr_points_array_pause.append(1)
 
-                if self.segments["modulation"] != []:
+                if self.segments["modulation"]:
                     self.nbr_points_array_modulation.append(1)
 
         max_approach = numpy.amax(self.nbr_points_array_approach)
@@ -478,13 +478,13 @@ class LoaderJPK:
             numpy.amax(self.nbr_points_array_retraction))
 
         # Number of points in the pause segment
-        if self.nbr_points_array_pause != []:
+        if self.nbr_points_array_pause:
             self.max_nbr_points_pause = int(
                 numpy.amax(self.nbr_points_array_pause))
         self.data.nbr_points_per_pause_curve = self.max_nbr_points_pause
 
         # Number of points in the modulation segment
-        if self.nbr_points_array_modulation != []:
+        if self.nbr_points_array_modulation:
             self.max_nbr_points_modulation = int(
                 numpy.amax(self.nbr_points_array_modulation))
         self.data.nbr_points_per_modulation_curve = self.max_nbr_points_modulation
@@ -1232,7 +1232,7 @@ class LoaderJPK:
             time_segments["pause"] = pause_t
             index = index + 1
 
-        if pm is not None or pm != []:
+        if pm is not None or pm:
             for i in range(len(self.segments["modulation"])):
                 modulation_t = numpy.linspace(times[index], times[index + 1], pm[i], endpoint=False)
                 time_segments["modulation"].append(modulation_t)

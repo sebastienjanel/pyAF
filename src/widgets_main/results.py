@@ -949,7 +949,7 @@ class ResultsWidget(PYAFWidget):
 
             elif mode == "profile_erase":
                 # Search in profile_list if there is a profile to delete
-                if data.profile_list != []:
+                if data.profile_list:
                     count = 0
                     for profile in data.profile_list:
                         for i in range(len(profile[0])):
@@ -1025,7 +1025,7 @@ class ResultsWidget(PYAFWidget):
                 # Finalize plotting
                 self.MPL_canvas1.canvas.update_blit("all")
 
-            elif mode == "profile_add" and length < 3 and ls != []:
+            elif mode == "profile_add" and length < 3 and ls:
                 # Nothing has happened
                 del data.profile_starts[data.profile_count]
                 del data.profile_list[data.profile_count]
@@ -1070,7 +1070,7 @@ class ResultsWidget(PYAFWidget):
 
             if mode == "profile_add":
                 # Delete current profile
-                if data.profile_list != []:
+                if data.profile_list:
                     del data.profile_list[data.profile_count]
 
                 # Add profile to list
@@ -1105,7 +1105,7 @@ class ResultsWidget(PYAFWidget):
             xpos, ypos = misc_tools.get_position_on_meshgrid(event)
 
             # Search in profile_list if there is a profile to delete
-            if data.profile_list != []:
+            if data.profile_list:
                 count = 0
                 for profile in data.profile_list:
                     found = False
