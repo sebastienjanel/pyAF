@@ -98,7 +98,7 @@ class PlotGroupedResults(PlotResults):
                 for i in range(len(shared.groups_data)):
                     result = shared.exp.groups_list[i]
 
-                    if shared.groups_data[i] and result.display:
+                    if any(shared.groups_data[i]) and result.display:
                         found_one_label_groups = True
 
                         ma = numpy.amax(shared.groups_data[i][1])

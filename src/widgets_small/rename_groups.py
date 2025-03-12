@@ -50,7 +50,7 @@ class RenameGroupsWidget(PYAFWidget):
 
         VL = QtWidgets.QVBoxLayout()
 
-        for i in range(1, len(shared.exp.groups_list), 1):
+        for i in range(1, len(shared.exp.groups_list)):
             field = PYAFInput(self, "input", "Name", width=200)
             field.changeValue(shared.exp.groups_list[i].name)
             self.input_list.append(field)
@@ -73,7 +73,7 @@ class RenameGroupsWidget(PYAFWidget):
         """Called when a button is clicked."""
         if button == "button_ok":
             # Save the new names
-            for i in range(1, len(shared.exp.groups_list), 1):
+            for i in range(1, len(shared.exp.groups_list)):
                 name = str(self.input_list[i - 1].get_str_value())
                 shared.exp.groups_list[i].name = name
 
@@ -83,10 +83,21 @@ class RenameGroupsWidget(PYAFWidget):
 
             tw = widgets_list.widget_results_groups.tableWidget
 
+            # Ensure TableWidget is initialized
+            if tw is None:
+                print("Error: TableWidget is not initialized.")
+                return
+
+            # Ensure table has enough rows
+            if tw.rowCount() < len(shared.exp.groups_list) - 1:
+                tw.setRowCount(len(shared.exp.groups_list) - 1)
+
             # Update the names in the histogram's group's list
-            for i in range(1, len(shared.exp.groups_list), 1):
+            for i in range(1, len(shared.exp.groups_list)):
                 name = shared.exp.groups_list[i].name
-                tw.item(i - 1, 0).setText(name)
+                if tw.item(i - 1, 1) is None:
+                    tw.setItem(i - 1, 1, QtWidgets.QTableWidgetItem())  # Create a new item
+                tw.item(i - 1, 1).setText(name)
 
             # Update the groups plot
             widgets_list.widget_results_groups.update_MPL()
