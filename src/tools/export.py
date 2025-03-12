@@ -590,7 +590,7 @@ def write_group_file(res_type, folder):
 
     group_found = False
     for group_id in range(len(shared.exp.groups_list)):
-        if groups[group_id]:
+        if len(groups[group_id]) > 0:
             group_found = True
 
     if group_found:
@@ -607,10 +607,10 @@ def write_group_file(res_type, folder):
         # Add header
         header = ""
         for group_id in range(1, len(shared.exp.groups_list)):
-            if groups[group_id]:
+            if len(groups[group_id]) > 0:
                 is_last_group = True
                 for i in range(group_id, len(shared.exp.groups_list) - 1):
-                    if groups[i + 1]:
+                    if len(groups[i + 1]) > 0:
                         is_last_group = False
                         break
 
@@ -631,11 +631,11 @@ def write_group_file(res_type, folder):
             text = ""
 
             for group_id in range(1, len(shared.exp.groups_list)):
-                if groups[group_id]:
+                if len(groups[group_id]) > 0:
                     is_last_group = True
                     for i in range(group_id,
                                    len(shared.exp.groups_list) - 1):
-                        if groups[i + 1]:
+                        if len(groups[i + 1]) > 0:
                             is_last_group = False
                             break
 

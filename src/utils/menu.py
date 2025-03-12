@@ -90,12 +90,12 @@ def create_menu(parent):
     # Results menu
     results_menu = parent.menu.addMenu("Plots")
 
-    action = QtWidgets.QAction("Export selected", parent)
+    action = QtWidgets.QAction("TXT export", parent)
     action.triggered.connect(lambda: tablewidget.export_results("classic_format"))
     results_menu.addAction(action)
     list_actions["export_selected"] = action
 
-    action = QtWidgets.QAction("Export selected for R", parent)
+    action = QtWidgets.QAction("R export (selected)", parent)
     action.triggered.connect(lambda: tablewidget.export_results("r_format"))
     results_menu.addAction(action)
     list_actions["export_selected_r"] = action
