@@ -90,6 +90,10 @@ class PlotSingleResults(PlotResults):
 
                         # Density functions
                         if shared.single_pdfs_x is not None:
+                            if i >= len(shared.single_pdfs_x) or i >= len(shared.single_pdfs_y):
+                                # print(f"Skipping index {i} because PDFs are missing.")
+                                continue  # Avoid accessing out-of-range indexes
+
                             self.pdfs.append([
                                 shared.single_pdfs_x[i],
                                 shared.single_pdfs_y[i],

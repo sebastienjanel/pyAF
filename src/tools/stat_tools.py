@@ -335,21 +335,22 @@ def get_pdfs_and_modes(mode):
 
         # Create a progressbar, this operation is slow
         prog_range = 0
-        for i in range(len(shared.single_data)):
-            data = shared.single_data[i]
-            themin = 0
-            themax = 0
+        for data in shared.single_data:
+            themin, themax = 0, 0
             if shared.exp.results_type != "loading_rates":
                 if isinstance(data, numpy.ndarray) and data.size > 0:
                     themin = numpy.amin(data)
                     themax = numpy.amax(data)
             else:
-                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
+                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], numpy.ndarray) and data[1].size > 0:
                     themin = numpy.amin(data[1])
                     themax = numpy.amax(data[1])
             prog_range += int(themax - themin)
 
-        Progressbar()
+        #Progressbar()
+        if not hasattr(widgets_list, "widget_progressbar") or widgets_list.widget_progressbar is None:
+            widgets_list.widget_progressbar = Progressbar()
+
         widgets_list.widget_progressbar.set_label("Getting PDFs (single)")
         widgets_list.widget_progressbar.set_range(0, prog_range)
 
@@ -368,7 +369,7 @@ def get_pdfs_and_modes(mode):
                     shared.single_pdfs_y.append([])
 
             else:
-                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
+                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], numpy.ndarray) and data[1].size > 0:
                     # 0 = forces, 1 = lr
                     pdf_x, pdf_y, mode_index = get_pdf_and_mode(
                         data[1], "single")
@@ -392,6 +393,12 @@ def get_pdfs_and_modes(mode):
         for i in range(len(shared.groups_data)):
             data = shared.groups_data[i]
 
+            # Skip empty or None data
+            if data is None or len(data) == 0:
+                shared.groups_pdfs_x.append([])
+                shared.groups_pdfs_y.append([])
+                continue  # Skip to the next data entry
+
             themin = 0
             themax = 0
             if shared.exp.results_type != "loading_rates":
@@ -404,12 +411,16 @@ def get_pdfs_and_modes(mode):
                     themax = numpy.amax(data[1])
             prog_range += int(themax - themin)
 
-        Progressbar()
+        # Progressbar()
+        if not hasattr(widgets_list, "widget_progressbar") or widgets_list.widget_progressbar is None:
+            widgets_list.widget_progressbar = Progressbar()
+
         widgets_list.widget_progressbar.set_label("Getting PDFs (groups)")
         widgets_list.widget_progressbar.set_range(0, prog_range)
 
         for i in range(len(shared.groups_data)):
             data = shared.groups_data[i]
+            # print(f"groups_data[{i}] type: {type(data)}; len(data): {len(data)}")
 
             if shared.exp.results_type != "loading_rates":
                 if isinstance(data, numpy.ndarray) and data.size > 0:
@@ -447,6 +458,13 @@ def get_pdfs_and_modes(mode):
         for i in range(len(shared.conditions_data)):
             data = shared.conditions_data[i]
 
+            # Skip empty or None data
+            if data is None or len(data) == 0:
+                # print(f"Skipping empty or None condition data at index {i}")
+                shared.conditions_pdfs_x.append([])
+                shared.conditions_pdfs_y.append([])
+                continue  # Skip to the next data entry
+
             themin = 0
             themax = 0
             if shared.exp.results_type != "loading_rates":
@@ -459,12 +477,16 @@ def get_pdfs_and_modes(mode):
                     themax = numpy.amax(data[1])
             prog_range += int(themax - themin)
 
-        Progressbar()
+        # Progressbar()
+        if not hasattr(widgets_list, "widget_progressbar") or widgets_list.widget_progressbar is None:
+            widgets_list.widget_progressbar = Progressbar()
+
         widgets_list.widget_progressbar.set_label("Getting PDFs (experiment)")
         widgets_list.widget_progressbar.set_range(0, prog_range)
 
         for i in range(len(shared.conditions_data)):
             data = shared.conditions_data[i]
+            # print(f"conditions_data[{i}] type: {type(data)}; len(data): {len(data)}")
 
             if shared.exp.results_type != "loading_rates":
                 if data:

@@ -29,7 +29,7 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-"""Plots the grouped results."""
+"""Plots the experiment results."""
 
 import numpy
 from ... import shared
@@ -38,7 +38,7 @@ from ...tools import stat_tools
 
 
 class PlotExperimentResults(PlotResults):
-    """Plots the grouped results."""
+    """Plots the experiment results."""
 
     def __init__(self, parent):
         super().__init__(parent)

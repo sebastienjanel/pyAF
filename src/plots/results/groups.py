@@ -86,6 +86,10 @@ class PlotGroupedResults(PlotResults):
 
                         # Density functions
                         if shared.groups_pdfs_x is not None:
+                            if i >= len(shared.groups_pdfs_x) or i >= len(shared.groups_pdfs_y):
+                                continue  # Avoid accessing out-of-range indexes
+
+                        if shared.groups_pdfs_x is not None:
                             self.pdfs.append([
                                 shared.groups_pdfs_x[i],
                                 shared.groups_pdfs_y[i],
@@ -98,7 +102,7 @@ class PlotGroupedResults(PlotResults):
                 for i in range(len(shared.groups_data)):
                     result = shared.exp.groups_list[i]
 
-                    if any(shared.groups_data[i]) and result.display:
+                    if numpy.any(shared.groups_data[i]) and result.display:
                         found_one_label_groups = True
 
                         ma = numpy.amax(shared.groups_data[i][1])
