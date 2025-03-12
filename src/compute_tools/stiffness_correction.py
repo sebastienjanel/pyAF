@@ -99,12 +99,15 @@ class StiffnessCorrection:
         if data.user_h is None or data.user_h == 0:
             d, a, b, _ = data.roi_list[data.roi_glass_id - 1].glass_coeffs
 
+        nf = data.noise_floor
+        if nf is None:
+            nf = 0
+
         x_size = data.scan_size_x / data.nbr_pixels_x
         y_size = data.scan_size_x / data.nbr_pixels_x
 
         for i in range(data.nbr_pixels_x):
             for j in range(data.nbr_pixels_y):
-
                 if data.user_h is None or data.user_h == 0:
                     z_glass = a * (j * y_size) + b * (i * x_size) + d
 
@@ -152,8 +155,8 @@ class StiffnessCorrection:
 
                     if model == 0:
                         # Hertz (paraboloid)
-
-                        if h >= 0:
+                        # Don't correct for height < noise floor
+                        if h >= nf:
                             # Old Chadwick/Dimitriadis correction
                             # X = math.sqrt(indentation * tip_radius) / h
                             # o2 = 1.133 * X + 1.283 * X ** 2
@@ -171,8 +174,8 @@ class StiffnessCorrection:
 
                     elif model == 1 or model == 2:
                         # Sneddon (Cone and Pyramid)
-
-                        if h >= 0:
+                        # Don't correct for height < noise floor
+                        if h >= nf:
                             # Old Chadwick/Dimitriadis correction
                             # X = (indentation) / h
                             # o1 = 1.7795 * (2 * tan_angle / math.pi ** 2) * X

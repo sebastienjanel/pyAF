@@ -409,6 +409,11 @@ class ComputeWidget(PYAFWidget):
         self.list_roi_glass = PYAFComboBox(self, "roi")
         self.list_roi_glass.setFixedSize(100, 26)  # Fixed width to prevent stretching
 
+        # Noise floor input (Label + Input Box)
+        self.label_noise_floor = QtWidgets.QLabel("Noise floor [nm]:")  # Label for noise floor
+        self.IN_noise_floor = PYAFInput(self, "noise_floor", "", width=50)  # Input box for noise floor
+        self.IN_noise_floor.input.setValidator(misc_tools.validator("UF"))  # Validation
+
         # Sample height input (Switched Label & Input Box)
         self.label_sample_height = QtWidgets.QLabel("Sample height [nm]:")  # Separate label
         self.IN_user_h = PYAFInput(self, "user_h", "", width=50)  # Empty label in PYAFInput
@@ -420,6 +425,12 @@ class ComputeWidget(PYAFWidget):
         self.stiff_corr_row.addWidget(self.list_roi_glass)
         self.stiff_corr_row.addStretch(1)  # Push everything to the left
 
+        # Layout for Noise Floor (Label First)
+        self.stiff_corr_noise_row = QtWidgets.QHBoxLayout()
+        self.stiff_corr_noise_row.addWidget(self.label_noise_floor)  # Label
+        self.stiff_corr_noise_row.addWidget(self.IN_noise_floor)  # Input box
+        self.stiff_corr_noise_row.addStretch(1)  # Push to the left
+
         # Layout for Sample Height (Label First)
         self.stiff_corr_height_row = QtWidgets.QHBoxLayout()
         self.stiff_corr_height_row.addWidget(self.label_sample_height)  # Label first
@@ -430,6 +441,7 @@ class ComputeWidget(PYAFWidget):
         self.stiff_corr_opts = QtWidgets.QVBoxLayout()
         self.stiff_corr_opts.addWidget(self.label_info)  # Instruction text
         self.stiff_corr_opts.addLayout(self.stiff_corr_row)  # ROI label + dropdown
+        self.stiff_corr_opts.addLayout(self.stiff_corr_noise_row)  # Add noise floor layout
         self.stiff_corr_opts.addLayout(self.stiff_corr_height_row)  # Sample height label + input
 
         VL_stiff_corr_opts = QtWidgets.QVBoxLayout()
@@ -706,13 +718,16 @@ class ComputeWidget(PYAFWidget):
             value = str(self.list_roi_glass.currentText())
             if value == "None":
                 value = 0
+                self.IN_noise_floor.input.setText("None")
+                data.noise_floor = None
+                self.IN_noise_floor.setEnabled(False)
                 self.IN_user_h.setEnabled(True)
             else:
                 value = int(value)
-                # Disable user input for height.
                 self.IN_user_h.input.setText("None")
                 data.user_h = None
                 self.IN_user_h.setEnabled(False)
+                self.IN_noise_floor.setEnabled(True)
 
             data.roi_glass_id = value
 
@@ -756,6 +771,10 @@ class ComputeWidget(PYAFWidget):
         elif field == "zoom_in_factor":
             val = self.IN_zoom_in_factor.get_float_value()
             data.zoom_fit_preview_factor = val
+
+        elif field == "noise_floor":
+            if self.IN_noise_floor.input.text() != "":
+                data.noise_floor = self.IN_noise_floor.get_float_value()
 
         elif field == "user_h":
             if self.IN_user_h.input.text() != "":

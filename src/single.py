@@ -446,6 +446,7 @@ class SingleFile:
 
         # Height value inputed by the user for the stiffness correction
         self.user_h = None
+        self.noise_floor = None
 
         # Which roi was used for the stiffness correction
         # 0 = None, 1 = first ROI, etc...
