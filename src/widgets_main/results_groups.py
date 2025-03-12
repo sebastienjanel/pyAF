@@ -120,15 +120,16 @@ class ResultsGroupsWidget(PYAFWidget):
         sizePolicy = QtWidgets.QSizePolicy(pol, pol)
         self.tableWidget.setSizePolicy(sizePolicy)
 
-        # Let only the name column be stretched
-        self.tableWidget.setColumnWidth(0, 30)  # Minimal size for checkboxes
+        # Stretch columns but not the checkboxes
+        self.tableWidget.setColumnWidth(0, 35)  # Minimal size for checkboxes
         headers.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-
-        # Leave some blank space on the right
-        spacer = QtWidgets.QSpacerItem(400, 10)
+        self.tableWidget.setColumnWidth(2, 140)
+        self.tableWidget.setColumnWidth(3, 140)
+        self.tableWidget.setColumnWidth(4, 140)
+        self.tableWidget.setColumnWidth(5, 140)
+        self.tableWidget.setColumnWidth(6, 140)
 
         self.HL_tableWidget_groups.addWidget(self.tableWidget)
-        self.HL_tableWidget_groups.addItem(spacer)
 
         widgets_list.widget_progressbar.update()
 

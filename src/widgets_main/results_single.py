@@ -304,13 +304,31 @@ class ResultsSingleWidget(PYAFWidget):
         self.tableWidget.setColumnCount(self.columns.len_visible)
         self.tableWidget.setHorizontalHeaderLabels(self.columns.names)
 
-        # Stretch all columns.
+        # Set specific column widths
         headers = self.tableWidget.horizontalHeader()
-        headers.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        if self.columns.get_column("File").visibility:
-            # Let the user increase the size of this one
-            headers.setSectionResizeMode(0, QtWidgets.QHeaderView.Interactive)
 
+        # Column 1 fixed width
+        self.tableWidget.setColumnWidth(0, 35)
+
+        # Column 2 to be stretchable
+        headers.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+
+        # Column 3 fixed width
+        self.tableWidget.setColumnWidth(2, 140)
+
+        # Set all other columns
+        for col in range(3, 5):  # Start from column 2 (index 2)
+            self.tableWidget.setColumnWidth(col, 90)
+
+        # Set all other columns
+        for col in range(6, self.columns.len_visible):  # Start from column 2 (index 2)
+            self.tableWidget.setColumnWidth(col, 120)
+
+        self.means_labels = []
+        self.medians_labels = []
+        self.sds_labels = []
+        self.mode_labels = []
+        self.checkboxes = []
         self.means_labels = []
         self.medians_labels = []
         self.sds_labels = []
@@ -323,19 +341,6 @@ class ResultsSingleWidget(PYAFWidget):
                 self.tableWidget.removeRow(i)
 
         self.tableWidget.setCurrentCell(0, 0)  # Select first row
-
-        if self.columns.get_column("File").visibility:
-            # Minimal size for checkboxes
-            ind = self.columns.get_column("File").position
-            self.tableWidget.setColumnWidth(ind, 300)
-        if self.columns.get_column("CB").visibility:
-            # Minimal size for checkboxes
-            ind = self.columns.get_column("CB").position
-            self.tableWidget.setColumnWidth(ind, 30)
-        if self.columns.get_column("Group").visibility:
-            # Make groups column bigger
-            ind = self.columns.get_column("Group").position
-            self.tableWidget.setColumnWidth(ind, 140)
 
         # Create new rows
         for i in range(len(shared.exp.results_list)):

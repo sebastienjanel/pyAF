@@ -139,7 +139,7 @@ class ResultsExperimentWidget(PYAFWidget):
         self.tableWidget.setSizePolicy(sizePolicy)
 
         # Let only the name column be stretched
-        self.tableWidget.setColumnWidth(0, 30)  # Minimal size for checkboxes
+        self.tableWidget.setColumnWidth(0, 35)  # Minimal size for checkboxes
         hist_headers.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
 
         # Stats table ##################################################################################################
@@ -325,7 +325,7 @@ class ResultsExperimentWidget(PYAFWidget):
     def add_row_in_stats_tablewidget_conditions(self, i):
         """Adds a row in the experiment results statistics table."""
         # Default row height is 30, but it is too big
-        self.stats_tableWidget.setRowHeight(i, 25)
+        self.stats_tableWidget.setRowHeight(i, 40)
 
         center = QtCore.Qt.AlignHCenter + QtCore.Qt.AlignVCenter
         pair = shared.exp.sample_groups[i]
