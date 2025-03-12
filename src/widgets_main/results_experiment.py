@@ -273,7 +273,7 @@ class ResultsExperimentWidget(PYAFWidget):
     def add_row_in_tablewidget_conditions(self, i):
         """Adds a row in the groups results table."""
         # Default row height is 30, but it is too big
-        self.tableWidget.setRowHeight(i, 25)
+        self.tableWidget.setRowHeight(i, 40)
 
         center = QtCore.Qt.AlignHCenter + QtCore.Qt.AlignVCenter
         condition = shared.exp.conditions_list[i + 1]

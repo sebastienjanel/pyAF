@@ -203,7 +203,7 @@ class ResultsGroupsWidget(PYAFWidget):
     def add_row_in_tablewidget_groups(self, i):
         """Adds a row in the groups results table."""
         # Default row height is 30, but it is too big
-        self.tableWidget.setRowHeight(i, 25)
+        self.tableWidget.setRowHeight(i, 40)
 
         center = QtCore.Qt.AlignHCenter + QtCore.Qt.AlignVCenter
         group = shared.exp.groups_list[i + 1]
