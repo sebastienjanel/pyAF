@@ -148,7 +148,7 @@ class ResultsExperimentWidget(PYAFWidget):
         rows = len(shared.exp.sample_groups)
         # Define small sizes, will for the tablewidget to shrink so that the
         # window fits for 13 inch screens.
-        stats_w = 60
+        stats_w = 50
         stats_h = 50
         self.stats_tableWidget = PYAFTableWidget(stats_w, stats_h, rows, 4)
         behavior = QtWidgets.QAbstractItemView.SelectRows
@@ -168,7 +168,7 @@ class ResultsExperimentWidget(PYAFWidget):
         self.stats_tableWidget.verticalHeader().hide()
 
         # Set maximum size for stats widget
-        max_w = 400
+        max_w = 650
         self.stats_tableWidget.setMaximumWidth(max_w)
 
         # Let the tablewidget expand
@@ -177,7 +177,7 @@ class ResultsExperimentWidget(PYAFWidget):
         self.stats_tableWidget.setSizePolicy(sizePolicy)
 
         # Let only the name column be stretched
-        self.stats_tableWidget.setColumnWidth(0, 30)  # Minimal size for checkboxes
+        self.stats_tableWidget.setColumnWidth(0, 35)  # Minimal size for checkboxes
         stats_headers.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
 
         widgets_list.widget_progressbar.update()
