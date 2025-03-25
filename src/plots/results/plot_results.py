@@ -31,20 +31,14 @@
 # knowledge of the CeCILL license and that you accept its terms.
 
 """Main results plotting module."""
-import random
 
-import numpy
 import textwrap
-
+import numpy
 import pandas as pd
-from matplotlib.pyplot import xlabel, ylabel, margins, xticks
-from seaborn import axes_style
-import numpy as np
-import matplotlib.pyplot as pyplot
 import seaborn as sns
 
-from ... import shared
 from ..plot_main import MainPlot
+from ... import shared
 
 
 class PlotResults(MainPlot):

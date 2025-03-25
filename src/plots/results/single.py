@@ -33,12 +33,10 @@
 """Plots the single results."""
 
 import numpy
-from numpy.ma.core import array
-from sympy.physics.quantum.circuitplot import pyplot
 
+from .plot_results import PlotResults
 from ... import shared
 from ...tools import stat_tools
-from .plot_results import PlotResults
 
 
 class PlotSingleResults(PlotResults):

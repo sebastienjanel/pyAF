@@ -10,13 +10,10 @@ DATA_FILES = []
 OPTIONS = {
     'includes': ['itk'],  # Add ITK to ensure it’s bundled
     'packages': [
-        'PIL', 'PyQt5', 'altgraph', 'anyio', 'asteval', 'blosc2', 'certifi',
-        'contourpy', 'cpuinfo', 'cycler', 'dill', 'fontTools', 'h11', 'h5py',
-        'httpx', 'idna', 'itk', 'itkConfig', 'kiwisolver', 'lmfit', 'macholib',
-        'markdown', 'matplotlib', 'modulegraph', 'mpmath', 'msgpack', 'ndindex',
-        'numexpr', 'numpy', 'packaging', 'pandas', 'psutil', 'pyparsing', 'pytz',
-        'qtpy', 'qtwidgets', 'scipy', 'seaborn', 'tables', 'typing_extensions',
-        'uncertainties', 'vtk', 'vtkmodules'
+        'PIL', 'PyQt5', 'h5py', 'itk', 'lmfit',
+        'matplotlib', 'numpy', 'packaging', 'pandas', 'psutil',
+        'qtpy', 'scipy', 'seaborn', 'tables',
+        'vtk'
     ],
     'excludes': ['setuptools', 'py2app', 'pytest', 'distutils', 'pip'],
     'resources': ['src'],  # Add additional resources if needed
