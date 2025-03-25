@@ -102,7 +102,7 @@ class SlicesWidget(PYAFWidget):
         self.HL_lists.addStretch(1)
 
         self.GL_slices = QtWidgets.QGridLayout()
-        self.GL_slices.addWidget(self.canvas, 0, 0, 1, 0)
+        self.GL_slices.addWidget(self.canvas, 0, 0, 1, 1)
         self.GL_slices.addWidget(self.CB_display_topo, 1, 0)
         self.GL_slices.addWidget(self.CB_aspect, 1, 1)
         self.GL_slices.addLayout(self.HL_lists, 2, 0, 1, 0)

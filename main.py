@@ -42,14 +42,6 @@ else:
     # Running in normal Python
     base_path = os.path.abspath(os.path.dirname(__file__))
 
-# Assuming your folder structure is like:
-# pyAF/
-# ├── main.py
-# └── pyAF/
-#     └── src/
-#         ├── __init__.py
-#         └── pyaf.py
-#
 # We need to add the parent folder of the inner "pyAF" package.
 parent_path = os.path.abspath(os.path.join(base_path, '..'))
 if parent_path not in sys.path:

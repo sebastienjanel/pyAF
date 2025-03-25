@@ -317,7 +317,7 @@ class EntryWidget(QtWidgets.QDialog):
             self.label_triangle.setPixmap(pixmap)
         else:
             self.display_advanced = True
-            self.GL_advanced.addWidget(self.checkbox, 0, 0, 1, 0)
+            self.GL_advanced.addWidget(self.checkbox, 0, 0, 1, 1)
             self.GL_advanced.addWidget(self.BT_reset_path, 1, 0)
             self.GL_advanced.addWidget(self.BT_change_path, 1, 1)
             self.GL_advanced.addWidget(self.label_path, 1, 2)
