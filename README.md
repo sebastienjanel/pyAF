@@ -23,4 +23,12 @@ Modified by Antoine Dujardin, Simone Bovio, Javier Lopez-Alonso, Nuno Duarte, SÃ
 When using the program, cite the original article : Stiffness tomography of eukaryotic intracellular compartments by atomic force microscopy (Nanoscale, 2019,11, 10320-10328).
 DOI	https://doi.org/10.1039/C8NR08955H
 
-DISCLAIMER: pyAF is a lab-developed software, it is not a commercial software. Check as much as possible results provided vs other software (e.g. JPK DP) to rule out any no supported edges cases. 
+DISCLAIMER: pyAF is a lab-developed software, it is not a commercial software.
+Check as much as possible results provided vs other software (e.g. JPK DP) to rule out any no supported edges cases! 
+
+INSTALL procedure with PyCharm software (free for academics):
+- copy the repository address from Github website (https://github.com/sebastienjanel/pyAF.git)
+- clone the repository in PyCharm (File/Project from Version Control)
+- install required packages from the terminal of PyCharm: pip install -r requirements.txt
+- configure the Run/Debug configuration by choosing the script /pyAF/main.py with the Python version of your venv
+- click run

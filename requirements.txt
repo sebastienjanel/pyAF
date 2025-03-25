@@ -8,6 +8,8 @@ pandas==2.2.3
 pillow==11.1.0
 psutil==7.0.0
 PyQt5==5.15.11
+qtwidgets==1.1
+QtPy==2.4.3
 scipy==1.15.2
 seaborn==0.13.2
 setuptools==78.0.2
