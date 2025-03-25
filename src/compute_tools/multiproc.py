@@ -377,7 +377,7 @@ def compute(mode, calc_id, params, path):
         for processor in processors:
             processor.join()
 
-        widgets_list.widget_progressbar.set_label("Saving results ...")
+        widgets_list.widget_progressbar.set_label("Saving results")
 
         # Shut down the FileAccess instance
         shutdown_send.send(0)
@@ -386,7 +386,7 @@ def compute(mode, calc_id, params, path):
         # to the disk
         file_access.join()
 
-        widgets_list.widget_progressbar.set_label("Getting elasticity")
+        widgets_list.widget_progressbar.set_label("Computing")
 
     return list_of_smoothing_errors
 
