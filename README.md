@@ -24,7 +24,7 @@ When using the program, cite the original article : Stiffness tomography of euka
 DOI	https://doi.org/10.1039/C8NR08955H
 
 DISCLAIMER: pyAF is a lab-developed software, it is not a commercial software.
-Check as much as possible results provided vs other software (e.g. JPK DP) to rule out any no supported edges cases! 
+Check as much as possible results provided vs other software (e.g. JPK DP) to rule out any no supported edge cases! 
 
 INSTALL procedure with PyCharm software (free for academics):
 - clone the repository (https://github.com/sebastienjanel/pyAF.git) in PyCharm (File/Project from Version Control)
