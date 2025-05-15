@@ -1,0 +1,139 @@
+{
+    "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+    "type": "SoftwareSourceCode",
+    "applicationCategory": "Microscopy",
+    "author": [
+        {
+            "id": "_:author_1",
+            "type": "Person",
+            "familyName": "Popoff",
+            "givenName": "Michka"
+        },
+        {
+            "type": "schema:Role",
+            "schema:author": "_:author_1",
+            "schema:roleName": "Developer"
+        },
+        {
+            "id": "_:author_2",
+            "type": "Person",
+            "familyName": "Dujardin",
+            "givenName": "Antoine"
+        },
+        {
+            "type": "schema:Role",
+            "schema:author": "_:author_2",
+            "schema:roleName": "Developer"
+        },
+        {
+            "id": "_:author_3",
+            "type": "Person",
+            "familyName": "Lopez-Alonso",
+            "givenName": "Javier"
+        },
+        {
+            "type": "schema:Role",
+            "schema:author": "_:author_3",
+            "schema:roleName": "Developer"
+        },
+        {
+            "id": "https://orcid.org/0000-0001-6736-3162",
+            "type": "Person",
+            "email": "sebastien.janel@cnrs.fr",
+            "familyName": "Janel",
+            "givenName": "Sébastien"
+        },
+        {
+            "type": "schema:Role",
+            "schema:author": "https://orcid.org/0000-0001-6736-3162",
+            "schema:roleName": "Contact"
+        },
+        {
+            "type": "schema:Role",
+            "schema:author": "https://orcid.org/0000-0001-6736-3162",
+            "schema:roleName": "Maintainer"
+        },
+        {
+            "type": "schema:Role",
+            "schema:author": "https://orcid.org/0000-0001-6736-3162",
+            "schema:roleName": "Developer"
+        }
+    ],
+    "codeRepository": "https://github.com/sebastienjanel/pyAF.git",
+    "contributor": [
+        {
+            "id": "_:contributor_1",
+            "type": "Person",
+            "familyName": "Dupres",
+            "givenName": "Vincent"
+        },
+        {
+            "type": "schema:Role",
+            "contributor": "_:contributor_1",
+            "schema:roleName": "Contributor"
+        },
+        {
+            "id": "_:contributor_2",
+            "type": "Person",
+            "familyName": "Lafont",
+            "givenName": "Frank"
+        },
+        {
+            "type": "schema:Role",
+            "contributor": "_:contributor_2",
+            "schema:roleName": "Contributor"
+        },
+        {
+            "id": "_:contributor_3",
+            "type": "Person",
+            "familyName": "Bovio",
+            "givenName": "Simone"
+        },
+        {
+            "type": "schema:Role",
+            "contributor": "_:contributor_3",
+            "schema:roleName": "Developer"
+        },
+        {
+            "id": "_:contributor_4",
+            "type": "Person",
+            "familyName": "Duarte",
+            "givenName": "Nuno"
+        },
+        {
+            "type": "schema:Role",
+            "contributor": "_:contributor_4",
+            "schema:roleName": "Developer"
+        }
+    ],
+    "dateCreated": "2014-12-01",
+    "dateModified": "2025-01-20",
+    "datePublished": "2025-01-20",
+    "description": "pyAF is a Python software to analyze force curves & force maps acquired by atomic force microscopes (Bruker and JPK)",
+    "funder": {
+        "type": "Organization",
+        "name": "Univ. Lille"
+    },
+    "keywords": [
+        "Atomic Force Microscopy",
+        "AFM",
+        "Elasticity"
+    ],
+    "license": "https://spdx.org/licenses/CECILL-2.1",
+    "name": "pyAF",
+    "operatingSystem": [
+        "Linux",
+        "Windows",
+        "Mac OS"
+    ],
+    "programmingLanguage": [
+        "Python 2",
+        "Python 3"
+    ],
+    "softwareRequirements": "https://github.com/sebastienjanel/pyAF/blob/main/requirements.txt",
+    "version": "4",
+    "developmentStatus": "active",
+    "funding": "ANR-10-EQPX-04-01, FEDER 12001407",
+    "issueTracker": "https://github.com/sebastienjanel/pyAF/issues",
+    "referencePublication": "https://doi.org/10.1039/C8NR08955H"
+}
