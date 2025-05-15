@@ -1,6 +1,6 @@
-#pyAF : An AFM Force Curve Analysis Software
+# pyAF : An AFM Force Curve Analysis Software
 
-pyAF is a tool to analyze force curves & force maps acquired by atomic force microscopes (Bruker and JPK).
+pyAF is a Python software to analyze force curves & force maps acquired by atomic force microscopes (Bruker and JPK).
 Developed at CMPI lab (https://cmpi.cnrs.fr).
 
 It computes:
@@ -27,8 +27,7 @@ DISCLAIMER: pyAF is a lab-developed software, it is not a commercial software.
 Check as much as possible results provided vs other software (e.g. JPK DP) to rule out any no supported edges cases! 
 
 INSTALL procedure with PyCharm software (free for academics):
-- copy the repository address from Github website (https://github.com/sebastienjanel/pyAF.git)
-- clone the repository in PyCharm (File/Project from Version Control)
+- clone the repository (https://github.com/sebastienjanel/pyAF.git) in PyCharm (File/Project from Version Control)
 - install required packages from the terminal of PyCharm: pip install -r requirements.txt
 - configure the Run/Debug configuration by choosing the script /pyAF/main.py with the Python version of your venv
 - click run
