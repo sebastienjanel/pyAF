@@ -37,15 +37,11 @@ experiment planner to make 5 forces curves per pixel with pauses and different
 settings, PYAF will not be able to open it. PYAF can only open files with
 one approach and one retraction curve per pixel (pauses are allowed).
 """
-import struct
 
 import numpy
 from dateutil.parser import parse
 from struct import unpack
 import zipfile
-from PyQt5 import QtWidgets
-import pandas as pd
-import h5py
 
 from ... import widgets_list
 from ... import shared
@@ -91,7 +87,7 @@ class LoaderJPK:
         self.height_channel_name = ""
         self.corrupted_pixel = []
 
-        # Variables for modulation segments 
+        # Variables for modulation segments
         self.segment_freqs = []
         self.segment_amps = []
         self.modulation_seg_count = 0
@@ -301,11 +297,9 @@ class LoaderJPK:
                             # Do the actual segment type extraction
                             seg = extract_str(line)
                             self.segments_types.append([segment_nbr, seg])
-                                
+
                         except KeyError:
-                            print("You changed the number of points per "
-                                  "curve during the scan. The file was "
-                                  "loaded but data may be missing.")
+                            print("The file was loaded but some data may be missing.")
 
                     val_2 = header_info_path + "duration"
                     if line.find(val_2) != -1:
@@ -313,10 +307,10 @@ class LoaderJPK:
                         self.segment_durations.append(duration)
 
                     val_3 = header_info_path + "frequency"
-                    if line.find(val_3) != -1: 
+                    if line.find(val_3) != -1:
                         frequency = extract_float(line)
                         self.segment_freqs.append(frequency)
-                    
+
                     val_4 = header_info_path + "amplitude"
                     if line.find(val_4) != -1:
                         amplitude = extract_float(line)
@@ -338,7 +332,7 @@ class LoaderJPK:
                     for line in afile.splitlines():
                         line = line.decode()
                         header_info_path = "force-segment-header.settings.segment-settings."
-                        
+
                         val = header_info_path + "style"
                         if line.find(val) != -1:
                             seg = extract_str(line)
@@ -348,16 +342,16 @@ class LoaderJPK:
                         if line.find(val_2) != -1:
                             duration = extract_float(line)
                             self.segment_durations.append(duration)
-                        
+
                         val_3 = header_info_path + "frequency"
                         if line.find(val_3) != -1:
-                                frequency = extract_float(line)
-                                self.segment_freqs.append(frequency)
-                        
+                            frequency = extract_float(line)
+                            self.segment_freqs.append(frequency)
+
                         val_4 = header_info_path + "amplitude"
                         if line.find(val_4) != -1:
-                                amplitude = extract_float(line)
-                                self.segment_amps.append(amplitude)
+                            amplitude = extract_float(line)
+                            self.segment_amps.append(amplitude)
 
                 except KeyError:
                     pass
@@ -528,7 +522,7 @@ class LoaderJPK:
                     if channel_name == "measuredHeight":
                         measured_height_channel_found = True
                     if channel_name == "height":
-                        height_channel_found = True  # For working with felix data, no height sensor.
+                        height_channel_found = True  # For working with no height sensor.
 
                     # Check if the channel file is present in the first
                     # segment of the first pixel, because this is not always
@@ -593,25 +587,38 @@ class LoaderJPK:
                     if line.find(pre + ".encoder.scaling.multiplier") != -1:
                         val = extract_float(line)
                         self.enc_capSensHeight_mult = val
-                elif channel[1] == "height":
-                    if line.find(pre + ".encoder.scaling.offset") != -1:
-                        val = extract_float(line)
-                        self.enc_capSensHeight_offset = val
-                    if line.find(pre + ".encoder.scaling.multiplier") != -1:
-                        val = extract_float(line)
-                        self.enc_capSensHeight_mult = val
+                # height is piezo-based estimation
 
         # Are there some conversions to do ?
         # print(self.channels)
         for channel in self.channels:
             if channel[1] == "vDeflection":
                 v_deflection_index = str(channel[0])
-            if channel[1] == "capacitiveSensorHeight":
-                height_index = str(channel[0])
-            if channel[1] == "measuredHeight":
-                height_index = str(channel[0])
-            if channel[1] == 'height':  # For working with felix data, no height sensor.
-                height_index = str(channel[0])
+
+            height_index = None
+
+            # 1) measuredHeight (capacitive sensor, preferred)
+            for channel in self.channels:
+                if channel[1] == "measuredHeight":
+                    height_index = str(channel[0])
+                    self.height_channel_name = "measuredHeight"
+                    break
+
+            # 2) capacitiveSensorHeight (old name)
+            if height_index is None:
+                for channel in self.channels:
+                    if channel[1] == "capacitiveSensorHeight":
+                        height_index = str(channel[0])
+                        self.height_channel_name = "capacitiveSensorHeight"
+                        break
+
+            # 3) height (piezo estimation, fallback only)
+            if height_index is None:
+                for channel in self.channels:
+                    if channel[1] == "height":
+                        height_index = str(channel[0])
+                        self.height_channel_name = "height"
+                        break
 
         # vDeflection
         base_defined = False
@@ -815,34 +822,6 @@ class LoaderJPK:
 
         time_segments = self.get_time_segments()
 
-        """ 
-        # Decide if we want to implement data export to HDF5
-        # hdf5 file name
-        hdf_name = f"{self.file_name}.hdf5"
-        hdf_file = h5py.File(hdf_name, "w")
-
-        grp_metadata = hdf_file.create_group("metadata")
-
-        # Append metadata to dataframe
-        metadata = {
-            "deflection_sens": self.data._original_deflection_sensitivity,
-            "spring_cte": self.data._original_spring_constant,
-            "exp_temp": self.data._original_temperature,
-            "nbr_points_per_curve_approach": self.data.nbr_points_per_curve_approach,
-            "nbr_points_pause": self.nbr_points_array_pause,
-            "nbr_points_per_curve_modulation": self.max_nbr_points_modulation,
-            "nbr_points_retract": self.data.nbr_points_per_curve_retraction,
-            "app_positions": app_positions,
-            "ret_positions": ret_positions
-        }
-
-        for key, value in metadata.items():
-            if value is not None:
-                grp_metadata.attrs[key] = value
-
-        grp_data = hdf_file.create_group("data")
-        """
-
         for index_nbr in range(self.data.real_nbr_pixels):
             if self.file_type != "JPK (Single File)":
                 seg_path = "index/" + str(index_nbr) + "/segments/"
@@ -955,7 +934,6 @@ class LoaderJPK:
                         ">" + str(nbr_points) + "i",
                         self.afm_file.read(segment_path + ch_2))
 
-
                     # Conversion of the values
                     base_val2 = (sc_pause[0] * self.enc_capSensHeight_mult +
                                  self.enc_capSensHeight_offset)
@@ -983,7 +961,6 @@ class LoaderJPK:
                     sc_modulation = numpy.zeros([3, nbr_points])
 
                     if self.corrupted_pixel[index_nbr]:
-
                         # Capacitive Sensor Height
                         sc_modulation[0][:nbr_points] = unpack(
                             ">" + str(nbr_points) + "i",
@@ -1073,67 +1050,6 @@ class LoaderJPK:
             # Update progressbar every curve
             widgets_list.widget_progressbar.update()
 
-            """
-            grp_curve = grp_data.create_group(f"{index_nbr}")
-                
-            xzero_1 = sc_retraction[0][retraction_startpos]
-            approach = {
-                "Height": xzero_1 -sc_approach[0],
-                "vDeflection": sc_approach[1],
-                "time": sc_approach[2]
-            }
-
-            subgrp_app = grp_curve.create_group("extend")
-            subgrp_app.create_dataset("height", data=approach["Height"])
-            subgrp_app.create_dataset("vDeflection", data=approach["vDeflection"])
-            subgrp_app.create_dataset("time", data=approach["time"])
-
-            if self.data.nbr_points_per_pause_curve is not None:
-                pause = {
-                    "Height": xzero_1 -sc_pause[0],
-                    "vDeflection": sc_pause[1],
-                    "time": sc_pause[2]
-                }
-
-                subgrp_pause = grp_curve.create_group("pause")
-                subgrp_pause.create_dataset("height", data=pause["Height"])
-                subgrp_pause.create_dataset("vDeflection", data=pause["vDeflection"])
-                subgrp_pause.create_dataset("time", data=pause["time"])
-
-            if self.max_nbr_points_modulation is not None:
-                subgrp_modulation = grp_curve.create_group("modulation")
-                for i in range(len(self.segments["modulation"])):
-                    modulation = {
-                        "Height": xzero_1 -modulation_segments[i][0],
-                        "vDeflection": modulation_segments[i][1],
-                        "time": modulation_segments[i][2]
-                    }
-
-                    subgrp = subgrp_modulation.create_group(self.segments["modulation"][i])
-                    # Save frequency and amplitude for every segment as an attribute
-                    subgrp.attrs["frequency"] = self.segment_freqs[i]
-                    subgrp.attrs["amplitude"] = self.segment_amps[i]
-                    # Create datasets for every modulation segment
-                    subgrp.create_dataset("height", data=modulation["Height"])
-                    subgrp.create_dataset("vDeflection", data=modulation["vDeflection"])
-                    subgrp.create_dataset("time", data=modulation["time"])
-
-            retract = {
-                "segment_type": "retract",
-                "segment_index": self.segments["retract"],
-                "Height": xzero_1 -sc_retraction[0],
-                "vDeflection": sc_retraction[1],
-                "time": sc_retraction[2]
-            }
-
-            subgrp_retract = grp_curve.create_group("retract")
-            subgrp_retract.create_dataset("height", data=retract["Height"])
-            subgrp_retract.create_dataset("vDeflection", data=retract["vDeflection"])
-            subgrp_retract.create_dataset("time", data=retract["time"])
-
-        hdf_file.close()
-        """
-
         # Fill empty curves with zeros
         max_curves = self.data.nbr_pixels_x * self.data.nbr_pixels_y
 
@@ -1147,17 +1063,17 @@ class LoaderJPK:
             nbr_points = self.nbr_points_array_approach[index_nbr]
             defl = numpy.zeros(nbr_points).tolist()
             ext = list(range(nbr_points))
-            #print(f"curves_approach shape: {curves_approach.shape}")
+            # print(f"curves_approach shape: {curves_approach.shape}")
             padded_approach = self.pad_curve(ext, defl, fill_value=0)
             curves_approach[self.pos_x, self.pos_y, :, :] = padded_approach
 
-            #curves_approach[self.pos_x, self.pos_y, :, :] = [ext, defl]
+            # curves_approach[self.pos_x, self.pos_y, :, :] = [ext, defl]
 
             # Retraction
             nbr_points = self.nbr_points_array_retraction[index_nbr]
             defl = numpy.zeros(nbr_points).tolist()
             ext = list(range(nbr_points))
-            #curves_retraction[self.pos_x, self.pos_y, :, :] = [ext, defl]
+            # curves_retraction[self.pos_x, self.pos_y, :, :] = [ext, defl]
             padded_retraction = self.pad_curve(ext, defl, fill_value=0)
             curves_retraction[self.pos_x, self.pos_y, :, :] = padded_retraction
 
