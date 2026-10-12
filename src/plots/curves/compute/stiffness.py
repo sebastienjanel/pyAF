@@ -42,7 +42,7 @@ class ComputeStiffness(PlotCurve):
         super().__init__(parent)
 
         # Labels
-        self.xlabel = "Scanner Extension [nm]"
+        self.xlabel = "Height (measured if available) [nm]"
         self.ylabel = "Deflection [nm]"
 
         self.curve_approach = self.approach

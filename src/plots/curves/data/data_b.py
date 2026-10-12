@@ -42,7 +42,7 @@ class PlotDataCurveB(PlotCurve):
 
         # Labels
         self.xlabel = "time [s]"
-        self.ylabel = "Scanner Extension [nm]"
+        self.ylabel = "Height (measured if available) [nm]"
 
         self.curve_approach = self.approach
         self.curve_retraction = self.retraction
