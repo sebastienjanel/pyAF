@@ -274,6 +274,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Close progressbar and display message + beep
         if wl.widget_progressbar is not None:
             wl.widget_progressbar.close()
+        # Place the window before displaying the message, which is centered
+        # on it
+        self.center_on_screen()
+
         if consts.AUTOLOAD is False and consts.UNIT_TESTING is False:
             QtWidgets.QApplication.beep()
             QtWidgets.QMessageBox.warning(self, "Information", "Loading done.")
@@ -314,6 +318,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.timer4 = QtCore.QTimer.singleShot(
                     0, mesh.refresh_blitting)
 
+
+    def center_on_screen(self):
+        """Centers the window on the screen, keeping it inside the screen."""
+        screen = QtGui.QGuiApplication.primaryScreen().availableGeometry()
+        self.adjustSize()
+        self.resize(self.size().boundedTo(screen.size()))
+        geometry = QtCore.QRect(QtCore.QPoint(0, 0), self.size())
+        geometry.moveCenter(screen.center())
+        self.move(geometry.topLeft())
 
     def display_message(self):
         """Displays a message telling the user he needs to save.
@@ -1223,7 +1236,6 @@ def main(app=None, files=None):
 
     # Create main window once the loading window is closed
     main_window = MainWindow(files_info)
-    main_window.move(0, 0)
     main_window.show()
     if sys.platform == "darwin":
         main_window.raise_()
