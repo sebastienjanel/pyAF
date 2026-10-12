@@ -31,7 +31,8 @@
 
 """A progressbar."""
 
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
+from .. import widgets_list
 from ..tools.PYAFWidget import PYAFWidget
 
 
@@ -55,7 +56,22 @@ class Progressbar(PYAFWidget):
         self.setLayout(self.widget_VL)
         self.counter = 0
         self.progressbar.setRange(0, 0)
+        self.adjustSize()
         self.show()
+        # Center once shown, when the size of the title bar is known
+        self.center_window()
+
+    def center_window(self):
+        """Center on the main window if it is displayed, else on the screen."""
+        main = widgets_list.widget_main
+        if main is not None and main.isVisible():
+            center = main.frameGeometry().center()
+        else:
+            screen = QtGui.QGuiApplication.primaryScreen()
+            center = screen.availableGeometry().center()
+        geometry = self.frameGeometry()
+        geometry.moveCenter(center)
+        self.move(geometry.topLeft())
 
     def update(self):
         """Update by one step."""
