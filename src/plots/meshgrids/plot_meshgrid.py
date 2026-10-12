@@ -215,14 +215,15 @@ class PlotMeshGrid(MainPlot):
 
         elif (self.colormap in ("Rainbow 1", "Cool-Warm")
               and self.data_meshgrid is not None):
-            # Rainbow 1 and Cool-Warm
+            # Rainbow 1 and Cool-Warm. Use the colortable and values of this
+            # meshgrid (in a multimeshgrid they differ from the data's ones)
             self.colortable = ColorTables(
-                self.data.colortableid,
-                self.data.color_saturation,
-                self.data.color_negative,
-                self.data.colortable_max_value *
+                self.colortables.colortables_mpl_list.index(self.colormap),
+                self.color_saturation,
+                self.color_negative,
+                self.colortable_max_value *
                 self.factor,
-                self.data.colortable_middle_value *
+                self.colortable_middle_value *
                 self.factor,
                 color_nan=self.color_nan)
 
