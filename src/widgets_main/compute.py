@@ -200,7 +200,7 @@ class ComputeWidget(PYAFWidget):
         self.label_models_list = QtWidgets.QLabel("Model : ")
         self.list_models = PYAFComboBox(self, "list_models")
         self.models = [
-            "Hertz (Paraboloid)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Stiffness tomography", "Flat punch"]
+            "Hertz (Paraboloid)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Slope", "Flat punch"]
         for model in self.models:
             self.list_models.addItem(str(model))
 

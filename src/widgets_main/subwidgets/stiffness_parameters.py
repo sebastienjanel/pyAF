@@ -99,7 +99,7 @@ class StiffnessParamsWidget(PYAFWidget):
         self.STK_data_selection.addWidget(self.indentation_selection)
 
         # Checkboxes
-        label = "Tomography"
+        label = "Stiffness tomography"
         self.CB_tomography = PYAFCheckBox(self, "tomography", label)
         # self.CB_strict_stop = PYAFCheckBox(self, "strict_stop", "Strict stop")
         # self.CB_perform_fit = PYAFCheckBox(self, "perform_fit", "Perform fit")
@@ -216,6 +216,14 @@ class StiffnessParamsWidget(PYAFWidget):
 
         if checkbox == "tomography":
             state = self.CB_tomography.isChecked()
-            shared.exp.list[shared.exp.id_selected].tomography = state
+            data = shared.exp.list[shared.exp.id_selected]
+            data.tomography = state
+
+            if state:
+                # Stiffness tomography uses the slope model
+                data.stiffness_model_selected = 3
+                compute = widgets_list.widget_compute
+                compute.update_GUI("stiffness_model_selected")
+                compute.update_GUI("grid_model_options")
 
         # widgets_list.widget_compute.update_MPL("MPL_canvas")
