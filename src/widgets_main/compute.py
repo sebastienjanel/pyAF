@@ -503,6 +503,10 @@ class ComputeWidget(PYAFWidget):
 
         self.STK_stiffness_mode.setCurrentIndex(data.stiffness_mode)
 
+        # Calculus/Tomography and Fitting parameters (start, segment size,
+        # ranges) of the selected file
+        self.widget_calculus.update_widget()
+        self.widget_fitting.update_widget()
         widgets_list.widget_fit_param_pocs.update_widget()
         widgets_list.widget_fit_param_jocs.update_widget()
         widgets_list.widget_fit_param_jocs_events.update_widget()
@@ -601,6 +605,13 @@ class ComputeWidget(PYAFWidget):
             self.IN_user_h.input.setText("None")
             if data.user_h is not None:
                 self.IN_user_h.input.setText(str(data.user_h))
+            self.IN_noise_floor.input.setText("None")
+            if data.noise_floor is not None:
+                self.IN_noise_floor.input.setText(str(data.noise_floor))
+            # The noise floor is used with a substrate ROI, the sample height
+            # without one
+            self.IN_noise_floor.setEnabled(data.roi_glass_id != 0)
+            self.IN_user_h.setEnabled(data.roi_glass_id == 0)
 
         if element == "get_lr" or element == "all":
             self.BT_get_lr.setEnabled(data.events_calculated)

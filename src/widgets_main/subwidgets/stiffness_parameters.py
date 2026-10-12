@@ -147,22 +147,19 @@ class StiffnessParamsWidget(PYAFWidget):
         """
         data = shared.exp.current_data
 
+        # Fill all the inputs (also the hidden ones, e.g. the other range
+        # mode), so that they all display the values of the selected file
+        self.IN_start.changeValue(data.indentation_start)
+        self.IN_stop.changeValue(data.indentation_stop)
+        self.IN_step.changeValue(data.indentation_step)
+        self.F_start.changeValue(data.force_start)
+        self.F_stop.changeValue(data.force_stop)
+
         if self.name == "widget_calculus":
-            self.IN_start.changeValue(data.indentation_start)
-            self.IN_step.changeValue(data.indentation_step)
             self.CB_tomography.setChecked(data.tomography)
 
         elif self.name == "widget_fitting":
             val = data.fit_range_type
-
-            if val == 0:
-                self.F_start.changeValue(data.force_start)
-                self.F_stop.changeValue(data.force_stop)
-
-            elif val == 1:
-                self.IN_start.changeValue(data.indentation_start)
-                self.IN_stop.changeValue(data.indentation_stop)
-
             self.list_range_mode.setCurrentIndex(val)
             self.STK_data_selection.setCurrentIndex(val)
 

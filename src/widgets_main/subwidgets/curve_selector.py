@@ -85,9 +85,12 @@ class ResultsSelectorWidget(PYAFWidget):
         xpos = shared.exp.meshgrid_click_xpos + 1
         ypos = shared.exp.meshgrid_click_ypos + 1
 
+        # Allowed positions for the selected file (the files can have
+        # different sizes)
+        self.IN_curve_x.input.setValidator(validator("x"))
+        self.IN_curve_y.input.setValidator(validator("y"))
+
         # Update the inputs
-        self.IN_curve_x.changeValue(xpos)
-        self.IN_curve_y.changeValue(ypos)
         self.IN_curve_x.changeValue(xpos)
         self.IN_curve_y.changeValue(ypos)
 
