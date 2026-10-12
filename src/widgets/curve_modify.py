@@ -59,16 +59,16 @@ class CurveModWidget(PYAFWidget):
 
         self.logger = logging.getLogger()
 
-        self.sel_st1 = "QWidget#widget_tilt { background-color: #3daee9; }"
-        self.sel_st2 = "QWidget#widget_stretch { background-color: #3daee9; }"
+        self.sel_st1 = "QWidget#widget_tilt { background-color: #3b8eea; }"
+        self.sel_st2 = "QWidget#widget_stretch { background-color: #3b8eea; }"
 
         if shared.exp.current_theme == "Dark":
             self.un_st1 = "QWidget#widget_tilt { background-color: #31363b; }"
             self.un_st2 = "QWidget#widget_stretch { background-color: #31363b; }"
 
         elif shared.exp.current_theme == "Light":
-            self.un_st1 = "QWidget#widget_tilt { background-color: #EFF0F1; }"
-            self.un_st2 = "QWidget#widget_stretch { background-color: #EFF0F1; }"
+            self.un_st1 = "QWidget#widget_tilt { background-color: #E4E6E9; }"
+            self.un_st2 = "QWidget#widget_stretch { background-color: #E4E6E9; }"
 
         self.gridLayout = QtWidgets.QGridLayout()
 

@@ -34,6 +34,7 @@
 import numpy
 from matplotlib.offsetbox import AnchoredText
 from ... import shared
+from ...gui_styles.theme_handler import curve_color
 from matplotlib.collections import LineCollection
 from matplotlib.patches import Rectangle
 from ...tools import curve_tools
@@ -211,7 +212,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 curve_x = self.curve_approach[0]
                 curve_y = self.curve_approach[1]
 
-            self.axes.plot(curve_x, curve_y, "#00FFFF", label="Approach")     # Changed for testing. Implement stylesheet.
+            self.axes.plot(curve_x, curve_y, curve_color("approach"), label="Approach")
 
             if self.display_raw_data and self.curve_type == "defl_ext" \
                     and pt != "fit_preview" and pt != "tilt_curve_preview":
@@ -236,7 +237,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 if self.curve_approach is not None:
                     curve_y += self.curve_approach[0][-1]
 
-            self.axes.plot(curve_x, curve_y, "#FF0000", label="Pause")
+            self.axes.plot(curve_x, curve_y, curve_color("pause"), label="Pause")
 
         if self.curve_modulation is not None and (pt == "curve_dataa" or pt == "curve_datab"):
             # Display raw data only if asked, on the curve on the data tab
@@ -260,7 +261,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 else:
                     curve_y += self.curve_approach[0][-1]
 
-            self.axes.plot(curve_x, curve_y, "#00FF80", label="Modulation")
+            self.axes.plot(curve_x, curve_y, curve_color("modulation"), label="Modulation")
 
         # Plot the retraction curve
         if self.curve_retraction is not None:
@@ -283,7 +284,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 curve_x = self.curve_retraction[2][positions[0]:positions[1]]
                 curve_y = numpy.flipud(self.curve_retraction[0][positions[0]:positions[1]])
 
-            self.axes.plot(curve_x, curve_y, "#FFA500", label="Retraction")     # Changed for testing. Implement stylesheet.
+            self.axes.plot(curve_x, curve_y, curve_color("retraction"), label="Retract")
 
             if self.display_raw_data and self.curve_type == "defl_ext" \
                     and pt != "fit_preview" and pt != "tilt_curve_preview":

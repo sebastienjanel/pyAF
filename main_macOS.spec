@@ -20,6 +20,7 @@ def list_files(directory, target_folder):
 # Collect theme styles
 theme_files = list_files("./src/gui_styles/stylesheets/dark", "gui_styles/stylesheets/")
 theme_files += list_files("./src/gui_styles/stylesheets/light", "gui_styles/stylesheets/")
+theme_files += list_files("./src/gui_styles/icons", "gui_styles/icons/")
 
 # Define Analysis
 a = Analysis(
