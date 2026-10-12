@@ -454,6 +454,10 @@ class CommonCurveTools:
             self.residuals = []
             self.chisqr = None
 
+            if len(dt.stiffness_array[self.xpos][self.ypos]) == 0:
+                # The fit failed for this curve: no fit to display
+                return
+
             app, _, _, _, _, _ = \
                 curve_tools.get_curve(dt, [self.xpos, self.ypos],
                                       mode="curve_results")  # get approach curve data
