@@ -123,16 +123,16 @@ def export_results(folder):
                 newfile = open(pre + "_elasticity.txt", "wb")
                 newfile.write("Index\tXpos\tYpos\tSlice\tElasticity (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
                 index = 0
+                _, step, tomography = data.get_used_indentation()
                 for i in range(data.nbr_pixels_x):
                     for j in range(data.nbr_pixels_y):
                         for k in range(0, len(data.stiffness_array[i][j])):
                             E = data.stiffness_array[i][j][k]
-                            z = k * data.indentation_step
-                            if not data.tomography:
-                                sl = "0 - " + str(z + data.indentation_step)
+                            z = k * step
+                            if not tomography:
+                                sl = "0 - " + str(z + step)
                             else:
-                                sl = str(z) + " - " + \
-                                    str(z + data.indentation_step)
+                                sl = str(z) + " - " + str(z + step)
 
                             text = str(index + 1) + "\t" + \
                                 str(i + 1) + "\t" + \

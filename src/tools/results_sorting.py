@@ -401,12 +401,13 @@ class GetResults:
 
                             # To export the data to a file, prepare the array
                             if self.export == "single" and found:
-                                z = k * dt.indentation_step
-                                if not dt.tomography:
-                                    sl = "0 - " + str(z + dt.indentation_step)
+                                _, step, tomography = \
+                                    dt.get_used_indentation()
+                                z = k * step
+                                if not tomography:
+                                    sl = "0 - " + str(z + step)
                                 else:
-                                    sl = str(z) + " - " + \
-                                        str(z + dt.indentation_step)
+                                    sl = str(z) + " - " + str(z + step)
 
                                 export_array.append(
                                     [index, i, j, sl, array[-1]])

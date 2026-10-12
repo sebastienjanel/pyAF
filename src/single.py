@@ -893,6 +893,20 @@ class SingleFile:
         condition = self.loading_rates_calculated
         return self.get_node("/results/loading_rates", condition, True)
 
+    def get_used_indentation(self):
+        """Returns the (start, step, tomography) used for the stiffness
+        computation, to describe the computed segments.
+
+        Falls back on the current parameters for the files saved before these
+        values were stored.
+        """
+        start = self.used_indentation_start
+        step = self.used_indentation_step
+        tomography = self.used_tomography
+        return (self.indentation_start if start is None else start,
+                self.indentation_step if step is None else step,
+                self.tomography if tomography is None else tomography)
+
     def reset_discarded(self):
         """Method used to reset the discarded curve array."""
         empty = numpy.zeros((self.nbr_pixels_x, self.nbr_pixels_y))

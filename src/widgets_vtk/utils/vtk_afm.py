@@ -291,7 +291,7 @@ def get_side(data, side):
 
     triangles = vtk.vtkCellArray()
 
-    step = data.indentation_step
+    _, step, _ = data.get_used_indentation()
     depth = data.stiffness_depth_view
 
     # Get the maximum indentation depth for a side, and the number of triangles
@@ -719,10 +719,10 @@ def get_actor_surface_as_cubes(self, data, mode):
                     z = self.pos_z
                 else:
                     z = topo[i][j] - \
-                        data.stiffness_depth_view * data.indentation_step
+                        data.stiffness_depth_view * data.get_used_indentation()[1]
             elif mode == "bottom":
                 z = topo[i][j] - \
-                    (len(array[i][j]) - 1) * data.indentation_step
+                    (len(array[i][j]) - 1) * data.get_used_indentation()[1]
 
             points.InsertNextPoint(i * data.x_size, j * data.y_size, z)
 
@@ -750,7 +750,7 @@ def get_actor_surface_as_cubes(self, data, mode):
     cubeSource = vtk.vtkCubeSource()
     cubeSource.SetXLength(data.x_size)
     cubeSource.SetYLength(data.y_size)
-    cubeSource.SetZLength(data.indentation_step)
+    cubeSource.SetZLength(data.get_used_indentation()[1])
 
     glyph3D = vtk.vtkGlyph3D()
     glyph3D.SetColorModeToColorByScalar()

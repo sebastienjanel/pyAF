@@ -380,7 +380,7 @@ class ResultsWidget(PYAFWidget):
             self.RBT_mesh_topography.setEnabled(val)
             self.RBT_mesh_stiffness.setEnabled(val)
             if val:
-                if data.indentation_step == 0:
+                if data.get_used_indentation()[1] == 0:
                     self.RBT_mesh_stiffness_slice.setEnabled(False)
                 else:
                     self.RBT_mesh_stiffness_slice.setEnabled(True)
@@ -389,7 +389,7 @@ class ResultsWidget(PYAFWidget):
             val = data.stiffness_corrected
             self.RBT_mesh_stiffness_corr.setEnabled(val)
             if val:
-                if data.indentation_step == 0:
+                if data.get_used_indentation()[1] == 0:
                     self.RBT_mesh_stiffness_slice_corr.setEnabled(False)
                 else:
                     self.RBT_mesh_stiffness_slice_corr.setEnabled(True)

@@ -43,14 +43,22 @@ class PlotStiffnessSliceMeshGrid(PlotMeshGrid):
 
         height = self.data.stiffness_slice_depth  # nm
 
+        _, step, _ = self.data.get_used_indentation()
+
         for i in range(self.nbr_pixels_x):
             for j in range(self.nbr_pixels_y):
+                values = self.data.stiffness_array[i][j]
+                # Distance between the surface and the slice
                 dist = self.data.topography[i][j] - height
-                if dist > 0 and int(dist / self.data.indentation_step) < \
-                        len(self.data.stiffness_array[i][j]):
-                    depth = int(dist / self.data.indentation_step)
-                    self.temp_array[i][j] = \
-                        self.data.stiffness_array[i][j][depth]
+                depth = -1
+                if dist > 0:
+                    if step:
+                        depth = int(dist / step)
+                    elif dist <= self.data.indentation[i][j]:
+                        # Step 0: a single segment over the whole indentation
+                        depth = 0
+                if 0 <= depth < len(values):
+                    self.temp_array[i][j] = values[depth]
                 else:
                     self.temp_array[i][j] = numpy.nan
 

@@ -117,10 +117,11 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         
         indentation_val = 0
         if o_params["indentation_stop"] != 0:
-            indentation_val = o_params["indentation_stop"] * 1e-09
+            indentation_val = o_params["indentation_stop"]
         
         else:
-            indentation_val = filtered_df["delta"].max()
+            # delta is in m, the indentation is stored in nm
+            indentation_val = filtered_df["delta"].max() * 1e09
 
         masked_data_to_fit = numpy.r_[data_to_fit[0:stop], filtered_df["data_to_fit"].values]
         masked_delta = numpy.r_[delta[0:stop], filtered_df["delta"].values]

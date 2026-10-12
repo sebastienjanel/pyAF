@@ -111,7 +111,8 @@ class PlotSlices(MainPlot):
         old_pos_x = 0
         old_pos_y = 0
 
-        z_size = self.data.indentation_step
+        # Step used for the computation of the displayed segments
+        _, z_size, _ = self.data.get_used_indentation()
         self.custom_max_x = 0  # For custom profile
 
         # Prepare the arrays with the data, depending on the direction

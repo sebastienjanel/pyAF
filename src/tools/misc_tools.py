@@ -860,10 +860,9 @@ def update_indentation_list(unique_id):
     # Create an array with text, defining slices of indent
     # for the list in the results tab
     data.indentation_list = []
-    step = data.indentation_step
-    start = data.indentation_start
+    start, step, tomography = data.get_used_indentation()
     for indentation in range(data.max_indentation_index):
-        if data.tomography:
+        if tomography:
             start_z = str(indentation * step + start)
         else:
             start_z = str(0 + start)

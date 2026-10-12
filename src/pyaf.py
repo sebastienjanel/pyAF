@@ -818,12 +818,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # when there is only one slice ...)
         if data.stiffness_calculated:
             cond1 = data.meshgrid_type == "stiffness_slice"
-            cond2 = data.indentation_step == 0
+            cond2 = data.get_used_indentation()[1] == 0
             if cond1 and cond2:
                 data.meshgrid_type = "stiffness"
         if data.stiffness_corrected:
             cond1 = data.meshgrid_type == "stiffness_slice_corr"
-            cond2 = data.indentation_step == 0
+            cond2 = data.get_used_indentation()[1] == 0
             if cond1 and cond2:
                 data.meshgrid_type = "stiffness_corr"
 
