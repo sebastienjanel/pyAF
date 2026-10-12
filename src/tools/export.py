@@ -123,8 +123,8 @@ def export_results(folder):
                 newfile = open(pre + "_elasticity.txt", "wb")
                 newfile.write("Index\tXpos\tYpos\tSlice\tElasticity (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
                 index = 0
-                for i in range(len(data.stiffness_array[0])):
-                    for j in range(len(data.stiffness_array[0])):
+                for i in range(data.nbr_pixels_x):
+                    for j in range(data.nbr_pixels_y):
                         for k in range(0, len(data.stiffness_array[i][j])):
                             E = data.stiffness_array[i][j][k]
                             z = k * data.indentation_step
@@ -151,8 +151,8 @@ def export_results(folder):
                 newfile.write("Index\tXpos\tYpos\tWork (J)\r\n".encode(encoding='UTF-8',errors='strict')
 )
                 index = 0
-                for i in range(len(data.work[0])):
-                    for j in range(len(data.work[0])):
+                for i in range(data.nbr_pixels_x):
+                    for j in range(data.nbr_pixels_y):
                         text = str(index + 1) + "\t" + \
                             str(i + 1) + "\t" + \
                             str(j + 1) + "\t" + \
@@ -168,8 +168,8 @@ def export_results(folder):
                 newfile = open(pre + "_rupture_force1.txt", "wb")
                 newfile.write("Index\tXpos\tYpos\tRupture force (N)\r\n".encode(encoding='UTF-8',errors='strict'))
                 index = 0
-                for i in range(len(data.rupture_force1[0])):
-                    for j in range(len(data.rupture_force1[0])):
+                for i in range(data.nbr_pixels_x):
+                    for j in range(data.nbr_pixels_y):
                         text = str(index + 1) + "\t" + \
                             str(i + 1) + "\t" + \
                             str(j + 1) + "\t" + \
@@ -186,8 +186,8 @@ def export_results(folder):
                 newfile = open(pre + "_events_forces.txt", "wb")
                 newfile.write("Index\tXpos\tYpos\tEvent Force (N)\r\n".encode(encoding='UTF-8',errors='strict'))
                 index = 0
-                for i in range(len(data.events_forces[0])):
-                    for j in range(len(data.events_forces[0])):
+                for i in range(data.nbr_pixels_x):
+                    for j in range(data.nbr_pixels_y):
                         for k in range(len(data.events_forces[i][j])):
                             text = str(index + 1) + "\t" + \
                                 str(i + 1) + "\t" + \
@@ -205,8 +205,8 @@ def export_results(folder):
                 newfile = open(pre + "_loading_rates.txt", "wb")
                 newfile.write("Index\tXpos\tYpos\tLoading rate (N/s)\r\n".encode(encoding='UTF-8',errors='strict'))
                 index = 0
-                for i in range(len(data.events_forces[0])):
-                    for j in range(len(data.events_forces[0])):
+                for i in range(data.nbr_pixels_x):
+                    for j in range(data.nbr_pixels_y):
                         for k in range(len(data.events_forces[i][j])):
                             text = str(index + 1) + "\t" + \
                                 str(i + 1) + "\t" + \
@@ -224,8 +224,8 @@ def export_results(folder):
                 newfile = open(pre + "_event_distance.txt", "wb")
                 newfile.write("Index\tXpos\tYpos\tDistance (m)\r\n".encode(encoding='UTF-8',errors='strict'))
                 index = 0
-                for i in range(len(data.events_forces_distance[0])):
-                    for j in range(len(data.events_forces_distance[0])):
+                for i in range(data.nbr_pixels_x):
+                    for j in range(data.nbr_pixels_y):
                         for k in range(len(data.events_forces_distance[i][j])):
                             text = str(index + 1) + "\t" + \
                                 str(i + 1) + "\t" + \
@@ -258,8 +258,8 @@ def export_results(folder):
                 data = shared.exp.list[data_id]
                 name = shared.exp.results_list[a].name
                 if data.events_calculated:
-                    for i in range(len(data.events_forces[0])):
-                        for j in range(len(data.events_forces[0])):
+                    for i in range(data.nbr_pixels_x):
+                        for j in range(data.nbr_pixels_y):
                             for k in range(len(data.events_forces[i][j])):
                                 val += 1
                 text = str(index) + "\t" + name + "\t" + str(val) + "\r\n"
