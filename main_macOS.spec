@@ -56,7 +56,8 @@ a = Analysis(
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    # Only bundle PySide6 (PyInstaller refuses several Qt bindings)
+    excludes=['PyQt5', 'PyQt6'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

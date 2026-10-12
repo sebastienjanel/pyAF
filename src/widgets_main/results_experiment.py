@@ -275,7 +275,7 @@ class ResultsExperimentWidget(PYAFWidget):
         # Default row height is 30, but it is too big
         self.tableWidget.setRowHeight(i, 40)
 
-        center = QtCore.Qt.AlignHCenter + QtCore.Qt.AlignVCenter
+        center = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
         condition = shared.exp.conditions_list[i + 1]
 
         # Checkbox (hide or display result)
@@ -327,7 +327,7 @@ class ResultsExperimentWidget(PYAFWidget):
         # Default row height is 30, but it is too big
         self.stats_tableWidget.setRowHeight(i, 40)
 
-        center = QtCore.Qt.AlignHCenter + QtCore.Qt.AlignVCenter
+        center = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
         pair = shared.exp.sample_groups[i]
         condition1 = shared.exp.conditions_list[pair[0]]
         condition2 = shared.exp.conditions_list[pair[1]]

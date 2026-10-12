@@ -296,7 +296,7 @@ class DataWidget(PYAFWidget):
         for the spring constant, deflection sensitivity or temperature.
         """
         # Check if its a click
-        if event.type() == event.MouseButtonPress:
+        if event.type() == QtCore.QEvent.MouseButtonPress:
             # Check if it's a click on an input field
             if self.IN_spring_constant.input == obj:
                 self.change_info_type("spring")

@@ -206,7 +206,7 @@ class ResultsGroupsWidget(PYAFWidget):
         # Default row height is 30, but it is too big
         self.tableWidget.setRowHeight(i, 40)
 
-        center = QtCore.Qt.AlignHCenter + QtCore.Qt.AlignVCenter
+        center = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
         group = shared.exp.groups_list[i + 1]
 
         # Checkbox (hide or display result)
