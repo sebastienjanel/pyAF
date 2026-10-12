@@ -80,11 +80,15 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
                                                              mode="compute", dt=dt, get_time=False)
 
     # Get data for the fit.
-    delta, data_to_fit, final_fit, first, stop = fit_tools.prepare_data_hertzfit(app, dt, fit_params)
+    delta, data_to_fit, final_fit, first, stop, poc_index_i, poc_pos_i = \
+        fit_tools.prepare_data_hertzfit(app, dt, fit_params)
 
     if len(delta) <= 1 or len(data_to_fit) <= 1:
-        # Check if there is no data to fit data. Skip if no data is found.
-        return
+        # No data to fit: no stiffness value, keep the initial POC
+        poc_index_fit = poc_index_i
+        real_poc = poc_pos_i
+        stiffness = []
+        indentation_val = 0
 
     else:
 
@@ -122,12 +126,20 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
 
         delta0_fit, e0_fit = fit_tools.do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit)
 
-        poc_index_fit = (numpy.abs(delta - delta0_fit)).argmin() + first
-        real_poc = [app[0][poc_index_fit] * 1e09, app[1][poc_index_fit] * 1e09]
+        if numpy.isnan(e0_fit):
+            # The fit failed: no stiffness value (displayed as nan and
+            # excluded from the results), keep the initial POC
+            poc_index_fit = poc_index_i
+            real_poc = poc_pos_i
+            stiffness = []
+        else:
+            poc_index_fit = (numpy.abs(delta - delta0_fit)).argmin() + first
+            real_poc = [app[0][poc_index_fit] * 1e09, app[1][poc_index_fit] * 1e09]
+            stiffness = [e0_fit]
 
     # Apply corrections to get the POC corrected value
     piez = dt["piezo_image"]
     poc_corrected = piez + app[0][len(app[0]) - 1] - real_poc[0]
 
-    return i, j, poc_index_fit, real_poc, final_fit, [e0_fit], poc_corrected, smoothing_error, indentation_val
+    return i, j, poc_index_fit, real_poc, final_fit, stiffness, poc_corrected, smoothing_error, indentation_val
 

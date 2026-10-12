@@ -822,15 +822,19 @@ class ComputeWidget(PYAFWidget):
                     found_error_list[i] = True
 
             list_smoothing_warnings = ""
+            list_fit_warnings = ""
             text = ""
             for item in smoothing_warnings:
                 if item:
                     name = shared.exp.list[item[0]].filename
                     for values in item[1]:
-                        # values[0] is set to "smoothing_error"
+                        # values[0] is "smoothing_error" or "fit_error"
                         # the curves are stored in values[1]
-                        text += "<li>" + name + " : " + values[1] + "</li>"
-                    list_smoothing_warnings += text
+                        line = "<li>" + name + " : " + values[1] + "</li>"
+                        if values[0] == "fit_error":
+                            list_fit_warnings += line
+                        else:
+                            list_smoothing_warnings += line
 
             list_strict_stop_error = ""
             for i in range(len(strict_stop_errors)):
@@ -859,6 +863,17 @@ class ComputeWidget(PYAFWidget):
                         The following curves had a problem : <ul>" + \
                     list_smoothing_warnings + "</ul>"
 
+            if list_fit_warnings != "":
+                fit_text = "The fit failed for some curves (no contact or \
+                        not enough points in the fit range). No stiffness \
+                        value was stored for these curves (displayed as \
+                        NaN).<br><br>The following curves had a problem : \
+                        <ul>" + list_fit_warnings + "</ul>"
+                if list_smoothing_warnings != "":
+                    text += "<br>" + fit_text
+                else:
+                    text = fit_text
+
             if list_strict_stop_error != "":
                 text = "Strict stop was checked but you defined a stop value \
                         which goes beyond the last point of some curves.<br>\
@@ -867,6 +882,7 @@ class ComputeWidget(PYAFWidget):
 
             if (list_stop_size_error != "" or list_no_segment_errors != ""
                     or list_smoothing_warnings != ""
+                    or list_fit_warnings != ""
                     or list_strict_stop_error != "") \
                     and not consts.UNIT_TESTING:
                 # Create a message box and display it

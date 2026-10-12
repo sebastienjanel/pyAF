@@ -1,9 +1,10 @@
 """
 Python application for fitting Hertz model to different force curves
 """
+import warnings
 import numpy as np
 from lmfit import Parameters, minimize
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, OptimizeWarning
 from . import curve_tools
 from . import search_poc
 
@@ -78,12 +79,17 @@ def prepare_data_hertzfit(app, dt, fit_params):
     offset_no_tilt = np.median(data_to_fit[0:stop])
     data_to_fit = data_to_fit - offset_no_tilt
 
-    return delta, data_to_fit, final_fit, first, stop
+    return delta, data_to_fit, final_fit, first, stop, poc_index_i, poc_pos_i
 
 
 def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):
     """
     Function to obtain delta0 (POC) and E0 by goodness of fit.
+
+    Returns nan for both values if the fit failed, i.e. if the covariance of
+    the parameters could not be estimated. This happens when the parameters
+    are not constrained by the data (no contact, too few points, ...): the
+    returned values would then be meaningless (often the initial guess).
     """
 
     # Initial guesses
@@ -96,11 +102,15 @@ def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):
     try:
         # Perform fit using numpy.optimize.curve_fit function.
         # Levenberg-Marquardt algorithm is used for the least squares fit.
-        fit_result = curve_fit(fit_model, masked_delta, masked_data_to_fit,
-                               method="lm", p0=initial_params,
-                               absolute_sigma=True)
-        ans, _ = fit_result
+        with warnings.catch_warnings():
+            # A failed fit is detected below with the covariance matrix
+            warnings.simplefilter("ignore", OptimizeWarning)
+            fit_result = curve_fit(fit_model, masked_delta,
+                                   masked_data_to_fit, method="lm",
+                                   p0=initial_params, absolute_sigma=True)
+        ans, pcov = fit_result
         delta0_fit, e0_fit = ans
+        fit_ok = np.all(np.isfinite(pcov))
 
     except RuntimeError:
         params = Parameters()
@@ -109,5 +119,9 @@ def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):
         fit_result = minimize(fit_model_lmfit, params, args=(masked_delta, masked_data_to_fit))
         e0_fit = fit_result.params['e0_fit'].value
         delta0_fit = fit_result.params['delta0_fit'].value
+        fit_ok = fit_result.success and fit_result.errorbars
+
+    if not fit_ok:
+        return np.nan, np.nan
 
     return delta0_fit, e0_fit

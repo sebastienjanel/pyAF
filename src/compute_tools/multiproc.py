@@ -357,7 +357,7 @@ def compute(mode, calc_id, params, path):
                 res = progress_queue.get()
                 # Get the progress. Depending on the first argument, store the
                 # errors, continue or raise exception
-                if res[0] == "smoothing_error":
+                if res[0] in ("smoothing_error", "fit_error"):
                     # Store the error, the excecution will continue
                     list_of_smoothing_errors.append(res)
                 elif res[0] == "exception":
@@ -572,6 +572,11 @@ class DataProcessor(multiprocessing.Process):
             if result is None:
                 # Just confirm that this loop is over
                 self.progress_queue.put((["continue", 1]))
+            elif self.mode == "stiffness" and self.dt["perform_fit"] and \
+                    len(result[5]) == 0:
+                # The fit failed, no stiffness value for this curve
+                val = "[" + str(col + 1) + ", " + str(row + 1) + "]"
+                self.progress_queue.put((["fit_error", val]))
             elif self.mode == "stiffness" and result[7]:
                 val = "[" + str(col + 1) + ", " + str(row + 1) + "]"
                 self.progress_queue.put((["smoothing_error", val]))

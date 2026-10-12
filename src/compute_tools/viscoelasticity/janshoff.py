@@ -59,7 +59,7 @@ class ComputeJanshoff:
         # Get curve.
         app, ret, _, _, _, smoothing_error = curve_tools.get_curve(None, [i, j], app, ret, mode="compute", dt=dt)
 
-        delta, data_to_fit, final_fit, first, stop = fit_tools.prepare_data_hertzfit(app, dt, fit_params)
+        delta, data_to_fit, final_fit, first, stop, _, _ = fit_tools.prepare_data_hertzfit(app, dt, fit_params)
 
         if len(delta) <= 1 or len(data_to_fit) <= 1:
             # Check if there is no data to fit data. Skip if no data is found.
