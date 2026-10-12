@@ -33,7 +33,7 @@
 
 import os
 import sys
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 from ... import consts
 from ... import shared

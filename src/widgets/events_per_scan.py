@@ -31,7 +31,7 @@
 
 """Displays the number of events per scan."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools.PYAFWidget import PYAFWidget
 

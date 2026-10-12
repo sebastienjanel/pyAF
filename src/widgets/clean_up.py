@@ -39,7 +39,7 @@ pixel. A list of corrupted curves is also displayed.
 
 from .. import shared
 from .. import widgets_list
-from PyQt5 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 from ..tools.gui_tools import PYAFButton, PYAFInput
 from ..tools.gui_tools import ClearWidgetsFromLayout
 from ..tools.PYAFWidget import PYAFWidget

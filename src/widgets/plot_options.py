@@ -31,7 +31,7 @@
 
 """Options for the meshgrids."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import apply_to_all
 from ..tools import misc_tools
 from ..tools.colortables import ColorTables

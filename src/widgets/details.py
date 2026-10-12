@@ -31,7 +31,7 @@
 
 """See the values of the results for a single curve."""
 
-from PyQt5 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 from ..tools.gui_tools import PYAFButton as PYAFButton
 from ..tools.gui_tools import ClearWidgetsFromLayout as ClearWidgetsFromLayout
 from ..tools.PYAFWidget import PYAFWidget

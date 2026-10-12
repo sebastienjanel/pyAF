@@ -31,7 +31,7 @@
 
 """Menu for the 3D widget."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFInput

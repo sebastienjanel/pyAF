@@ -31,7 +31,7 @@
 
 """Display a list with results of DFS experiments."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import gui_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFButtonGroup

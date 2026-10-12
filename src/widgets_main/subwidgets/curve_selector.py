@@ -31,7 +31,7 @@
 
 """Widget used to go through the curves."""
 
-from PyQt5 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 
 from ... import shared
 from ... import widgets_list

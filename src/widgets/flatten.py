@@ -31,7 +31,7 @@
 
 """Widget used to flatten the piezo image."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFCheckBox
 from ..plots.PYAFPlot import PYAFPlot

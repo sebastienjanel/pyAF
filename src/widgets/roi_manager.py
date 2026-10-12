@@ -35,7 +35,7 @@ import numpy
 from .. import shared
 from .. import widgets_list
 import logging
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import gui_tools
 from ..tools import math_tools
 from ..tools.gui_tools import PYAFButton

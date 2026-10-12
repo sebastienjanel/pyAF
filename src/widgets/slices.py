@@ -32,7 +32,7 @@
 """Widget used to display slices in the tomography."""
 
 import os
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 from ..widgets_small.slices_axes import SlicesAxesWidget
 from ..tools.gui_tools import PYAFCheckBox

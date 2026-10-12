@@ -37,7 +37,7 @@ import matplotlib
 import matplotlib.pyplot as pyplot
 import matplotlib.font_manager as fm
 import platform
-from PyQt5 import QtCore
+from qtpy import QtCore
 
 
 class MainPlot:

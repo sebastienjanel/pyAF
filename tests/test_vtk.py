@@ -31,8 +31,8 @@
 
 from nose.plugins.skip import SkipTest
 import os
-from PyQt5.QtTest import QTest
-from PyQt5.QtCore import Qt
+from qtpy.QtTest import QTest
+from qtpy.QtCore import Qt
 
 from pyAF.src import widgets_list
 from pyAF.src import shared

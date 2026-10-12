@@ -35,7 +35,7 @@ import os
 import textwrap
 from .. import shared
 from .. import widgets_list
-from PyQt5 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import ClearWidgetsFromLayout

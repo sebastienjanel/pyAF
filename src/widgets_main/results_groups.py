@@ -34,7 +34,7 @@
 import logging
 from .. import shared
 from .. import widgets_list
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import gui_tools
 from ..tools import stat_tools
 from ..widgets_main.subwidgets.result_chooser import ResultsChooserWidget

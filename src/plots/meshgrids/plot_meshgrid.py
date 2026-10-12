@@ -36,7 +36,7 @@ import matplotlib
 from matplotlib.colors import Normalize
 from ... import widgets_list
 from ... import shared
-from PyQt5 import QtCore
+from qtpy import QtCore
 import matplotlib.font_manager as fm
 from matplotlib.collections import PolyCollection, LineCollection
 from ...tools.colortables import ColorTables

@@ -33,7 +33,7 @@
 
 from ... import shared
 from ... import widgets_list
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools.gui_tools import PYAFInput
 from ...tools.gui_tools import PYAFCheckBox
@@ -70,7 +70,7 @@ class EventsParamsWidget(PYAFWidget):
             "Display fit")
 
         # Kernel - Kernel size input
-        reg = QtCore.QRegExp("[1-9]\\d{0,1}")
+        reg = QtCore.QRegularExpression("[1-9]\\d{0,1}")
         self.IN_kernel_size = PYAFInput(
             self, "kernel_size", "Kernel half size [pts]")
         self.IN_kernel_size.input.setValidator(
@@ -83,12 +83,12 @@ class EventsParamsWidget(PYAFWidget):
             "Adaptive threshold")
 
         # Kernel - Adaptive kernel window size
-        reg = QtCore.QRegExp("[1-9]\\d{0,2}")
+        reg = QtCore.QRegularExpression("[1-9]\\d{0,2}")
         self.IN_adaptive_smoothing_window = PYAFInput(
             self, "adaptive_ws", "Smoothing window size [pts]")
 
         # Kernel - Adaptive kernel order
-        reg = QtCore.QRegExp("[1-9]\\d{0,1}")
+        reg = QtCore.QRegularExpression("[1-9]\\d{0,1}")
         self.IN_adaptive_smoothing_order = PYAFInput(
             self, "adaptive_order", "Smoothing mode")
 

@@ -32,7 +32,7 @@
 """Advanced options for statistical analysis, called from Experiment Plots tab."""
 
 from .. import shared
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools.gui_tools import PYAFButton, PYAFComboBox
 from ..tools.PYAFWidget import PYAFWidget
 from .. import widgets_list

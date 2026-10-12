@@ -1,8 +1,8 @@
 """
 Python application for fitting Hertz model to different force curves
 """
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QFile, QTextStream
+from qtpy.QtWidgets import QApplication
+from qtpy.QtCore import QFile, QTextStream
 from ..tools.misc_tools import get_resource_path
 import matplotlib.pyplot as plt
 from . import breeze_resources  # Do not delete, important for making the style themes work.

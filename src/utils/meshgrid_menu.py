@@ -32,7 +32,7 @@
 """Menu displayed when right-clicking on the meshgrids."""
 
 import os
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from .. import shared
 from .. import widgets_list

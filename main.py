@@ -35,6 +35,10 @@ import sys
 import os
 import logging
 
+# Qt binding used through QtPy: "pyqt5", "pyqt6" or "pyside6".
+# Can be overridden with the QT_API environment variable.
+os.environ.setdefault("QT_API", "pyqt5")
+
 if getattr(sys, 'frozen', False):
     # Running in a bundle
     base_path = sys._MEIPASS

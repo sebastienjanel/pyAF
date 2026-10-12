@@ -31,7 +31,7 @@
 
 """Small widget allowing to change the distance filter."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFButton

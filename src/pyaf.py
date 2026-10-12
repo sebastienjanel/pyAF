@@ -62,19 +62,19 @@ class FetchStderr:
 
 import multiprocessing
 
-from PyQt5 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 
 if multiprocessing.current_process().name == "MainProcess":
     # Import only once (for performance issue with multiprocessing on windows)
     import sys
     import os
     import logging
-    from PyQt5 import QtCore
+    from qtpy import QtCore
 
-    if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
+    import qtpy
+    if qtpy.QT5:
+        # Always enabled (and deprecated) in Qt6
         QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
-
-    if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
         QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 
     # Import matplotlib the first time to define the backend (You won't be able
@@ -83,7 +83,7 @@ if multiprocessing.current_process().name == "MainProcess":
     # The backend change is conditional because Sphinx (documentation system)
     # will display an error message if we want to apply the backend two times.
     import matplotlib
-    matplotlib.use("Qt5Agg")
+    matplotlib.use("QtAgg")
 
     # Check for the versions. See PEP 386 for the check
     # [AD: deprecated under PEP 386 (!)]
@@ -100,17 +100,6 @@ if multiprocessing.current_process().name == "MainProcess":
         message = "Matplotlib's version is " + matplotlib.__version__ + "." \
             " Version 1.4.0 is needed."
         sys.exit(message)"""
-    qt_version = Version(QtCore.QT_VERSION_STR)
-    if platform.uname()[0] == "Darwin" and qt_version < Version("4.8.6"):
-        # For mac we need 4.8.6
-        message = "Qt's version is " + QtCore.QT_VERSION_STR + "." \
-            " Version 4.8.6 is needed."
-        sys.exit(message)
-    else:
-        if qt_version < Version("4.8.5"):
-            message = "Qt's version is " + QtCore.QT_VERSION_STR + "." \
-                " Version 4.8.5 is needed."
-            sys.exit(message)
     if module_exists("vtk"):
         import vtk
         if vtk.VTK_MAJOR_VERSION <= 5:
@@ -324,6 +313,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 mesh = wl.widget_results.MPL_canvas1
                 self.timer4 = QtCore.QTimer.singleShot(
                     0, mesh.refresh_blitting)
+
 
     def display_message(self):
         """Displays a message telling the user he needs to save.

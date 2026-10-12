@@ -31,7 +31,7 @@
 
 """Plots profiles."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools import math_tools
 from ..tools.gui_tools import PYAFInput

@@ -33,8 +33,8 @@
 
 from .. import shared
 from .. import widgets_list
-from PyQt5 import QtCore, QtWidgets
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from qtpy import QtCore, QtWidgets
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib
 from .meshgrids.piezo_meshgrid import PlotPiezoMeshGrid

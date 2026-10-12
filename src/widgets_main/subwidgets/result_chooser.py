@@ -35,7 +35,7 @@
 import logging
 from ... import shared
 from ... import widgets_list
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools import misc_tools

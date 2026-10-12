@@ -37,7 +37,7 @@ from .. import widgets_list
 from .. import experiment
 import logging
 from .. import consts
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools import misc_tools
 from ..tools import apply_to_all
 from ..tools import stat_tools

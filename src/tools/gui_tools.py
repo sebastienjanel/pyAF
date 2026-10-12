@@ -32,10 +32,9 @@
 """Some tools for the graphical interface of PYAF."""
 
 import logging
-import qtwidgets
 from .. import shared
 from .. import widgets_list
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 
 
@@ -467,6 +466,53 @@ class PYAFComboBox(QtWidgets.QComboBox):
         pass
 
 
+class ToggleSwitch(QtWidgets.QCheckBox):
+    """A checkbox drawn as an on/off switch."""
+
+    def __init__(self, checked_color="#00FF44", parent=None):
+        super().__init__(parent)
+        self.checked_color = QtGui.QColor(checked_color)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setFixedHeight(24)
+
+    def sizeHint(self):
+        return QtCore.QSize(58, 24)
+
+    def hitButton(self, pos):
+        # The whole widget is clickable
+        return self.contentsRect().contains(pos)
+
+    def paintEvent(self, event):
+        rect = self.contentsRect()
+        height = min(rect.height(), 24)
+        width = min(rect.width(), 2 * height)
+        radius = height / 2.0
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+
+        # Bar
+        bar = QtCore.QRectF(rect.x(), rect.y() + (rect.height() - height) / 2,
+                            width, height)
+        if self.isChecked():
+            painter.setBrush(self.checked_color.lighter())
+        else:
+            painter.setBrush(QtGui.QColor(QtCore.Qt.gray))
+        painter.drawRoundedRect(bar, radius, radius)
+
+        # Handle
+        if self.isChecked():
+            painter.setBrush(self.checked_color)
+            x_center = bar.right() - radius
+        else:
+            painter.setBrush(QtGui.QColor(QtCore.Qt.white))
+            x_center = bar.left() + radius
+        painter.drawEllipse(QtCore.QPointF(x_center, bar.center().y()),
+                            radius - 2, radius - 2)
+        painter.end()
+
+
 class PYAFToggle(QtWidgets.QWidget):
     """Reimplementation of the PyQT Toggle.
 
@@ -489,7 +535,7 @@ class PYAFToggle(QtWidgets.QWidget):
         if size is None:
             size = 100
 
-        self.toggle = qtwidgets.Toggle(checked_color="#00FF44")
+        self.toggle = ToggleSwitch(checked_color="#00FF44")
         self.toggle.setFixedWidth(70)
         self.toggle.clicked.connect(self.toggle_clicked)
 
@@ -532,11 +578,10 @@ def disable_combobox_item(combobox, position):
     # 2011/01/disabling-qcombobox-items.html
 
     index = combobox.model().index(position, 0)
-    combobox.model().setData(index, QtCore.QVariant(0), QtCore.Qt.UserRole - 1)
+    combobox.model().setData(index, 0, QtCore.Qt.UserRole - 1)
 
 
 def enable_combobox_item(combobox, position):
     """Function used to enable a row in a qcombobox."""
     index = combobox.model().index(position, 0)
-    combobox.model().setData(index,
-                             QtCore.QVariant(1 | 32), QtCore.Qt.UserRole - 1)
+    combobox.model().setData(index, 1 | 32, QtCore.Qt.UserRole - 1)

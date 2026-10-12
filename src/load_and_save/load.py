@@ -33,7 +33,7 @@
 
 import logging
 import copy
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.temp_file import TempFile
 from ..widgets.progressbar import Progressbar
 from ..tools import misc_tools

@@ -31,7 +31,7 @@
 
 """A progressbar."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools.PYAFWidget import PYAFWidget
 
 

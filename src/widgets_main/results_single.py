@@ -36,7 +36,7 @@ from .. import shared
 from .. import widgets_list
 from .. import consts
 from ..tools.utils import module_exists
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import stat_tools
 from ..tools import gui_tools
 from ..tools.gui_tools import PYAFButton

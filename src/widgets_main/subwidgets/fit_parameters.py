@@ -40,7 +40,7 @@ in the inputs. Changing a value will update the plot in the compute tab.
 from ... import shared
 import logging
 from ... import widgets_list
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools.gui_tools import PYAFInput
 from ...tools.gui_tools import PYAFCheckBox

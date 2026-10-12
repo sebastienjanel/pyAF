@@ -41,7 +41,7 @@ integration in PYAF).
 import re
 import numpy
 import struct
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from dateutil.parser import parse
 from struct import unpack
 from ... import widgets_list

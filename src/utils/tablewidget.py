@@ -37,7 +37,7 @@ You can export your results to a folder.
 
 import copy
 import os
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from .. import consts
 from .. import shared

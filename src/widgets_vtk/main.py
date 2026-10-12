@@ -31,7 +31,7 @@
 
 """Main VTK widget."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from .menu_options import MenuOptionsWidget
 from .menu_layer_list import MenuLayerListWidget
 from .opengl_vtk import VTKWidget

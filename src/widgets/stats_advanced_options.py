@@ -35,7 +35,7 @@ import logging
 from .. import shared
 import matplotlib
 from packaging.version import Version
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import misc_tools
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFCheckBox

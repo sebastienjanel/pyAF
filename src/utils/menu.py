@@ -33,7 +33,7 @@
 
 import sys
 import webbrowser
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..load_and_save.save import Save
 from . import tablewidget
 from .export_figure import export_figure

@@ -38,7 +38,7 @@ import faulthandler
 import numpy
 import sys
 import unittest
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from pyAF.src import consts
 from pyAF.src import pyaf

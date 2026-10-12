@@ -31,7 +31,7 @@
 
 """Widget with options for the AFM tomographies."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from .. import shared
 from .. import widgets_list

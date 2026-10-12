@@ -42,7 +42,7 @@ from .. import shared
 import os
 from .. import experiment
 from .. import consts
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import gui_tools
 from ..tools import misc_tools
 from ..tools import math_tools

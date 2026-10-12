@@ -35,7 +35,7 @@ import os
 import psutil
 import sys
 import logging
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from .. import consts
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFButton
@@ -459,7 +459,7 @@ class EntryWidget(QtWidgets.QDialog):
     def center(self):
         """Called by main.py to center the Widget in the middle of the screen."""
         geometry = self.frameGeometry()
-        wcenter = QtWidgets.QDesktopWidget().availableGeometry().center()
+        wcenter = QtGui.QGuiApplication.primaryScreen().availableGeometry().center()
         geometry.moveCenter(wcenter)
         self.move(geometry.topLeft())
 

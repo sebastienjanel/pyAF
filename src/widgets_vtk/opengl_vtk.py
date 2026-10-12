@@ -35,8 +35,12 @@ import vtk
 import math
 from .. import shared
 from .. import consts
-from PyQt5 import QtCore, QtWidgets
-from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+import qtpy
+from qtpy import QtCore, QtWidgets
+import vtkmodules.qt
+# Use the same Qt binding as the rest of the application
+vtkmodules.qt.PyQtImpl = qtpy.API_NAME
+from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 from .layers.layer_afm import LayerAFM
 from .layers.layer_single_image import LayerSingleImage
 from .layers.layer_optics_HR import LayerOpticsHR

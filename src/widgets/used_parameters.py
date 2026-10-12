@@ -31,7 +31,7 @@
 
 """Displays the used parameters for the computation."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.PYAFWidget import PYAFWidget
 from .. import shared
 from .. import widgets_list

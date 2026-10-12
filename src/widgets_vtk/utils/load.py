@@ -32,7 +32,7 @@
 """Import saved layers in VTK."""
 
 import pickle
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 from ... import shared
 from ... import widgets_list

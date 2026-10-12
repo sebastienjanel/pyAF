@@ -34,7 +34,7 @@
 import os
 import logging
 import platform
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools import math_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFInput

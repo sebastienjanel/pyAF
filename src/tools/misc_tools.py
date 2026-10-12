@@ -42,7 +42,7 @@ import logging
 import logging.handlers
 from PIL import Image
 #from PIL.ImageQt import ImageQt
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 import matplotlib
 import multiprocessing
 from .. import shared
@@ -835,7 +835,7 @@ def validator(name, reg=None, bottom=None, top=None, decimal=None):
 
     # Specific regular expression
     elif name == "R":
-        val = QtGui.QRegExpValidator(reg)
+        val = QtGui.QRegularExpressionValidator(reg)
 
     return val
 

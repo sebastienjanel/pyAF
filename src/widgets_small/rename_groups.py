@@ -31,7 +31,7 @@
 
 """Widget used to rename the groups."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFButton
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFInput

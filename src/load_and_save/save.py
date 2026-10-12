@@ -40,7 +40,7 @@ from ..tools import misc_tools
 from ..tools import math_tools
 from ..tools import temp_file
 from ..tools import apply_to_all
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 import shutil
 from .. import consts
 from ..widgets.progressbar import Progressbar

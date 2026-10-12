@@ -32,7 +32,7 @@
 """Widget showing which curve has been corrected for the tilt."""
 
 import logging
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from .. import shared
 from .. import widgets_list
 from ..plots.PYAFPlot import PYAFPlot
