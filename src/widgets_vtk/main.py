@@ -187,23 +187,26 @@ def get_color_bar():
     lut.SetNumberOfColors(4)
     lut.SetNumberOfTableValues(512)
     tp = data.opengl_surf_type
+    # Same range as the colors of the tomography: from the min value, except
+    # for Rainbow 1 and Cool-Warm which start at 0 (as in the 2D meshgrids)
+    themin = 0 if data.colortableid in (1, 6) else data.colortable_min_value
+    themax = data.colortable_max_value
     if tp == "Stiffness" or tp == "Stiffness_squares":
-        themax = data.colortable_max_value
-        lut.SetTableRange(0, themax / 1000.0)
+        lut.SetTableRange(themin / 1000.0, themax / 1000.0)
     elif tp == "Topo_dots" or tp == "Topo_surf":
-        themax = data.colortable_max_value
-        lut.SetTableRange(0, themax)
+        lut.SetTableRange(themin, themax)
     colortable = ColorTables(data.colortableid,
                              data.color_saturation,
                              data.color_negative,
                              data.colortable_max_value,
                              data.colortable_middle_value,
                              mode="scalarMap",
-                             color_nan=data.color_nan)
-    step = themax / 512.0
+                             color_nan=data.color_nan,
+                             min_value=themin)
+    step = (themax - themin) / 512.0
 
     for i in range(512):
-        color_st = colortable.get_color_as_list(i * step)
+        color_st = colortable.get_color_as_list(themin + i * step)
         lut.SetTableValue(i, [color_st[0], color_st[1], color_st[2], 1.0])
     lut.Build()
 

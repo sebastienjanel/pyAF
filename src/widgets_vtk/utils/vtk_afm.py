@@ -65,7 +65,8 @@ def get_surface(parent, data, mode):
     topo = get_topography_for_geometry(data)
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
+                             data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value)
 
     # Get the array with the stiffness
     if data.stiffness_corrected:
@@ -275,7 +276,8 @@ def get_side(data, side):
 
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
+                             data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value)
 
     if data.stiffness_corrected:
         array = data.stiffness_corrected_array
@@ -594,7 +596,8 @@ def get_surface_as_squares(data, off):
     """
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
+                             data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value)
 
     # Get the array with the stiffness
     if data.stiffness_corrected:
@@ -697,6 +700,7 @@ def get_actor_surface_as_cubes(self, data, mode):
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
                              data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value,
                              color_nan=data.color_nan)
 
     if data.stiffness_corrected:
@@ -771,6 +775,7 @@ def get_surface_as_points(self, data, mode):
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
                              data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value,
                              color_nan=data.color_nan)
 
     points = vtk.vtkPoints()
