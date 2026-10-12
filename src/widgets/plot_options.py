@@ -259,62 +259,35 @@ class PlotOptionsWidget(PYAFWidget):
             data = shared.exp.list[self.data_id]
 
         mt = data.meshgrid_type
-        exp = shared.exp
-        dt = data
 
         if button == "autoscale":
-            if shared.exp.apply_to_all_data:
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    dt.colortable_max_value = exp.global_max_stiffness
-                    dt.colortable_middle_value = exp.global_max_stiffness / 2.0
-                elif mt == "work":
-                    dt.colortable_max_value = exp.global_max_work
-                    dt.colortable_middle_value = exp.global_max_work / 2.0
-                elif mt == "rupture_force":
-                    dt.colortable_max_value = exp.global_max_rupture_force1
-                    dt.colortable_middle_value = \
-                        exp.global_max_rupture_force1 / 2.0
-                elif mt == "events_rupture_force":
-                    dt.colortable_max_value = exp.global_max_rupture_force2
-                    dt.colortable_middle_value = \
-                        exp.global_max_rupture_force2 / 2.0
-                elif mt == "events_per_curve":
-                    dt.colortable_max_value = exp.global_max_nbr_events
-                    dt.colortable_middle_value = exp.global_max_nbr_events / \
-                        2.0
-                elif mt == "piezo":
-                    dt.colortable_max_value = exp.global_max_piezo
-                    dt.colortable_middle_value = exp.global_max_piezo / 2.0
-                elif mt == "topo":
-                    dt.colortable_max_value = exp.global_max_topo
-                    dt.colortable_middle_value = exp.global_max_topo / 2.0
-
-            else:
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    data.colortable_max_value = data.max_stiffness
-                    data.colortable_middle_value = data.max_stiffness / 2.0
-                elif mt == "work":
-                    data.colortable_max_value = data.max_work
-                    data.colortable_middle_value = data.max_work / 2.0
-                elif mt == "rupture_force":
-                    data.colortable_max_value = data.max_rupture_force1
-                    data.colortable_middle_value = data.max_rupture_force1 / \
-                        2.0
-                elif mt == "events_rupture_force":
-                    data.colortable_max_value = data.max_rupture_force2
-                    data.colortable_middle_value = data.max_rupture_force2 / \
-                        2.0
-                elif mt == "events_per_curve":
-                    data.colortable_max_value = data.max_nbr_events
-                    data.colortable_middle_value = data.max_nbr_events / 2.0
-                elif mt == "piezo":
-                    data.colortable_max_value = data.max_piezo
-                    data.colortable_middle_value = data.max_piezo / 2.0
-                elif mt == "topo":
-                    data.colortable_max_value = data.max_topo
-                    data.colortable_middle_value = data.max_topo / 2.0
+            # Autoscale on the selected file. With apply to all, its scale
+            # is then copied to all the files (same scale in the multi
+            # meshgrids)
+            if mt == "stiffness" or mt == "stiffness_slice" or \
+                    mt == "stiffness_corr" or mt == "stiffness_corr_slice":
+                data.colortable_max_value = data.max_stiffness
+                data.colortable_middle_value = data.max_stiffness / 2.0
+            elif mt == "work":
+                data.colortable_max_value = data.max_work
+                data.colortable_middle_value = data.max_work / 2.0
+            elif mt == "rupture_force":
+                data.colortable_max_value = data.max_rupture_force1
+                data.colortable_middle_value = data.max_rupture_force1 / \
+                    2.0
+            elif mt == "events_rupture_force":
+                data.colortable_max_value = data.max_rupture_force2
+                data.colortable_middle_value = data.max_rupture_force2 / \
+                    2.0
+            elif mt == "events_per_curve":
+                data.colortable_max_value = data.max_nbr_events
+                data.colortable_middle_value = data.max_nbr_events / 2.0
+            elif mt == "piezo":
+                data.colortable_max_value = data.max_piezo
+                data.colortable_middle_value = data.max_piezo / 2.0
+            elif mt == "topo":
+                data.colortable_max_value = data.max_topo
+                data.colortable_middle_value = data.max_topo / 2.0
 
             data.colortable_min_value = 0
 
@@ -370,60 +343,45 @@ class PlotOptionsWidget(PYAFWidget):
 
         mt = data.meshgrid_type
 
-        # Define max label
-        if shared.exp.apply_to_all_data:
-            if mt == "piezo":
-                text = "Max. piezo height (All) : " + \
-                    str(shared.exp.global_max_piezo) + " nm"
-            if mt == "topo":
-                text = "Max. topography height (All) : " + \
-                    str(shared.exp.global_max_topo) + " nm"
-            if mt == "stiffness" or mt == "stiffness_slice" or \
-                    mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                if data.used_stiffness_model_selected == 3:
-                    text = "Max. slope (All) : " + \
-                        str(shared.exp.global_max_stiffness) + " N/m"
-                else:
-                    val = round(shared.exp.global_max_stiffness * 1e-3, 2)
-                    text = "Max. stiffness (All) : " + str(val) + " kPa"
-            if mt == "work":
-                val = round(shared.exp.global_max_work * 1e15, 2)
-                text = "Max. work (All) : " + str(val) + " fJ"
-            if mt == "rupture_force":
-                val = round(shared.exp.global_max_rupture_force1 * 1e12, 2)
-                text = "Max. rupture force (All) : " + str(val) + " pN"
-            if mt == "events_rupture_force":
-                val = round(shared.exp.global_max_rupture_force2 * 1e12, 2)
-                text = "Max. rupture force (All) : " + str(val) + " pN"
+        # Define max label: maximum of the selected file (used by autoscale)
+        # and, when the scale is applied to all the files, of all the files
+        exp = shared.exp
+        if mt in ("stiffness", "stiffness_slice",
+                  "stiffness_corr", "stiffness_corr_slice"):
+            if data.used_stiffness_model_selected == 3:
+                name, unit, factor = "Max. slope", "N/m", 1
+            else:
+                name, unit, factor = "Max. stiffness", "kPa", 1e-3
+            val, val_all = data.max_stiffness, exp.global_max_stiffness
+        elif mt == "piezo":
+            name, unit, factor = "Max. piezo height", "nm", 1
+            val, val_all = data.max_piezo, exp.global_max_piezo
+        elif mt == "topo":
+            name, unit, factor = "Max. topography height", "nm", 1
+            val, val_all = data.max_topo, exp.global_max_topo
+        elif mt == "work":
+            name, unit, factor = "Max. work", "fJ", 1e15
+            val, val_all = data.max_work, exp.global_max_work
+        elif mt == "rupture_force":
+            name, unit, factor = "Max. rupture force", "pN", 1e12
+            val, val_all = data.max_rupture_force1, \
+                exp.global_max_rupture_force1
+        elif mt == "events_rupture_force":
+            name, unit, factor = "Max. rupture force", "pN", 1e12
+            val, val_all = data.max_rupture_force2, \
+                exp.global_max_rupture_force2
+        elif mt == "events_per_curve":
+            name, unit, factor = "Max. number of events", "events", 1
+            val, val_all = data.max_nbr_events, exp.global_max_nbr_events
+
+        def fmt(value):
             if mt == "events_per_curve":
-                val = int(shared.exp.global_max_nbr_events - 1)
-                text = "Max. number of events (All) : " + str(val) + " events"
-        else:
-            if mt == "piezo":
-                text = "Max. piezo height : " + str(data.max_piezo) + " nm"
-            if mt == "topo":
-                text = "Max. topography height : " + str(data.max_topo) + " nm"
-            if mt == "stiffness" or mt == "stiffness_slice" or \
-                    mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                if data.used_stiffness_model_selected == 3:
-                    text = "Max. slope : " + \
-                        str(data.max_stiffness) + " N/m"
-                else:
-                    text = "Max. stiffness : " + \
-                        str(round(data.max_stiffness * 1e-3, 2)) + \
-                        " kPa"
-            if mt == "work":
-                text = "Max. work : " + \
-                    str(round(data.max_work * 1e15, 2)) + " fJ"
-            if mt == "rupture_force":
-                text = "Max. rupture force : " + \
-                    str(round(data.max_rupture_force1 * 1e12)) + " pN"
-            if mt == "events_rupture_force":
-                text = "Max. rupture force : " + \
-                    str(round(data.max_rupture_force2 * 1e12)) + " pN"
-            if mt == "events_per_curve":
-                text = "Max. number of events : " + \
-                    str(int(data.max_nbr_events + 1)) + " events"
+                return str(int(value))
+            return str(round(float(value) * factor, 2))
+
+        text = name + " : " + fmt(val) + " " + unit
+        if exp.apply_to_all_data and val_all is not None:
+            text += " (all files : " + fmt(val_all) + " " + unit + ")"
 
         self.label_max.setText(text)
 
