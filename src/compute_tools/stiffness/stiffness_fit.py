@@ -141,7 +141,8 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
     # Apply corrections to get the POC corrected value
     piez = dt["piezo_image"]
     if poc_found:
-        poc_corrected = piez + app[0][len(app[0]) - 1] - real_poc[0]
+        # app was converted to m by prepare_data_hertzfit, real_poc is in nm
+        poc_corrected = piez + app[0][len(app[0]) - 1] * 1e09 - real_poc[0]
     else:
         # No POC: no topography value
         poc_corrected = numpy.nan
