@@ -93,12 +93,19 @@ class FitParamsWidget(PYAFWidget):
         self.GL.addWidget(self.IN_skip_start, 0, 0)
         self.GL.addWidget(self.IN_fit_length, 1, 0)
         self.GL.addWidget(self.IN_noise_multi, 2, 0)
-        self.GL.addWidget(self.IN_refit, 0, 1)
-        self.GL.addWidget(self.IN_refit_times, 1, 1)
+        if self.name in ("fit_param_pocs", "fit_param_jocs"):
+            # Point of contact (elasticity) and jump of contact (work): the
+            # parameters are stacked in one column. Not for the events, whose
+            # tab would be taller (and the main window with it).
+            self.GL.addWidget(self.IN_refit, 3, 0)
+            self.GL.addWidget(self.IN_refit_times, 4, 0)
+        else:
+            self.GL.addWidget(self.IN_refit, 0, 1)
+            self.GL.addWidget(self.IN_refit_times, 1, 1)
 
         VL_empty = QtWidgets.QVBoxLayout()
         VL_empty.addStretch(1)
-        self.GL.addLayout(VL_empty, 3, 0)
+        self.GL.addLayout(VL_empty, 6, 0)
 
         BOX.setLayout(self.GL)
         VL.addWidget(BOX)

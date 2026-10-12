@@ -139,6 +139,7 @@ if multiprocessing.current_process().name == "MainProcess":
     from src.widgets.about import AboutWidget
     from src.tools import apply_to_all
     from src.tools import misc_tools
+    from src.tools import gui_tools
     from src.tools import math_tools as mt
     from src.tools import temp_file
     from src.widgets.progressbar import Progressbar
@@ -207,6 +208,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Tabs
         self.tabs = QtWidgets.QTabWidget()
+        # Styled as a segmented control by the stylesheets
+        self.tabs.setObjectName("mainTabs")
 
         # Create the 5 main widgets (will automatically be registered in wl)
         DataWidget(self)
@@ -280,7 +283,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if consts.AUTOLOAD is False and consts.UNIT_TESTING is False:
             QtWidgets.QApplication.beep()
-            QtWidgets.QMessageBox.warning(self, "Information", "Loading done.")
+            nbr = len(shared.exp.list)
+            gui_tools.show_success(
+                self, "Loading complete",
+                str(nbr) + " file" + ("s" if nbr > 1 else "") + " loaded.")
 
         self.logger.debug("Opening done")
 

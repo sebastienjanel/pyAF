@@ -75,7 +75,8 @@ class ResultsWidget(PYAFWidget):
         self.logger = logging.getLogger()
 
         # Fixed height for the 2 top boxes, to keep them aligned
-        self.options_boxes_height = 160
+        # Room for the title and the rows of options
+        self.options_boxes_height = 185
 
         self.cursor_mode = "select"
         self.parent = parent
@@ -147,7 +148,7 @@ class ResultsWidget(PYAFWidget):
         self.box_meshgrid = QtWidgets.QGroupBox()
         self.GL_meshgrid = QtWidgets.QGridLayout()
         # Options (meshgrid)
-        self.box_meshgrid_options = QtWidgets.QGroupBox()
+        self.box_meshgrid_options = QtWidgets.QGroupBox("Data type")
         self.box_meshgrid_options.setFixedHeight(self.options_boxes_height)
 
         self.GRP_mesh_type = PYAFButtonGroup(self, "BTG_meshgrid_type")
@@ -176,6 +177,9 @@ class ResultsWidget(PYAFWidget):
         self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force2, 9)
 
         self.GL_mesh_options = QtWidgets.QGridLayout()
+        # Same spacing between all the rows (the style's default spacing
+        # depends on the neighbouring widgets)
+        self.GL_mesh_options.setVerticalSpacing(8)
         self.VL_meshgrid_options = QtWidgets.QVBoxLayout()
         self.VL_meshgrid_options.setContentsMargins(0, 0, 0, 0)
 
@@ -220,7 +224,7 @@ class ResultsWidget(PYAFWidget):
         # --- Curves ----------------------------------------------------------
 
         # Options curves
-        self.box_curves_options = QtWidgets.QGroupBox()
+        self.box_curves_options = QtWidgets.QGroupBox("Information")
         self.box_curves_options.setFixedHeight(self.options_boxes_height)
 
         self.BT_group_type_of_curve = PYAFButtonGroup(
@@ -275,6 +279,9 @@ class ResultsWidget(PYAFWidget):
             self, "checkbox_events_display_fit_joc", "Display Joc fit")
 
         self.GL_curves_options = QtWidgets.QGridLayout()
+        # Same spacing between all the rows (the style's default spacing
+        # depends on the neighbouring widgets)
+        self.GL_curves_options.setVerticalSpacing(8)
         self.VL_curves_options = QtWidgets.QVBoxLayout()
         widgets_list.widget_progressbar.update()
 

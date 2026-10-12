@@ -112,7 +112,7 @@ class DataWidget(PYAFWidget):
         self.GL_data = QtWidgets.QGridLayout()
 
         # General information -------------------------------------------------
-        self.box_info1 = QtWidgets.QGroupBox()
+        self.box_info1 = QtWidgets.QGroupBox("File parameters")
         self.box_info1.setFixedSize(550, 250)
         self.HL_box_info = QtWidgets.QHBoxLayout()
         self.VL_box_info1 = QtWidgets.QVBoxLayout()
@@ -168,10 +168,11 @@ class DataWidget(PYAFWidget):
         self.HL_box_info.addLayout(self.VL_box_info2)
 
         self.box_info1.setLayout(self.HL_box_info)
-        self.box_info1.setFont(self.parent.smallfont)
+        # The labels have a small font (set in update_GUI), the title keeps
+        # the same font as the other boxes
 
         # Cantilever & Microscope ---------------------------------------------
-        self.box_cantilever = QtWidgets.QGroupBox()
+        self.box_cantilever = QtWidgets.QGroupBox("Calibration")
         self.box_cantilever.setFixedSize(350, 250)
 
         self.IN_spring_constant = PYAFInput(
@@ -279,8 +280,11 @@ class DataWidget(PYAFWidget):
         else:
             self.GL_data.addWidget(self.curve, 2, 1)
 
+        self.box_files = QtWidgets.QGroupBox("File list")
+        self.box_files.setLayout(self.VL_list)
+
         self.HL = QtWidgets.QHBoxLayout()
-        self.HL.addLayout(self.VL_list)
+        self.HL.addWidget(self.box_files)
         self.HL.addLayout(self.GL_data)
 
         self.VL.addLayout(self.HL)
@@ -521,13 +525,13 @@ class DataWidget(PYAFWidget):
             self.list_sel_styles = []
             self.list_unsel_styles = []
             for i in range(len(shared.exp.list)):
-                color = " { background-color: #3daee9; }"
+                color = " { background-color: #3b8eea; }"
                 style = "QWidget#data_" + str(i) + color
                 self.list_sel_styles.append(style)
                 if shared.exp.current_theme == "Dark":
                     color = " { background-color: #31363b; }"
                 elif shared.exp.current_theme == "Light":
-                    color = " { background-color: #EFF0F1; }"
+                    color = " { background-color: #E4E6E9; }"
                 style = "QWidget#data_" + str(i) + color
                 self.list_unsel_styles.append(style)
 

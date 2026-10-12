@@ -39,6 +39,7 @@ import logging
 from .. import consts
 from qtpy import QtWidgets
 from ..tools import misc_tools
+from ..tools import gui_tools
 from ..tools import apply_to_all
 from ..tools import stat_tools
 from ..tools.gui_tools import PYAFButton
@@ -93,11 +94,16 @@ class ComputeWidget(PYAFWidget):
 
         # --- Experiment ------------------------------------------------------
         self.GL_choosers = QtWidgets.QGridLayout()
-        self.GL_choosers.setContentsMargins(0, 0, 0, 0)
+        self.GL_choosers.setContentsMargins(8, 0, 8, 2)
+        self.GL_choosers.setHorizontalSpacing(4)
 
         self.HL_choser = QtWidgets.QHBoxLayout()
         self.list_exp2 = PYAFComboBox(self, "list2")
-        self.list_exp2.setFixedSize(350, 26)
+        self.list_exp2.setFixedSize(374, 26)
+        # The min-width of the application style sheet overrides the fixed
+        # width: set it for this list (width of the text area, without the
+        # padding and the drop-down arrow)
+        self.list_exp2.setStyleSheet("QComboBox { min-width: 335px; }")
         for data in shared.exp.list:
             self.list_exp2.addItem(data.filename)
         self.HL_choser.addWidget(self.list_exp2)
@@ -106,19 +112,18 @@ class ComputeWidget(PYAFWidget):
         self.curve_selector = ResultsSelectorWidget(self, name)
         # self.curve_selector is added to the layout in update_widget().
 
-        HL_empty = QtWidgets.QHBoxLayout()
-        HL_empty.addStretch(1)
-
         self.GL_choosers.addLayout(self.HL_choser, 0, 0)
-        self.GL_choosers.addLayout(HL_empty, 0, 2)
+
 
         widgets_list.widget_progressbar.update()
 
         self.CB_zoom_in = PYAFCheckBox(self, "zoom_in", "Zoom in")
         self.IN_zoom_in_factor = PYAFInput(
-            self, "zoom_in_factor", "Zoom factor")
+            self, "zoom_in_factor", "factor", 40)
         self.BT_next_zoom_element = PYAFButton(
             self, "next_zoom_element", ">", size=40)
+        self.BT_next_zoom_element.setToolTip(
+            "Zoom on the next element of the curve (jump of contact, events)")
 
         widgets_list.widget_progressbar.update()
 
@@ -148,25 +153,47 @@ class ComputeWidget(PYAFWidget):
         label = "Apply to all"
         self.CB_apply_to_all = PYAFCheckBox(self, "apply_to_all", label)
 
-        self.HL_options = QtWidgets.QHBoxLayout()
-        self.BT_flatten = PYAFButton(self, "flatten", "Flatten")
-        self.BT_curve_mod = PYAFButton(self, "curve_mod", "Curve modifications")
-        self.BT_clean_up = PYAFButton(self, "clean_up", "Clean Up")
-        self.HL_options.addWidget(self.BT_flatten)
-        self.HL_options.addWidget(self.BT_curve_mod)
-        self.HL_options.addWidget(self.BT_clean_up)
+        self.BT_flatten = PYAFButton(self, "flatten", "Flatten", size=80)
+        self.BT_curve_mod = PYAFButton(
+            self, "curve_mod", "Tilting/Smoothing", size=150)
+        self.BT_clean_up = PYAFButton(self, "clean_up", "Clean Up", size=95)
 
+        # Map navigation: file, flatten, curve selector (added in
+        # update_widget)
+        self.GL_choosers.addWidget(self.BT_flatten, 0, 1)
+        self.box_navigation = QtWidgets.QGroupBox("Map navigation")
+        self.box_navigation.setLayout(self.GL_choosers)
+
+        # Curves: modifications, clean up and zoom
+        self.HL_curves = QtWidgets.QHBoxLayout()
+        self.HL_curves.setContentsMargins(8, 0, 8, 2)
+        self.HL_curves.addWidget(self.BT_clean_up)
+        self.HL_curves.addWidget(self.BT_curve_mod)
+        self.HL_curves.addSpacing(4)
+        self.HL_curves.addWidget(self.CB_zoom_in)
+        self.HL_curves.addWidget(self.IN_zoom_in_factor)
+        self.HL_curves.addWidget(self.BT_next_zoom_element)
+        self.box_curves = QtWidgets.QGroupBox("Curves")
+        self.box_curves.setLayout(self.HL_curves)
+
+        # Both boxes at the top of the tab
+        self.HL_top = QtWidgets.QHBoxLayout()
+        # (they share the width of the tab, aligned with the panels below)
+        self.HL_top.addWidget(self.box_navigation)
+        self.HL_top.addWidget(self.box_curves)
+
+        # Options of the computation
+        self.HL_options = QtWidgets.QHBoxLayout()
         self.HL_options.addWidget(self.CB_compute_all)
         self.HL_options.addWidget(self.CB_apply_to_all)
-        self.HL_options.addWidget(self.CB_zoom_in)
-        self.HL_options.addWidget(self.IN_zoom_in_factor)
-        self.HL_options.addWidget(self.BT_next_zoom_element)
         self.HL_options.addStretch(1)
 
         widgets_list.widget_progressbar.update()
 
         # Tabs
         self.tabs = QtWidgets.QTabWidget()
+        # Styled as pills by the stylesheets
+        self.tabs.setObjectName("subTabs")
         self.tabs.currentChanged.connect(self.tabs_changed)
 
         self.widget_app = QtWidgets.QWidget()
@@ -189,8 +216,9 @@ class ComputeWidget(PYAFWidget):
         label = "Tip radius [nm]"
         self.IN_tip_radius = PYAFInput(self, "tip_radius", label, 60)
         label = "Tip half-opening angle (" + "\u00b0" + ")"
-        self.IN_tip_angle = PYAFInput(self, "tip_angle", label)
-        self.IN_poisson = PYAFInput(self, "poisson", "Poisson ratio")
+        # Same width for the three inputs of the model parameters
+        self.IN_tip_angle = PYAFInput(self, "tip_angle", label, 60)
+        self.IN_poisson = PYAFInput(self, "poisson", "Poisson ratio", 60)
         self.IN_tip_radius.input.setValidator(misc_tools.validator("UF"))
         self.IN_tip_angle.input.setValidator(misc_tools.validator("UF"))
         self.IN_poisson.input.setValidator(misc_tools.validator("UF"))
@@ -203,6 +231,15 @@ class ComputeWidget(PYAFWidget):
             "Hertz (Paraboloid)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Slope", "Flat punch"]
         for model in self.models:
             self.list_models.addItem(str(model))
+        # Wide enough to display the longest model name. Set with a style
+        # sheet: the min-width of the application style sheet would override
+        # setMinimumWidth (here min-width is the width of the text area)
+        metrics = self.list_models.fontMetrics()
+        longest = max(metrics.horizontalAdvance(m) for m in self.models)
+        self.list_models.setStyleSheet(
+            "QComboBox { min-width: " + str(longest + 20) + "px; }")
+        # The list that opens is also wide enough for the names
+        self.list_models.view().setMinimumWidth(longest + 80)
 
         self.HL_list_stiff.addWidget(self.label_models_list)
         self.HL_list_stiff.addWidget(self.list_models)
@@ -268,8 +305,8 @@ class ComputeWidget(PYAFWidget):
         VL_button_compute_stiffness.addWidget(self.BT_compute_stiffness)
         VL_button_compute_stiffness.addStretch(1)
 
-        self.HL_widget_app.addWidget(W_stiff_exp_params)
         self.HL_widget_app.addWidget(W_fit_params_pocs)
+        self.HL_widget_app.addWidget(W_stiff_exp_params)
         self.HL_widget_app.addWidget(W_stiff_segments)
         self.HL_widget_app.addLayout(VL_button_compute_stiffness)
 
@@ -291,6 +328,10 @@ class ComputeWidget(PYAFWidget):
             self.BT_compute_work_and_rupture_force)
         VL_button_compute_work.addStretch(1)
 
+        # Box centered in the tab (the spacing balances the compute button)
+        self.HL_widget_ret.addSpacing(
+            self.BT_compute_work_and_rupture_force.width())
+        self.HL_widget_ret.addStretch(1)
         self.HL_widget_ret.addWidget(W_fit_params_jocs)
         self.HL_widget_ret.addStretch(1)
         self.HL_widget_ret.addLayout(VL_button_compute_work)
@@ -386,9 +427,14 @@ class ComputeWidget(PYAFWidget):
         VL_loading_rates.addStretch(1)
 
         VL_coeff = QtWidgets.QVBoxLayout()
+        VL_coeff.addStretch(1)
         VL_coeff.addWidget(self.IN_lr_coef)
         VL_coeff.addStretch(1)
 
+        # Coefficient centered in the tab (the spacing balances the compute
+        # button)
+        HL_loading_rates.addSpacing(self.BT_get_lr.width())
+        HL_loading_rates.addStretch(1)
         HL_loading_rates.addLayout(VL_coeff)
         HL_loading_rates.addStretch(1)
         HL_loading_rates.addLayout(VL_loading_rates)
@@ -399,6 +445,13 @@ class ComputeWidget(PYAFWidget):
 
         self.BT_height_corr = PYAFButton(self, "height_correction", "Compute")
         self.BT_height_corr.setFixedSize(100, 100)
+
+        # Main action buttons, highlighted by the stylesheet
+        for button in (self.BT_compute_stiffness,
+                       self.BT_compute_work_and_rupture_force,
+                       self.BT_compute_events, self.BT_get_lr,
+                       self.BT_height_corr):
+            button.setObjectName("primaryButton")
 
         # Instruction label
         self.label_info = QtWidgets.QLabel("Either select the substrate from the ROI manager (results tab) or input"
@@ -469,9 +522,11 @@ class ComputeWidget(PYAFWidget):
         self.tabs.addTab(self.widget_loading_rates, "Loading rates")
 
         self.GL_compute = QtWidgets.QGridLayout()
-        self.GL_compute.addWidget(self.MPL_meshgrid, 0, 0)
-        self.GL_compute.addWidget(self.MPL_curve, 0, 1)
-        self.GL_compute.addLayout(self.GL_choosers, 1, 0, 1, 0)
+        # Compact rows (plots, navigation, options, computation tabs)
+        self.GL_compute.setVerticalSpacing(4)
+        self.GL_compute.addLayout(self.HL_top, 0, 0, 1, 0)
+        self.GL_compute.addWidget(self.MPL_meshgrid, 1, 0)
+        self.GL_compute.addWidget(self.MPL_curve, 1, 1)
         self.GL_compute.addLayout(self.HL_options, 2, 0, 1, 0)
         self.GL_compute.addWidget(self.tabs, 3, 0, 1, 0)
 
@@ -490,7 +545,7 @@ class ComputeWidget(PYAFWidget):
         if data.is_single:
             self.curve_selector.setParent(None)
         else:
-            self.GL_choosers.addWidget(self.curve_selector, 0, 1)
+            self.GL_choosers.addWidget(self.curve_selector, 0, 2)
             self.curve_selector.update_widget()
 
         if data.events_algorithm == "kernel":
@@ -562,7 +617,7 @@ class ComputeWidget(PYAFWidget):
                 self.MPL_meshgrid.setParent(None)
                 self.BT_clean_up.setEnabled(False)
             else:
-                self.GL_compute.addWidget(self.MPL_meshgrid, 0, 0)
+                self.GL_compute.addWidget(self.MPL_meshgrid, 1, 0)
                 self.BT_clean_up.setEnabled(True)
 
         if element == "apply_to_all" or element == "all":
@@ -952,8 +1007,7 @@ class ComputeWidget(PYAFWidget):
 
             if not consts.UNIT_TESTING and not consts.AUTOCALC_STIFFNESS:
                 QtWidgets.QApplication.beep()
-                text = "Calculation done."
-                QtWidgets.QMessageBox.warning(self, "Information", text)
+                gui_tools.show_success(self, "Calculation complete")
 
     def button_clicked(self, button):
         """Method called whenever a button is clicked."""

@@ -42,7 +42,7 @@ from qtpy import QtWidgets
 from .. import consts
 from .. import shared
 from .. import widgets_list
-from ..tools import export, misc_tools, stat_tools
+from ..tools import export, gui_tools, misc_tools, stat_tools
 
 
 def duplicate_results():
@@ -189,7 +189,8 @@ def export_results(mode):
             export.export_results_r(folder)
 
         QtWidgets.QApplication.beep()
-        QtWidgets.QMessageBox.warning(widget, "Information", "Exporting done.")
+        gui_tools.show_success(widget, "Export complete",
+                               "Results exported to " + str(folder))
 
 
 def change_color():

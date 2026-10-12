@@ -32,6 +32,7 @@
 """Some tools for the graphical interface of PYAF."""
 
 import logging
+import os
 from .. import shared
 from .. import widgets_list
 from qtpy import QtCore, QtGui, QtWidgets
@@ -585,3 +586,20 @@ def enable_combobox_item(combobox, position):
     """Function used to enable a row in a qcombobox."""
     index = combobox.model().index(position, 0)
     combobox.model().setData(index, 1 | 32, QtCore.Qt.UserRole - 1)
+
+
+def show_success(parent, text, details=None):
+    """Message box for an operation completed successfully, with a green
+    check mark (instead of the warning sign)."""
+    # Imported here to avoid a circular import
+    from ..gui_styles.theme_handler import get_icons_path
+
+    msg = QtWidgets.QMessageBox(parent)
+    msg.setWindowTitle("pyAF")
+    msg.setText("<b>" + text + "</b>")
+    if details:
+        msg.setInformativeText(details)
+    icon = QtGui.QIcon(os.path.join(get_icons_path(), "success.svg"))
+    msg.setIconPixmap(icon.pixmap(48, 48))
+    msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
+    msg.exec_()

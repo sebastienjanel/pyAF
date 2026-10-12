@@ -268,9 +268,10 @@ class EntryWidget(QtWidgets.QDialog):
 
         # Set the width of the columns
         self.tableWidget.setColumnWidth(0, 40)
-        self.tableWidget.setColumnWidth(1, 240)
-        self.tableWidget.setColumnWidth(2, 100)
-        self.tableWidget.setColumnWidth(3, 203)
+        self.tableWidget.setColumnWidth(1, 220)
+        self.tableWidget.setColumnWidth(2, 150)
+        # The last column fills the width of the table
+        self.tableWidget.horizontalHeader().setStretchLastSection(True)
 
         # Define check all checkbox
         checkbox = QtWidgets.QCheckBox("Select all")
@@ -390,12 +391,13 @@ class EntryWidget(QtWidgets.QDialog):
             lb = gui_tools.CenteredCellwidget(content)
             self.tableWidget.setCellWidget(i, 3, lb)
 
-        # Define the size of the table to hide the white space at the bottom
-        if self.tableWidget.verticalHeader().length() >= 200:
-            table_height = 200
-        else:
-            table_height = self.tableWidget.verticalHeader().length()
-        self.tableWidget.setFixedSize(600, table_height + 30)
+        # Define the size of the table to hide the white space at the bottom:
+        # rows (up to 200 px, then the table scrolls) + header + frame, so
+        # that there is no scroll bar when all the rows are displayed
+        table_height = min(self.tableWidget.verticalHeader().length(), 200)
+        header_height = self.tableWidget.horizontalHeader().sizeHint().height()
+        frame = 2 * self.tableWidget.frameWidth()
+        self.tableWidget.setFixedSize(600, table_height + header_height + frame)
 
     def fade(self):
         """Method which changes the alpha value of an image.
