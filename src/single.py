@@ -303,7 +303,8 @@ class SingleFile:
         self.events_results_filter_slope_max = 0
 
         # Information for the models
-        self.stiffness_mode = 1  # 0 Calculus 1 Fit
+        # 0 Calculus/Tomography, 1 Fit (perform_fit is derived from it)
+        self.stiffness_mode = 1
         self.stiffness_model_selected = 0  # Select Hertz by default
         self.tip_radius = 75
         self.tip_angle = 15  # Note : this is in fact the half-opening angle
@@ -317,7 +318,6 @@ class SingleFile:
         self.tomography = 0
         self.lr_coef = 0.33
         #self.mfev = 50
-        self.perform_fit = False
         self.fit_range_type = 0
 
         # Store the parameters used for the computation
@@ -892,6 +892,17 @@ class SingleFile:
         """Loading rates values for each event and for each pixel."""
         condition = self.loading_rates_calculated
         return self.get_node("/results/loading_rates", condition, True)
+
+    @property
+    def perform_fit(self):
+        """True if the stiffness is computed by fitting (Fitting selected),
+        False for Calculus/Tomography. Derived from stiffness_mode, so that
+        the computation always matches the displayed choice."""
+        return self.stiffness_mode == 1
+
+    @perform_fit.setter
+    def perform_fit(self, value):
+        self.stiffness_mode = 1 if value else 0
 
     def get_used_indentation(self):
         """Returns the (start, step, tomography) used for the stiffness

@@ -612,7 +612,6 @@ class ComputeWidget(PYAFWidget):
                 self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
                 # Enable fit options
-                self.RBT_fitting_params.setChecked(True)
                 self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 1:
                 self.IN_tip_radius.setParent(None)
@@ -620,7 +619,6 @@ class ComputeWidget(PYAFWidget):
                 self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
                 # Enable fit options
-                self.RBT_fitting_params.setChecked(True)
                 self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 2:
                 self.IN_tip_radius.setParent(None)
@@ -628,14 +626,13 @@ class ComputeWidget(PYAFWidget):
                 self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
                 # Enable fit options
-                self.RBT_fitting_params.setChecked(True)
                 self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 3:
                 self.IN_tip_radius.setParent(None)
                 self.IN_tip_angle.setParent(None)
                 self.IN_poisson.setParent(None)
-                # Disable fit options
-                self.RBT_fitting_params.setChecked(False)
+                # No fit for the slope model: Calculus/Tomography only
+                data.stiffness_mode = 0
                 self.RBT_fitting_params.setEnabled(False)
             if data.stiffness_model_selected == 4:
                 self.IN_tip_angle.setParent(None)
@@ -643,10 +640,12 @@ class ComputeWidget(PYAFWidget):
                 self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
                 # Enable fit options
-                self.RBT_fitting_params.setChecked(True)
                 self.RBT_fitting_params.setEnabled(True)
 
             self.IN_poisson.input.setText(str(data.poisson_ratio))
+
+            # Display the mode of the file (the slope model may have changed it)
+            self.update_GUI("stiffness_params")
 
         # if element == "input_segments" or element == "all":
             # self.IN_start.input.setText(str(data.indentation_start))
@@ -691,10 +690,8 @@ class ComputeWidget(PYAFWidget):
         if element == "stiffness_params" or element == "all":
             if data.stiffness_mode == 0:
                 self.RBT_calculus_params.setChecked(True)
-                data.perform_fit = False
             elif data.stiffness_mode == 1:
                 self.RBT_fitting_params.setChecked(True)
-                data.perform_fit = True
 
         if element == "events_curve_type" or element == "all":
             if data.events_curve_type == "curve":
@@ -1243,10 +1240,6 @@ class ComputeWidget(PYAFWidget):
         elif button == "stiffness_params":
             value = self.GRP_stiffness_params.checkedId()
             data.stiffness_mode = value
-            if value == 0:
-                data.perform_fit = False
-            elif value == 1:
-                data.perform_fit = True
             self.update_widget()
 
         elif button == "next_zoom_element":

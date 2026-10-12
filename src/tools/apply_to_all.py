@@ -195,15 +195,16 @@ def apply_to_all(mode, option=None, oldid=None):
                 dt.tip_radius = cur.tip_radius
                 dt.tip_angle = cur.tip_angle
                 dt.poisson_ratio = cur.poisson_ratio
-                dt.perform_fit = cur.perform_fit
+                # Calculus/Tomography or Fitting (perform_fit follows)
+                dt.stiffness_mode = cur.stiffness_mode
                 dt.fit_range_type = cur.fit_range_type
+                # All the ranges (the indentation ones are also used by
+                # Calculus/Tomography, whatever the fit range type)
                 dt.indentation_start = cur.indentation_start
-                if dt.fit_range_type == 0:
-                    dt.force_start = cur.force_start
-                    dt.force_stop = cur.force_stop
-                elif dt.fit_range_type == 1:
-                    dt.indentation_stop = cur.indentation_stop
-                    dt.indentation_step = cur.indentation_step
+                dt.indentation_stop = cur.indentation_stop
+                dt.indentation_step = cur.indentation_step
+                dt.force_start = cur.force_start
+                dt.force_stop = cur.force_stop
                 dt.strict_stop = cur.strict_stop
                 dt.fitparam_poc_skip_start = cur.fitparam_poc_skip_start
                 dt.fitparam_poc_fit_length = cur.fitparam_poc_fit_length
