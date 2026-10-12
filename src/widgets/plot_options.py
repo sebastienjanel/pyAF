@@ -180,10 +180,14 @@ class PlotOptionsWidget(PYAFWidget):
             factor, offset = color_value_conversion(data, field)
             values[field] = (stored - offset) / factor
 
+        # Only the values modified by the user are stored. The others keep
+        # their exact value (the inputs display rounded values: re-reading
+        # them would for example lower the max set by autoscale)
         new_fields = []
         for field in fields:
             value = inputs[field].get_str_value(use_replace=True)
-            if value != "":
+            if value != "" and \
+                    float(value) != displayed_color_value(data, field):
                 values[field] = float(value)
                 new_fields.append(field)
 
@@ -389,68 +393,9 @@ class PlotOptionsWidget(PYAFWidget):
         self.LS_colortable.setCurrentIndex(data.colortableid)
 
         # Define input values
-        if mt == "stiffness" or mt == "stiffness_slice" or \
-                mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-            if data.used_stiffness_model_selected == 3:
-                val = data.colortable_max_value
-            else:
-                val = round(data.colortable_max_value * 1e-3, 2)
-            self.input_max.changeValue(val)
-        elif mt == "work":
-            val = float(f"{data.colortable_max_value * 1e15:.4g}")
-            self.input_max.changeValue(val)
-        elif mt == "rupture_force":
-            val = round(data.colortable_max_value * 1e12, 2)
-            self.input_max.changeValue(val)
-        elif mt == "events_rupture_force":
-            val = round(data.colortable_max_value * 1e12, 2)
-            self.input_max.changeValue(val)
-        elif mt == "events_per_curve":
-            self.input_max.changeValue(data.colortable_max_value - 1)
-        else:
-            self.input_max.changeValue(data.colortable_max_value)
-
-        if mt == "stiffness" or mt == "stiffness_slice" or \
-                mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-            if data.used_stiffness_model_selected == 3:
-                val = data.colortable_middle_value
-            else:
-                val = round(data.colortable_middle_value * 1e-3, 2)
-            self.input_middle.changeValue(val)
-        elif mt == "work":
-            val = float(f"{data.colortable_middle_value * 1e15:.4g}")
-            self.input_middle.changeValue(val)
-        elif mt == "rupture_force":
-            val = round(data.colortable_middle_value * 1e12, 2)
-            self.input_middle.changeValue(val)
-        elif mt == "events_rupture_force":
-            val = round(data.colortable_middle_value * 1e12, 2)
-            self.input_middle.changeValue(val)
-        elif mt == "events_per_curve":
-            self.input_middle.changeValue(data.colortable_middle_value - 1)
-        else:
-            self.input_middle.changeValue(data.colortable_middle_value)
-
-        if mt == "stiffness" or mt == "stiffness_slice" or \
-                mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-            if data.used_stiffness_model_selected == 3:
-                val = data.colortable_min_value
-            else:
-                val = round(data.colortable_min_value * 1e-3, 2)
-            self.input_min.changeValue(val)
-        elif mt == "work":
-            val = float(f"{data.colortable_min_value * 1e15:.4g}")
-            self.input_min.changeValue(val)
-        elif mt == "rupture_force":
-            val = round(data.colortable_min_value * 1e12, 2)
-            self.input_min.changeValue(val)
-        elif mt == "events_rupture_force":
-            val = round(data.colortable_min_value * 1e12, 2)
-            self.input_min.changeValue(val)
-        elif mt == "events_per_curve":
-            self.input_min.changeValue(data.colortable_min_value + 1)
-        else:
-            self.input_min.changeValue(data.colortable_min_value)
+        self.input_max.changeValue(displayed_color_value(data, "max"))
+        self.input_middle.changeValue(displayed_color_value(data, "middle"))
+        self.input_min.changeValue(displayed_color_value(data, "min"))
 
         # Check checkbox if needed
         self.CB_apply_to_all.setChecked(shared.exp.apply_to_all_data)
@@ -522,6 +467,25 @@ def color_value_conversion(data, field):
             return 1.0, -1.0
         return 1.0, 1.0
     return 1.0, 0.0
+
+
+def displayed_color_value(data, field):
+    """Returns the color value of field ("max", "middle" or "min") as
+    displayed in the inputs (displayed units, rounded)."""
+    stored = getattr(data, "colortable_" + field + "_value")
+    factor, offset = color_value_conversion(data, field)
+    value = float((stored - offset) / factor)
+    mt = data.meshgrid_type
+    if mt in ("stiffness", "stiffness_slice",
+              "stiffness_corr", "stiffness_corr_slice") and \
+            data.used_stiffness_model_selected != 3:
+        return round(value, 2)
+    elif mt == "work":
+        # Work values can be small, keep significant digits
+        return float(f"{value:.4g}")
+    elif mt in ("rupture_force", "events_rupture_force"):
+        return round(value, 2)
+    return float(f"{value:.7g}")
 
 
 def display_events_limit_message(text):
