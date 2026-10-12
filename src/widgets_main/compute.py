@@ -678,14 +678,6 @@ class ComputeWidget(PYAFWidget):
             else:
                 self.BT_flatten.setEnabled(False)
 
-        # if element == "strict_stop" or element == "all":
-            # self.CB_strict_stop.setChecked(data.strict_stop)
-            # Enable or disable strict stop mode
-            # if data.indentation_stop != 0:
-                # self.CB_strict_stop.setEnabled(True)
-            # else:
-                # self.CB_strict_stop.setEnabled(False)
-
         # if element == "tomography" or element == "all":
             # self.CB_tomography.setChecked(data.tomography)
 
@@ -767,7 +759,6 @@ class ComputeWidget(PYAFWidget):
         # elif field == "input_stop":
             # if self.IN_stop.input.text() != "":
                 # data.indentation_stop = self.IN_stop.get_int_value()
-                # self.update_GUI("strict_stop")
 
         # elif field == "input_step":
             # if self.IN_step.input.text() != "":
@@ -797,7 +788,7 @@ class ComputeWidget(PYAFWidget):
             stop_size_errors = warnings[0]
             no_segment_errors = warnings[1]
             smoothing_warnings = warnings[2]
-            strict_stop_errors = warnings[3]
+            range_warnings = warnings[3] if len(warnings) > 3 else []
 
             found_error_list = []
             for i in range(len(stop_size_errors)):
@@ -844,18 +835,6 @@ class ComputeWidget(PYAFWidget):
                         else:
                             list_smoothing_warnings += line
 
-            list_strict_stop_error = ""
-            for i in range(len(strict_stop_errors)):
-                item = strict_stop_errors[i]
-                if item:
-                    shared.exp.list[item[0]].stiffness_calculated = False
-                    name = shared.exp.list[item[0]].filename
-
-                    text = "<li>" + name + "</li>"
-                    list_strict_stop_error += text
-                else:
-                    found_error_list[i] = True
-
             if list_stop_size_error != "":
                 text = "The 'stop' value is too big ! The maximum value you \
                         can use is : <ul>" + list_stop_size_error + "</ul>"
@@ -882,22 +861,33 @@ class ComputeWidget(PYAFWidget):
                 else:
                     text = fit_text
 
-            if list_strict_stop_error != "":
-                text = "Strict stop was checked but you defined a stop value \
-                        which goes beyond the last point of some curves.<br>\
-                        <br>The following files had a problem : <ul>" + \
-                    list_strict_stop_error + "</ul>"
-
             if (list_stop_size_error != "" or list_no_segment_errors != ""
                     or list_smoothing_warnings != ""
-                    or list_fit_warnings != ""
-                    or list_strict_stop_error != "") \
+                    or list_fit_warnings != "") \
                     and not consts.UNIT_TESTING:
                 # Create a message box and display it
                 msg = QtWidgets.QMessageBox()
                 msg.setText("Error")
                 msg.setInformativeText(text)
                 msg.setIcon(QtWidgets.QMessageBox.Critical)
+                msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
+                msg.exec_()
+
+            # The pixels are computed up to their maximum indentation when the
+            # selected range is not attained: inform the user
+            if range_warnings and not consts.UNIT_TESTING:
+                lines = ""
+                for calc_id, (stop, nbr, total) in range_warnings:
+                    name = shared.exp.list[calc_id].filename
+                    lines += "<li>" + name + " : selected indentation range " \
+                        + str(stop) + " nm was not attained on " + str(nbr) \
+                        + " pixels out of " + str(total) + "</li>"
+                msg = QtWidgets.QMessageBox()
+                msg.setText("Indentation range")
+                msg.setInformativeText(
+                    "The stiffness was computed up to the maximum indentation "
+                    "for these pixels.<ul>" + lines + "</ul>")
+                msg.setIcon(QtWidgets.QMessageBox.Information)
                 msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
                 msg.exec_()
 
@@ -999,9 +989,9 @@ class ComputeWidget(PYAFWidget):
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
             smoothing_warnings = []
+            range_warnings = []
             stop_size_errors = []
             no_segment_errors = []
-            strict_stop_errors = []
             one_computed = False
 
             # Make a list of data to treat
@@ -1027,17 +1017,9 @@ class ComputeWidget(PYAFWidget):
                     stop_size_errors.append([calc_id, val])
                     no_segment_errors.append([])
                     smoothing_warnings.append([])
-                    strict_stop_errors.append([])
 
                 elif self.compute_stiffness.error == "Error: no segments":
                     no_segment_errors.append([calc_id, None])
-                    stop_size_errors.append([])
-                    smoothing_warnings.append([])
-                    strict_stop_errors.append([])
-
-                elif self.compute_stiffness.error == "Error: strict stop":
-                    strict_stop_errors.append([calc_id])
-                    no_segment_errors.append([])
                     stop_size_errors.append([])
                     smoothing_warnings.append([])
 
@@ -1047,7 +1029,6 @@ class ComputeWidget(PYAFWidget):
 
                     stop_size_errors.append([])
                     no_segment_errors.append([])
-                    strict_stop_errors.append([])
 
                     # Store smoothing warnings to display a message at the end
                     # of the computation
@@ -1056,6 +1037,12 @@ class ComputeWidget(PYAFWidget):
                         smoothing_warnings.append([calc_id, warnings])
                     else:
                         smoothing_warnings.append([])
+
+                    # Pixels where the selected indentation range was not
+                    # attained
+                    not_attained = self.compute_stiffness.range_not_attained
+                    if not_attained:
+                        range_warnings.append([calc_id, not_attained])
 
                     data.max_indentation_index = \
                         self.compute_stiffness.max_indentation_index
@@ -1082,7 +1069,7 @@ class ComputeWidget(PYAFWidget):
             warnings = [stop_size_errors,
                         no_segment_errors,
                         smoothing_warnings,
-                        strict_stop_errors]
+                        range_warnings]
 
             self.finish_computation(warnings)
 
@@ -1321,10 +1308,6 @@ class ComputeWidget(PYAFWidget):
                 # If we check the box, apply to all the current configuration
                 apply_to_all.apply_to_all("calc_options")
 
-        elif checkbox == "strict_stop":
-            state = self.CB_strict_stop.isChecked()
-            shared.exp.list[shared.exp.id_selected].strict_stop = state
-
         # elif checkbox == "tomography":
             # state = self.CB_tomography.isChecked()
             # shared.exp.list[shared.exp.id_selected].tomography = state
@@ -1346,8 +1329,6 @@ class ComputeWidget(PYAFWidget):
                 # self.IN_step.setEnabled(False)
                 # self.CB_tomography.setChecked(False)
                 # self.CB_tomography.setEnabled(False)
-                # self.CB_strict_stop.setChecked(False)
-                # self.CB_strict_stop.setEnabled(False)
 
             else:
                 pass
@@ -1355,7 +1336,6 @@ class ComputeWidget(PYAFWidget):
                 # self.IN_stop.setEnabled(True)
                 # self.IN_step.setEnabled(True)
                 # self.CB_tomography.setEnabled(True)
-                # self.CB_strict_stop.setEnabled(True)
 
 
 

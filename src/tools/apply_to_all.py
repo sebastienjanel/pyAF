@@ -205,7 +205,6 @@ def apply_to_all(mode, option=None, oldid=None):
                 dt.indentation_step = cur.indentation_step
                 dt.force_start = cur.force_start
                 dt.force_stop = cur.force_stop
-                dt.strict_stop = cur.strict_stop
                 dt.fitparam_poc_skip_start = cur.fitparam_poc_skip_start
                 dt.fitparam_poc_fit_length = cur.fitparam_poc_fit_length
                 dt.fitparam_poc_refit_option = cur.fitparam_poc_refit_option

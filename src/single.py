@@ -314,7 +314,6 @@ class SingleFile:
         self.indentation_step = 0
         self.force_start = 0
         self.force_stop = 100
-        self.strict_stop = 1
         self.tomography = 0
         self.lr_coef = 0.33
         #self.mfev = 50
@@ -331,7 +330,6 @@ class SingleFile:
         self.used_indentation_stop = None
         self.used_force_stop = None
         self.used_indentation_step = None
-        self.used_strict_stop = None
         self.used_tomography = None
         self.used_lr_coef = None
 

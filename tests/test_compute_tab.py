@@ -74,8 +74,6 @@ class ComputeTabTest(pyAFTestCase):
                          default.indentation_stop)
         self.assertEqual(data.indentation_step,
                          default.indentation_step)
-        self.assertEqual(data.strict_stop,
-                         default.strict_stop)
         self.assertEqual(data.tomography,
                          default.tomography)
 

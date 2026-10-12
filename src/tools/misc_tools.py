@@ -231,7 +231,6 @@ def save_used_params(data, mode):
         data.used_indentation_step = data.indentation_step
         data.used_force_start = data.force_start
         data.used_force_stop = data.force_stop
-        data.used_strict_stop = data.strict_stop
         data.used_tomography = data.tomography
         data.used_fitparam_poc_skip_start = data.fitparam_poc_skip_start
         data.used_fitparam_poc_fit_length = data.fitparam_poc_fit_length

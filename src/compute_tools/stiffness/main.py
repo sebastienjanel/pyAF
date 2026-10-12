@@ -83,10 +83,17 @@ class Stiffness:
         self.max_indentation_index = 0
         self.list_of_smoothing_errors = []
         self.error = False
+        # [stop, pixels where the stop was not attained, computed pixels]
+        self.range_not_attained = None
 
     def get_stiffness(self, calc_id):
         """Method used to launch the computation."""
         data = shared.exp.list[calc_id]
+
+        # Reset the state of the previous computation
+        self.error = False
+        self.range_not_attained = None
+
         # Be sure that the data is updated (when computing "all", the hdf5
         # file is closed en reopened many times, so that we need to call an
         # update here)
@@ -177,7 +184,6 @@ class Stiffness:
             "fit_range_type": data.fit_range_type,
             "force_start": data.force_start,
             "force_stop": data.force_stop,
-            "strict_stop": data.used_strict_stop,
             "model_selected": data.stiffness_model_selected,
             "tomography": data.tomography,
             "trig_threshold": data.trig_threshold,
@@ -201,31 +207,9 @@ class Stiffness:
         stiffness = tf.get_node(st + "/results", "stiffness_array")
         topography = tf.get_node(st + "/results", "topography")
 
-        # Check for strict stop (NOT USED ANYMORE)
-        strict_stop_error = False
-        if data.used_strict_stop and data.indentation_stop != 0:
-            dist = data.used_indentation_stop - data.used_indentation_start
-            if data.used_indentation_step == 0:
-                segments_per_curve = 1
-            else:
-                segments_per_curve = dist // data.used_indentation_step
-            for i in range(len(stiffness)):
-                if len(stiffness[i]) != segments_per_curve:
-                    strict_stop_error = True
-                    # No need to check further, we found an error
-                    break
-
-            # Delete the stiffness
-            if strict_stop_error:
-                widgets_list.widget_progressbar.close()
-                self.error = "Error: strict stop"
-
-                # Delete result table
-                name = "stiffness"
-                self.temp_file.delete_tables_for_results(str(calc_id), name)
-                self.temp_file.create_tables_for_results(str(calc_id), name)
-
-                return True
+        # The pixels are computed up to the selected stop, or up to their
+        # maximum indentation if the stop is not attained (counted below)
+        indentation = tf.get_node(st + "/results", "indentation")
 
         # Calculate the maximum indentation index
         z_array = []
@@ -242,8 +226,19 @@ class Stiffness:
         # Store the base to get a minimal value to correct the pocs array
         base = []
         step = data.indentation_step
+        # The indentation stop applies to Calculus/Tomography and to the
+        # indentation range mode of the fit
+        stop = data.used_indentation_stop
+        check_stop = stop != 0 and \
+            (not data.perform_fit or data.fit_range_type == 1)
+        nbr_computed = 0
+        nbr_not_attained = 0
         for i in range(len(stiffness)):
             k = len(stiffness[i])
+            if k != 0:
+                nbr_computed += 1
+                if check_stop and indentation[row][col] < stop:
+                    nbr_not_attained += 1
             z_array.append(k * data.indentation_step)
             # At least one value was found
             if k != 0 and nosegment:
@@ -258,6 +253,9 @@ class Stiffness:
                 row += 1
 
         self.max_indentation_index = max_ind
+        if nbr_not_attained:
+            self.range_not_attained = [stop, nbr_not_attained, nbr_computed]
+
         if nosegment:
             # The step was too big or we wanted to calculate too far
             # z_array is only populated wit 0, 0 segments

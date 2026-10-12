@@ -101,7 +101,6 @@ class StiffnessParamsWidget(PYAFWidget):
         # Checkboxes
         label = "Stiffness tomography"
         self.CB_tomography = PYAFCheckBox(self, "tomography", label)
-        # self.CB_strict_stop = PYAFCheckBox(self, "strict_stop", "Strict stop")
         # self.CB_perform_fit = PYAFCheckBox(self, "perform_fit", "Perform fit")
 
         widgets_list.widget_progressbar.update()
@@ -195,7 +194,6 @@ class StiffnessParamsWidget(PYAFWidget):
         if field == "input_stop_in":
             if self.IN_stop.input.text() != "":
                 data.indentation_stop = self.IN_stop.get_int_value()
-                # self.update_GUI("strict_stop")
 
         if field == "input_step_in":
             if self.IN_step.input.text() != "":

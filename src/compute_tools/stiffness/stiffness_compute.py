@@ -71,12 +71,10 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
     curve_x[0] = 0
     curve_y[0] = 0
 
-    indentation_val = 0
+    # Indentation reached, up to the selected stop (if any)
+    indentation_val = numpy.max(curve_x)
     if o_params["indentation_stop"] != 0:
-        indentation_val = o_params["indentation_stop"]
-    
-    else:
-        indentation_val = numpy.max(curve_x)
+        indentation_val = min(o_params["indentation_stop"], indentation_val)
 
     parts = segment_curve(
         curve_x,
@@ -115,14 +113,16 @@ def get_x_parts(start, stop, step, max_x):
     nbr_segments = 0
     newstop = 0
 
-    # No step, no stop, take whole indentation curve
-    if step == 0 and stop == 0:
-        parts_x.append(start)
-        parts_x.append(max_x)
-        if start >= max_x:
+    # No step: a single segment, up to the stop (or the whole indentation
+    # if there is no stop, or if the stop is not attained)
+    if step == 0:
+        end = max_x if stop == 0 else min(stop, max_x)
+        if start >= end:
             # Very rare case were the poc is set as the last point of the curve
             # Then we return no segment
             return []
+        parts_x.append(start)
+        parts_x.append(end)
         return parts_x
 
     # All existing segments from start to end
