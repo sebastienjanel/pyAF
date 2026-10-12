@@ -173,7 +173,7 @@ class PlotMeshGrid(MainPlot):
                 self.data_meshgrid is not None:
             if self.mesh_type == "events_per_curve":
                 # Discrete self.colormap for the events
-                self.colormap = matplotlib.cm.get_cmap(self.colormap)
+                self.colormap = matplotlib.colormaps.get_cmap(self.colormap)
 
                 # Adjust the number of bins to fit the colormap's size
                 ncolors = self.colormap.N
@@ -189,7 +189,7 @@ class PlotMeshGrid(MainPlot):
                 norm = matplotlib.colors.BoundaryNorm(bounds, self.colormap.N)
             else:
                 # Normal self.colormap for the other meshgrid types
-                self.colormap = matplotlib.cm.get_cmap(self.colormap)
+                self.colormap = matplotlib.colormaps.get_cmap(self.colormap)
                 if self.color_saturation is not None:
                     self.colormap.set_over(self.color_saturation)
                     self.colormap.set_under(self.color_negative)

@@ -157,115 +157,67 @@ class PlotOptionsWidget(PYAFWidget):
         # Set focus on widget to validate the inputs
         self.setFocus()
 
-        # Get and store the values
-        if what == "input_max" or what == "all":
-            value = self.input_max.get_str_value()
+        # Get the fields to update: a single input, or all of them when the
+        # apply button is clicked. The middle value is only used by the
+        # Rainbow 1 colortable.
+        inputs = {"max": self.input_max,
+                  "middle": self.input_middle,
+                  "min": self.input_min}
+        if what == "all":
+            fields = ["max", "min"]
+            if data.colortableid == 1:
+                fields.append("middle")
+        elif what in ("input_max", "input_middle", "input_min"):
+            fields = [what[len("input_"):]]
+        else:
+            return True
+
+        # Start from the stored values, converted to the displayed units, so
+        # that the new and old values are compared in the same units
+        values = {}
+        for field in inputs:
+            stored = getattr(data, "colortable_" + field + "_value")
+            factor, offset = color_value_conversion(data, field)
+            values[field] = (stored - offset) / factor
+
+        new_fields = []
+        for field in fields:
+            value = inputs[field].get_str_value(use_replace=True)
             if value != "":
-                value = value.replace(',', '.')
-                if float(value) <= data.colortable_min_value:
-                    display_bad_value_message()
-                    self.update_widget()
-                    return False
+                values[field] = float(value)
+                new_fields.append(field)
 
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    if data.used_stiffness_model_selected == 3:
-                        data.colortable_max_value = float(value)
-                    else:
-                        data.colortable_max_value = float(value) * 1e3
-                elif mt == "work":
-                    data.colortable_max_value = float(value) * 1e-9
-                elif mt == "rupture_force":
-                    data.colortable_max_value = float(value) * 1e-12
-                elif mt == "events_rupture_force":
-                    data.colortable_max_value = float(value) * 1e-12
-                elif mt == "events_per_curve":
-                    if float(value) < 2:
-                        text = "The maximum color value can not be set to a \
-                                value smaller than 2 !"
+        if mt == "events_per_curve":
+            if "max" in new_fields and values["max"] < 2:
+                display_events_limit_message(
+                    "The maximum color value can not be set to a value "
+                    "smaller than 2 !")
+                self.update_widget()
+                return False
+            if "min" in new_fields and values["min"] < 1:
+                display_events_limit_message(
+                    "The minimum color value can not be set to a value "
+                    "smaller than 1 !")
+                self.update_widget()
+                return False
 
-                        # Create a message box
-                        msg = QtWidgets.QMessageBox()
-                        msg.setText("Error")
-                        msg.setInformativeText(text)
-                        msg.setIcon(QtWidgets.QMessageBox.Critical)
-                        msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
-                        msg.exec_()
+        if ("max" in new_fields or "min" in new_fields) and \
+                values["max"] <= values["min"]:
+            display_bad_value_message()
+            self.update_widget()
+            return False
 
-                        val = data.colortable_max_value - 1
-                        self.input_max.changeValue(val)
-                        return False
-                    else:
-                        data.colortable_max_value = float(value) + 1
-                else:
-                    data.colortable_max_value = float(value)
+        if "middle" in new_fields and \
+                not values["min"] < values["middle"] < values["max"]:
+            display_bad_value_message(mode="middle")
+            self.update_widget()
+            return False
 
-        elif what == "input_middle" or what == "all":
-            value = self.input_middle.get_str_value()
-            if value != "":
-                if float(value) <= data.colortable_min_value or \
-                        float(value) >= data.colortable_max_value:
-                    display_bad_value_message(mode="middle")
-                    self.update_widget()
-                    return False
-
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    if data.used_stiffness_model_selected == 3:
-                        data.colortable_middle_value = float(value)
-                    else:
-                        data.colortable_middle_value = float(value) * 1e3
-                elif mt == "work":
-                    data.colortable_middle_value = float(value) * 1e-9
-                elif mt == "rupture_force":
-                    data.colortable_middle_value = float(value) * 1e-12
-                elif mt == "events_rupture_force":
-                    data.colortable_middle_value = float(value) * 1e-12
-                elif mt == "events_per_curve":
-                    data.colortable_middle_value = float(value) + 1
-                else:
-                    data.colortable_middle_value = float(value)
-
-        elif what == "input_min" or what == "all":
-            value = self.input_min.get_str_value()
-            if value != "":
-                if float(value) >= data.colortable_max_value:
-                    display_bad_value_message()
-                    self.update_widget()
-                    return False
-
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    if data.used_stiffness_model_selected == 3:
-                        data.colortable_min_value = float(value)
-                    else:
-                        data.colortable_min_value = float(value) * 1e3
-                elif mt == "work":
-                    data.colortable_min_value = float(value) * 1e-9
-                elif mt == "rupture_force":
-                    data.colortable_min_value = float(value) * 1e-12
-                elif mt == "events_rupture_force":
-                    data.colortable_min_value = float(value) * 1e-12
-                elif mt == "events_per_curve":
-                    if float(value) < 1:
-                        text = "The minimum color value can not be set to a \
-                                value smaller than 1 !"
-
-                        # Create a message box
-                        msg = QtWidgets.QMessageBox()
-                        msg.setText("Error")
-                        msg.setInformativeText(text)
-                        msg.setIcon(QtWidgets.QMessageBox.Critical)
-                        msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
-                        msg.exec_()
-
-                        val = data.colortable_min_value + 1
-                        self.input_min.changeValue(val)
-                        return False
-                    else:
-                        data.colortable_min_value = float(value) - 1
-                else:
-                    data.colortable_min_value = float(value)
+        # Store the values, converted back to the internal units
+        for field in new_fields:
+            factor, offset = color_value_conversion(data, field)
+            setattr(data, "colortable_" + field + "_value",
+                    values[field] * factor + offset)
 
         return True
 
@@ -286,7 +238,9 @@ class PlotOptionsWidget(PYAFWidget):
                 # Check for the middle value, if its misconfigured
                 # replace it by the half of the max value
                 if val_middle <= val_min or val_middle >= val_max:
-                    data.colortable_middle_value = val_max / 2.0
+                    factor, offset = color_value_conversion(data, "middle")
+                    data.colortable_middle_value = \
+                        val_max / 2.0 * factor + offset
 
             data.colortableid = colortable_id
 
@@ -485,7 +439,7 @@ class PlotOptionsWidget(PYAFWidget):
                 val = round(data.colortable_max_value * 1e-3, 2)
             self.input_max.changeValue(val)
         elif mt == "work":
-            val = round(data.colortable_max_value * 1e9, 2)
+            val = float(f"{data.colortable_max_value * 1e15:.4g}")
             self.input_max.changeValue(val)
         elif mt == "rupture_force":
             val = round(data.colortable_max_value * 1e12, 2)
@@ -506,7 +460,7 @@ class PlotOptionsWidget(PYAFWidget):
                 val = round(data.colortable_middle_value * 1e-3, 2)
             self.input_middle.changeValue(val)
         elif mt == "work":
-            val = round(data.colortable_middle_value * 1e9, 2)
+            val = float(f"{data.colortable_middle_value * 1e15:.4g}")
             self.input_middle.changeValue(val)
         elif mt == "rupture_force":
             val = round(data.colortable_middle_value * 1e12, 2)
@@ -527,7 +481,7 @@ class PlotOptionsWidget(PYAFWidget):
                 val = round(data.colortable_min_value * 1e-3, 2)
             self.input_min.changeValue(val)
         elif mt == "work":
-            val = round(data.colortable_min_value * 1e9, 2)
+            val = float(f"{data.colortable_min_value * 1e15:.4g}")
             self.input_min.changeValue(val)
         elif mt == "rupture_force":
             val = round(data.colortable_min_value * 1e12, 2)
@@ -581,6 +535,45 @@ class PlotOptionsWidget(PYAFWidget):
         if (widg_mesh is not None and ref and widg_opengl is not None) or \
                 (widg_mesh is not None and widg_opengl is None):
             widgets_list.widget_multimeshgrids.update_widget()
+
+
+def color_value_conversion(data, field):
+    """Returns the (factor, offset) used to convert a color value displayed in
+    the inputs to the value stored in data:
+    stored = displayed * factor + offset.
+
+    field is "max", "middle" or "min".
+    """
+    mt = data.meshgrid_type
+    if mt in ("stiffness", "stiffness_slice",
+              "stiffness_corr", "stiffness_corr_slice"):
+        if data.used_stiffness_model_selected == 3:
+            # Slope in N/m
+            return 1.0, 0.0
+        # kPa to Pa
+        return 1e3, 0.0
+    elif mt == "work":
+        # fJ to J
+        return 1e-15, 0.0
+    elif mt in ("rupture_force", "events_rupture_force"):
+        # pN to N
+        return 1e-12, 0.0
+    elif mt == "events_per_curve":
+        # The events colortable is shifted by one
+        if field == "min":
+            return 1.0, -1.0
+        return 1.0, 1.0
+    return 1.0, 0.0
+
+
+def display_events_limit_message(text):
+    """Tells the user the events colortable limits are not respected."""
+    msg = QtWidgets.QMessageBox()
+    msg.setText("Error")
+    msg.setInformativeText(text)
+    msg.setIcon(QtWidgets.QMessageBox.Critical)
+    msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
+    msg.exec_()
 
 
 def display_bad_value_message(mode=None):
