@@ -32,6 +32,7 @@
 """Main plotting module."""
 
 from .. import shared
+from .. import widgets_list
 from ..tools import misc_tools
 import matplotlib
 import matplotlib.pyplot as pyplot
@@ -121,6 +122,42 @@ class MainPlot:
 
         self.axes = self.fig.add_subplot(111)
 
+    def leave_margins_for_curves(self, map_type):
+        """Use at least the top and bottom margins of the curves displayed
+        next to this map (computed by their tight layout)."""
+        params = self.fig.subplotpars
+        bottom, top = params.bottom, params.top
+        for curve in get_curves_next_to_map(map_type):
+            # Only for figures of the same height, displayed side by side
+            if abs(curve.fig.bbox.height - self.fig.bbox.height) > 1:
+                continue
+            curve.fig.tight_layout()
+            bottom = max(bottom, curve.fig.subplotpars.bottom)
+            top = min(top, curve.fig.subplotpars.top)
+        if bottom < top:
+            self.fig.subplots_adjust(bottom=bottom, top=top)
+
+    def align_with_map(self, map_plot):
+        """Use the same top and bottom as the map displayed next to this
+        curve, so that both have the same height (the map is square and is
+        often limited by its width).
+
+        Returns True if the layout was changed.
+        """
+        axes = getattr(map_plot, "axes", None)
+        if axes is None or axes.figure is self.fig:
+            return False
+        # Only for figures of the same height, displayed side by side
+        if abs(axes.figure.bbox.height - self.fig.bbox.height) > 1:
+            return False
+        position = axes.get_position()
+        current = self.fig.subplotpars
+        if abs(current.bottom - position.y0) < 1e-3 and \
+                abs(current.top - position.y1) < 1e-3:
+            return False
+        self.fig.subplots_adjust(bottom=position.y0, top=position.y1)
+        return True
+
     def plot_labels(self):
         """Plots the x and y lables."""
         if self.xlabel is not None:
@@ -187,6 +224,16 @@ class MainPlot:
                 self.fig.subplots_adjust(left=0.125, right=0.7,
                                          bottom=0.2, top=0.9)
 
+            elif p_type == "meshgrid_data":
+                # Small map: leave room on the right for the colour bar
+                # (ticks and label)
+                self.fig.subplots_adjust(right=0.78)
+
+            elif p_type == "meshgrid":
+                # Results map: small vertical margins, to be as tall as
+                # possible (the curve next to it is aligned on the map)
+                self.fig.subplots_adjust(bottom=0.1, top=0.975)
+
             elif p_type == "small_meshgrid" or p_type == "multimeshgrid":
                 self.axes.set_axis_off()  # Remove black border
                 self.fig.subplots_adjust(0, 0, 1, 1, None, None)  # Adjust
@@ -197,9 +244,23 @@ class MainPlot:
                         p_type != "small_meshgrid_compute" and \
                         p_type != "meshgrid_data":
                     self.fig.tight_layout()
+                    # A curve next to a map has the same height as the map
+                    self.align_with_map(get_map_next_to_curve(p_type))
+
+            # A map keeps at least the margins needed by the curve next to
+            # it (axis labels), so that the curve can be aligned on the map
+            # without hiding its labels (e.g. small windows)
+            if p_type in MAPS_AND_CURVES:
+                self.leave_margins_for_curves(p_type)
 
             # Draw in the canvas
             self.fig.canvas.draw()
+
+            # A map is drawn: align the curve next to it on it
+            for curve in get_curves_next_to_map(p_type):
+                curve.fig.tight_layout()
+                curve.align_with_map(self)
+                curve.fig.canvas.draw()
 
             # Draw ROI for multimeshgrid
             display_roi = shared.exp.display_roi_in_multimeshgrid
@@ -208,3 +269,47 @@ class MainPlot:
 
             if p_type == "meshgrid_tilt_check":
                 self.draw_check_tilt_squares()
+
+
+# Maps and the curves displayed next to them: (widget, map attribute,
+# curve attributes)
+MAPS_AND_CURVES = {
+    "meshgrid_data": ("widget_data", "meshgrid",
+                      ("curve", "curve_1", "curve_2")),
+    "small_meshgrid_compute": ("widget_compute", "MPL_meshgrid",
+                               ("MPL_curve",)),
+    "meshgrid": ("widget_results", "MPL_canvas1", ("MPL_canvas2",))}
+
+# Plot types of these curves, and the map type next to them
+CURVE_MAP_TYPES = {
+    "curve_data": "meshgrid_data",
+    "curve_dataa": "meshgrid_data",
+    "curve_datab": "meshgrid_data",
+    "fit_preview": "small_meshgrid_compute",
+    "curve_results": "meshgrid"}
+
+
+def _plot_of(widget_name, attribute):
+    """Plot (with fig and axes) of a PYAFPlot of a main widget, or None."""
+    widget = getattr(widgets_list, widget_name, None)
+    pyaf_plot = getattr(widget, attribute, None)
+    plot = getattr(pyaf_plot, "canvas", None)
+    return plot if hasattr(plot, "fig") else None
+
+
+def get_map_next_to_curve(curve_type):
+    """Map displayed next to a curve of this type, or None."""
+    map_type = CURVE_MAP_TYPES.get(curve_type)
+    if map_type is None:
+        return None
+    widget_name, map_attribute, _ = MAPS_AND_CURVES[map_type]
+    return _plot_of(widget_name, map_attribute)
+
+
+def get_curves_next_to_map(map_type):
+    """Curves displayed next to a map of this type."""
+    if map_type not in MAPS_AND_CURVES:
+        return []
+    widget_name, _, curve_attributes = MAPS_AND_CURVES[map_type]
+    curves = [_plot_of(widget_name, a) for a in curve_attributes]
+    return [c for c in curves if c is not None]
