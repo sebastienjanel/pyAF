@@ -415,6 +415,24 @@ class PYAFInteractor(QVTKRenderWindowInteractor):
         super().__init__(frame)
 
         self.started_drawing_square = False
+        self.render_pending = False
+
+    def paintEvent(self, event):
+        """Render outside of the paint event.
+
+        With Qt >= 6.10 on macOS, calling Render() inside the paint event
+        (as QVTKRenderWindowInteractor does) freezes the application. The
+        render is deferred to the event loop instead.
+        """
+        if not self.render_pending:
+            self.render_pending = True
+            QtCore.QTimer.singleShot(0, self.deferred_render)
+
+    def deferred_render(self):
+        """Render the window (called from paintEvent)."""
+        self.render_pending = False
+        # Same call as QVTKRenderWindowInteractor.paintEvent
+        self._Iren.Render()
 
     def mousePressEvent(self, event):
         """Fetch mouse press events."""
