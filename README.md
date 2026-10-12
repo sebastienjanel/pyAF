@@ -28,7 +28,7 @@ Check as much as possible results provided vs other software (e.g. JPK DP) to ru
 
 INSTALL procedure with PyCharm software (free for academics):
 - clone the repository (https://github.com/sebastienjanel/pyAF.git) in PyCharm (File/Project from Version Control)
-- install/select a Python3 interpreter
+- install/select a Python 3 interpreter (3.11 or newer, 3.13 recommended)
 - install required packages from the terminal of PyCharm: pip install -r requirements.txt
 - configure the Run/Debug configuration by choosing the script /pyAF/main.py with the Python version of your venv
 - click run

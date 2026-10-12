@@ -4,6 +4,11 @@
 import os
 import sys
 import glob
+from PyInstaller.utils.hooks import get_package_paths
+
+# Locate ITK and VTK in the active environment (no hardcoded venv path)
+ITK_DIR = get_package_paths("itk")[1]
+VTK_DIR = get_package_paths("vtkmodules")[1]
 
 block_cipher = None
 
@@ -45,8 +50,8 @@ a = Analysis(
         (os.path.join(os.getcwd(), "src/gui_styles/stylesheets/light.qss"), "gui_styles/stylesheets/"),
 
         # ITK/VTK
-        (os.path.join(os.getcwd(), ".venv/lib/python3.13/site-packages/itk"), "itk/"),
-        (os.path.join(os.getcwd(), ".venv/lib/python3.13/site-packages/vtkmodules"), "itk/"),
+        (ITK_DIR, "itk/"),
+        (VTK_DIR, "itk/"),
     ] + theme_files,
     hiddenimports=[],
     hookspath=[],
@@ -67,7 +72,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='main',
-    debug=True,
+    debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,

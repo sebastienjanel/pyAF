@@ -127,7 +127,6 @@
         "Mac OS"
     ],
     "programmingLanguage": [
-        "Python 2",
         "Python 3"
     ],
     "softwareRequirements": "https://github.com/sebastienjanel/pyAF/blob/main/requirements.txt",
@@ -136,3 +135,4 @@
     "funding": "ANR-10-EQPX-04-01, FEDER 12001407",
     "issueTracker": "https://github.com/sebastienjanel/pyAF/issues",
     "referencePublication": "https://doi.org/10.1039/C8NR08955H"
+}
