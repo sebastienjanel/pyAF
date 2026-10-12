@@ -97,7 +97,7 @@ class OpenglWidget(PYAFWidget):
 
         # Add colorbar to the renderer
         self.scalar_bar = get_color_bar()
-        self.canvas.renderer.AddActor2D(self.scalar_bar)
+        self.canvas.renderer.AddViewProp(self.scalar_bar)
 
         # Automatically load saved layers, is used for debugging
         if consts.AUTO_LOAD_LAYER_IN_3D:
@@ -169,7 +169,7 @@ class OpenglWidget(PYAFWidget):
 
         # Get a new scalar bar and add it to the renderer
         self.scalar_bar = get_color_bar()
-        self.canvas.renderer.AddActor2D(self.scalar_bar)
+        self.canvas.renderer.AddViewProp(self.scalar_bar)
 
         # Render
         if shared.VTK_first is False:
