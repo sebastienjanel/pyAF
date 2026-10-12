@@ -18,8 +18,9 @@ def prepare_data_hertzfit(app, dt, fit_params):
     """
 
     # Calculate initial guess POC
-    poc_index_before, real_poc, final_fit, _ = search_poc.get_POC(
+    poc_index_before, real_poc, final_fit, fit_segment = search_poc.get_POC(
         app, dt["approach_position"], fit_params)
+    poc_found = search_poc.poc_found(fit_segment)
 
     # Initial values for the POC index and POC pos
     poc_index_i = poc_index_before
@@ -79,7 +80,8 @@ def prepare_data_hertzfit(app, dt, fit_params):
     offset_no_tilt = np.median(data_to_fit[0:stop])
     data_to_fit = data_to_fit - offset_no_tilt
 
-    return delta, data_to_fit, final_fit, first, stop, poc_index_i, poc_pos_i
+    return delta, data_to_fit, final_fit, first, stop, poc_index_i, poc_pos_i, \
+        poc_found
 
 
 def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):

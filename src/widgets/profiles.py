@@ -213,7 +213,11 @@ class ProfileWidget(PYAFWidget):
                         break
 
                 value = abs(z1 - z2)
-                self.delta_z_labels[profile].setText(str(round(value)))
+                if numpy.isnan(value):
+                    # No topography at one of the bars (no POC found)
+                    self.delta_z_labels[profile].setText("NaN")
+                else:
+                    self.delta_z_labels[profile].setText(str(round(value)))
 
     def open_single_figure(self):
         """Open the figure in a separate window."""

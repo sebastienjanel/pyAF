@@ -45,8 +45,9 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
         None, [i, j], app, ret, mode="compute", dt=dt)
 
     # Get POC
-    poc_index_before, real_poc, final_fit, _ = search_poc.get_POC(
+    poc_index_before, real_poc, final_fit, fit_segment = search_poc.get_POC(
         app, dt["approach_position"], fit_params)
+    found = search_poc.poc_found(fit_segment)
 
     # Get force curve
     curve_x = app[0]
@@ -57,7 +58,11 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
         dt["spring_constant"])
 
     piez = dt["piezo_image"]
-    poc_corrected = piez + curve_x[len(curve_x) - 1] - real_poc[0]
+    if found:
+        poc_corrected = piez + curve_x[len(curve_x) - 1] - real_poc[0]
+    else:
+        # No POC: no topography value
+        poc_corrected = numpy.nan
 
     # Get stiffness
     segment = slice(poc_index_before, len(resforce[1]))
@@ -86,12 +91,16 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
     else:
         curve = None
 
-    stiffness_array = compute_stiffness(
-        parts,
-        o_params["coeff"],
-        o_params["model_selected"],
-        o_params["tomography"],
-        curve)
+    if found:
+        stiffness_array = compute_stiffness(
+            parts,
+            o_params["coeff"],
+            o_params["model_selected"],
+            o_params["tomography"],
+            curve)
+    else:
+        # No POC: no stiffness value (the default POC is not a measure)
+        stiffness_array = []
 
     return i, j, poc_index_before, real_poc, final_fit, stiffness_array, \
            poc_corrected, smoothing_error, indentation_val

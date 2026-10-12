@@ -35,6 +35,16 @@ import numpy
 from . import math_tools
 
 
+def poc_found(fit_segment):
+    """Returns False if get_POC could not find a point of contact.
+
+    fit_segment is the last value returned by get_POC. When no POC is found,
+    get_POC returns a default POC (second to last point of the curve) with an
+    empty [0, 0] fit segment.
+    """
+    return list(fit_segment) != [0, 0]
+
+
 def get_POC(curve, cor_pos, params):
     """Get the point of contact.
 

@@ -265,6 +265,10 @@ class RoiManagerWidget(PYAFWidget):
                     y = numpy.array(y)
                     z = numpy.array(z)
 
+                    # Ignore the pixels without topography (no POC found)
+                    finite = numpy.isfinite(z)
+                    x, y, z = x[finite], y[finite], z[finite]
+
                     # Get the coefficients of the 2D fit
                     co = math_tools.polyfit2d(
                         x,

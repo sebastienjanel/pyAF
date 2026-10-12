@@ -301,7 +301,7 @@ class PlotSlices(MainPlot):
         self.z_size = z_size
         self.nbr_pixels_x = nbr_pixels_x
         self.nbr_pixels_y = nbr_pixels_y
-        self.y_height = numpy.amax(self.data.topography)
+        self.y_height = numpy.nanmax(self.data.topography)
         self.data_stiffness_slices = [numpy.array(E_array),
                                       numpy.array(X_array),
                                       numpy.array(Z_array)]

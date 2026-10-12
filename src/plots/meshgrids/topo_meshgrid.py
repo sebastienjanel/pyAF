@@ -31,6 +31,7 @@
 
 """Plots the meshgrid with the topography."""
 
+import numpy
 from .plot_meshgrid import PlotMeshGrid
 
 
@@ -44,6 +45,10 @@ class PlotTopoMeshGrid(PlotMeshGrid):
         super().__init__(parent)
 
         self.temp_array[:] = self.data.topography
+        # Mask the nans (no POC found), so that matplotlib displays them with
+        # the nan color
+        self.temp_array = numpy.ma.masked_where(
+            numpy.isnan(self.temp_array), self.temp_array)
 
         self.factor = 1.0
         self.colorbarlabel = "Zero-force topography [nm]"

@@ -273,7 +273,7 @@ class Stiffness:
         # Correct POC with piezo height (piezo_image) for topography and
         # stiffness display. Get a corrected POC array (when 3D is
         # reconstructed, the last point in z is = 0)
-        minimum = numpy.amin(base)
+        minimum = numpy.nanmin(base)
         for i in range(data.nbr_pixels_x):
             for j in range(data.nbr_pixels_y):
                 topography[i, j] = topography[i][j] - minimum

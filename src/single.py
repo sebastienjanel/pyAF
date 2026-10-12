@@ -928,7 +928,7 @@ class SingleFile:
                         array_stiffness.append(self.stiffness_array[i][j][k])
 
             self.max_stiffness = numpy.amax(array_stiffness)
-            self.max_topo = numpy.amax(self.topography)
+            self.max_topo = numpy.nanmax(self.topography)
             if color:
                 self.color_opts_topo[2] = self.max_topo
                 self.color_opts_topo[3] = self.max_topo / 2.0
