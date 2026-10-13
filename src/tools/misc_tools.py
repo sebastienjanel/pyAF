@@ -922,6 +922,18 @@ def update_slice_position(unique_id):
 PLOT_FONT_FILE = "Inter-Regular.ttf"
 
 
+def z_label(data, unit="nm"):
+    """Label of the z axis of the curves (position of the z axis, from the
+    start of the retraction curve), with the source of the values."""
+    if data.zsensor_used is True:
+        source = " (height sensor)"
+    elif data.zsensor_used is False:
+        source = " (piezo, calculated)"
+    else:
+        source = ""
+    return "Z position" + source + " [" + unit + "]"
+
+
 def get_font_path():
     """Path of the font of the plots (in the application bundle if
     frozen, see main_macOS.spec)."""

@@ -57,7 +57,7 @@ from ..tools.PYAFWidget import PYAFWidget
 from ..widgets.progressbar import Progressbar
 
 
-# File types with the time plots (deflection and scanner extension vs time)
+# File types with the time plots (deflection and z position vs time)
 JPK_FILE_TYPES = ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)")
 
 
@@ -444,7 +444,7 @@ class DataWidget(PYAFWidget):
 
     def update_plot_selector(self):
         """Display the plot selector and the selected plot for the JPK
-        files, the deflection vs scanner extension plot for the other
+        files, the deflection vs z position plot for the other
         files."""
         jpk = self.is_jpk()
         # Keep the space of the selector if a JPK file is loaded, so that

@@ -32,6 +32,7 @@
 """Plots the work and rupture force fit preview."""
 
 from ..plot_curve import PlotCurve
+from ....tools import misc_tools
 from ....tools import search_joc
 
 
@@ -42,7 +43,7 @@ class ComputeWorkAndRuptureForce(PlotCurve):
         super().__init__(parent)
 
         # Labels
-        self.xlabel = "Scanner Extension [nm]"
+        self.xlabel = misc_tools.z_label(self.data)
         self.ylabel = "Deflection [nm]"
 
         self.curve_retraction = self.retraction

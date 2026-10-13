@@ -220,7 +220,7 @@ class ResultsForceDist(PlotCurve):
         The retraction curve and its elements are defined with the jump of
         contact at 0, 0. Shift them so that the point of contact is at 0, 0,
         as for the approach curve (the curves are then at the same relative
-        position as on the deflection - extension curve).
+        position as on the deflection - Z curve).
         """
         poc = self.data.pocs_real[self.xpos][self.ypos]
         joc = self.data.jocs1_real[self.xpos][self.ypos]

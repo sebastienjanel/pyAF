@@ -511,6 +511,9 @@ class LoaderNanoscope:
         scaling_factor = data.hard_z_scale
         f_samples = data.nbr_points_per_curve_approach
 
+        # Source of the z values, for the labels of the plots
+        data.zsensor_used = bool(data.zsensor_used)
+
         # Get sensor values if we have acces to Z-Sensor data
         if data.zsensor_used:
             curves_x_app, curves_x_ret = self.fetch_approach()

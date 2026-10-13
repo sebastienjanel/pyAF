@@ -47,7 +47,7 @@ class PlotSelectorWidget(PYAFWidget):
         if self.name == "plot_selector_data":
             self.parent_widget = widgets_list.widget_data
 
-        self.plot_types = ("Deflection vs Scanner Extension", "Deflection vs Time", "Scanner Extension vs Time")
+        self.plot_types = ("Deflection vs Z position", "Deflection vs Time", "Z position vs Time")
 
         self.BT_back = PYAFButton(self, "back", "<", size=60)
         self.BT_forward = PYAFButton(self, "forward", ">", size=60)

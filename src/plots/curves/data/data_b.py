@@ -32,6 +32,7 @@
 """Plot the curve on the data tab."""
 
 from ..plot_curve import PlotCurve
+from ....tools import misc_tools
 
 
 class PlotDataCurveB(PlotCurve):
@@ -42,7 +43,7 @@ class PlotDataCurveB(PlotCurve):
 
         # Labels
         self.xlabel = "time [s]"
-        self.ylabel = "Height (measured if available) [nm]"
+        self.ylabel = misc_tools.z_label(self.data)
 
         self.curve_approach = self.approach
         self.curve_retraction = self.retraction

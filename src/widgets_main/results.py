@@ -229,8 +229,8 @@ class ResultsWidget(PYAFWidget):
 
         self.BT_group_type_of_curve = PYAFButtonGroup(
             self, "button_group_type_of_curve")
-        self.RB_defl_ext = QtWidgets.QRadioButton("Deflection - Extension curve")
-        self.RB_force_ext = QtWidgets.QRadioButton("Force - Extension curve")
+        self.RB_defl_ext = QtWidgets.QRadioButton("Deflection - Z curve")
+        self.RB_force_ext = QtWidgets.QRadioButton("Force - Z curve")
         self.RB_force = QtWidgets.QRadioButton("Force - Distance curve")
         self.RB_force_events = QtWidgets.QRadioButton("Force curve (events)")
         self.RB_indentation_curve = QtWidgets.QRadioButton("Indentation curve")

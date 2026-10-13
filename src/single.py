@@ -128,6 +128,8 @@ class SingleFile:
         self.nbr_pixels_y = None
         self.x_size = None
         self.y_size = None
+        # True if the z values come from a height sensor, False if they are
+        # calculated from the piezo (None for the old .pyaf files)
         self.zsensor_used = None
         # Note, z_size is not defined as it can be different for each pixel
         # in JPK files. Access this value by using the get_x_dist function

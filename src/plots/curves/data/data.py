@@ -32,6 +32,7 @@
 """Plot the curve on the data tab."""
 
 from ..plot_curve import PlotCurve
+from ....tools import misc_tools
 
 
 class PlotDataCurve(PlotCurve):
@@ -41,7 +42,7 @@ class PlotDataCurve(PlotCurve):
         super().__init__(parent)
 
         # Labels
-        self.xlabel = "Height (measured if available) [nm]"
+        self.xlabel = misc_tools.z_label(self.data)
         self.ylabel = "Deflection [nm]"
 
         self.curve_approach = self.approach

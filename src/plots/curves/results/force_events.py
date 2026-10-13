@@ -32,6 +32,7 @@
 """Plots the force curve with the detected events."""
 
 from ..plot_curve import PlotCurve
+from ....tools import misc_tools
 from ....tools import math_tools
 from ....tools import curve_tools
 
@@ -53,9 +54,9 @@ class ResultsForceEvents(PlotCurve):
 
         # Labels
         if self.data.curve_distance_units == "nm":
-            self.xlabel = "Scanner Extension [nm]"
+            self.xlabel = misc_tools.z_label(self.data)
         elif self.data.curve_distance_units == "um":
-            self.xlabel = "Scanner Extension [\u03bcm]"
+            self.xlabel = misc_tools.z_label(self.data, "\u03bcm")
         self.ylabel = "Force [" + self.data.curve_force_units + "]"
 
         self.curve_retraction = curve_tools.get_force_curves(

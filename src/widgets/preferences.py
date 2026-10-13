@@ -76,7 +76,7 @@ class PreferencesWidget(PYAFWidget):
         self.CB_zero_defl.setToolTip(tip)
 
         text = "Display raw data on curves (Data, Results)"
-        tip = ("Displays in green the parts of the deflection - extension"
+        tip = ("Displays in green the parts of the deflection - Z position"
                " curves which are not used for the computations.")
         self.CB_raw_data = PYAFCheckBox(self, "raw_data", text)
         self.CB_raw_data.setToolTip(tip)
