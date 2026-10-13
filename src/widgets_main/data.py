@@ -57,6 +57,10 @@ from ..tools.PYAFWidget import PYAFWidget
 from ..widgets.progressbar import Progressbar
 
 
+# File types with the time plots (deflection and scanner extension vs time)
+JPK_FILE_TYPES = ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)")
+
+
 class DataWidget(PYAFWidget):
     """Init the DataWidget UI.
 
@@ -66,9 +70,6 @@ class DataWidget(PYAFWidget):
 
     def __init__(self, parent):
         super().__init__(parent, "widget_data")
-
-        data = shared.exp.list[shared.exp.id_selected]
-        self.file_type_flag = data.file_type in ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)")
 
         self.list_boxes = None
         self.container = None
@@ -232,53 +233,42 @@ class DataWidget(PYAFWidget):
         # Curve
         self.curve_size = [490, 350]
         sizes = [self.curve_size[0] / 72.0, self.curve_size[1] / 72.0, 72.0]
-        if self.file_type_flag:
-            self.canvas_stack = QtWidgets.QStackedWidget()
-            self.canvas_curve = QtWidgets.QWidget()
-            self.canvas_curve_a = QtWidgets.QWidget()
-            self.canvas_curve_b = QtWidgets.QWidget()
-            self.curve = PYAFPlot(self, "curve_data", self.canvas_curve, sizes)
-            self.curve_1 = PYAFPlot(self, "curve_dataa", self.canvas_curve_a, sizes)
-            self.curve_2 = PYAFPlot(self, "curve_datab", self.canvas_curve_b, sizes)
+        # The time plots (curve_1 and curve_2) are only available for the
+        # JPK files, but are always created: the files can be of different
+        # types (see update_plot_selector)
+        self.canvas_stack = QtWidgets.QStackedWidget()
+        self.canvas_curve = QtWidgets.QWidget()
+        self.canvas_curve_a = QtWidgets.QWidget()
+        self.canvas_curve_b = QtWidgets.QWidget()
+        self.curve = PYAFPlot(self, "curve_data", self.canvas_curve, sizes)
+        self.curve_1 = PYAFPlot(self, "curve_dataa", self.canvas_curve_a, sizes)
+        self.curve_2 = PYAFPlot(self, "curve_datab", self.canvas_curve_b, sizes)
 
-            self.canvas_stack.addWidget(self.curve)
-            self.canvas_stack.addWidget(self.curve_1)
-            self.canvas_stack.addWidget(self.curve_2)
+        self.canvas_stack.addWidget(self.curve)
+        self.canvas_stack.addWidget(self.curve_1)
+        self.canvas_stack.addWidget(self.curve_2)
 
-            pol = QtWidgets.QSizePolicy.Minimum
-            sizePolicy = QtWidgets.QSizePolicy(pol, pol)
-            self.curve.setSizePolicy(sizePolicy)
-            self.curve_1.setSizePolicy(sizePolicy)
-            self.curve_2.setSizePolicy(sizePolicy)
-            self.canvas_stack.setSizePolicy(sizePolicy)
-            self.canvas_mesh.setSizePolicy(sizePolicy)
-            self.meshgrid.setSizePolicy(sizePolicy)
-
-        else:
-            self.canvas_curve = QtWidgets.QWidget()
-            self.curve = PYAFPlot(self, "curve_data", self.canvas_curve, sizes)
+        pol = QtWidgets.QSizePolicy.Minimum
+        sizePolicy = QtWidgets.QSizePolicy(pol, pol)
+        self.curve.setSizePolicy(sizePolicy)
+        self.curve_1.setSizePolicy(sizePolicy)
+        self.curve_2.setSizePolicy(sizePolicy)
+        self.canvas_stack.setSizePolicy(sizePolicy)
+        self.canvas_mesh.setSizePolicy(sizePolicy)
+        self.meshgrid.setSizePolicy(sizePolicy)
 
         self.HL_box_infos = QtWidgets.QHBoxLayout()
         self.HL_box_infos.addWidget(self.box_info1)
         self.HL_box_infos.addWidget(self.box_cantilever)
         self.HL_box_infos.addStretch(1)
 
-        if self.file_type_flag:
-            name = "widget_plot_selector_data"
-            self.plot_selector = PlotSelectorWidget(self, name)
+        name = "widget_plot_selector_data"
+        self.plot_selector = PlotSelectorWidget(self, name)
 
         self.GL_data.addLayout(self.HL_box_infos, 0, 0, 1, 0)
-
-        if self.file_type_flag:
-            self.GL_data.addWidget(self.plot_selector, 1, 1)
-
+        self.GL_data.addWidget(self.plot_selector, 1, 1)
         self.GL_data.addWidget(self.meshgrid, 2, 0)
-
-        if self.file_type_flag:
-            self.GL_data.addWidget(self.canvas_stack, 2, 1)
-
-        else:
-            self.GL_data.addWidget(self.curve, 2, 1)
+        self.GL_data.addWidget(self.canvas_stack, 2, 1)
 
         self.box_files = QtWidgets.QGroupBox("File list")
         self.box_files.setLayout(self.VL_list)
@@ -436,11 +426,37 @@ class DataWidget(PYAFWidget):
         self.IN_temp.setFont(self.smallfont)
 
         # Update the meshgrid
+        self.update_plot_selector()
         self.meshgrid.update_plot()
         self.curve.update_plot()
-        if self.file_type_flag:
+        if self.is_jpk():
             self.curve_1.update_plot()
             self.curve_2.update_plot()
+
+    def is_jpk(self, data=None):
+        """True for the JPK files (selected file by default), which have
+        the time plots."""
+        if data is None:
+            data = shared.exp.list[shared.exp.id_selected]
+        return data.file_type in JPK_FILE_TYPES
+
+    def update_plot_selector(self):
+        """Display the plot selector and the selected plot for the JPK
+        files, the deflection vs scanner extension plot for the other
+        files."""
+        jpk = self.is_jpk()
+        # Keep the space of the selector if a JPK file is loaded, so that
+        # the plots do not move when changing files
+        any_jpk = any(self.is_jpk(data) for data in shared.exp.list)
+        policy = self.plot_selector.sizePolicy()
+        policy.setRetainSizeWhenHidden(any_jpk)
+        self.plot_selector.setSizePolicy(policy)
+        self.plot_selector.setVisible(jpk)
+        if jpk:
+            index = self.plot_selector.list_plot_types.currentIndex()
+        else:
+            index = 0
+        self.canvas_stack.setCurrentIndex(index)
 
     def change_info_type(self, newtype):
         """Change the type of information which is selected.

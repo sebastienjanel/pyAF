@@ -673,7 +673,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Update the curves
         if self.tabs.currentIndex() == 0:
             wl.widget_data.curve.update_plot()
-            if data.file_type in ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)"):
+            if wl.widget_data.is_jpk(data):
                 wl.widget_data.curve_1.update_plot()
                 wl.widget_data.curve_2.update_plot()
         if self.tabs.currentIndex() == 1:
