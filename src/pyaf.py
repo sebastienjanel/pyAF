@@ -345,21 +345,24 @@ class MainWindow(QtWidgets.QMainWindow):
         isavailable = QtWidgets.QSystemTrayIcon.isSystemTrayAvailable()
 
         if isavailable and self.tray_enabled and enabled:
-            tray = QtWidgets.QSystemTrayIcon(self)
-            icon = QtGui.QIcon("images/icon.png")
-            tray.setIcon(icon)
+            # Create the tray icon once, and reuse it for the next messages
+            # (a new icon each time would pile them up in the menu bar)
+            if getattr(self, "tray", None) is None:
+                self.tray = QtWidgets.QSystemTrayIcon(self)
+                path = misc_tools.get_app_path() + "/images/icon.png"
+                self.tray.setIcon(QtGui.QIcon(path))
 
-            # On Windows, allow the creation of a new tray only if the user
-            # has clicked on the old one and removed it.
-            # Will not be triggered on OS X
-            tray.messageClicked.connect(self.enable_tray)
+                # On Windows, display a new message only if the user has
+                # clicked on the old one. Will not be triggered on OS X
+                self.tray.messageClicked.connect(self.enable_tray)
 
-            tray.show()
-            tray.showMessage(
+            # Hidden when the message is disabled in the preferences
+            self.tray.show()
+            self.tray.showMessage(
                 "pyAF", "Do not forget to save your file !",
                 QtWidgets.QSystemTrayIcon.Information, msecs=1000 * 10)
 
-            # Disable the creation of a new tray on Windows and Linux
+            # Disable the next messages on Windows and Linux
             if sys.platform != "darwin":
                 self.tray_enabled = False
 

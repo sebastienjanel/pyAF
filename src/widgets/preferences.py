@@ -213,6 +213,11 @@ class PreferencesWidget(PYAFWidget):
             # Save the value
             self.settings.setValue("RememberMeToSave", value)
 
+            # Remove the icon of the message from the menu bar
+            tray = getattr(self.parent, "tray", None)
+            if not value and tray is not None:
+                tray.hide()
+
         elif name == "mesh_style":
             # Get the value
             value = self.CB_mesh_style.isChecked()
