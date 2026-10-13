@@ -92,6 +92,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
         # Events (default empty values, will not be plotted if not filled)
         self.loading_rates_fits = None
+        # Elements to zoom on in the loading rates preview (curve indices)
+        self.loading_rates_zoom_points = None
         self.events_filter_dist_square = None
         self.display_events_detection_exclude_square = False
         self.current_jump = None
@@ -651,6 +653,12 @@ class PlotCurve(MainPlot, CommonCurveTools):
                     else:
                         point = self.joc2_indice
 
+                elif shared.exp.compute_type == "loading_rates":
+                    # Zoom on the events, then on the joc
+                    points = self.loading_rates_zoom_points
+                    if points:
+                        point = points[shared.zoomed_in_element % len(points)]
+
             if self.no_fit_found:
                 # If no fit has been found, do not zoom
                 point = None
@@ -685,11 +693,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
                     ylength / 8.0
 
                 if self.data.auto_zoom_in and point is not None:
-                    if point + xlength > len(curve_x):
-                        xmax = curve_x[len(curve_x) - 1]
-                    else:
-                        xmax = curve_x[point + int(xlength)]
-                    xmin = curve_x[point - int(xlength)]
+                    xmax = curve_x[min(point + int(xlength), len(curve_x) - 1)]
+                    xmin = curve_x[max(point - int(xlength), 0)]
 
                     ymin = numpy.mean(curve_y[seg]) - ylength
                     ymax = numpy.mean(curve_y[seg]) + ylength

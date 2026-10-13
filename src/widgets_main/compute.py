@@ -618,7 +618,7 @@ class ComputeWidget(PYAFWidget):
             self.BT_next_zoom_element.setEnabled(True)
         elif self.tabs.currentIndex() == 4:
             shared.exp.compute_type = "loading_rates"
-            self.BT_next_zoom_element.setEnabled(False)
+            self.BT_next_zoom_element.setEnabled(True)
 
         self.update_MPL("MPL_canvas")
 
@@ -1336,8 +1336,9 @@ class ComputeWidget(PYAFWidget):
                 else:
                     val = None
             elif shared.exp.compute_type == "loading_rates":
-                # No element to display here
-                val = None
+                # The events and the joc
+                points = self.MPL_curve.canvas.loading_rates_zoom_points
+                val = len(points) if points else None
 
             if val is not None:
                 if shared.zoomed_in_element + 1 < val:
@@ -1394,8 +1395,8 @@ class ComputeWidget(PYAFWidget):
         elif checkbox == "zoom_in":
             data.auto_zoom_in = self.CB_zoom_in.isChecked()
             tp = shared.exp.compute_type
-            if tp == "events" or tp == "work_and_rupture_force":
-                self.BT_next_zoom_element.setEnabled(data.auto_zoom_in)
+            if tp in ("events", "work_and_rupture_force", "loading_rates"):
+                self.BT_next_zoom_element.setEnabled(True)
             self.update_MPL("MPL_canvas")
 
         elif checkbox == "perform_fit":

@@ -73,4 +73,13 @@ class ComputeLoadingRates(PlotCurve):
 
             self.loading_rates_fits = fit_boundaries
 
+            # Elements to zoom on: the end of each event (where its loading
+            # rate fit starts), then the jump of contact
+            stops = self.data.events_positions_stop[self.xpos][self.ypos]
+            joc = self.data.events_jocs2_indices[self.xpos][self.ypos]
+            points = [int(stop) for stop in stops]
+            if joc is not None and joc == joc:  # Not None or NaN
+                points.append(int(joc))
+            self.loading_rates_zoom_points = points
+
         self.plot_fig()
