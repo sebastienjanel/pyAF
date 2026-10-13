@@ -45,7 +45,7 @@ class ComputeLoadingRates(PlotCurve):
         super().__init__(parent)
 
         # Labels
-        self.xlabel = "Distance [\u03bcm]"
+        self.xlabel = "Distance [nm]"
         self.ylabel = "Force [nN]"
 
         if self.data.events_calculated:

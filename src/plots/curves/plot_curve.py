@@ -685,6 +685,11 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 if not factor:
                     return  # Cancel if = 0
 
+                if len(curve_y[seg]) == 0 or point >= len(curve_x):
+                    # Point outside of the displayed curve (e.g. the MSF
+                    # curve, shorter than the force curve): no zoom
+                    return
+
                 diff = (abs(max(curve_y[seg]) - min(curve_y[seg])) / 2.0)
                 ylength = diff * (10.0 / factor)
 
