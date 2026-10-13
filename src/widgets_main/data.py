@@ -205,9 +205,9 @@ class DataWidget(PYAFWidget):
         self.BT_reset_all = PYAFButton(self, "reset_all", "Reset all", size=100)
 
         self.gridLayout = QtWidgets.QGridLayout()
-        self.gridLayout.addWidget(self.IN_spring_constant, 0, 0, 1, 0)
-        self.gridLayout.addWidget(self.IN_defl_sens, 1, 0, 1, 0)
-        self.gridLayout.addWidget(self.IN_temp, 2, 0, 1, 0)
+        self.gridLayout.addWidget(self.IN_spring_constant, 0, 0, 1, 3)
+        self.gridLayout.addWidget(self.IN_defl_sens, 1, 0, 1, 3)
+        self.gridLayout.addWidget(self.IN_temp, 2, 0, 1, 3)
         self.gridLayout.addWidget(self.BT_reset, 3, 0)
         self.gridLayout.addWidget(self.BT_apply_on_all, 3, 1)
         self.gridLayout.addWidget(self.BT_reset_all, 3, 2)

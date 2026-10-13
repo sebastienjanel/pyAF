@@ -626,3 +626,10 @@ def show_success(parent, text, details=None, warning=False):
     msg.setIconPixmap(icon.pixmap(48, 48))
     msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
     msg.exec_()
+
+
+def font_of_size(size):
+    """The default font of the application, with the given point size."""
+    font = QtGui.QFont()
+    font.setPointSize(size)
+    return font

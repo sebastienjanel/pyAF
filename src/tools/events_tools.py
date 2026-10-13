@@ -487,7 +487,7 @@ def apply_msf(curve_x, curve_y, window_size):
     d is the difference between the differences between the 2 fits and the data
     points.
     """
-    window_size = int(numpy.fix(window_size / 2) * 2)
+    window_size = int(numpy.trunc(window_size / 2) * 2)
 
     l1 = int(window_size / 2.0)
     d = []

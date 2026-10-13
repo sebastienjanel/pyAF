@@ -174,12 +174,13 @@ class PlotMeshGrid(MainPlot):
                 self.data_meshgrid is not None:
             self.colormap = matplotlib.colormaps.get_cmap(self.colormap)
             if self.color_saturation is not None:
-                self.colormap.set_over(self.color_saturation)
-                self.colormap.set_under(self.color_negative)
+                self.colormap = self.colormap.with_extremes(
+                    over=self.color_saturation, under=self.color_negative)
 
             # If some values are masked, define their color
             if self.color_nan is not None:
-                self.colormap.set_bad(self.color_nan)
+                self.colormap = self.colormap.with_extremes(
+                    bad=self.color_nan)
 
             if self.mesh_type == "events_per_curve":
                 self.colormap, norm = self.get_events_colorscale(self.colormap)

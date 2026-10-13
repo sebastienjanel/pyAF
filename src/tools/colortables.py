@@ -294,9 +294,9 @@ class ColorTables:
                               (1.0, 0.0, 0.0))}
             colormap = mpl_colors.LinearSegmentedColormap("mycolormap",
                                                           cdict, freq)
-            colormap.set_over(self.color_saturation)
-            colormap.set_under(self.color_negative)
-            colormap.set_bad(self.color_nan)
+            colormap = colormap.with_extremes(
+                over=self.color_saturation, under=self.color_negative,
+                bad=self.color_nan)
             norm = mpl_colors.Normalize(vmin=0, vmax=self.saturation_limit)
         elif colortable == "Cool-Warm":
             cdict = {"red": ((0.0, 0.0, 59 / 256.0),
@@ -401,9 +401,9 @@ class ColorTables:
 
             colormap = mpl_colors.LinearSegmentedColormap("mycolormap",
                                                           cdict, 256)
-            colormap.set_over(self.color_saturation)
-            colormap.set_under(self.color_negative)
-            colormap.set_bad(self.color_nan)
+            colormap = colormap.with_extremes(
+                over=self.color_saturation, under=self.color_negative,
+                bad=self.color_nan)
             norm = mpl_colors.Normalize(vmin=0, vmax=self.saturation_limit)
         return colormap, norm
 

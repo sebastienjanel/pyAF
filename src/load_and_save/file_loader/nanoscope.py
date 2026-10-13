@@ -72,11 +72,14 @@ class LoaderNanoscope:
         self.line = None
         self.peakforce = None
 
-        # Fetch the data
-        self.fetch_header()
-        shared.exp.temp_file.create_data_tables(self.unique_id)
-        self.fetch_image()
-        self.fetch_curves()
+        # Fetch the data (close the file even if the reading fails)
+        try:
+            self.fetch_header()
+            shared.exp.temp_file.create_data_tables(self.unique_id)
+            self.fetch_image()
+            self.fetch_curves()
+        finally:
+            self.afm_file.close()
 
     def fetch_header(self):
         """Saves all the informations in the header."""

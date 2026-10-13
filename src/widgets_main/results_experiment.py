@@ -213,7 +213,7 @@ class ResultsExperimentWidget(PYAFWidget):
         self.GL_tableWidget_groups.addLayout(self.HL_hist_buttons, 1, 0)
         self.GL_tableWidget_groups.addWidget(self.stats_tableWidget, 0, 1)
         self.GL_tableWidget_groups.addLayout(self.HL_stats_buttons, 1, 1)
-        self.GL_tableWidget_groups.addItem(spacer, 0, 2, 1, 0)
+        self.GL_tableWidget_groups.addItem(spacer, 0, 2, 1, 1)
 
         # Connect header checkboxes
         # hist_headers.all_selected.connect(lambda: self.check_all(mode="hist"))
