@@ -618,33 +618,25 @@ class DataWidget(PYAFWidget):
             self.update_GUI("thresh_units")
 
         elif button == "apply_on_all":
-            if shared.exp.info_selected == "spring":
-                value = self.IN_spring_constant.get_float_value()
-                for data in shared.exp.list:
-                    data.spring_constant = value
-
-            elif shared.exp.info_selected == "defl":
-                value = self.IN_defl_sens.get_float_value()
-                for data in shared.exp.list:
-                    data.deflection_sensitivity = value
-
-            elif shared.exp.info_selected == "temp":
-                value = self.IN_temp.get_float_value()
-                for data in shared.exp.list:
-                    data.temperature = value + 273.15
+            # Copy the three calibration values of the current file to all
+            # the other files (the exact values, not the rounded ones
+            # displayed in the inputs). The getter returns the spring
+            # constant in N/nm, the setter takes N/m.
+            spring_constant = data.spring_constant * 1e9
+            deflection_sensitivity = data.deflection_sensitivity
+            temperature = data.temperature
+            for other in shared.exp.list:
+                if other is not data:
+                    other.spring_constant = spring_constant
+                    other.deflection_sensitivity = deflection_sensitivity
+                    other.temperature = temperature
 
         elif button == "reset_all":
-            if shared.exp.info_selected == "spring":
-                for data in shared.exp.list:
-                    data.spring_constant = None
-
-            elif shared.exp.info_selected == "defl":
-                for data in shared.exp.list:
-                    data.deflection_sensitivity = None
-
-            elif shared.exp.info_selected == "temp":
-                for data in shared.exp.list:
-                    data.temperature = None
+            # Reset the three calibration values of all the files
+            for other in shared.exp.list:
+                other.spring_constant = None
+                other.deflection_sensitivity = None
+                other.temperature = None
 
         elif button == "add_files":
             self.parent.load_more()
