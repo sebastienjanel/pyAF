@@ -35,6 +35,7 @@ from qtpy import QtWidgets
 from ..tools.PYAFWidget import PYAFWidget
 from .. import shared
 from .. import widgets_list
+from ..tools import misc_tools
 
 
 class UsedParametersWidget(PYAFWidget):
@@ -194,9 +195,10 @@ class UsedParametersWidget(PYAFWidget):
         # - Other
         self.LB_defl_sens.setText(
             "Deflection sensitivity (nm/V) : " +
-            str(dt.used_deflection_sensitivity))
+            misc_tools.format_number(dt.used_deflection_sensitivity))
         self.LB_spring_constant.setText(
-            "Spring constant (N/m) : " + str(dt.used_spring_constant * 1e9))
+            "Spring constant (N/m) : " +
+            misc_tools.format_number(dt.used_spring_constant * 1e9))
 
         # Elasticity
         if dt.stiffness_calculated:

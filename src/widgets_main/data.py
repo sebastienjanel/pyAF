@@ -390,9 +390,10 @@ class DataWidget(PYAFWidget):
             self.LB_extended_delay.setText("Extended delay : None")
 
         self.IN_spring_constant.changeValue(
-            round(data.spring_constant * 1e9, 4))
+            misc_tools.format_number(data.spring_constant * 1e9))
         self.IN_defl_sens.changeValue(round(data.deflection_sensitivity, 2))
-        self.IN_temp.changeValue(data.temperature - 273.15)
+        self.IN_temp.changeValue(
+            misc_tools.format_number(data.temperature - 273.15))
 
         self.update_GUI("all")
 
@@ -881,7 +882,7 @@ class DataWidget(PYAFWidget):
         if field == "spring_constant":
             value = self.IN_spring_constant.get_str_value(True)
             # Compare strings, comparing floats won't work well ...
-            if value != str(round(data.spring_constant * 1e9, 4)):
+            if value != misc_tools.format_number(data.spring_constant * 1e9):
                 data.spring_constant = float(value)
                 self.update_GUI("info_selected")
                 QtWidgets.QMessageBox.warning(
@@ -896,7 +897,8 @@ class DataWidget(PYAFWidget):
                 self.curve.update_plot()
         elif field == "input_temp":
             value = self.IN_temp.get_str_value(True)
-            if value != str(data.temperature):
+            # Compare with the displayed value (in degC)
+            if value != misc_tools.format_number(data.temperature - 273.15):
                 data.temperature = float(value) + 273.15
                 self.update_GUI("info_selected")
 

@@ -848,6 +848,15 @@ class StrictlyPositiveDoubleValidator(DoubleValidator):
         return state
 
 
+def format_number(value):
+    """Text of a value with 6 significant digits.
+
+    Removes the floating point noise of the conversions (e.g. 21.5 degC
+    stored as 294.65 K, displayed as 21.499999999999996).
+    """
+    return "{:.6g}".format(value)
+
+
 def validator(name, reg=None, bottom=None, top=None, decimal=None):
     """Validate the inputs.
 
