@@ -34,6 +34,7 @@
 import numpy
 import matplotlib
 from matplotlib.colors import Normalize
+from matplotlib.ticker import MaxNLocator
 from ... import widgets_list
 from ... import shared
 from qtpy import QtCore
@@ -171,38 +172,23 @@ class PlotMeshGrid(MainPlot):
         # Plot the meshgrid
         if self.colormap != "Rainbow 1" and self.colormap != "Cool-Warm" and \
                 self.data_meshgrid is not None:
-            if self.mesh_type == "events_per_curve":
-                # Discrete self.colormap for the events
-                self.colormap = matplotlib.colormaps.get_cmap(self.colormap)
-
-                # Adjust the number of bins to fit the colormap's size
-                ncolors = self.colormap.N
-                bounds = list(range(int(self.colortable_min_value * self.factor),
-                                    int(self.colortable_max_value * self.factor)))
-
-                # Ensure bounds don't exceed colormap's size
-                if len(bounds) > ncolors:
-                    # If too many bins, reduce the range or step size
-                    step_size = max(1, len(bounds) // ncolors)
-                    bounds = bounds[::step_size]
-
-                norm = matplotlib.colors.BoundaryNorm(bounds, self.colormap.N)
-            else:
-                # Normal self.colormap for the other meshgrid types
-                self.colormap = matplotlib.colormaps.get_cmap(self.colormap)
-                if self.color_saturation is not None:
-                    self.colormap.set_over(self.color_saturation)
-                    self.colormap.set_under(self.color_negative)
+            self.colormap = matplotlib.colormaps.get_cmap(self.colormap)
+            if self.color_saturation is not None:
+                self.colormap.set_over(self.color_saturation)
+                self.colormap.set_under(self.color_negative)
 
             # If some values are masked, define their color
             if self.color_nan is not None:
                 self.colormap.set_bad(self.color_nan)
 
-            # Define norm with vmin and vmax
-            norm = Normalize(
-                vmin=self.colortable_min_value * self.factor,
-                vmax=self.colortable_max_value * self.factor
-            )
+            if self.mesh_type == "events_per_curve":
+                self.colormap, norm = self.get_events_colorscale(self.colormap)
+            else:
+                # Define norm with vmin and vmax
+                norm = Normalize(
+                    vmin=self.colortable_min_value * self.factor,
+                    vmax=self.colortable_max_value * self.factor
+                )
 
             mesh = self.axes.pcolormesh(
                 self.x_range,
@@ -227,18 +213,9 @@ class PlotMeshGrid(MainPlot):
                 self.factor,
                 color_nan=self.color_nan)
 
+            self.colormap, norm = self.colortable.get_color_as_cdict()
             if self.mesh_type == "events_per_curve":
-                # Discrete self.colormap for the events
-                diff = (self.colortable_max_value -
-                        self.colortable_min_value) * self.factor
-                self.colormap, norm = self.colortable.get_color_as_cdict(
-                    freq=int(diff) - 1)
-                bounds = list(range(int(self.colortable_min_value * self.factor),
-                               int(self.colortable_max_value * self.factor)))
-                norm = matplotlib.colors.BoundaryNorm(bounds, self.colormap.N)
-            else:
-                # Normal self.colormap for the other meshgrid types
-                self.colormap, norm = self.colortable.get_color_as_cdict()
+                self.colormap, norm = self.get_events_colorscale(self.colormap)
 
             mesh = self.axes.pcolormesh(self.x_range, self.y_range,
                                         self.data_meshgrid,
@@ -266,6 +243,14 @@ class PlotMeshGrid(MainPlot):
                     cax=cax,
                     cmap=self.colormap,
                     norm=norm)
+            if self.mesh_type == "events_per_curve":
+                # Integer ticks, at the center of their color
+                vmin, vmax = norm.boundaries[0] + 0.5, norm.boundaries[-1] - 0.5
+                ticks = MaxNLocator(integer=True).tick_values(vmin, vmax)
+                self.color_bar.set_ticks(
+                    [t for t in ticks if vmin <= t <= vmax])
+                self.color_bar.minorticks_off()
+
             # Color bar label
             self.color_bar.set_label(self.colorbarlabel,
                                      fontproperties=self.font)
@@ -318,6 +303,24 @@ class PlotMeshGrid(MainPlot):
 
         # Do the actual plotting, is defined in MainPlot class
         self.start_plot()
+
+    def get_events_colorscale(self, colormap):
+        """Returns a discrete colorscale for the number of events.
+
+        There is one color per number of events, from the min to the max
+        values of the colorscale, each number being at the center of its
+        color. The values above the max (or below the min) get the
+        saturation (or negative) color of the colormap.
+        """
+        vmin = int(round(self.colortable_min_value * self.factor))
+        vmax = max(int(round(self.colortable_max_value * self.factor)), vmin)
+        nbr_colors = vmax - vmin + 1
+
+        colormap = colormap.resampled(nbr_colors)
+        bounds = numpy.arange(vmin - 0.5, vmax + 1.0)
+        norm = matplotlib.colors.BoundaryNorm(bounds, nbr_colors)
+
+        return colormap, norm
 
     def draw_check_tilt_squares(self):
         """Show tilted correction.
