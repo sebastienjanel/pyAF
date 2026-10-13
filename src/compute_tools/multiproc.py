@@ -50,6 +50,7 @@ import atexit
 import concurrent.futures
 import math
 import multiprocessing
+import sys
 
 import numpy
 import tables
@@ -138,6 +139,9 @@ def compute(mode, calc_id, params, path):
               if key not in ("discarded_curves", "piezo_image")}
 
     nbr_workers = max(1, min(shared.exp.cores, nbr_cols * nbr_rows))
+    if sys.platform == "win32":
+        # Maximum number of processes of a pool on Windows
+        nbr_workers = min(nbr_workers, 61)
     executor = get_executor(nbr_workers) if nbr_workers > 1 else None
 
     h5_file = tables.open_file(path, "r+")

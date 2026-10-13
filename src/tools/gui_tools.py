@@ -405,10 +405,32 @@ class PYAFButton(QtWidgets.QPushButton):
 
         if size is None:
             size = 150
-        self.setFixedWidth(size)
+        # Width chosen for the layout, enlarged if the text does not fit
+        # (the fonts are wider on some systems, e.g. on Linux)
+        self.base_width = size
         self.setFixedHeight(40)
         self.setText(text)
         self.clicked.connect(self.button_clicked)
+
+    def setText(self, text):
+        """Set the text, and adapt the width of the button to it."""
+        super().setText(text)
+        self.update_width()
+
+    def update_width(self):
+        """Width of the button: the chosen one, or the width of the text
+        with the padding of the style sheets (1.2ex on each side, and the
+        border) if larger."""
+        metrics = self.fontMetrics()
+        text_width = metrics.horizontalAdvance(self.text()) + \
+            3 * metrics.xHeight() + 4
+        self.setFixedWidth(max(self.base_width, text_width))
+
+    def changeEvent(self, event):
+        """Adapt the width when the font changes (style sheets)."""
+        super().changeEvent(event)
+        if event.type() == QtCore.QEvent.FontChange:
+            self.update_width()
 
     def button_clicked(self):
         """Called when the button is clicked.

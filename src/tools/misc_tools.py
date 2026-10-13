@@ -58,12 +58,9 @@ def get_app_path():
 
     Split the current's file path and go back 2 levels, to be in main folder.
     """
-    splitted_path = os.path.realpath(__file__).split(os.sep)
-    path = ""
-    for i in range(1, len(splitted_path) - 2):
-        path += os.sep + splitted_path[i]
-
-    return path
+    # (keeps the drive letter on Windows)
+    tools_folder = os.path.dirname(os.path.realpath(__file__))
+    return os.path.dirname(tools_folder)
 
 
 def get_base_window_title():
