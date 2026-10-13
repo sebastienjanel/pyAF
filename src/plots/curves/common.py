@@ -530,7 +530,9 @@ class CommonCurveTools:
 
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
-            y[i] = coeff * e0 * numpy.power((delta[i]), 1.5)
+            # No force without indentation (same as the fit models)
+            if delta[i] > 0:
+                y[i] = coeff * e0 * numpy.power((delta[i]), 1.5)
 
         return data - y
 
@@ -538,7 +540,9 @@ class CommonCurveTools:
 
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
-            y[i] = coeff * e0 * numpy.power((delta[i]), 2)
+            # No force without indentation (same as the fit models)
+            if delta[i] > 0:
+                y[i] = coeff * e0 * numpy.power((delta[i]), 2)
 
         return data - y
 
@@ -546,7 +550,9 @@ class CommonCurveTools:
 
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
-            y[i] = coeff * e0 * numpy.power((delta[i]), 2)
+            # No force without indentation (same as the fit models)
+            if delta[i] > 0:
+                y[i] = coeff * e0 * numpy.power((delta[i]), 2)
 
         return data - y
 
@@ -554,12 +560,14 @@ class CommonCurveTools:
 
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
-            y[i] = coeff * e0 * numpy.power((delta[i]), 1)
+            # No force without indentation (same as the fit models)
+            if delta[i] > 0:
+                y[i] = coeff * e0 * numpy.power((delta[i]), 1)
 
         return data - y
 
     def get_chisqr(self, r):
-        """
+        r"""
         Chi-square: :math:`\chi^2 = \sum_i^N [{\rm Resid}_i]^2`
         """
         return (r**2).sum()
