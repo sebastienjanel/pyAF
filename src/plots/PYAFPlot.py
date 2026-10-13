@@ -37,6 +37,7 @@ from qtpy import QtCore, QtWidgets
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib
+from .plot_main import CURVE_MAP_TYPES, get_map_next_to_curve
 from .meshgrids.piezo_meshgrid import PlotPiezoMeshGrid
 from .meshgrids.topo_meshgrid import PlotTopoMeshGrid
 from .meshgrids.stiffness_meshgrid import PlotStiffnessMeshGrid
@@ -161,6 +162,11 @@ class PYAFPlot(FigureCanvasQTAgg):
         self.tab_id = None
         self.timer2 = None
         self.timer2a = None
+
+        # Alignment of a curve on the map next to it, after a resize
+        self.align_timer = QtCore.QTimer(self)
+        self.align_timer.setSingleShot(True)
+        self.align_timer.timeout.connect(self.align_with_map)
 
         if min_size is not None:
             # Force the usage of a minimun size (used for multimeshgrids)
@@ -361,7 +367,22 @@ class PYAFPlot(FigureCanvasQTAgg):
             self.resize_timer.start(self.timeout)
             self.timer_is_running = True
 
+        # A curve next to a map is not replotted when resized: align it
+        # again on the map (e.g. at startup the map can be drawn before the
+        # curve has its final size)
+        if p_type in CURVE_MAP_TYPES:
+            self.align_timer.start(self.timeout)
+
         super().resizeEvent(ev)
+
+    def align_with_map(self):
+        """Align a curve on the map displayed next to it."""
+        plot = self.canvas
+        if not hasattr(plot, "align_with_map"):
+            return
+        plot.fig.tight_layout()
+        plot.align_with_map(get_map_next_to_curve(self.plot_type))
+        self.draw_idle()
 
     def delayed_update(self):
         """Update the plots after a certain delay.
