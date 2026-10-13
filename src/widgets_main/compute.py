@@ -188,8 +188,8 @@ class ComputeWidget(PYAFWidget):
         # Right aligned, above the compute buttons of the tabs
         self.HL_options = QtWidgets.QHBoxLayout()
         self.HL_options.addStretch(1)
-        self.HL_options.addWidget(self.CB_compute_all)
         self.HL_options.addWidget(self.CB_apply_to_all)
+        self.HL_options.addWidget(self.CB_compute_all)
 
         widgets_list.widget_progressbar.update()
 
