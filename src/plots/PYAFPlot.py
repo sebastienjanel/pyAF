@@ -207,6 +207,10 @@ class PYAFPlot(FigureCanvasQTAgg):
         # For multimeshgrid, use the multimeshgrid's type
         if self.plot_type == "multimeshgrid":
             self.mesh_type = shared.exp.multi_meshgrid_type
+        elif self.plot_type == "meshgrid_data":
+            # The map on the data tab is always the piezo height, whatever
+            # the type of map selected on the results tab
+            self.mesh_type = "piezo"
         else:
             self.mesh_type = dt.meshgrid_type
 
