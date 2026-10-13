@@ -322,6 +322,10 @@ class SingleFile:
         # Store the parameters used for the computation
         self.used_deflection_sensitivity = None
         self.used_stiffness_model_selected = None
+        # Calculus/Tomography or Fitting, and fit range type (see
+        # used_perform_fit and get_used_fit_range_type)
+        self.used_stiffness_mode = None
+        self.used_fit_range_type = None
         self.used_tip_radius = None
         self.used_tip_angle = None
         self.used_poisson_ratio = None
@@ -901,6 +905,27 @@ class SingleFile:
     @perform_fit.setter
     def perform_fit(self, value):
         self.stiffness_mode = 1 if value else 0
+
+    @property
+    def used_perform_fit(self):
+        """True if the stiffness was computed by fitting.
+
+        Falls back on the current choice for the files saved before this
+        value was stored.
+        """
+        if self.used_stiffness_mode is None:
+            return self.perform_fit
+        return self.used_stiffness_mode == 1
+
+    def get_used_fit_range_type(self):
+        """Returns the fit range type used for the stiffness computation.
+
+        Falls back on the current value for the files saved before this
+        value was stored.
+        """
+        if self.used_fit_range_type is None:
+            return self.fit_range_type
+        return self.used_fit_range_type
 
     def get_used_indentation(self):
         """Returns the (start, step, tomography) used for the stiffness

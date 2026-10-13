@@ -271,6 +271,12 @@ class PYAFPlot(FigureCanvasQTAgg):
             elif p_type == "tilt_curve_preview":
                 self.canvas = PlotTiltPreview(self)
             elif p_type == "curve_results":
+                # The curve type can be applied from another file (apply to
+                # all) where it is available: display the deflection -
+                # extension curve if the results are missing for this file
+                if not curve_type_available(dt, c_type):
+                    c_type = "defl_ext"
+
                 if c_type == "defl_ext":
                     self.canvas = ResultsDeflExt(self)
                 elif c_type == "force_ext":
@@ -396,3 +402,17 @@ class PYAFPlot(FigureCanvasQTAgg):
         self.timer_is_running = False
         self.resize_timer.stop()
         self.update_plot()
+
+
+def curve_type_available(data, curve_type):
+    """True if the results needed for the curve type are computed."""
+    if curve_type == "force":
+        return (data.stiffness_calculated or
+                data.work_and_rupture_force1_calculated)
+    if curve_type == "indentation":
+        return data.stiffness_calculated
+    if curve_type == "results_force_events":
+        return data.events_calculated
+    if curve_type == "residuals":
+        return data.stiffness_calculated and data.used_perform_fit
+    return True

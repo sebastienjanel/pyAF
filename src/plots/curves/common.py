@@ -501,7 +501,7 @@ class CommonCurveTools:
             data_to_fit = fcapp[1][ind::]
 
             # Display elasticity fit within the indentation range selected by user.
-            if dt.used_indentation_stop != 0 and dt.fit_range_type == 1:
+            if dt.used_indentation_stop != 0 and dt.get_used_fit_range_type() == 1:
                 start_f = dt.used_indentation_start * 1e-09  # 0 is the default value.
                 stop_f = dt.used_indentation_stop * 1e-09
 

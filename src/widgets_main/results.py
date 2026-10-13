@@ -55,7 +55,7 @@ from ..widgets.roi_manager import RoiManagerWidget
 from ..widgets.events_filters import ChangeFilterWidget
 from ..widgets.used_parameters import UsedParametersWidget
 from ..plots.plot_main import MainPlot
-from ..plots.PYAFPlot import PYAFPlot
+from ..plots.PYAFPlot import PYAFPlot, curve_type_available
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools import events_refresher
 
@@ -465,7 +465,14 @@ class ResultsWidget(PYAFWidget):
             self.RB_indentation_curve.setEnabled(data.stiffness_calculated)
 
             # Enable residuals option
-            self.RB_residuals.setEnabled(data.perform_fit)
+            # Residuals of the fits: only for a stiffness computed by
+            # fitting
+            self.RB_residuals.setEnabled(
+                data.stiffness_calculated and data.used_perform_fit)
+
+            # A curve type applied from another file can be missing here
+            if not curve_type_available(data, data.display_curve_type):
+                data.display_curve_type = "defl_ext"
 
             # Check
             if data.display_curve_type == "defl_ext":

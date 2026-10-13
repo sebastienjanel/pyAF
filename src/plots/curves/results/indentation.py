@@ -78,13 +78,13 @@ class ResultsIndentation(PlotCurve):
             self.curve_approach = [curve_x, curve_y]
 
             # Get the fits for each segment
-            if self.data.perform_fit is False:
+            if self.data.used_perform_fit is False:
                 self.setup_segments()
 
             # Get the fits for each segment (pass curve_x in case there is only
             # one segment, we need the size of it)
 
-            if self.data.perform_fit:
+            if self.data.used_perform_fit:
                 self.get_stiffness_lm_fits(curve_x)
 
                 if self.data.fit_range_type == 0:

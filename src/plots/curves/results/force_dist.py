@@ -109,13 +109,13 @@ class ResultsForceDist(PlotCurve):
                 self.setup_lines(params, "app", "force")
 
             # Get the fits for each segment
-            if skip is False and self.data.perform_fit is False:
+            if skip is False and self.data.used_perform_fit is False:
                 self.setup_segments()
 
             # Get the fits for each segment (pass tr[0] in case there is only
             # one segment, we need the size of it)
             if skip is False:
-                if self.data.perform_fit:
+                if self.data.used_perform_fit:
                     self.get_stiffness_lm_fits(tr[0])
                 else:
                     self.get_stiffness_fits(tr[0])

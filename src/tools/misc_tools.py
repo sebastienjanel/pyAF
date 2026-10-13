@@ -223,6 +223,8 @@ def save_used_params(data, mode):
     """Saved current parameters to shared.exp."""
     if mode == "stiffness" or mode == "all":
         data.used_stiffness_model_selected = data.stiffness_model_selected
+        data.used_stiffness_mode = data.stiffness_mode
+        data.used_fit_range_type = data.fit_range_type
         data.used_tip_radius = data.tip_radius
         data.used_tip_angle = data.tip_angle
         data.used_poisson_ratio = data.poisson_ratio
