@@ -547,7 +547,7 @@ class DataWidget(PYAFWidget):
                 if shared.exp.current_theme == "Dark":
                     color = " { background-color: #31363b; }"
                 elif shared.exp.current_theme == "Light":
-                    color = " { background-color: #E4E6E9; }"
+                    color = " { background-color: #D0D3D7; }"
                 style = "QWidget#data_" + str(i) + color
                 self.list_unsel_styles.append(style)
 
