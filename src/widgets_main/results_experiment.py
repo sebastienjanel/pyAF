@@ -35,7 +35,7 @@ from itertools import combinations
 import logging
 from .. import shared
 from .. import widgets_list
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..tools import gui_tools
 from ..tools import stat_tools
 from ..tools.gui_tools import PYAFComboBox
@@ -250,12 +250,9 @@ class ResultsExperimentWidget(PYAFWidget):
     def canvas_press(self, event):
         """Called when clicking on the plot."""
         if event.button == 3 and event.inaxes == self.MPL_canvas_hist.canvas.axes:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.MPL_canvas_hist.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             self.popUpMenu(pos, "histogram_groups")
 
     def list_updated(self, name):

@@ -31,7 +31,7 @@
 
 """Displays the number of events per scan."""
 
-from qtpy import QtCore, QtWidgets
+from qtpy import QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools.PYAFWidget import PYAFWidget
 
@@ -84,13 +84,9 @@ class EventsPerScanWidget(PYAFWidget):
         This opens a drop down menu on right clicking,
         """
         if event.button == 3:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.MPL_canvas.mapToGlobal(QtCore.QPoint(0, 0))
-
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
 
             # Open the menu
             self.popUpMenu(pos)

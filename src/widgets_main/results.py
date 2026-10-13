@@ -998,12 +998,9 @@ class ResultsWidget(PYAFWidget):
         elif (ev.button == 3 and
               isinstance(self.MPL_canvas1.canvas, MainPlot) and
               ev.inaxes == self.MPL_canvas1.canvas.axes):
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.MPL_canvas1.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + ev.x
-            y = globalpos.y() + (self.meshgrid_canvas_size[1] - ev.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             meshgrid_menu.create_meshgrid_menu(self, "results", pos)
 
     def canvas_release(self, event):
@@ -1208,12 +1205,9 @@ class ResultsWidget(PYAFWidget):
     def curves_canvas_press(self, event):
         """Called when there is a click on the curve."""
         if event.button == 3 and event.inaxes == self.MPL_canvas2.canvas.axes:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.MPL_canvas2.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.curves_canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             self.popUpMenu(pos, "curve_results")
 
     def change_cursor_mode(self, mode):

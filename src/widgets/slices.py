@@ -32,7 +32,7 @@
 """Widget used to display slices in the tomography."""
 
 import os
-from qtpy import QtCore, QtWidgets
+from qtpy import QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 from ..widgets_small.slices_axes import SlicesAxesWidget
 from ..tools.gui_tools import PYAFCheckBox
@@ -329,12 +329,9 @@ class SlicesWidget(PYAFWidget):
 
         elif event.button == 3 and event.inaxes == self.canvas.canvas.axes:
             # Right click, open a menu
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.canvas.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             self.popUpMenu(pos)
 
     def get_position_on_meshgrid(self, event):

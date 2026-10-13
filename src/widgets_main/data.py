@@ -42,7 +42,7 @@ from .. import shared
 import os
 from .. import experiment
 from .. import consts
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..tools import gui_tools
 from ..tools import misc_tools
 from ..tools import math_tools
@@ -560,12 +560,9 @@ class DataWidget(PYAFWidget):
             widgets_list.widget_main.change_curve(xpos, ypos)
 
         elif event.button == 3 and event.inaxes == self.meshgrid.canvas.axes:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.meshgrid.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.mesh_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             meshgrid_menu.create_meshgrid_menu(self, "data", pos)
 
     def button_clicked(self, button):

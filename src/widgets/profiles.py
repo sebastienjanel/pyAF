@@ -31,7 +31,7 @@
 
 """Plots profiles."""
 
-from qtpy import QtCore, QtWidgets
+from qtpy import QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools import math_tools
 from ..tools.gui_tools import PYAFInput
@@ -257,13 +257,9 @@ class ProfileWidget(PYAFWidget):
         canv = self.canvas
 
         if event.button == 3 and event.inaxes == canv.canvas.axes:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = canv.mapToGlobal(QtCore.QPoint(0, 0))
-
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
 
             self.popUpMenu(pos)
 
