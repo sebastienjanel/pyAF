@@ -202,7 +202,57 @@ class ResultsForceDist(PlotCurve):
                         segy * self.force_factor,
                         y * self.force_factor]
 
+        if self.curve_approach is not None and \
+                self.curve_retraction is not None:
+            # Both curves are displayed: use the same origin for both (the
+            # point of contact), else the retraction curve (centered on the
+            # jump of contact) is offset from the approach curve
+            self.center_retraction_on_poc()
+
         self.define_x_scale()
         self.define_y_scale()
 
         self.plot_fig()
+
+    def center_retraction_on_poc(self):
+        """Move the retraction curve and its elements to the poc origin.
+
+        The retraction curve and its elements are defined with the jump of
+        contact at 0, 0. Shift them so that the point of contact is at 0, 0,
+        as for the approach curve (the curves are then at the same relative
+        position as on the deflection - extension curve).
+        """
+        poc = self.data.pocs_real[self.xpos][self.ypos]
+        joc = self.data.jocs1_real[self.xpos][self.ypos]
+
+        # Shift in nm and nN (same computation as in get_force_curves)
+        dx = (joc[0] - joc[1]) - (poc[0] - poc[1])
+        dy = (joc[1] - poc[1]) * self.spring_constant
+
+        self.curve_retraction[0] = self.curve_retraction[0] + dx
+        self.curve_retraction[1] = self.curve_retraction[1] + dy
+
+        # The other elements are already in the displayed units
+        dx_disp = dx * self.x_factor
+        dy_disp = dy * self.force_factor
+
+        if self.joc1_pos is not None:
+            self.joc1_pos = [self.joc1_pos[0] + dx_disp,
+                             self.joc1_pos[1] + dy_disp]
+            self.joc2_pos = [self.joc2_pos[0] + dx_disp,
+                             self.joc2_pos[1] + dy_disp]
+
+        if self.fits_lines_joc is not None:
+            # The lines are plotted against the x values of the curve
+            self.fits_lines_joc = [line + dy_disp
+                                   for line in self.fits_lines_joc]
+
+        if self.max_force is not None:
+            linex, liney = self.max_force
+            self.max_force = [[x + dx_disp for x in linex],
+                              [y + dy_disp for y in liney]]
+
+        if self.surface_params is not None:
+            segx, segy, y = self.surface_params
+            self.surface_params = [segx + dx_disp, segy + dy_disp,
+                                   y + dy_disp]
