@@ -596,11 +596,13 @@ class MainWindow(QtWidgets.QMainWindow):
                     if len(list_curves) == nbr_of_curves_total:
                         shared.exp.parsed_random_curves = []
                         self.change_curve(1, 1)
+                        return
 
                     elif len(list_curves) > nbr_of_curves_total - limit:
-                        # Find a curve not already seen
-                        for i in range(nbr_pixels_x):
-                            for j in range(nbr_pixels_y):
+                        # Find a curve not already seen (user coordinates,
+                        # from 1)
+                        for i in range(1, nbr_pixels_x + 1):
+                            for j in range(1, nbr_pixels_y + 1):
                                 if mt.in_list(list_curves, [i, j]) is False:
                                     self.change_curve(i, j, save_rand=True)
                                     return
@@ -616,6 +618,12 @@ class MainWindow(QtWidgets.QMainWindow):
                                 notfound = False
 
                         self.change_curve(xpos, ypos, rand="rand")
+
+        # Keep the position inside the map of the current file (a position
+        # can come from a file with a larger map)
+        if xpos is not None and ypos is not None:
+            xpos = min(max(int(xpos), 1), data.nbr_pixels_x)
+            ypos = min(max(int(ypos), 1), data.nbr_pixels_y)
 
         if rand == "rand" or save_rand and random_control:
             shared.exp.parsed_random_curves.append([xpos, ypos])
@@ -761,7 +769,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Reset the last ten curves list, it could happen that the user wants
         # to go back to a curve out of bounds if scan sizes are different
-        shared.exp.last_ten_curves = [[0, 0]]
+        # (starts with the current position, in user coordinates)
+        shared.exp.last_ten_curves = [[shared.exp.meshgrid_click_xpos + 1,
+                                       shared.exp.meshgrid_click_ypos + 1]]
         shared.exp.pos_in_last_ten_curves = 0
 
         self.update_GUI("single_or_forcevolume")

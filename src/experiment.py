@@ -131,7 +131,8 @@ class Experiment:
         self.parsed_random_curves = []
 
         # Last ten selected curves?
-        self.last_ten_curves = [[0, 0]]
+        # Positions in user coordinates (from 1)
+        self.last_ten_curves = [[1, 1]]
         self.pos_in_last_ten_curves = 0
 
         # Display approach/retraction legend on curve plot
