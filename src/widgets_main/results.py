@@ -148,7 +148,7 @@ class ResultsWidget(PYAFWidget):
         self.box_meshgrid = QtWidgets.QGroupBox()
         self.GL_meshgrid = QtWidgets.QGridLayout()
         # Options (meshgrid)
-        self.box_meshgrid_options = QtWidgets.QGroupBox("Data type")
+        self.box_meshgrid_options = QtWidgets.QGroupBox("Maps")
         self.box_meshgrid_options.setFixedHeight(self.options_boxes_height)
 
         self.GRP_mesh_type = PYAFButtonGroup(self, "BTG_meshgrid_type")
@@ -224,7 +224,7 @@ class ResultsWidget(PYAFWidget):
         # --- Curves ----------------------------------------------------------
 
         # Options curves
-        self.box_curves_options = QtWidgets.QGroupBox("Information")
+        self.box_curves_options = QtWidgets.QGroupBox("Force curves")
         self.box_curves_options.setFixedHeight(self.options_boxes_height)
 
         self.BT_group_type_of_curve = PYAFButtonGroup(
