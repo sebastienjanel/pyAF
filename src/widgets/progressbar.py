@@ -73,10 +73,10 @@ class Progressbar(PYAFWidget):
         geometry.moveCenter(center)
         self.move(geometry.topLeft())
 
-    def update(self):
-        """Update by one step."""
-        self.progressbar.setValue(self.counter)
-        self.counter += 1
+    def update(self, steps=1):
+        """Update by one step (or by the given number of steps)."""
+        self.counter += steps
+        self.progressbar.setValue(self.counter - 1)
         QtCore.QCoreApplication.processEvents()
 
     def set_label(self, text):

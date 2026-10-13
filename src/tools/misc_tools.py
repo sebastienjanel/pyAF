@@ -46,7 +46,6 @@ from qtpy import QtCore, QtGui, QtWidgets
 import matplotlib
 import multiprocessing
 from .. import shared
-from .. import consts
 import psutil
 from . import git_tools
 from . import events_tools
@@ -474,52 +473,8 @@ def get_results_type_from_id(results_type):
 
 
 def get_cores():
-    """Function used to determine the number of cores aviable,"""
-    cores = multiprocessing.cpu_count()
-
-    if consts.UNIT_TESTING is False:
-        return int(cores)
-    else:
-        # The unit tests segfault often due to problems
-        # with process forks on OS X. Remove the segfaults
-        # by setting the cores to 1.
-        return 1
-
-
-def get_processes(nbr_pixels):
-    """Get the number of processes the software can spawn for the multiprocessing.
-
-    The data has to be evenly shared through the processes, so the number of
-    processes will depend on the number of curves and the numbers of cores.
-
-    On windows the maximum processes is set to 4 for performance reasons.
-    (See documentation).
-    """
-    cores = shared.exp.cores
-
-    # Define the number of processes to spawn.
-    if nbr_pixels < cores:
-        nbr_processes = nbr_pixels
-    else:
-        nbr_processes = cores
-
-    # Reduce number of processes if needed
-    # (for example using 24 cores on 4096 curves will not work).
-    # The data has to be evenly distributed to every process.
-    while nbr_pixels % nbr_processes != 0:
-        nbr_processes -= 1
-        if nbr_processes == 1:
-            break
-
-    # On windows allow only the creation of maximum 4 processes, spawning
-    # more processes is slow.
-    if platform.uname()[0] == "Windows":
-        if nbr_processes != 1:
-            nbr_processes = 4
-            while nbr_processes > cores:
-                nbr_processes = nbr_processes / 2
-
-    return int(nbr_processes)
+    """Number of cores available for the computations."""
+    return int(multiprocessing.cpu_count())
 
 
 def get_nbr_blocks(cols, rows):

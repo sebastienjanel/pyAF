@@ -196,11 +196,12 @@ class Stiffness:
 
         # Compute and get the list of errors if there are some
         filepath = self.temp_file.filepath
-        self.list_of_smoothing_errors = multiproc.compute(
-            "stiffness", calc_id, dt, filepath)
-
-        # Reopen the hdf5 file
-        self.temp_file.open_file()
+        try:
+            self.list_of_smoothing_errors = multiproc.compute(
+                "stiffness", calc_id, dt, filepath)
+        finally:
+            # Reopen the hdf5 file (also after an error)
+            self.temp_file.open_file()
 
         st = "/data/_" + str(calc_id)
         tf = self.temp_file.file
