@@ -224,7 +224,7 @@ class MainPlot:
                 self.fig.subplots_adjust(left=0.125, right=0.7,
                                          bottom=0.2, top=0.9)
 
-            elif p_type == "meshgrid_data":
+            elif p_type in ("meshgrid_data", "small_meshgrid_compute"):
                 # Small map: leave room on the right for the colour bar
                 # (ticks and label)
                 self.fig.subplots_adjust(right=0.78)

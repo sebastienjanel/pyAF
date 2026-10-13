@@ -588,9 +588,10 @@ def enable_combobox_item(combobox, position):
     combobox.model().setData(index, 1 | 32, QtCore.Qt.UserRole - 1)
 
 
-def show_success(parent, text, details=None):
+def show_success(parent, text, details=None, warning=False):
     """Message box for an operation completed successfully, with a green
-    check mark (instead of the warning sign)."""
+    check mark, or a warning sign if something needs the attention of the
+    user (explained in the details)."""
     # Imported here to avoid a circular import
     from ..gui_styles.theme_handler import get_icons_path
 
@@ -599,7 +600,8 @@ def show_success(parent, text, details=None):
     msg.setText("<b>" + text + "</b>")
     if details:
         msg.setInformativeText(details)
-    icon = QtGui.QIcon(os.path.join(get_icons_path(), "success.svg"))
+    name = "warning.svg" if warning else "success.svg"
+    icon = QtGui.QIcon(os.path.join(get_icons_path(), name))
     msg.setIconPixmap(icon.pixmap(48, 48))
     msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
     msg.exec_()

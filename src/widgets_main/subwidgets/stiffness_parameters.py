@@ -53,6 +53,16 @@ class StiffnessParamsWidget(PYAFWidget):
         self.list_range_mode = PYAFComboBox(self, "list_range_mode")
         self.list_range_mode.addItem("Force")
         self.list_range_mode.addItem("Indentation")
+        # Wide enough to display the longest item. Set with a style sheet:
+        # the min-width of the application style sheet would override
+        # setMinimumWidth (here min-width is the width of the text area)
+        metrics = self.list_range_mode.fontMetrics()
+        longest = max(metrics.horizontalAdvance(self.list_range_mode.itemText(i))
+                      for i in range(self.list_range_mode.count()))
+        self.list_range_mode.setStyleSheet(
+            "QComboBox { min-width: " + str(longest + 20) + "px; }")
+        # The list that opens is also wide enough for the items
+        self.list_range_mode.view().setMinimumWidth(longest + 80)
 
         # Indentation start
         self.IN_start = PYAFInput(self, "input_start_in", "Start [nm]")

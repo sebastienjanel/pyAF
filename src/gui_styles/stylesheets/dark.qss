@@ -1663,6 +1663,13 @@ QDoubleSpinBox::down-arrow:off
 
 
 /* Computation tabs (Elasticity, B.E.C., ...): pills */
+/* No padding in the pane (not counted in the size of the tabs, which
+   would be too small): the pages have larger margins instead */
+QTabWidget#subTabs::pane
+{
+    padding: 0px;
+}
+
 QTabWidget#subTabs > QTabBar::tab:top
 {
     color: #a9adb3;

@@ -37,7 +37,7 @@ from .. import widgets_list
 from .. import experiment
 import logging
 from .. import consts
-from qtpy import QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import misc_tools
 from ..tools import gui_tools
 from ..tools import apply_to_all
@@ -85,8 +85,10 @@ class ComputeWidget(PYAFWidget):
         self.get_lr = GetLoadingRate()
 
         self.canvas_resolution = self.parent.canvas_resolution
-        self.curve_canvas_size = [800, 350]
-        self.meshgrid_canvas_size = [300, 300]
+        # Height of the plots: the height of the main window is set by
+        # this tab (the boxes of the tabs below take the rest)
+        self.curve_canvas_size = [800, 299]
+        self.meshgrid_canvas_size = [300, 299]
 
         # --- Main layout -----------------------------------------------------
 
@@ -129,7 +131,7 @@ class ComputeWidget(PYAFWidget):
 
         # Canvas Meshgrid
         sizes = [self.meshgrid_canvas_size[0] // self.canvas_resolution,
-                 self.meshgrid_canvas_size[1] // self.canvas_resolution,
+                 self.meshgrid_canvas_size[1] / self.canvas_resolution,
                  self.canvas_resolution]
 
         self.W_mesh = QtWidgets.QWidget()
@@ -141,7 +143,7 @@ class ComputeWidget(PYAFWidget):
 
         # Canvas curves
         sizes = [self.curve_canvas_size[0] // self.canvas_resolution,
-                 self.curve_canvas_size[1] // self.canvas_resolution,
+                 self.curve_canvas_size[1] / self.canvas_resolution,
                  self.canvas_resolution]
         self.W_curve = QtWidgets.QWidget()
         self.MPL_curve = PYAFPlot(self, "fit_preview", self.W_curve, sizes)
@@ -183,10 +185,11 @@ class ComputeWidget(PYAFWidget):
         self.HL_top.addWidget(self.box_curves)
 
         # Options of the computation
+        # Right aligned, above the compute buttons of the tabs
         self.HL_options = QtWidgets.QHBoxLayout()
+        self.HL_options.addStretch(1)
         self.HL_options.addWidget(self.CB_compute_all)
         self.HL_options.addWidget(self.CB_apply_to_all)
-        self.HL_options.addStretch(1)
 
         widgets_list.widget_progressbar.update()
 
@@ -521,6 +524,28 @@ class ComputeWidget(PYAFWidget):
         self.tabs.addTab(self.widget_events, "Unbinding events")
         self.tabs.addTab(self.widget_loading_rates, "Loading rates")
 
+        # Margins of the pages, with the padding of the pane (no padding in
+        # the stylesheet, see QTabWidget#subTabs::pane)
+        for i in range(self.tabs.count()):
+            layout = QtWidgets.QWidget.layout(self.tabs.widget(i))
+            m = layout.contentsMargins()
+            layout.setContentsMargins(m.left() + 4, m.top() + 4,
+                                      m.right() + 4, m.bottom() + 4)
+
+        # The boxes keep their height (no empty space at their bottom) when
+        # the tabs are taller
+        self.HL_widget_app.setAlignment(QtCore.Qt.AlignTop)
+        self.HL_widget_ret.setAlignment(QtCore.Qt.AlignTop)
+
+        # The events tab is the tallest: no vertical margins around the
+        # parameter boxes (the tab and the boxes keep theirs), to leave more
+        # height to the plots
+        for widget in (self.widget_kernel, self.widget_msf):
+            # (some widgets have an attribute named layout)
+            layout = QtWidgets.QWidget.layout(widget)
+            margins = layout.contentsMargins()
+            layout.setContentsMargins(margins.left(), 0, margins.right(), 0)
+
         self.GL_compute = QtWidgets.QGridLayout()
         # Compact rows (plots, navigation, options, computation tabs)
         self.GL_compute.setVerticalSpacing(4)
@@ -839,6 +864,9 @@ class ComputeWidget(PYAFWidget):
 
     def finish_computation(self, warnings=None):
         """At the end of the computation, display the errors and refresh the GUI."""
+        # Indentation range not attained on some pixels (final message)
+        range_text = None
+
         if warnings is not None:
             stop_size_errors = warnings[0]
             no_segment_errors = warnings[1]
@@ -929,22 +957,17 @@ class ComputeWidget(PYAFWidget):
                 msg.exec_()
 
             # The pixels are computed up to their maximum indentation when the
-            # selected range is not attained: inform the user
-            if range_warnings and not consts.UNIT_TESTING:
+            # selected range is not attained: the user is informed in the
+            # final message
+            if range_warnings:
                 lines = ""
                 for calc_id, (stop, nbr, total) in range_warnings:
                     name = shared.exp.list[calc_id].filename
                     lines += "<li>" + name + " : selected indentation range " \
                         + str(stop) + " nm was not attained on " + str(nbr) \
                         + " pixels out of " + str(total) + "</li>"
-                msg = QtWidgets.QMessageBox()
-                msg.setText("Indentation range")
-                msg.setInformativeText(
-                    "The stiffness was computed up to the maximum indentation "
-                    "for these pixels.<ul>" + lines + "</ul>")
-                msg.setIcon(QtWidgets.QMessageBox.Information)
-                msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
-                msg.exec_()
+                range_text = "The stiffness was computed up to the maximum " \
+                    "indentation for these pixels.<ul>" + lines + "</ul>"
 
         else:
             # No errors
@@ -1007,7 +1030,9 @@ class ComputeWidget(PYAFWidget):
 
             if not consts.UNIT_TESTING and not consts.AUTOCALC_STIFFNESS:
                 QtWidgets.QApplication.beep()
-                gui_tools.show_success(self, "Calculation complete")
+                gui_tools.show_success(self, "Calculation complete",
+                                       range_text,
+                                       warning=range_text is not None)
 
     def button_clicked(self, button):
         """Method called whenever a button is clicked."""
