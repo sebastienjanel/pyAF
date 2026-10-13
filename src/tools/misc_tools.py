@@ -917,6 +917,19 @@ def update_slice_position(unique_id):
                 res.slice = 0
 
 
+# Font of the plots, shipped with pyAF (SIL Open Font License, see the
+# OFL.txt file next to it)
+PLOT_FONT_FILE = "Inter-Regular.ttf"
+
+
+def get_font_path():
+    """Path of the font of the plots (in the application bundle if
+    frozen, see main_macOS.spec)."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, "fonts", PLOT_FONT_FILE)
+    return os.path.join(get_app_path(), "fonts", PLOT_FONT_FILE)
+
+
 def get_resource_path(relative_path):
 
     extension = os.path.splitext(relative_path)[1]

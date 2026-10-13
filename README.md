@@ -17,6 +17,8 @@ It computes:
 
 This software is governed by the CeCILL license under French law and abiding by the rules of distribution of free software. You can use, modify and/or redistribute the software under the terms of the CeCILL license as circulated by CEA, CNRS and INRIA at the following URL "http://www.cecill.info".
 
+The plots use the Inter font (https://rsms.me/inter), shipped in src/fonts under the SIL Open Font License 1.1 (src/fonts/OFL.txt).
+
 Main coding made by Michka Popoff (https://theses.fr/api/v1/document/2014LIL10220).
 Modified by Antoine Dujardin, Simone Bovio, Javier Lopez-Alonso, Nuno Duarte, Sébastien Janel.
 

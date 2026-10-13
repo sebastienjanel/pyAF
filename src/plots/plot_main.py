@@ -34,11 +34,35 @@
 from .. import shared
 from .. import widgets_list
 from ..tools import misc_tools
+import os
 import matplotlib
 import matplotlib.pyplot as pyplot
 import matplotlib.font_manager as fm
 import platform
 from qtpy import QtCore
+
+
+def use_plot_font():
+    """Use the font shipped with pyAF for the texts of the plots.
+
+    The font is registered once in matplotlib. It is set at each plot, as
+    changing the theme resets the matplotlib parameters. The default font
+    of matplotlib is used for the characters missing in it, or if the font
+    file is missing.
+    """
+    global _PLOT_FONT_NAME
+    if _PLOT_FONT_NAME is None:
+        path = misc_tools.get_font_path()
+        if os.path.isfile(path):
+            fm.fontManager.addfont(path)
+            _PLOT_FONT_NAME = fm.FontProperties(fname=path).get_name()
+        else:
+            _PLOT_FONT_NAME = ""
+    if _PLOT_FONT_NAME:
+        matplotlib.rcParams["font.family"] = [_PLOT_FONT_NAME, "DejaVu Sans"]
+
+
+_PLOT_FONT_NAME = None
 
 
 class MainPlot:
@@ -73,14 +97,12 @@ class MainPlot:
             # Default savefig directory
             matplotlib.rcParams["savefig.directory"] = self.save_path
 
-        # Font (use the Lucida Grande font I ship)
-        path = misc_tools.get_app_path() + "/fonts/HelveticaNowText-Regular.ttf"
-        font_size = shared.exp.mpl_labels_font_size
-        try:
-            with open(path):
-                self.font = fm.FontProperties(fname=path, size=font_size)
-        except IOError:
-            self.font = fm.FontProperties(size=font_size)
+        # Font of all the texts of the plots (shipped with pyAF, so that the
+        # plots look the same on all the computers)
+        use_plot_font()
+        self.font = fm.FontProperties(
+            family=matplotlib.rcParams["font.family"],
+            size=shared.exp.mpl_labels_font_size)
 
         matplotlib.rcParams["font.size"] = shared.exp.mpl_labels_font_size
         # Adjust distance between xticks and plot, prevents overlapping

@@ -43,7 +43,8 @@ a = Analysis(
         (os.path.join(os.getcwd(), "src/images/icon.png"), "images/"),
         (os.path.join(os.getcwd(), "src/images/icon.ico"), "images/"),
         # Fonts
-        (os.path.join(os.getcwd(), "src/fonts/Lucida_Grande.ttf"), "fonts/"),
+        (os.path.join(os.getcwd(), "src/fonts/Inter-Regular.ttf"), "fonts/"),
+        (os.path.join(os.getcwd(), "src/fonts/OFL.txt"), "fonts/"),
 
         # Stylesheets
         (os.path.join(os.getcwd(), "src/gui_styles/plot_styles/dark_plot.mplstyle"), "gui_styles/plot_styles/"),

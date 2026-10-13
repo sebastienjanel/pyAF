@@ -282,10 +282,9 @@ class PlotMeshGrid(MainPlot):
             self.axes.get_yaxis().set_ticklabels([])
             self.axes.get_yaxis().set_ticks([])
 
-            # Add scale bar
-            # Font (use the font I ship)
-            path = misc_tools.get_app_path() + "/fonts/HelveticaNowText-Regular.ttf"
-            ft = fm.FontProperties(fname=path, size=10)
+            # Add scale bar (font of the plots)
+            ft = fm.FontProperties(
+                family=matplotlib.rcParams["font.family"], size=10)
 
             # label = u"1 \u03bcm" Label deactivated for the moment
             label = ""
