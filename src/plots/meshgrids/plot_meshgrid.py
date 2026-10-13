@@ -263,12 +263,14 @@ class PlotMeshGrid(MainPlot):
             for tick in self.color_bar.ax.get_yticklabels():
                 tick.set_fontproperties(self.font)
 
-        if self.settings.value("ClassicMeshgridStyle", True):
-            self.plot_labels()
-
+        # The non classic style is only used for the maps of the data and
+        # results tabs
         pt = self.plot_type
         tp = (pt == "meshgrid" or pt == "meshgrid_data")
         st = self.settings.value("ClassicMeshgridStyle", True)
+
+        if st or not tp:
+            self.plot_labels()
 
         if tp and st is False:
             vert = self.scan_size_y / 100.0
