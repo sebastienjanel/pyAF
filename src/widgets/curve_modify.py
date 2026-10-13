@@ -157,7 +157,7 @@ class CurveModWidget(PYAFWidget):
         self.input_stretch_len = PYAFInput(self, "in_stretch_len", "Length")
         self.BTGRP_stretch_mode = PYAFButtonGroup(self, "grp_stretch_mode")
         self.RB_stretch_app = QtWidgets.QRadioButton("Approach")
-        self.RB_stretch_ret = QtWidgets.QRadioButton("Retraction")
+        self.RB_stretch_ret = QtWidgets.QRadioButton("Retract")
         self.BTGRP_stretch_mode.addButton(self.RB_stretch_app, 0)
         self.BTGRP_stretch_mode.addButton(self.RB_stretch_ret, 1)
         self.HL_stretch1.addWidget(self.input_stretch1)

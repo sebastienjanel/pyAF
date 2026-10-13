@@ -245,7 +245,7 @@ class ResultsWidget(PYAFWidget):
         self.BT_group_trace_or_retrace = PYAFButtonGroup(
             self, "button_group_trace_or_retrace")
         self.radiobutton_trace = QtWidgets.QRadioButton("Approach curve")
-        self.radiobutton_retrace = QtWidgets.QRadioButton("Retraction curve")
+        self.radiobutton_retrace = QtWidgets.QRadioButton("Retract curve")
         self.radiobutton_both = QtWidgets.QRadioButton("Both")
         self.BT_group_trace_or_retrace.addButton(self.radiobutton_trace, 0)
         self.BT_group_trace_or_retrace.addButton(self.radiobutton_retrace, 1)
