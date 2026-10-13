@@ -800,6 +800,54 @@ def get_position_on_meshgrid(event):
     return int(event.xdata / xsize) + 1, int(event.ydata / ysize) + 1
 
 
+class DoubleValidator(QtGui.QDoubleValidator):
+    """Validator for the floats, accepting "." and "," as decimal point.
+
+    The values are displayed with a ".", and get_float_value accepts both,
+    whatever the language of the computer (QDoubleValidator alone only
+    accepts the decimal point of the language, "," in French).
+    """
+
+    def __init__(self, allow_empty=False):
+        super().__init__()
+        self.setLocale(QtCore.QLocale.c())
+        self.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        # An empty input is accepted (to remove an optional value)
+        self.allow_empty = allow_empty
+
+    def validate(self, text, pos):
+        result = super().validate(text.replace(",", "."), pos)
+        state = result[0] if isinstance(result, tuple) else result
+        state = self.check(text, state)
+        if self.allow_empty and text.strip() == "":
+            state = QtGui.QValidator.Acceptable
+        # Keep the text typed by the user (with its "," if any)
+        if isinstance(result, tuple):
+            return state, text, pos
+        return state
+
+    def check(self, text, state):
+        """Additional check of an acceptable value."""
+        return state
+
+
+class StrictlyPositiveDoubleValidator(DoubleValidator):
+    """Validator for the floats > 0 (0 stays an intermediate input)."""
+
+    def __init__(self):
+        super().__init__()
+        self.setBottom(0)
+
+    def check(self, text, state):
+        if state == QtGui.QValidator.Acceptable:
+            try:
+                if float(text.replace(",", ".")) == 0:
+                    return QtGui.QValidator.Intermediate
+            except ValueError:
+                pass
+        return state
+
+
 def validator(name, reg=None, bottom=None, top=None, decimal=None):
     """Validate the inputs.
 
@@ -822,17 +870,31 @@ def validator(name, reg=None, bottom=None, top=None, decimal=None):
 
     # Positive float
     elif name == "UF":
-        val = QtGui.QDoubleValidator()
+        val = DoubleValidator()
         val.setBottom(0)
+
+    # Positive float, or no value
+    elif name == "UF_or_empty":
+        val = DoubleValidator(allow_empty=True)
+        val.setBottom(0)
+
+    # Strictly positive float (0 is refused)
+    elif name == "PF":
+        val = StrictlyPositiveDoubleValidator()
+
+    # Integer greater or equal to 'bottom'
+    elif name == "MI":
+        val = QtGui.QIntValidator()
+        val.setBottom(bottom)
 
     # Float between 'bottom' and 'top' and max decimal of 'decimal'
     elif name == "RF":
-        val = QtGui.QDoubleValidator()
+        val = DoubleValidator()
         val.setRange(bottom, top, decimal)
 
     # All floats
     elif name == "F":
-        val = QtGui.QDoubleValidator()
+        val = DoubleValidator()
 
     # Specific regular expression
     elif name == "R":

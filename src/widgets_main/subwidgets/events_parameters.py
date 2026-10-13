@@ -95,7 +95,9 @@ class EventsParamsWidget(PYAFWidget):
         # MSF - Window size
         self.IN_window_size = PYAFInput(
             self, "window_size", "Window size [pts]")
-        self.IN_window_size.input.setValidator(misc_tools.validator("UI"))
+        # The MSF window has a left and a right part (at least 2 points)
+        self.IN_window_size.input.setValidator(
+            misc_tools.validator("MI", bottom=2))
 
         GB_conv_params = QtWidgets.QGroupBox("Convolution parameters")
         VL_conv_params = QtWidgets.QVBoxLayout()

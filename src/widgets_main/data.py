@@ -182,7 +182,8 @@ class DataWidget(PYAFWidget):
             self, "defl_sens", "Deflection sensitivity [nm/V]", 90)
         self.IN_temp = PYAFInput(
             self, "input_temp", "Temperature [°C]", 90)
-        self.IN_spring_constant.input.setValidator(misc_tools.validator("UF"))
+        # A spring constant of 0 is refused
+        self.IN_spring_constant.input.setValidator(misc_tools.validator("PF"))
         self.IN_defl_sens.input.setValidator(misc_tools.validator("UF"))
         self.IN_temp.input.setValidator(misc_tools.validator("UF"))
 

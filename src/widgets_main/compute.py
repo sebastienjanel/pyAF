@@ -222,8 +222,9 @@ class ComputeWidget(PYAFWidget):
         # Same width for the three inputs of the model parameters
         self.IN_tip_angle = PYAFInput(self, "tip_angle", label, 60)
         self.IN_poisson = PYAFInput(self, "poisson", "Poisson ratio", 60)
-        self.IN_tip_radius.input.setValidator(misc_tools.validator("UF"))
-        self.IN_tip_angle.input.setValidator(misc_tools.validator("UF"))
+        # 0 is refused (division by zero in the models)
+        self.IN_tip_radius.input.setValidator(misc_tools.validator("PF"))
+        self.IN_tip_angle.input.setValidator(misc_tools.validator("PF"))
         self.IN_poisson.input.setValidator(misc_tools.validator("UF"))
 
         # Model
@@ -468,12 +469,13 @@ class ComputeWidget(PYAFWidget):
         # Noise floor input (Label + Input Box)
         self.label_noise_floor = QtWidgets.QLabel("Noise floor [nm]:")  # Label for noise floor
         self.IN_noise_floor = PYAFInput(self, "noise_floor", "", width=50)  # Input box for noise floor
-        self.IN_noise_floor.input.setValidator(misc_tools.validator("UF"))  # Validation
+        self.IN_noise_floor.input.setValidator(
+            misc_tools.validator("UF_or_empty"))  # Validation
 
         # Sample height input (Switched Label & Input Box)
         self.label_sample_height = QtWidgets.QLabel("Sample height [nm]:")  # Separate label
         self.IN_user_h = PYAFInput(self, "user_h", "", width=50)  # Empty label in PYAFInput
-        self.IN_user_h.input.setValidator(misc_tools.validator("UF"))
+        self.IN_user_h.input.setValidator(misc_tools.validator("UF_or_empty"))
 
         # Layout for ROI selection (aligns label & dropdown closely)
         self.stiff_corr_row = QtWidgets.QHBoxLayout()
@@ -682,12 +684,11 @@ class ComputeWidget(PYAFWidget):
                     count += 1
 
         if element == "IN_user_h" or element == "all":
-            self.IN_user_h.input.setText("None")
-            if data.user_h is not None:
-                self.IN_user_h.input.setText(str(data.user_h))
-            self.IN_noise_floor.input.setText("None")
-            if data.noise_floor is not None:
-                self.IN_noise_floor.input.setText(str(data.noise_floor))
+            # Empty input when no value is defined
+            self.IN_user_h.changeValue(
+                "" if data.user_h is None else data.user_h)
+            self.IN_noise_floor.changeValue(
+                "" if data.noise_floor is None else data.noise_floor)
             # The noise floor is used with a substrate ROI, the sample height
             # without one
             self.IN_noise_floor.setEnabled(data.roi_glass_id != 0)
@@ -852,12 +853,17 @@ class ComputeWidget(PYAFWidget):
             data.zoom_fit_preview_factor = val
 
         elif field == "noise_floor":
+            # An empty input removes the value
             if self.IN_noise_floor.input.text() != "":
                 data.noise_floor = self.IN_noise_floor.get_float_value()
+            else:
+                data.noise_floor = None
 
         elif field == "user_h":
             if self.IN_user_h.input.text() != "":
                 data.user_h = self.IN_user_h.get_float_value()
+            else:
+                data.user_h = None
 
         self.update_MPL("MPL_canvas")
         self.update_GUI("BT_height_correction")

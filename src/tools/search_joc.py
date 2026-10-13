@@ -73,6 +73,10 @@ def get_JOC(curve, cor_pos, params):
     if joc_skip_start + joc_fit_length >= len(curve_x):
         return default
 
+    if joc_fit_length < 2:
+        # Fit length shorter than two points: no fit
+        return default
+
     start = joc_skip_start
     stop = start + joc_fit_length
     seg = slice(start, stop)

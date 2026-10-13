@@ -194,6 +194,13 @@ class PYAFInput(QtWidgets.QWidget):
 
         self.input = QtWidgets.QLineEdit()
         self.input.setFixedSize(width, height)
+
+        # Last accepted value, restored when the user leaves the input with
+        # a value refused by its validator (e.g. 0 for a fit length)
+        self.last_text = ""
+        self.input.editingFinished.connect(self.save_last_text)
+        self.input.installEventFilter(self)
+
         if "_input_updated" in dir(parent):
             # If the parent class is a PYAFWidget (that's what the dir() check
             # is for), then it has an _input_updated method. This method
@@ -224,6 +231,20 @@ class PYAFInput(QtWidgets.QWidget):
         self.logger.debug("Input updated: %s, value: %s", self.name, value)
 
         self.input.setText(str(value))
+        self.last_text = self.input.text()
+
+    def save_last_text(self):
+        """Keep the accepted value (editingFinished is only emitted for
+        the values accepted by the validator)."""
+        self.last_text = self.input.text()
+
+    def eventFilter(self, obj, event):
+        """Restore the last accepted value when leaving the input with a
+        refused value."""
+        if obj is self.input and event.type() == QtCore.QEvent.FocusOut and \
+                not self.input.hasAcceptableInput():
+            self.input.setText(self.last_text)
+        return super().eventFilter(obj, event)
 
     def setEnabled(self, value):
         """Enable or disable the input."""

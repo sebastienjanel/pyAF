@@ -86,6 +86,10 @@ def get_POC(curve, cor_pos, params):
         # Fitting params too long, return default
         return default
 
+    if fit_length < 2:
+        # Fit length shorter than two points: no fit
+        return default
+
     poc_index_before = 0
     start = skip_start
     stop = start + fit_length

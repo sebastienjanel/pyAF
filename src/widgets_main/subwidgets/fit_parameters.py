@@ -81,7 +81,9 @@ class FitParamsWidget(PYAFWidget):
         self.IN_refit_times = PYAFInput(
             self, "refit_times", "Refit [times]")
         self.IN_skip_start.input.setValidator(misc_tools.validator("UI"))
-        self.IN_fit_length.input.setValidator(misc_tools.validator("UI"))
+        # A fit needs a length (0 is refused)
+        self.IN_fit_length.input.setValidator(
+            misc_tools.validator("MI", bottom=1))
         self.IN_noise_multi.input.setValidator(misc_tools.validator("UF"))
         self.IN_refit.input.setValidator(misc_tools.validator("UI"))
         self.IN_refit_times.input.setValidator(misc_tools.validator("UI"))
