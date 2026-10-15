@@ -165,7 +165,8 @@ class DFSWidget(PYAFWidget):
                 for item in table:
                     row_index = item.row()
                     group_id = row_index + 1
-                    if groups[group_id] != [[], []]:
+                    # Group without values: [] (else [forces, lr])
+                    if len(groups[group_id]) > 0:
                         val = groups[group_id][0]
                         medians_force.append(numpy.median(val) * 1e-12)
                         medians_lr.append(values[group_id][1] * 1e-12)
