@@ -144,10 +144,13 @@ class ResultsGroupsWidget(PYAFWidget):
         # self.list_values.addItem("Frequencies")
 
         self.BT_refresh_hist = PYAFButton(self, "refresh_hist", "Refresh")
+        # Density functions of the groups, for their histograms
+        self.BT_get_pdf = PYAFButton(self, "get_pdf", "Get PDF")
 
         self.HL_hist_buttons.addWidget(self.widget_result_chooser)
         # self.HL_hist_buttons.addWidget(self.list_values)
         self.HL_hist_buttons.addWidget(self.BT_refresh_hist)
+        self.HL_hist_buttons.addWidget(self.BT_get_pdf)
         self.HL_hist_buttons.addStretch(1)
 
         self.GL_results_data = QtWidgets.QGridLayout()
@@ -291,6 +294,11 @@ class ResultsGroupsWidget(PYAFWidget):
 
             stat_tools.fetch_group_data()
             stat_tools.fetch_conditions_data()
+            widgets_list.widget_results_experiment.update_widget()
+
+        elif button == "get_pdf":
+            stat_tools.get_pdf()
+            self.update_widget()
             widgets_list.widget_results_experiment.update_widget()
 
     def update_GUI(self, what):

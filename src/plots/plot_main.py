@@ -196,6 +196,9 @@ class MainPlot:
         p_type = self.plot_type
 
         if self.parent.single:
+            if p_type == "results_single":
+                # Violins of the files: no legend, use all the space
+                self.fig.tight_layout()
             pyplot.draw()
 
             if p_type == "meshgrid_tilt_check":
@@ -236,7 +239,12 @@ class MainPlot:
                 pyplot.show()
 
         else:
-            if p_type in ("results_single", "results_groups", "results_experiment", "results_stats"):
+            if p_type == "results_single":
+                # Violins of the files: no legend, use all the space
+                self.fig.tight_layout()
+
+            elif p_type in ("results_groups", "results_experiment",
+                            "results_stats"):
                 # In the case of the results plot, due to the legend which
                 # is placed outside of the box with a small hack, we can not
                 # use the tight layout. In this case we define the borders

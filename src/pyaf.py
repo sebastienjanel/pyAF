@@ -939,6 +939,7 @@ class MainWindow(QtWidgets.QMainWindow):
         figures. The menu actions are stored in self.list_actions
         """
         self.logger.debug("Going to tab: %s", str(self.tabs.currentIndex()))
+        previous_tab = getattr(self, "current_tab", None)
         self.current_tab = self.tabs.currentIndex()
 
         if self.tabs.currentIndex() == 0:
@@ -1012,12 +1013,12 @@ class MainWindow(QtWidgets.QMainWindow):
             text = "Change color of row (Groups)"
             self.list_actions["row_color"].setText(text)
 
-        # Results update. Called from ROI manager
-        if self.tabs.currentIndex() == 3 or self.tabs.currentIndex() == 4:
-            if self.update_results:
-                wl.widget_results_single.update_widget()
-                wl.widget_results_groups.update_widget()
-                self.update_results = False
+        # Plots tabs, coming from the other tabs: recompute the values (the
+        # curves, the ROIs or the computations may have changed)
+        if self.tabs.currentIndex() in (3, 4) and \
+                previous_tab is not None and previous_tab < 3:
+            wl.widget_results_single.button_clicked("refresh_hist")
+            self.update_results = False
 
         self.setFocus()
 

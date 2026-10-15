@@ -77,7 +77,9 @@ class RenameGroupsWidget(PYAFWidget):
                 name = str(self.input_list[i - 1].get_str_value())
                 shared.exp.groups_list[i].name = name
 
-            # Update the names in the histogram's list
+            # Update the names in the histogram's list (keep the choices of
+            # the table)
+            widgets_list.widget_results_single.save_hist_prefs()
             widgets_list.widget_results_single.reset_table()
             widgets_list.widget_results_single.update_widget()
 

@@ -40,6 +40,7 @@ from ...tools import stat_tools
 from ...tools.gui_tools import PYAFInput
 from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
+from .violin_options import ZEROS_TOOLTIP
 from ...tools.gui_tools import PYAFCheckBox
 
 
@@ -77,7 +78,8 @@ class ResultsHistOptionsWidget(PYAFWidget):
 
         if self.name == "widget_results_hist_options_single":
             # Remove or display zeros
-            self.CB_zeros = PYAFCheckBox(self, "zeros", "Remove zeros")
+            self.CB_zeros = PYAFCheckBox(self, "zeros", "Remove \u2264 0")
+            self.CB_zeros.setToolTip(ZEROS_TOOLTIP)
 
             # Use log scale
             self.CB_log = PYAFCheckBox(self, "log", "Use log scale")

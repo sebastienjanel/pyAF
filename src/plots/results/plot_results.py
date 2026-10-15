@@ -160,7 +160,7 @@ class PlotResults(MainPlot):
                 self.xlabel = ""
             else:
                 self.xlabel = "Force [pN]"
-        elif rt == "events_per_curves":
+        elif rt == "events_per_curve":
             if self.plot_selected == "box":
                 self.xlabel = ""
             else:
@@ -189,7 +189,7 @@ class PlotResults(MainPlot):
                     self.ylabel = "Detachment force [pN]"
                 elif rt == "events_forces":
                     self.ylabel = "Force [pN]"
-                elif rt == "events_per_curves":
+                elif rt == "events_per_curve":
                     self.ylabel = "Events per curve"
                 elif rt == "events_rupture_force":
                     self.ylabel = "Detachment force [pN]"

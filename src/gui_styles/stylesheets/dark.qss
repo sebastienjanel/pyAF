@@ -1694,6 +1694,20 @@ QTabWidget#subTabs > QTabBar::tab:top:!selected:hover
     background-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Type of result of the plots tabs: as the selected sub tab */
+QComboBox#resultChooser
+{
+    color: #8fc0ff;
+    background-color: rgba(59, 142, 234, 0.22);
+    border: 1px solid rgba(59, 142, 234, 0.5);
+    font-weight: bold;
+}
+
+QComboBox#resultChooser:hover
+{
+    border: 1px solid #3b8eea;
+}
+
 /* Main tabs (Data, Compute, Results...): segmented control */
 QTabWidget#mainTabs > QTabBar::tab:top
 {

@@ -187,6 +187,8 @@ class ChangeFilterWidget(QtWidgets.QDialog):
                         cell.items[0].setText(str(val_slope_min))
                         cell.items[1].setText(str(val_slope_max))
 
+            # Recompute the values with the new filters
+            wl.schedule_refresh()
             self.close()
 
     def update_parents(self):

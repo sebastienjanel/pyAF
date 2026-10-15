@@ -872,7 +872,7 @@ def ask_user_for_color(current_color):
     color = QtWidgets.QColorDialog.getColor(current_color)
     if color.isValid():
         color = color.getRgb()[:-1]
-        return [color[0] / 256.0, color[1] / 256.0, color[2] / 256.0, 1.0]
+        return [color[0] / 255.0, color[1] / 255.0, color[2] / 255.0, 1.0]
     else:
         return False
 

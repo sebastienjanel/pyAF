@@ -32,18 +32,18 @@
 """Widget displaying histograms and results (Single)."""
 
 import logging
+import numpy
 from .. import shared
 from .. import widgets_list
 from .. import consts
-from ..tools.utils import module_exists
+from .. import experiment
 from qtpy import QtCore, QtWidgets
 from ..tools import stat_tools
 from ..tools import gui_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..widgets_main.subwidgets.result_chooser import ResultsChooserWidget
-from ..widgets_main.subwidgets.result_hist_options import \
-    ResultsHistOptionsWidget
+from ..widgets_main.subwidgets.violin_options import ViolinOptionsWidget
 from ..widgets.events_per_scan import EventsPerScanWidget
 from ..widgets.events_filters import ChangeFilterWidget
 from ..widgets.dfs import DFSWidget
@@ -51,6 +51,13 @@ from ..plots.PYAFPlot import PYAFPlot
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFTableWidget
 from .subwidgets.result_header import QCheckableHeader
+
+
+# Size of the violin plot: width per file and for the axis and its labels,
+# minimum height
+VIOLIN_WIDTH = 60
+PLOT_MARGINS_WIDTH = 120
+PLOT_MIN_HEIGHT = 300
 
 
 class Columns:
@@ -64,35 +71,26 @@ class Columns:
 
         # Create the single columns
         self.list = []
-        self.list.append(Column(0, "CB"))
-        self.list.append(Column(1, "File"))
-        self.list.append(Column(2, "Group"))
-        self.list.append(Column(3, "Mean"))
-        self.list.append(Column(4, "Median"))
-        self.list.append(Column(5, "Sd"))
-        self.list.append(Column(6, "Mode"))
+        names = ["CB", "File", "Short name", "Group", "Mean", "Median",
+                 "Sd", "Mode"]
 
         if self.results_type == "stiffness":
-            self.list.append(Column(7, "Slice"))
-            self.list.append(Column(8, "Roi"))
-            self.list.append(Column(9, "Corr."))
+            names += ["Slice", "Roi", "Corr."]
 
         elif self.results_type == "events_forces" or \
                 self.results_type == "events_per_curve" or \
                 self.results_type == "events_rupture_force" or \
                 self.results_type == "loading_rates":
-            self.list.append(Column(7, "Slope"))
-            self.list.append(Column(8, "Dist"))
-            self.list.append(Column(9, "Roi"))
+            names += ["Slope", "Dist", "Roi"]
 
         elif self.results_type == "events_distance":
-            self.list.append(Column(7, "Slope"))
-            self.list.append(Column(8, "Dist"))
-            self.list.append(Column(9, "Event(s)"))
-            self.list.append(Column(10, "Roi"))
+            names += ["Slope", "Dist", "Event(s)", "Roi"]
 
         else:
-            self.list.append(Column(7, "Roi"))
+            names += ["Roi"]
+
+        for index, name in enumerate(names):
+            self.list.append(Column(index, name))
 
     @property
     def len_all(self):
@@ -183,13 +181,28 @@ class ResultsSingleWidget(PYAFWidget):
                  self.canvas_size[1] / self.canvas_resolution,
                  self.canvas_resolution]
 
-        # Canvas for the plots (single and groups)
+        # Violin plot of the files, in a scroll area: the plot gets wider
+        # with the number of files (see update_MPL)
         self.canva = QtWidgets.QWidget()
-        self.canva.setFixedSize(self.canvas_size[0], self.canvas_size[1])
         self.MPL_canva = PYAFPlot(self, "results_single", self.canva, sizes)
+        self.SA_plot = QtWidgets.QScrollArea()
+        self.SA_plot.setWidget(self.MPL_canva)
+        self.SA_plot.setWidgetResizable(False)
+        self.SA_plot.setVerticalScrollBarPolicy(
+            QtCore.Qt.ScrollBarAlwaysOff)
+        self.SA_plot.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.SA_plot.setStyleSheet("QScrollArea { border: none; }")
+        self.SA_plot.setMinimumHeight(PLOT_MIN_HEIGHT)
+        self.SA_plot.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                   QtWidgets.QSizePolicy.Expanding)
+        # Redraw the plot at its new size when the tab is resized
+        self.plot_resize_timer = QtCore.QTimer(self)
+        self.plot_resize_timer.setSingleShot(True)
+        self.plot_resize_timer.timeout.connect(self.update_MPL)
+        self.SA_plot.viewport().installEventFilter(self)
 
-        name = "widget_results_hist_options_single"
-        self.widget_options = ResultsHistOptionsWidget(self, name)
+        name = "widget_violin_options_single"
+        self.widget_options = ViolinOptionsWidget(self, name)
 
         # The histogram's data and statistical results
         self.GL_tableWidget_groups = QtWidgets.QGridLayout()
@@ -225,12 +238,17 @@ class ResultsSingleWidget(PYAFWidget):
         widgets_list.widget_progressbar.set_label("Loading GUI ...")
         widgets_list.widget_progressbar.update()
 
+        # The values are recomputed when an option of the table is changed
+        # (once for several quick changes)
+        self.refreshing = False
+        self.refresh_timer = QtCore.QTimer(self)
+        self.refresh_timer.setSingleShot(True)
+        self.refresh_timer.setInterval(300)
+        self.refresh_timer.timeout.connect(
+            lambda: self.button_clicked("refresh_hist"))
+
         # Buttons for calculations/actions on histograms
         self.HL_hist_buttons = QtWidgets.QHBoxLayout()
-        self.BT_refresh_hist = PYAFButton(self, "refresh_hist", "Refresh")
-        self.BT_get_pdf = PYAFButton(self, "get_pdf", "Get PDF")
-        if not module_exists("scipy"):
-            self.BT_get_pdf.setEnabled(False)
         label = "Events per scan"
         self.BT_events_per_scan = PYAFButton(self, "events_per_scan", label)
         self.BT_dfs = PYAFButton(self, "dfs", "DFS")
@@ -244,17 +262,21 @@ class ResultsSingleWidget(PYAFWidget):
 
         self.HL_hist_buttons.addWidget(self.widget_result_chooser)
         # self.HL_hist_buttons.addWidget(self.list_values)
-        self.HL_hist_buttons.addWidget(self.BT_refresh_hist)
-        self.HL_hist_buttons.addWidget(self.BT_get_pdf)
+        self.HL_hist_buttons.addStretch(1)
         self.HL_hist_buttons.addWidget(self.BT_events_per_scan)
         self.HL_hist_buttons.addWidget(self.BT_dfs)
-        self.HL_hist_buttons.addStretch(1)
 
+        # Plot and its options, then the results type and the buttons, then
+        # the files
         self.GL_results_data = QtWidgets.QGridLayout()
-        self.GL_results_data.addWidget(self.widget_options, 0, 0)
-        self.GL_results_data.addWidget(self.MPL_canva, 0, 1)
-        self.GL_results_data.addLayout(self.VL_tableWidget, 1, 0, 1, 0)
-        self.GL_results_data.addLayout(self.HL_hist_buttons, 2, 0, 1, 0)
+        self.GL_results_data.addWidget(self.SA_plot, 0, 0)
+        self.GL_results_data.addWidget(
+            self.widget_options, 0, 1, QtCore.Qt.AlignTop)
+        self.GL_results_data.addLayout(self.HL_hist_buttons, 1, 0, 1, 2)
+        self.GL_results_data.addLayout(self.VL_tableWidget, 2, 0, 1, 2)
+        self.GL_results_data.setRowStretch(0, 3)
+        self.GL_results_data.setRowStretch(2, 2)
+        self.GL_results_data.setColumnStretch(0, 1)
 
         self.setLayout(self.GL_results_data)
         widgets_list.widget_progressbar.update()
@@ -268,13 +290,32 @@ class ResultsSingleWidget(PYAFWidget):
     def update_widget(self):
         """Update only GUI, do not recalulate nothing."""
         widgets_list.widget_results_chooser_single.update_widget()
-        widgets_list.widget_results_hist_options_single.update_widget()
+        self.widget_options.update_widget()
         self.update_GUI("all")
         self.update_MPL()
 
     def update_MPL(self):
-        """Update the plot."""
+        """Update the plot.
+
+        The plot fills the visible area, and gets wider (with a scroll bar)
+        when there are too many files for it.
+        """
+        viewport = self.SA_plot.viewport().size()
+        nbr_files = sum(1 for result in shared.exp.results_list
+                        if result.display)
+        width = max(viewport.width(),
+                    PLOT_MARGINS_WIDTH + nbr_files * VIOLIN_WIDTH)
+        height = max(viewport.height(), PLOT_MIN_HEIGHT)
+        if self.MPL_canva.size() != QtCore.QSize(width, height):
+            self.MPL_canva.resize(width, height)
         self.MPL_canva.update_plot()
+
+    def eventFilter(self, obj, event):
+        """Redraw the plot when the visible area is resized."""
+        if obj is self.SA_plot.viewport() and \
+                event.type() == QtCore.QEvent.Resize:
+            self.plot_resize_timer.start(150)
+        return super().eventFilter(obj, event)
 
     def list_updated(self, name):
         """Called when a list is updated."""
@@ -307,22 +348,20 @@ class ResultsSingleWidget(PYAFWidget):
         # Set specific column widths
         headers = self.tableWidget.horizontalHeader()
 
-        # Column 1 fixed width
-        self.tableWidget.setColumnWidth(0, 35)
-
-        # Column 2 to be stretchable
-        headers.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-
-        # Column 3 fixed width
-        self.tableWidget.setColumnWidth(2, 140)
-
-        # Set all other columns
-        for col in range(3, 5):  # Start from column 2 (index 2)
-            self.tableWidget.setColumnWidth(col, 90)
-
-        # Set all other columns
-        for col in range(6, self.columns.len_visible):  # Start from column 2 (index 2)
-            self.tableWidget.setColumnWidth(col, 120)
+        # Widths of the columns (the file names take the remaining space)
+        widths = {"CB": 35, "Short name": 170, "Group": 140, "Mean": 90,
+                  "Median": 90, "Sd": 90, "Mode": 90}
+        for column in self.columns.list:
+            if not column.visibility:
+                continue
+            if column.name == "File":
+                headers.setSectionResizeMode(
+                    column.position, QtWidgets.QHeaderView.Stretch)
+            else:
+                headers.setSectionResizeMode(
+                    column.position, QtWidgets.QHeaderView.Interactive)
+                self.tableWidget.setColumnWidth(
+                    column.position, widths.get(column.name, 120))
 
         self.means_labels = []
         self.medians_labels = []
@@ -357,6 +396,9 @@ class ResultsSingleWidget(PYAFWidget):
 
         if self.columns.get_column("File").visibility:
             self.add_cell_at_pos("File", row_index)
+
+        if self.columns.get_column("Short name").visibility:
+            self.add_cell_at_pos("Short name", row_index)
 
         if self.columns.get_column("Group").visibility:
             self.add_cell_at_pos("Group", row_index)
@@ -420,6 +462,18 @@ class ResultsSingleWidget(PYAFWidget):
             cell = self.tableWidget.cellWidget(row_index, column_pos)
             cell.setToolTip("Copy from file " + name)
 
+        elif name == "Short name":
+            # Name in the plots, editable
+            line_edit = QtWidgets.QLineEdit(experiment.get_short_name(result))
+            line_edit.setFont(self.parent.smallfont)
+            line_edit.setAlignment(QtCore.Qt.AlignCenter)
+            line_edit.setFrame(False)
+            line_edit.setToolTip(
+                "Name in the plots (edit it, empty: automatic name)")
+            line_edit.editingFinished.connect(
+                lambda r=row_index, e=line_edit: self.short_name_edited(r, e))
+            self.tableWidget.setCellWidget(row_index, column_pos, line_edit)
+
         elif name == "CB":
             # Checkbox (hide or display histogram)
             cb = gui_tools.CenteredCellCheckbox(
@@ -436,6 +490,7 @@ class ResultsSingleWidget(PYAFWidget):
             for group in shared.exp.groups_list:
                 sumlist.addItem(str(group.name))
             sumlist.setCurrentIndex(result.group)
+            sumlist.activated.connect(self.schedule_refresh)
             self.tableWidget.setCellWidget(row_index, column_pos, sumlist)
 
         elif name == "Mean":
@@ -473,6 +528,7 @@ class ResultsSingleWidget(PYAFWidget):
             for j in range(len(shared.exp.list[result.data_id].roi_list)):
                 roi_list.addItem(str(j + 1))
             roi_list.setCurrentIndex(result.roi)
+            roi_list.activated.connect(self.schedule_refresh)
             rois = gui_tools.CenteredCellComboBox(roi_list)
             self.tableWidget.setCellWidget(row_index, column_pos, rois)
 
@@ -495,6 +551,7 @@ class ResultsSingleWidget(PYAFWidget):
             else:
                 list_indent_hist.setEnabled(False)
 
+            list_indent_hist.activated.connect(self.schedule_refresh)
             ind = gui_tools.CenteredCellComboBox(list_indent_hist)
             self.tableWidget.setCellWidget(row_index, column_pos, ind)
 
@@ -508,6 +565,7 @@ class ResultsSingleWidget(PYAFWidget):
             if not shared.exp.list[result.data_id].stiffness_corrected:
                 corr_list.setEnabled(False)
 
+            corr_list.activated.connect(self.schedule_refresh)
             corr = gui_tools.CenteredCellComboBox(corr_list)
             self.tableWidget.setCellWidget(row_index, column_pos, corr)
 
@@ -521,6 +579,8 @@ class ResultsSingleWidget(PYAFWidget):
             input_slope_max.setText(str(result.filter_slope_max))
 
             items = [input_slope_min, input_slope_max]
+            for item in items:
+                item.editingFinished.connect(self.schedule_refresh)
             widget = gui_tools.CenteredCellwidget2(items)
             self.tableWidget.setCellWidget(row_index, column_pos, widget)
 
@@ -532,6 +592,7 @@ class ResultsSingleWidget(PYAFWidget):
             input_dist_to_joc.addItem("Last")
             input_dist_to_joc.setFont(self.parent.smallfont)
             input_dist_to_joc.setCurrentIndex(result.dist_to_joc)
+            input_dist_to_joc.activated.connect(self.schedule_refresh)
             dist = gui_tools.CenteredCellComboBox(input_dist_to_joc)
             self.tableWidget.setCellWidget(row_index, column_pos, dist)
 
@@ -549,6 +610,9 @@ class ResultsSingleWidget(PYAFWidget):
             cb.setToolTip("Keep events between limits")
 
             items = [input_dist_left, input_dist_right, cb]
+            input_dist_left.editingFinished.connect(self.schedule_refresh)
+            input_dist_right.editingFinished.connect(self.schedule_refresh)
+            cb.clicked.connect(self.schedule_refresh)
             widget = gui_tools.CenteredCellwidget2(items)
             self.tableWidget.setCellWidget(row_index, column_pos, widget)
 
@@ -609,27 +673,50 @@ class ResultsSingleWidget(PYAFWidget):
                 sub_type = cell.list.currentIndex()
                 result.sub_type = sub_type
 
+    def add_group(self):
+        """Add a group (the table is rebuilt: keep its current choices)."""
+        self.save_hist_prefs()
+        widgets_list.widget_results_groups.add_group()
+
+    def short_name_edited(self, row_index, line_edit):
+        """A short name was edited: rename the file in the plots."""
+        result = shared.exp.results_list[row_index]
+        text = line_edit.text().strip()
+        if text == experiment.get_short_name(result):
+            return
+        result.short_name = text
+        # Empty: back to the automatic name
+        line_edit.setText(experiment.get_short_name(result))
+        self.update_MPL()
+
+    def schedule_refresh(self, *args):
+        """Recompute the values after a change of the table (the changes
+        made quickly one after the other are applied together)."""
+        self.refresh_timer.start()
+
     def button_clicked(self, button):
         """Method called upon a click on a button."""
         if button == "refresh_hist":
-            self.save_hist_prefs()
+            if self.refreshing:
+                # The progress bar processes the events: a refresh asked
+                # during a refresh is done after it
+                self.refresh_timer.start()
+                return
+            self.refreshing = True
+            self.refresh_timer.stop()
+            try:
+                self.save_hist_prefs()
 
-            stat_tools.get_values()
+                stat_tools.get_values()
 
-            self.update_widget()
+                self.update_widget()
 
-            stat_tools.fetch_group_data()
-            stat_tools.fetch_conditions_data()
-            widgets_list.widget_results_groups.update_widget()
-            widgets_list.widget_results_experiment.update_widget()
-
-        elif button == "get_pdf":
-            stat_tools.get_pdf()
-
-            self.update_widget()
-
-            widgets_list.widget_results_groups.update_widget()
-            widgets_list.widget_results_experiment.update_widget()
+                stat_tools.fetch_group_data()
+                stat_tools.fetch_conditions_data()
+                widgets_list.widget_results_groups.update_widget()
+                widgets_list.widget_results_experiment.update_widget()
+            finally:
+                self.refreshing = False
 
         elif button == "events_per_scan":
             if widgets_list.widget_events_per_scan is None:
@@ -688,42 +775,11 @@ class ResultsSingleWidget(PYAFWidget):
         if what == "table_labels" or what == "all":
             if shared.single_values is not None:
                 for i in range(len(shared.single_values)):
-                    norm = shared.exp.norm_hist_single
-                    if shared.single_factors is not None and norm is False:
-                        factor = shared.single_factors[i]
-                    elif shared.single_factors is None or norm:
-                        factor = 1.0
-
-                    mean = str(0)
-                    median = str(0)
-                    std = str(0)
-                    mode = str(0)
-
-                    values = [0, 0, 0, 0]
-
-                    if shared.exp.hist_values_or_frequencies == "values":
-                        values = shared.single_values[i]
-                        factor = 1.0
-                    else:
-                        if shared.single_frequencies is not None:
-                            if shared.single_frequencies[i]:
-                                values = shared.single_frequencies[i]
-
-                    # Write the labels
-                    if values[0] != 0:
-                        mean = str(round(values[0] * factor, 6))
-                    if values[1] != 0:
-                        median = str(round(values[1] * factor, 6))
-                    if values[2] != 0 and values[2] is not None:
-                        std = str(round(values[2] * factor, 6))
-                    if values[3] != 0:
-                        if shared.exp.hist_values_or_frequencies == "values":
-                            mode_index = values[3]
-                            val = shared.single_pdfs_x[i][mode_index]
-                        else:
-                            val = values[3]
-
-                        mode = str(round(val * factor, 6))
+                    # NaN (no values): "-"
+                    texts = ["\u2013" if v is None or not numpy.isfinite(v)
+                             else str(round(v, 6))
+                             for v in shared.single_values[i][:4]]
+                    mean, median, std, mode = texts
 
                     if self.columns.get_column("Mean").visibility:
                         self.means_labels[i].setText(mean)
@@ -834,15 +890,15 @@ class ResultsSingleWidget(PYAFWidget):
             if shared.exp.groups_list[i].name == text:
                 index = i
                 break
-        # Save the values, change the lists. You will need to refresh manually
-        # to get the correct values / histograms
+        # Save the values, change the lists, then recompute the values
+        column = self.columns.get_column("Group")
         for item in self.tableWidget.selectionModel().selectedRows():
             row_index = item.row()
             shared.exp.results_list[row_index].group = index
-            col = self.columns.get_column("Group").position
-            if col is not None:
-                cell = self.tableWidget.cellWidget(row_index, 2)
+            if column.visibility:
+                cell = self.tableWidget.cellWidget(row_index, column.position)
                 cell.setCurrentIndex(index)
+        self.schedule_refresh()
 
     def batch_slices_change(self, force_index=None):
         """Allows you to change all the slices menu's in the tableWidget.
@@ -912,6 +968,8 @@ class ResultsSingleWidget(PYAFWidget):
                 cell = self.tableWidget.cellWidget(row_index, col)
                 cell.list.setCurrentIndex(newindex)
 
+        self.schedule_refresh()
+
     def batch_rois_change(self):
         """Changes all the selected ROIs to the wanted value."""
         self.logger.debug("Batch change rois")
@@ -962,24 +1020,22 @@ class ResultsSingleWidget(PYAFWidget):
                 cell = self.tableWidget.cellWidget(row_index, col)
                 cell.list.setCurrentIndex(newindex)
 
+        self.schedule_refresh()
+
     def batch_events_change(self):
         """Change selected events."""
         # Get the mode which was selected
-        if self.submenu_events.sender().text() == "All":
-            value = "All"
-            index = 0
-        if self.submenu_events.sender().text() == "Last":
-            value = "Last"
-            index = 1
-        # Save the values, change the lists. You will need to refresh manually
-        # to get the correct values / histograms
+        # 0: all the events, 1: the last one
+        index = 0 if self.submenu_events.sender().text() == "All" else 1
+        # Save the values, change the lists, then recompute the values
         for item in self.tableWidget.selectionModel().selectedRows():
             row_index = item.row()
-            shared.exp.dist_to_joc_list[row_index] = value
+            shared.exp.results_list[row_index].dist_to_joc = index
             col = self.columns.get_column("Event(s)").position
             if col is not None:
                 cell = self.tableWidget.cellWidget(row_index, col)
                 cell.list.setCurrentIndex(index)
+        self.schedule_refresh()
 
     def hide_or_display_column(self):
         """Hide or display a column in the tablewidget."""
@@ -1031,6 +1087,15 @@ class ResultsSingleWidget(PYAFWidget):
             self.submenu_columns.addAction(subaction)
         self.submenu_columns.triggered.connect(self.hide_or_display_column)
         action.setMenu(self.submenu_columns)
+
+        # Groups (as in the grouped plots tab)
+        action = QtWidgets.QAction("Add group", self)
+        action.triggered.connect(self.add_group)
+        menu.addAction(action)
+        action = QtWidgets.QAction("Rename groups", self)
+        action.triggered.connect(
+            widgets_list.widget_results_groups.rename_groups)
+        menu.addAction(action)
 
         # Batch change groups
         action = QtWidgets.QAction("Change selected groups", self)

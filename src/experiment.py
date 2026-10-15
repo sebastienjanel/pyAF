@@ -45,11 +45,14 @@ this :
 
 """
 
-import numpy
 import logging
+import re
+
+import numpy
 from . import shared
 from .single import SingleFile
 from .tools import math_tools
+from .tools import palettes
 
 
 class Experiment:
@@ -170,7 +173,7 @@ class Experiment:
         self.hist_experiment_min_x = 0
         self.hist_experiment_max_y = 100
         self.hist_experiment_min_y = 0
-        self.hist_remove_zeros = True
+        self.hist_remove_zeros = False
         self.hist_log = False
         self.hist_single_display_pdf_fit = True
         self.hist_groups_display_pdf_fit = True
@@ -191,6 +194,9 @@ class Experiment:
         self.norm_hist_experiment = True
 
         self.hist_single_plot_selected = "hist"
+
+        # Options of the violin plot of the single results (plots tab)
+        self.violin_single = default_violin_options()
         self.hist_groups_plot_selected = "hist"
 
         # Selected flatten order
@@ -358,6 +364,53 @@ class ResultGroup:
         self.condition = 0  # 0 = No condition
 
 
+def default_violin_options():
+    """Default options of the violin plots."""
+    return {
+        "inner": "Box",                  # Box, Notched box, Quartiles or
+                                         # None
+        "points": "None",                # None, Strip or Swarm
+        "bw_adjust": 1.0,                # Factor of the KDE bandwidth
+        "cut": False,                    # Violins limited to the data
+        "density_norm": "Same width",    # Same width, Same area or
+                                         # Number of values
+        "log_scale": False,
+        "show_counts": True,             # Number of values under the names
+        "y_mode": "auto",                # auto or manual
+        "y_min": 0.0,
+        "y_max": 100.0,
+        "palette": "ggplot2",            # Name in palettes.NAMES, or
+                                         # palettes.CUSTOM
+        "background": "Theme"}           # Theme or White
+
+
+def get_violin_options(exp):
+    """Options of the violin plot of an experiment (the defaults for the
+    missing ones, e.g. for the files saved before they were added)."""
+    saved = getattr(exp, "violin_single", None)
+    options = default_violin_options()
+    if saved is None:
+        # Files saved before the violins: keep the colors of the files
+        options["palette"] = palettes.CUSTOM
+    options.update(saved or {})
+    # Names of the first versions
+    options["points"] = {"Strip": "Jitter", "Swarm": "Beeswarm"}.get(
+        options["points"], options["points"])
+    exp.violin_single = options
+    return options
+
+
+def apply_palette(exp):
+    """Sets the colors of the results with the palette of the violin plot
+    (nothing for the custom colors)."""
+    name = get_violin_options(exp)["palette"]
+    if name == palettes.CUSTOM:
+        return
+    colors = palettes.get_colors(name, len(exp.results_list))
+    for result, color in zip(exp.results_list, colors):
+        result.color = color
+
+
 class ConditionGroup:
     """Object used to store settings for a result's line in the experiment results."""
 
@@ -403,6 +456,7 @@ def add_result(unique_id, name):
         result = Result(len(shared.exp.results_list), unique_id)
         shared.exp.results_list.append(result)
         result.name = name
+        result.short_name = auto_short_name(name)
 
         # Set the color. Go through the list and determine a color
         # periodically.
@@ -410,6 +464,24 @@ def add_result(unique_id, name):
         while pos >= len(shared.colors_list):
             pos = pos - len(shared.colors_list)
         result.color = shared.colors_list[pos]
+        # Colors of the palette (some change with the number of files)
+        apply_palette(shared.exp)
+
+
+def auto_short_name(name):
+    """Name of a file without the end added by the AFM software: the
+    extension of the Bruker files (.spm, with the number of the file, e.g.
+    .0_00012.spm), and of the JPK files (.jpk-force-map or .jpk-qi-data,
+    with the milliseconds of the time, e.g. .311.jpk-force-map)."""
+    short = re.sub(r"(\.\d+_\d+)?\.spm$", "", name)
+    short = re.sub(r"(\.\d+)?\.jpk-(force-map|qi-data)$", "", short)
+    return short or name
+
+
+def get_short_name(result):
+    """Name of a result in the plots."""
+    short_name = getattr(result, "short_name", "")
+    return short_name or auto_short_name(result.name)
 
 
 class Result:
@@ -437,6 +509,9 @@ class Result:
         self.dist_to_joc = 0
         self.sub_type = 0  # 0 = normal, 1 = corrected
         self.name = ""
+        # Name in the plots ("": the name without its extension, see
+        # get_short_name)
+        self.short_name = ""
         self.color = None  # Color for the histograms (defined by add_result)
 
         # Experimental condition

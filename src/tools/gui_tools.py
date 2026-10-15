@@ -521,6 +521,21 @@ class PYAFComboBox(QtWidgets.QComboBox):
         """Redefine wheelEvent. It will be disabled."""
         pass
 
+    def fit_to_contents(self):
+        """Make the list wide enough for its longest item.
+
+        The style sheets define a min-width, which overrides
+        setMinimumWidth, so the width is set with a style sheet.
+        """
+        # Bold font: the widest text (bold in some style sheets)
+        font = QtGui.QFont(self.font())
+        font.setBold(True)
+        metrics = QtGui.QFontMetrics(font)
+        longest = max(metrics.horizontalAdvance(self.itemText(i))
+                      for i in range(self.count()))
+        self.setStyleSheet(
+            "QComboBox { min-width: " + str(longest + 30) + "px; }")
+
 
 class ToggleSwitch(QtWidgets.QCheckBox):
     """A checkbox drawn as an on/off switch."""

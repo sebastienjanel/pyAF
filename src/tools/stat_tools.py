@@ -81,10 +81,43 @@ def get_values():
 
         # For the plots
         shared.single_data.append(array)
-        shared.single_values.append(values)
+        shared.single_values.append(list(values))
+
+    update_single_modes()
 
     if new_bar:
         widgets_list.widget_progressbar.close()
+
+
+def update_single_modes():
+    """Computes the modes of the single results (index 3 of the values),
+    with the density estimate of the violins (same smoothing)."""
+    from ..experiment import get_violin_options
+    bw_adjust = get_violin_options(shared.exp)["bw_adjust"]
+
+    for i, data in enumerate(shared.single_data or []):
+        if shared.exp.results_type == "loading_rates":
+            # 0 = forces, 1 = loading rates
+            data = data[1] if len(data) > 1 else []
+        shared.single_values[i][3] = get_mode(data, bw_adjust)
+
+
+def get_mode(data, bw_adjust=1.0):
+    """Mode of the values: maximum of their density estimate (gaussian
+    kernels, Scott's rule for the bandwidth multiplied by bw_adjust).
+
+    NaN if there are no values.
+    """
+    data = numpy.asarray(data, dtype=float).ravel()
+    data = data[numpy.isfinite(data)]
+    if data.size == 0:
+        return numpy.nan
+    if data.size == 1 or numpy.ptp(data) == 0:
+        return data[0]
+    kde = stats.gaussian_kde(data)
+    kde.set_bandwidth(kde.factor * bw_adjust)
+    grid = numpy.linspace(data.min(), data.max(), 1024)
+    return grid[numpy.argmax(kde(grid))]
 
 
 def get_range(mode, themax, data):
@@ -184,22 +217,15 @@ def get_pdf_and_mode(array, mode):
     bw = get_bandwidth(mode)
 
     # Get a probability density function, and the mode
-    pdf = stats.kde.gaussian_kde(array, bw_method=bw)
+    pdf = stats.gaussian_kde(array, bw_method=bw)
 
-    newpdf_x = []
-    newpdf_y = []
-
-    for i in range(int(steps)):
-        newpdf_x.append(i * step_x)
-        try:
-            newpdf_y.append(pdf(i * step_x)[0])
-        except FloatingPointError:
-            newpdf_y.append(0)
-        widgets_list.widget_progressbar.update()
+    newpdf_x = numpy.arange(int(steps)) * step_x
+    with numpy.errstate(all="ignore"):
+        newpdf_y = numpy.nan_to_num(pdf(newpdf_x))
 
     max_index = numpy.argmax(newpdf_y)
 
-    return numpy.array(newpdf_x), numpy.array(newpdf_y), max_index
+    return newpdf_x, newpdf_y, max_index
 
 
 def update_counts(mode):
@@ -572,10 +598,9 @@ def fetch_conditions_data():
 
 
 def get_pdf():
-    """Get the probability density function for the histogram."""
-    get_pdfs_and_modes("single")
-    update_counts("single")
-
+    """Get the probability density function for the histograms of the
+    groups and the conditions (the modes of the single results are computed
+    with their values, see update_single_modes)."""
     get_pdfs_and_modes("groups")
     update_counts("groups")
 
