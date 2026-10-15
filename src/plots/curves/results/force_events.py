@@ -89,27 +89,23 @@ class ResultsForceEvents(PlotCurve):
 
             # xdist can be None for corrupted curves
             if xdist is not None:
-                left = \
-                    self.data.events_results_filter_dist_left * self.x_factor
-                right = \
-                    self.data.events_results_filter_dist_right * self.x_factor
-                keep_middle = self.data.events_results_filter_dist_keep_middle
+                # Distances from the joc2, the events are on the left of 0
+                d_min = self.data.events_results_filter_dist_min
+                d_max = self.data.events_results_filter_dist_max
+                left = -d_max * self.x_factor
+                right = -d_min * self.x_factor
 
-                if keep_middle:
-                    # First excluded segment
-                    # (on the left, at beginning of curve)
-                    seg1 = [None, left]
-
-                    # Second excluded segment
-                    # (on the right, near the joc2)
-                    seg2 = [right, 0]
-
+                if d_max <= d_min:
+                    # No filter
+                    segments = []
+                elif self.data.events_results_filter_dist_keep:
+                    # Removed events: further than the max, closer than the
+                    # min (None = edge of the plot)
+                    segments = [[None, left], [right, None]]
                 else:
-                    # Only one excluded segment
-                    seg1 = [left, right]
-                    seg2 = None
+                    segments = [[left, right]]
 
-                self.events_filter_dist_square = [seg1, seg2]
+                self.events_filter_dist_square = segments
 
         self.define_x_scale()
         self.define_y_scale()

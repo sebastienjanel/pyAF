@@ -458,6 +458,14 @@ def add_result(unique_id, name):
         result.name = name
         result.short_name = auto_short_name(name)
 
+        # Filters of the events: the ones of the Results tab
+        data = shared.exp.list[unique_id]
+        result.filter_dist_min = data.events_results_filter_dist_min
+        result.filter_dist_max = data.events_results_filter_dist_max
+        result.filter_dist_keep = data.events_results_filter_dist_keep
+        result.filter_slope_min = data.events_results_filter_slope_min
+        result.filter_slope_max = data.events_results_filter_slope_max
+
         # Set the color. Go through the list and determine a color
         # periodically.
         pos = len(shared.exp.results_list) - 1
@@ -496,12 +504,14 @@ class Result:
         self.group = 0  # 0 = no group
         self.slice = 0  # 0 = All
 
-        # Filtering of the events by distance from JOC, in nm
-        self.filter_dist_left = 0
-        self.filter_dist_right = 0
-        self.filter_dist_keep_middle = False
+        # Filtering of the events by distance from the jump of contact, in
+        # nm (see tools.event_filter_tools): the events between min and max
+        # are removed, or the only ones kept if filter_dist_keep is True
+        self.filter_dist_min = 0
+        self.filter_dist_max = 0
+        self.filter_dist_keep = False
 
-        # Event filtering by slope of the fit on the right
+        # Event filtering by slope of the fit next to the event
         self.filter_slope_min = 0
         self.filter_slope_max = 0
 

@@ -36,6 +36,7 @@ import pandas as pd
 from .. import shared
 from ..tools import math_tools
 from ..tools import curve_tools
+from ..tools import event_filter_tools
 from .. import widgets_list
 
 
@@ -65,9 +66,9 @@ class GetResults:
         self.select = None
         self.log = None
 
-        self.filter_dist_left = None
-        self.filter_dist_right = None
-        self.filter_dist_keep_middle = None
+        self.filter_dist_min = None
+        self.filter_dist_max = None
+        self.filter_dist_keep = None
 
         self.filter_slope_min = None
         self.filter_slope_max = None
@@ -77,10 +78,9 @@ class GetResults:
         if data_id is not None and result_id is None:
             self.data = shared.exp.list[data_id]
 
-            self.filter_dist_left = self.data.events_results_filter_dist_left
-            self.filter_dist_right = self.data.events_results_filter_dist_right
-            self.filter_dist_keep_middle = \
-                self.data.events_results_filter_dist_keep_middle
+            self.filter_dist_min = self.data.events_results_filter_dist_min
+            self.filter_dist_max = self.data.events_results_filter_dist_max
+            self.filter_dist_keep = self.data.events_results_filter_dist_keep
 
             self.filter_slope_min = self.data.events_results_filter_slope_min
             self.filter_slope_max = self.data.events_results_filter_slope_max
@@ -92,9 +92,9 @@ class GetResults:
             result = shared.exp.results_list[result_id]
             self.data = shared.exp.list[result.data_id]
 
-            self.filter_dist_left = result.filter_dist_left
-            self.filter_dist_right = result.filter_dist_right
-            self.filter_dist_keep_middle = result.filter_dist_keep_middle
+            self.filter_dist_min = result.filter_dist_min
+            self.filter_dist_max = result.filter_dist_max
+            self.filter_dist_keep = result.filter_dist_keep
 
             self.filter_slope_min = result.filter_slope_min
             self.filter_slope_max = result.filter_slope_max
@@ -847,23 +847,12 @@ class GetResults:
     def filter_event(self, pos, slope):
         """Cheks if an event on the curve can be kept or not.
 
-        Some filters can remove events from the curve so that it is not
-        counted.
+        pos is the position of the event on the distance axis of the curve
+        (negative: the events are situated before the joc2 == 0).
 
-        pos is a negative value (the events are situaded before the joc2 == 0)
-
-        slope is the value of the slope of the fit on the right of the event.
-        The user can ask to filter by keeping only slopes between two values.
+        slope is the value of the slope of the fit next to the event.
         """
-        if self.filter_slope_max != 0 and self.filter_slope_min != 0:
-            if slope > self.filter_slope_max or slope < self.filter_slope_min:
-                return False
-
-        if self.filter_dist_keep_middle:
-            if self.filter_dist_left < pos and pos < self.filter_dist_right:
-                return True
-        else:
-            if self.filter_dist_left > pos or pos > self.filter_dist_right:
-                return True
-
-        return False
+        return event_filter_tools.keep_event(
+            -pos, slope, self.filter_dist_min, self.filter_dist_max,
+            self.filter_dist_keep, self.filter_slope_min,
+            self.filter_slope_max)

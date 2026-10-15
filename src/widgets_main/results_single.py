@@ -46,6 +46,8 @@ from ..widgets_main.subwidgets.result_chooser import ResultsChooserWidget
 from ..widgets_main.subwidgets.violin_options import ViolinOptionsWidget
 from ..widgets.events_per_scan import EventsPerScanWidget
 from ..widgets.events_filters import ChangeFilterWidget
+from ..widgets.events_filters import DIST_TOOLTIP, SLOPE_TOOLTIP
+from ..tools import event_filter_tools
 from ..widgets.dfs import DFSWidget
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools.PYAFWidget import PYAFWidget
@@ -81,10 +83,10 @@ class Columns:
                 self.results_type == "events_per_curve" or \
                 self.results_type == "events_rupture_force" or \
                 self.results_type == "loading_rates":
-            names += ["Slope", "Dist", "Roi"]
+            names += ["Slope filter", "Distance filter", "Roi"]
 
         elif self.results_type == "events_distance":
-            names += ["Slope", "Dist", "Event(s)", "Roi"]
+            names += ["Slope filter", "Distance filter", "Event(s)", "Roi"]
 
         else:
             names += ["Roi"]
@@ -350,7 +352,8 @@ class ResultsSingleWidget(PYAFWidget):
 
         # Widths of the columns (the file names take the remaining space)
         widths = {"CB": 35, "Short name": 170, "Group": 140, "Mean": 90,
-                  "Median": 90, "Sd": 90, "Mode": 90}
+                  "Median": 90, "Sd": 90, "Mode": 90, "Slope filter": 110,
+                  "Distance filter": 160}
         for column in self.columns.list:
             if not column.visibility:
                 continue
@@ -427,9 +430,9 @@ class ResultsSingleWidget(PYAFWidget):
         elif rtype == "events_forces" or rtype == "events_per_curve" or \
                 rtype == "events_rupture_force" or rtype == "loading_rates" \
                 or rtype == "events_distance":
-            self.add_cell_at_pos("Slope", row_index)
+            self.add_cell_at_pos("Slope filter", row_index)
 
-            self.add_cell_at_pos("Dist", row_index)
+            self.add_cell_at_pos("Distance filter", row_index)
 
             if rtype == "events_distance":
                 self.add_cell_at_pos("Event(s)", row_index)
@@ -569,20 +572,18 @@ class ResultsSingleWidget(PYAFWidget):
             corr = gui_tools.CenteredCellComboBox(corr_list)
             self.tableWidget.setCellWidget(row_index, column_pos, corr)
 
-        elif name == "Slope":
-            # Slope filter
-            input_slope_min = QtWidgets.QLineEdit()
-            input_slope_min.setFont(self.parent.smallfont)
-            input_slope_min.setText(str(result.filter_slope_min))
-            input_slope_max = QtWidgets.QLineEdit()
-            input_slope_max.setFont(self.parent.smallfont)
-            input_slope_max.setText(str(result.filter_slope_max))
-
-            items = [input_slope_min, input_slope_max]
-            for item in items:
-                item.editingFinished.connect(self.schedule_refresh)
-            widget = gui_tools.CenteredCellwidget2(items)
+        elif name == "Slope filter" or name == "Distance filter":
+            # The filters are changed in a small window (click on the cell)
+            button = gui_tools.ClickableCellLabel()
+            button.setFont(self.parent.smallfont)
+            filt = "slope" if name == "Slope filter" else "dist_filt"
+            tooltip = SLOPE_TOOLTIP if filt == "slope" else DIST_TOOLTIP
+            button.setToolTip(tooltip + "\nClick to change it.")
+            button.clicked.connect(
+                lambda b=button, f=filt: self.filter_cell_clicked(b, f))
+            widget = gui_tools.CenteredCellwidget2([button])
             self.tableWidget.setCellWidget(row_index, column_pos, widget)
+            self.update_filter_cells(row_index)
 
         elif name == "Event(s)":
             # Event to select (Distance to Joc)
@@ -596,25 +597,33 @@ class ResultsSingleWidget(PYAFWidget):
             dist = gui_tools.CenteredCellComboBox(input_dist_to_joc)
             self.tableWidget.setCellWidget(row_index, column_pos, dist)
 
-        elif name == "Dist":
-            # Dist (filter_distance)
-            input_dist_left = QtWidgets.QLineEdit()
-            input_dist_left.setFont(self.parent.smallfont)
-            input_dist_left.setText(str(result.filter_dist_left))
-            input_dist_right = QtWidgets.QLineEdit()
-            input_dist_right.setFont(self.parent.smallfont)
-            input_dist_right.setText(str(result.filter_dist_right))
+    def update_filter_cells(self, row_index):
+        """Display the filters of a row of the table."""
+        result = shared.exp.results_list[row_index]
+        col = self.columns.get_column("Slope filter")
+        if col is not None and col.visibility:
+            cell = self.tableWidget.cellWidget(row_index, col.position)
+            if cell is not None:
+                cell.items[0].setText(event_filter_tools.slope_filter_text(
+                    result.filter_slope_min, result.filter_slope_max))
+        col = self.columns.get_column("Distance filter")
+        if col is not None and col.visibility:
+            cell = self.tableWidget.cellWidget(row_index, col.position)
+            if cell is not None:
+                cell.items[0].setText(event_filter_tools.dist_filter_text(
+                    result.filter_dist_min, result.filter_dist_max,
+                    result.filter_dist_keep))
 
-            cb = QtWidgets.QCheckBox()
-            cb.setChecked(result.filter_dist_keep_middle)
-            cb.setToolTip("Keep events between limits")
-
-            items = [input_dist_left, input_dist_right, cb]
-            input_dist_left.editingFinished.connect(self.schedule_refresh)
-            input_dist_right.editingFinished.connect(self.schedule_refresh)
-            cb.clicked.connect(self.schedule_refresh)
-            widget = gui_tools.CenteredCellwidget2(items)
-            self.tableWidget.setCellWidget(row_index, column_pos, widget)
+    def filter_cell_clicked(self, button, filt):
+        """Change the filter of the row of the clicked cell (and of the
+        other selected rows if it is one of them)."""
+        position = button.parentWidget().pos()
+        row = self.tableWidget.indexAt(position).row()
+        selected = [item.row() for item in
+                    self.tableWidget.selectionModel().selectedRows()]
+        if row not in selected:
+            self.tableWidget.selectRow(row)
+        self.change_filters(filt)
 
     def save_hist_prefs(self):
         """Save the currently chosen options in the results table."""
@@ -644,23 +653,6 @@ class ResultsSingleWidget(PYAFWidget):
             if col is not None and col.visibility:
                 cell = self.tableWidget.cellWidget(i, col.position)
                 result.slice = cell.list.currentIndex()
-
-            col = self.columns.get_column("Slope")
-            if col is not None and col.visibility:
-                cell = self.tableWidget.cellWidget(i, col.position)
-                result.filter_slope_min = \
-                    float(str(cell.items[0].text()).replace(",", "."))
-                result.filter_slope_max = \
-                    float(str(cell.items[1].text()).replace(",", "."))
-
-            col = self.columns.get_column("Dist")
-            if col is not None and col.visibility:
-                cell = self.tableWidget.cellWidget(i, col.position)
-                result.filter_dist_left = \
-                    float(str(cell.items[0].text()).replace(",", "."))
-                result.filter_dist_right = \
-                    float(str(cell.items[1].text()).replace(",", "."))
-                result.filter_dist_keep_middle = cell.items[2].isChecked()
 
             col = self.columns.get_column("Event(s)")
             if col is not None and col.visibility:
@@ -867,20 +859,12 @@ class ResultsSingleWidget(PYAFWidget):
         self.update_MPL()
 
     def change_filters(self, name):
-        """Change all selected filters."""
+        """Change the filters of the selected rows."""
         if name == "slope":
             widget = ChangeFilterWidget(self, "slope_batch")
-            widget.setWindowTitle("Change slopes filter")
-            widget.resize(200, 100)
-            widget.activateWindow()
-            widget.show()
-
-        elif name == "dist_filt":
+        else:
             widget = ChangeFilterWidget(self, "dist_batch")
-            widget.setWindowTitle("Change distance filter")
-            widget.resize(200, 100)
-            widget.activateWindow()
-            widget.show()
+        widget.exec()
 
     def batch_groups_change(self):
         """Change all the selected groups."""

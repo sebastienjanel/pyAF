@@ -43,6 +43,7 @@ except ImportError:
 from ... import widgets_list
 from ... import shared
 from ...tools import misc_tools
+from ...tools import event_filter_tools
 
 class LoaderPYAF:
     """Class used to load pyAF files."""
@@ -162,6 +163,7 @@ class LoaderPYAF:
         for i in range(len(new_list)):
 
             misc_tools.add_attributes(new_list[i])
+            event_filter_tools.convert_old_filters(new_list[i])
 
             # Append the result
             shared.exp.results_list.append(new_list[i])
@@ -274,6 +276,9 @@ class LoaderPYAF:
             # Update the id
             data = shared.exp.list[i]
             data.unique_id = i
+
+            # Distance filter of the files saved before 2026
+            event_filter_tools.convert_old_filters(data)
 
             # COMPATIBILITY MODE 17/01/14 add new vtk values
             try:

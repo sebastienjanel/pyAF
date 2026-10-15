@@ -320,6 +320,24 @@ class CenteredCellwidget2(QtWidgets.QWidget):
         self.setLayout(layout)
 
 
+class ClickableCellLabel(QtWidgets.QLabel):
+    """A text for the tablewidgets, which can be clicked."""
+
+    clicked = QtCore.Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.setAlignment(QtCore.Qt.AlignCenter)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+
+    def mouseReleaseEvent(self, event):
+        """Emit clicked when the left button is released on the text."""
+        if event.button() == QtCore.Qt.LeftButton and \
+                self.rect().contains(event.position().toPoint()):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
 class CenteredCellCheckbox(QtWidgets.QWidget):
     """A centered checkbox for the tablewidgets."""
 

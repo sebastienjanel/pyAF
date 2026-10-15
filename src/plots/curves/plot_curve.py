@@ -560,47 +560,18 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
             self.axes.add_patch(rect)
 
-        # Plot events dist filter as a grey square
+        # Plot the events removed by the distance filter in grey (None is
+        # the edge of the plot)
         if self.events_filter_dist_square is not None:
-            vals = self.events_filter_dist_square
             size = self.axes.axis()  # (x0, x1, y0, y1)
+            height = size[3] - size[2]
 
-            if vals[1] is not None:
-                seg1 = vals[0]
-                seg2 = vals[1]
-
-                height = abs(size[3] - size[2])
-                width1 = abs(size[0] - seg1[1])
-                width2 = abs(seg2[0])
-
-                # Left rectangle, near beginning of the curve
-                rect1 = Rectangle(
-                    (size[0], size[2]),
-                    width1,
-                    height,
-                    facecolor="grey",
-                    alpha=0.4)
-
-                # Right rectangle, near joc2
-                rect2 = Rectangle(
-                    (seg2[0], size[2]),
-                    width2,
-                    height,
-                    facecolor="grey",
-                    alpha=0.4)
-
-                self.axes.add_patch(rect1)
-                self.axes.add_patch(rect2)
-
-            else:
-                seg1 = vals[0]
-
-                height = size[3] - size[2]
-                width = abs(seg1[1] - seg1[0])
-
+            for x0, x1 in self.events_filter_dist_square:
+                x0 = size[0] if x0 is None else x0
+                x1 = size[1] if x1 is None else x1
                 rect = Rectangle(
-                    (seg1[0], size[2]),
-                    width,
+                    (x0, size[2]),
+                    x1 - x0,
                     height,
                     facecolor="grey",
                     alpha=0.4)

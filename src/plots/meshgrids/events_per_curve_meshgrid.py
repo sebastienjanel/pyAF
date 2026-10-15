@@ -32,6 +32,7 @@
 """Events per curve meshgrid."""
 
 from .plot_meshgrid import PlotMeshGrid
+from ...tools import event_filter_tools
 
 
 class PlotEventsPerCurveMeshGrid(PlotMeshGrid):
@@ -48,19 +49,13 @@ class PlotEventsPerCurveMeshGrid(PlotMeshGrid):
 
         self.factor = 1
 
-        left = self.data.events_results_filter_dist_left
-        right = self.data.events_results_filter_dist_right
-        middle = self.data.events_results_filter_dist_keep_middle
+        text = event_filter_tools.dist_filter_text(
+            self.data.events_results_filter_dist_min,
+            self.data.events_results_filter_dist_max,
+            self.data.events_results_filter_dist_keep)
 
-        if middle:
-            text = "(" + str(left) + " < event < " + str(right) + ")"
-        else:
-            text = "(" + str(left) + " > event > " + str(right) + ")"
-
-        # print(left, right, middle, text)
-
-        if left != 0 and right != 0:
-            self.colorbarlabel = "Events per curve" + text
+        if text != "None":
+            self.colorbarlabel = "Events per curve (" + text + ")"
         else:
             self.colorbarlabel = "Events per curve"
 

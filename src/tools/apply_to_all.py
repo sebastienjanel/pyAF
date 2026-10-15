@@ -130,12 +130,12 @@ def apply_to_all(mode, option=None, oldid=None):
             if dt.events_calculated:
                 dt.events_results_display_annotations = \
                     cur.events_results_display_annotations
-                dt.events_results_filter_dist_left = \
-                    cur.events_results_filter_dist_left
-                dt.events_results_filter_dist_right = \
-                    cur.events_results_filter_dist_right
-                dt.events_results_filter_dist_keep_middle = \
-                    cur.events_results_filter_dist_keep_middle
+                dt.events_results_filter_dist_min = \
+                    cur.events_results_filter_dist_min
+                dt.events_results_filter_dist_max = \
+                    cur.events_results_filter_dist_max
+                dt.events_results_filter_dist_keep = \
+                    cur.events_results_filter_dist_keep
                 dt.events_display_results_filter_dist = \
                     cur.events_display_results_filter_dist
                 dt.events_results_filter_slope_min = \

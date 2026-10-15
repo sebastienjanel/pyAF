@@ -29,167 +29,207 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-"""Small widget allowing to change the distance filter."""
+"""Small window allowing to change the distance or the slope filter of the
+events (see tools.event_filter_tools)."""
 
-from qtpy import QtWidgets
-from ..tools.gui_tools import PYAFInput
-from ..tools.gui_tools import PYAFCheckBox
-from ..tools.gui_tools import PYAFButton
+from qtpy import QtCore, QtWidgets
+from ..tools.gui_tools import PYAFButton, PYAFComboBox
 from .. import widgets_list
 from .. import shared
 from ..tools import apply_to_all
 from ..tools import events_refresher
+from ..tools import event_filter_tools
+
+DIST_TOOLTIP = (
+    "Distances from the jump of contact, in positive nm.\n"
+    "Remove: the events between the two distances are not counted.\n"
+    "Keep only: only the events between the two distances are counted.\n"
+    "0 to 0: no filter.")
+
+SLOPE_TOOLTIP = (
+    "Slope of the line fitted on the curve next to each event, in nN/nm.\n"
+    "Only the events with a slope between the two values are counted.\n"
+    "0 to 0: no filter.")
 
 
 class ChangeFilterWidget(QtWidgets.QDialog):
-    """Small widget for the changing of the distance filter.
+    """Small window to change the distance or the slope filter.
 
-    The distance filter can be changed on the results tab. It is used to
-    exclude events between the jump of contact and a specific distance.
+    filt is "dist" or "slope" for the filter of the file displayed in the
+    Results tab, "dist_batch" or "slope_batch" for the filters of the rows
+    selected in the table of the Plots tab.
     """
 
     def __init__(self, parent, filt):
         super().__init__()
 
-        self.open = True
         self.parent = parent
         self.filt = filt
+        self.is_dist = filt in ("dist", "dist_batch")
+        self.batch = filt in ("dist_batch", "slope_batch")
 
-        dt = shared.exp.current_data
+        if self.is_dist:
+            self.setWindowTitle("Change distance filter")
+        else:
+            self.setWindowTitle("Change slope filter")
 
-        LAY = QtWidgets.QHBoxLayout()
+        dist_min, dist_max, dist_keep, slope_min, slope_max = \
+            self.get_current_values()
 
-        if self.filt == "slope" or self.filt == "slope_batch":
-            self.IN_slope_min = PYAFInput(self, "input_min", "Min", width=100)
-            self.IN_slope_max = PYAFInput(self, "input_max", "Max", width=100)
+        self.IN_min = QtWidgets.QLineEdit(
+            event_filter_tools.format_number(
+                dist_min if self.is_dist else slope_min))
+        self.IN_max = QtWidgets.QLineEdit(
+            event_filter_tools.format_number(
+                dist_max if self.is_dist else slope_max))
+        for item in (self.IN_min, self.IN_max):
+            item.setFixedWidth(70)
+            item.setAlignment(QtCore.Qt.AlignRight)
 
-            self.IN_slope_min.changeValue(dt.events_results_filter_dist_left)
-            self.IN_slope_max.changeValue(dt.events_results_filter_dist_right)
+        LAY_values = QtWidgets.QHBoxLayout()
+        if self.is_dist:
+            self.CB_mode = PYAFComboBox(self, None)
+            self.CB_mode.addItem("Remove")
+            self.CB_mode.addItem("Keep only")
+            self.CB_mode.fit_to_contents()
+            self.CB_mode.setCurrentIndex(1 if dist_keep else 0)
+            LAY_values.addWidget(self.CB_mode)
+            LAY_values.addWidget(QtWidgets.QLabel("events from"))
+        else:
+            LAY_values.addWidget(
+                QtWidgets.QLabel("Keep only events with a slope from"))
+        LAY_values.addWidget(self.IN_min)
+        LAY_values.addWidget(QtWidgets.QLabel("to"))
+        LAY_values.addWidget(self.IN_max)
+        if self.is_dist:
+            LAY_values.addWidget(
+                QtWidgets.QLabel("nm from the jump of contact"))
+        else:
+            LAY_values.addWidget(QtWidgets.QLabel("nN/nm"))
+        LAY_values.addStretch(1)
 
-            LAY.addWidget(self.IN_slope_min)
-            LAY.addWidget(self.IN_slope_max)
+        self.setToolTip(DIST_TOOLTIP if self.is_dist else SLOPE_TOOLTIP)
 
-        elif self.filt == "dist" or self.filt == "dist_batch":
-            LAY = QtWidgets.QHBoxLayout()
+        if self.batch:
+            nbr = len(self.get_selected_rows())
+            where = "the " + str(nbr) + " selected row" + \
+                ("s" if nbr > 1 else "") + " of the table"
+        else:
+            where = shared.exp.current_data.filename
+        self.LB_info = QtWidgets.QLabel("Applies to " + where + ".")
 
-            self.IN_left = PYAFInput(self, "input_left", "Left", width=100)
-            self.IN_right = PYAFInput(self, "input_right", "Right", width=100)
-            self.CB_middle = PYAFCheckBox(self, "cb", "Keep middle")
+        BT_cancel = PYAFButton(self, "cancel", "Cancel")
+        BT_ok = PYAFButton(self, "ok", "OK")
+        BT_ok.setDefault(True)
+        LAY_buttons = QtWidgets.QHBoxLayout()
+        LAY_buttons.addWidget(self.LB_info)
+        LAY_buttons.addStretch(1)
+        LAY_buttons.addWidget(BT_cancel)
+        LAY_buttons.addWidget(BT_ok)
 
-            self.IN_left.changeValue(dt.events_results_filter_dist_left)
-            self.IN_right.changeValue(dt.events_results_filter_dist_right)
-            self.CB_middle.setChecked(
-                dt.events_results_filter_dist_keep_middle)
-
-            LAY.addWidget(self.IN_left)
-            LAY.addWidget(self.IN_right)
-            LAY.addWidget(self.CB_middle)
-
-        if self.filt == "dist_batch" or self.filt == "slope_batch":
-            BT_ok = PYAFButton(self, "ok", "OK")
-            BT_ok.setDefault(True)
-            LAY.addWidget(BT_ok)
-
+        LAY = QtWidgets.QVBoxLayout()
+        LAY.addLayout(LAY_values)
+        LAY.addLayout(LAY_buttons)
         self.setLayout(LAY)
 
-    def closeEvent(self, _):
-        """Called when closing the widget."""
-        self.open = False
+    def get_selected_rows(self):
+        """Rows selected in the table of the Plots tab."""
+        table = widgets_list.widget_results_single.tableWidget
+        return sorted(item.row() for item in
+                      table.selectionModel().selectedRows())
 
-    def _input_updated(self, val):
-        """Called when the input is updated."""
-        # Can be called only if the widget still exists
-        if self.open:
-            self.input_updated(val)
+    def get_current_values(self):
+        """Values of the filters displayed when opening the window: the
+        ones of the first selected row of the table, or of the file of the
+        Results tab."""
+        if self.batch:
+            rows = self.get_selected_rows()
+            if rows:
+                result = shared.exp.results_list[rows[0]]
+                return (result.filter_dist_min, result.filter_dist_max,
+                        result.filter_dist_keep, result.filter_slope_min,
+                        result.filter_slope_max)
 
-    def input_updated(self, name):
-        """Called when the input is updated."""
         data = shared.exp.current_data
-        filt = self.filt
-        update = False
-
-        if filt == "dist_batch":
-            # Do nothing, the values are validated when the user clicks on OK.
-            return False
-
-        if name == "input_min":
-            val = self.IN_slope_min.get_float_value()
-            if val != data.events_results_filter_slope_min:
-                update = True
-                data.events_results_filter_slope_min = val
-
-        elif name == "input_max":
-            val = self.IN_slope_max.get_float_value()
-            if val != data.events_results_filter_slope_max:
-                update = True
-                data.events_results_filter_slope_max = val
-
-        elif name == "input_left":
-            val_left = self.IN_left.get_float_value()
-            if val_left != data.events_results_filter_dist_left:
-                update = True
-                data.events_results_filter_dist_left = val_left
-
-        elif name == "input_right":
-            val_right = self.IN_right.get_float_value()
-            if val_right != data.events_results_filter_dist_right:
-                update = True
-                data.events_results_filter_dist_right = val_right
-
-        # Update parent plots if we have been called from the results tab
-        # and not from the plots tab. Check also if a value has changed
-        # to prevent too many unwanted auto-updates.
-        if filt != "dist_batch" and filt != "slope_batch" and update:
-            self.update_parents()
-
-    def checkbox_clicked(self, name):
-        """Called when the checkbox is clicked."""
-        data = shared.exp.current_data
-
-        if self.filt == "dist_batch":
-            # Do nothing, the values are validated when the user clicks on OK.
-            return False
-
-        if name == "cb":
-            val_cb = self.CB_middle.isChecked()
-            data.events_results_filter_dist_keep_middle = val_cb
-
-        # Update parent plots if we have been called from the results tab
-        # and not from the plots tab.
-        if self.filt != "dist_batch" and self.filt != "slope_batch":
-            self.update_parents()
+        return (data.events_results_filter_dist_min,
+                data.events_results_filter_dist_max,
+                data.events_results_filter_dist_keep,
+                data.events_results_filter_slope_min,
+                data.events_results_filter_slope_max)
 
     def button_clicked(self, name):
         """Called when a button is clicked."""
-        if name == "ok":
-            if self.filt == "dist_batch":
-                val_left = self.IN_left.get_float_value()
-                val_right = self.IN_right.get_float_value()
-                val_cb = self.CB_middle.isChecked()
-            elif self.filt == "slope_batch":
-                val_slope_min = self.IN_slope_min.get_float_value()
-                val_slope_max = self.IN_slope_max.get_float_value()
+        if name == "cancel":
+            self.close()
+            return
 
+        try:
+            val_min = float(self.IN_min.text().replace(",", "."))
+            val_max = float(self.IN_max.text().replace(",", "."))
+        except ValueError:
+            self.LB_info.setText("The limits must be numbers.")
+            return
+        keep = self.is_dist and self.CB_mode.currentIndex() == 1
+
+        if self.batch:
             wl = widgets_list.widget_results_single
-            for item in wl.tableWidget.selectionModel().selectedRows():
-                index = item.row()
-                if self.filt == "dist_batch":
-                    col = wl.columns.get_column("Dist").position
-                    if col is not None:
-                        cell = wl.tableWidget.cellWidget(index, col)
-                        cell.items[0].setText(str(val_left))
-                        cell.items[1].setText(str(val_right))
-                        cell.items[2].setChecked(val_cb)
-                elif self.filt == "slope_batch":
-                    col = wl.columns.get_column("Slope").position
-                    if col is not None:
-                        cell = wl.tableWidget.cellWidget(index, col)
-                        cell.items[0].setText(str(val_slope_min))
-                        cell.items[1].setText(str(val_slope_max))
+            for row in self.get_selected_rows():
+                result = shared.exp.results_list[row]
+                if self.is_dist:
+                    result.filter_dist_min = val_min
+                    result.filter_dist_max = val_max
+                    result.filter_dist_keep = keep
+                else:
+                    result.filter_slope_min = val_min
+                    result.filter_slope_max = val_max
+                wl.update_filter_cells(row)
 
             # Recompute the values with the new filters
             wl.schedule_refresh()
-            self.close()
+
+        else:
+            data = shared.exp.current_data
+            if self.is_dist:
+                data.events_results_filter_dist_min = val_min
+                data.events_results_filter_dist_max = val_max
+                data.events_results_filter_dist_keep = keep
+            else:
+                data.events_results_filter_slope_min = val_min
+                data.events_results_filter_slope_max = val_max
+            self.update_parents()
+            self.update_plots_rows()
+
+        self.close()
+
+    def update_plots_rows(self):
+        """Give the filter of the file (and of the other files if it was
+        applied to all) to its rows in the table of the Plots tab."""
+        if shared.exp.apply_to_all_data:
+            data_ids = range(len(shared.exp.list))
+        else:
+            data_ids = [shared.exp.id_selected]
+
+        wl = widgets_list.widget_results_single
+        for row, result in enumerate(shared.exp.results_list):
+            if result.data_id not in data_ids:
+                continue
+            data = shared.exp.list[result.data_id]
+            if self.is_dist:
+                result.filter_dist_min = data.events_results_filter_dist_min
+                result.filter_dist_max = data.events_results_filter_dist_max
+                result.filter_dist_keep = \
+                    data.events_results_filter_dist_keep
+            else:
+                result.filter_slope_min = \
+                    data.events_results_filter_slope_min
+                result.filter_slope_max = \
+                    data.events_results_filter_slope_max
+            if wl is not None:
+                wl.update_filter_cells(row)
+
+        # The Plots tab is refreshed when it is displayed
+        if wl is not None:
+            wl.schedule_refresh()
 
     def update_parents(self):
         """Update parents plots and values.

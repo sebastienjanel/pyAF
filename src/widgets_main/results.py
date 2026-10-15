@@ -273,6 +273,10 @@ class ResultsWidget(PYAFWidget):
         self.BT_group_events.addButton(self.RBT_events_annotations, 1)
         self.CB_events_filter_dist = PYAFCheckBox(
             self, "checkbox_events_filter_dist", "Distance filter")
+        self.CB_events_filter_dist.setToolTip(
+            "Shades in grey the events removed by the distance filter of "
+            "this file.\nTo set up the filter, right-click on the curve "
+            "and choose \"Change distance filter\".")
         self.CB_events_display_joc = PYAFCheckBox(
             self, "checkbox_events_display_joc", "Display Joc")
         self.CB_events_display_fit_joc = PYAFCheckBox(
@@ -1276,7 +1280,7 @@ class ResultsWidget(PYAFWidget):
 
             if data.events_calculated:
                 menu.addSeparator()
-                action = QtWidgets.QAction("Change dist filter", self)
+                action = QtWidgets.QAction("Change distance filter", self)
                 action.triggered.connect(lambda: self.change_filter("dist"))
                 menu.addAction(action)
 
@@ -1349,13 +1353,7 @@ class ResultsWidget(PYAFWidget):
     def change_filter(self, filter_value):
         """Update the value of the filter for the events."""
         widget = ChangeFilterWidget(self, filter_value)
-        if filter_value == "slope":
-            widget.setWindowTitle("Change slope filter")
-        elif filter_value == "dist":
-            widget.setWindowTitle("Change dist filter")
-        widget.resize(200, 100)
-        widget.activateWindow()
-        widget.show()
+        widget.exec()
 
 
 def prepare_roi(xpos, ypos):

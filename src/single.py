@@ -298,9 +298,10 @@ class SingleFile:
         self.events_display_results_filter_dist = False
         self.events_results_display_joc = False
         self.events_results_display_fit_joc = False
-        self.events_results_filter_dist_left = 0
-        self.events_results_filter_dist_right = 0
-        self.events_results_filter_dist_keep_middle = False
+        # Distance filter (see tools.event_filter_tools)
+        self.events_results_filter_dist_min = 0
+        self.events_results_filter_dist_max = 0
+        self.events_results_filter_dist_keep = False
         self.events_results_filter_slope_min = 0
         self.events_results_filter_slope_max = 0
 
