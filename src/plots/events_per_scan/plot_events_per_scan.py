@@ -33,6 +33,7 @@
 
 from ...tools import results_sorting
 from ... import shared
+from ...experiment import get_short_name
 from ..plot_main import MainPlot
 
 
@@ -52,12 +53,11 @@ class PlotEventsPerScan(MainPlot):
 
         res_util = results_sorting.GetResults(force_type="events_per_curve")
 
-        for i in range(len(shared.exp.results_list)):
-            data_id = shared.exp.results_list[i].data_id
-            if shared.exp.results_list[i].display:
-                res_util.load_data(data_id=data_id)
+        for i, result in enumerate(shared.exp.results_list):
+            if result.display:
+                res_util.load_data(data_id=result.data_id)
                 nbr = res_util.count_events_per_scan()
-                ev_per_scan.append([i, nbr, shared.exp.list[data_id].filename])
+                ev_per_scan.append([i, nbr, get_short_name(result)])
 
         xlabels_indexes = []
         xlabels_names = []
