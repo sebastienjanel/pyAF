@@ -114,6 +114,9 @@ class ChangeFilterWidget(QtWidgets.QDialog):
             nbr = len(self.get_selected_rows())
             where = "the " + str(nbr) + " selected row" + \
                 ("s" if nbr > 1 else "") + " of the table"
+        elif shared.exp.apply_to_all_data:
+            # Results tab with "apply to all" (see update_parents)
+            where = "all the files"
         else:
             where = shared.exp.current_data.filename
         self.LB_info = QtWidgets.QLabel("Applies to " + where + ".")
