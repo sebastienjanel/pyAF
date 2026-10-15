@@ -477,7 +477,9 @@ class ResultsSingleWidget(PYAFWidget):
                 "Name in the plots (edit it, empty: automatic name)")
             line_edit.editingFinished.connect(
                 lambda r=row_index, e=line_edit: self.short_name_edited(r, e))
-            self.tableWidget.setCellWidget(row_index, column_pos, line_edit)
+            # In a layout: keeps the width of the cell (see FullCellWidget)
+            self.tableWidget.setCellWidget(
+                row_index, column_pos, gui_tools.FullCellWidget(line_edit))
 
         elif name == "CB":
             # Checkbox (hide or display histogram)
@@ -496,7 +498,8 @@ class ResultsSingleWidget(PYAFWidget):
                 sumlist.addItem(str(group.name))
             sumlist.setCurrentIndex(result.group)
             sumlist.activated.connect(self.schedule_refresh)
-            self.tableWidget.setCellWidget(row_index, column_pos, sumlist)
+            self.tableWidget.setCellWidget(
+                row_index, column_pos, gui_tools.FullCellWidget(sumlist))
 
         elif name == "Mean":
             label_mean = QtWidgets.QLabel()
@@ -636,7 +639,7 @@ class ResultsSingleWidget(PYAFWidget):
             col = self.columns.get_column("Group")
             if col is not None and col.visibility:
                 cell = self.tableWidget.cellWidget(i, col.position)
-                result.group = cell.currentIndex()
+                result.group = cell.widget.currentIndex()
 
             # Checkboxes
             col = self.columns.get_column("CB")
@@ -885,7 +888,7 @@ class ResultsSingleWidget(PYAFWidget):
             shared.exp.results_list[row_index].group = index
             if column.visibility:
                 cell = self.tableWidget.cellWidget(row_index, column.position)
-                cell.setCurrentIndex(index)
+                cell.widget.setCurrentIndex(index)
         self.schedule_refresh()
 
     def batch_slices_change(self, force_index=None):
