@@ -63,9 +63,7 @@ class ResultsChooserWidget(PYAFWidget):
         self.list_choser.addItem("Loading rates")
         self.list_choser.addItem("Distance to Joc")
 
-        # Highlighted as the selected tab of the compute tab (style sheets),
-        # wide enough for the longest result type
-        self.list_choser.setObjectName("resultChooser")
+        # Wide enough for the longest result type
         self.list_choser.fit_to_contents()
 
         self.VL.addWidget(self.list_choser)
