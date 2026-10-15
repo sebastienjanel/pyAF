@@ -424,7 +424,19 @@ class PYAFButton(QtWidgets.QPushButton):
         metrics = self.fontMetrics()
         text_width = metrics.horizontalAdvance(self.text()) + \
             3 * metrics.xHeight() + 4
-        self.setFixedWidth(max(self.base_width, text_width))
+        QtWidgets.QPushButton.setFixedWidth(
+            self, max(self.base_width, text_width))
+
+    def setFixedWidth(self, width):
+        """The chosen width (enlarged if the text does not fit)."""
+        self.base_width = width
+        self.update_width()
+
+    def setFixedSize(self, *args):
+        """The chosen size (enlarged if the text does not fit)."""
+        super().setFixedSize(*args)
+        self.base_width = self.minimumWidth()
+        self.update_width()
 
     def changeEvent(self, event):
         """Adapt the width when the font changes (style sheets)."""
