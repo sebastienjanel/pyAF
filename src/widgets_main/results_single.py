@@ -117,6 +117,8 @@ class Columns:
                 if column.name == "CB":
                     # Remove layer for the first column so it will not overlap with checkbox.
                     name_list.append("")
+                elif column.name == "Sd":
+                    name_list.append("S.D.")
                 else:
                     name_list.append(column.name)
         return name_list

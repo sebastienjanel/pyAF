@@ -120,7 +120,7 @@ class ResultsExperimentWidget(PYAFWidget):
         self.tableWidget.horizontalHeader().setHighlightSections(False)
         policy = QtCore.Qt.ScrollBarAlwaysOff
         self.tableWidget.setHorizontalScrollBarPolicy(policy)
-        labels = ["", "Condition", "Sample size", "Mean", "Median", "Sd", "Mode"]
+        labels = ["", "Condition", "Sample size", "Mean", "Median", "S.D.", "Mode"]
         custom_header = QCheckableHeader(QtCore.Qt.Horizontal, self.tableWidget)
         self.tableWidget.setHorizontalHeader(custom_header)
         self.tableWidget.setHorizontalHeaderLabels(labels)
