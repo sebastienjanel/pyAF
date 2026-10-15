@@ -572,13 +572,13 @@ class GetResults:
         return numpy.array(array)
 
     def prepare_rupture_force2(self):
-        """Get the rupture force from the events."""
+        """Get the largest event force of each curve (the curves without
+        events have no value)."""
         dt = self.data
 
         if dt.events_calculated is False:
             return []
 
-        tp = "events_rupture_force"
         array = []
         for i in range(dt.nbr_pixels_x):
             for j in range(dt.nbr_pixels_y):
@@ -588,9 +588,11 @@ class GetResults:
                         inlist = math_tools.in_list(roi_vals, [i, j])
 
                     if self.roi_id == 0 or inlist:
-                        force = self.get_data_from_curve(i, j, tp)
+                        forces = self.get_data_from_curve(
+                            i, j, "forces_per_curve")
 
-                        array.append(force)
+                        if forces:
+                            array.append(max(forces))
 
             if widgets_list.widget_progressbar is not None:
                 widgets_list.widget_progressbar.update()
@@ -640,20 +642,6 @@ class GetResults:
 
         else:
             return numpy.array(array) * 1e9  # in nm
-
-    def count_events_per_scan(self):
-        """This function counts the number of events per scan.
-
-        It parses each curve with the count_events_per_curve function and
-        returns the value.
-        """
-        val = 0
-        for i in range(self.data.nbr_pixels_x):
-            for j in range(self.data.nbr_pixels_y):
-                nbr = self.get_data_from_curve(i, j, "events_per_curve")
-                val = val + nbr
-
-        return val
 
     def prepare_loading_rates(self):
         """Get the loading rates."""
