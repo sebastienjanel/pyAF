@@ -74,18 +74,10 @@ single_values = None
 groups_values = None
 conditions_values = None
 
-single_factors = None
-groups_factors = None
 conditions_factors = None
 
-single_frequencies = None
-groups_frequencies = None
 conditions_frequencies = None
 
-single_pdfs_x = None
-single_pdfs_y = None
-groups_pdfs_x = None
-groups_pdfs_y = None
 conditions_pdfs_x = None
 conditions_pdfs_y = None
 

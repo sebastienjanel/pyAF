@@ -83,25 +83,8 @@ class RenameGroupsWidget(PYAFWidget):
             widgets_list.widget_results_single.reset_table()
             widgets_list.widget_results_single.update_widget()
 
-            tw = widgets_list.widget_results_groups.tableWidget
-
-            # Ensure TableWidget is initialized
-            if tw is None:
-                print("Error: TableWidget is not initialized.")
-                return
-
-            # Ensure table has enough rows
-            if tw.rowCount() < len(shared.exp.groups_list) - 1:
-                tw.setRowCount(len(shared.exp.groups_list) - 1)
-
-            # Update the names in the histogram's group's list
-            for i in range(1, len(shared.exp.groups_list)):
-                name = shared.exp.groups_list[i].name
-                if tw.item(i - 1, 1) is None:
-                    tw.setItem(i - 1, 1, QtWidgets.QTableWidgetItem())  # Create a new item
-                tw.item(i - 1, 1).setText(name)
-
-            # Update the groups plot
+            # Update the names of the table and of the plot of the groups
+            widgets_list.widget_results_groups.reset_table()
             widgets_list.widget_results_groups.update_MPL()
 
             # Close widget

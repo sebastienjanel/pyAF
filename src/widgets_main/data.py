@@ -717,13 +717,6 @@ class DataWidget(PYAFWidget):
                     del shared.exp.results_list[i]
                     del shared.single_data[i]
                     del shared.single_values[i]
-                    if shared.single_factors is not None:
-                        del shared.single_factors[i]
-                    if shared.single_factors is not None:
-                        del shared.single_factors[i]
-                    if shared.single_pdfs_x is not None:
-                        del shared.single_pdfs_x[i]
-                        del shared.single_pdfs_y[i]
                     widgets_list.widget_results_single.tableWidget.removeRow(i)
 
             widgets_list.widget_progressbar.update()

@@ -185,8 +185,11 @@ class ResultsExperimentWidget(PYAFWidget):
         # Buttons for calculations/actions on histograms
         self.HL_hist_buttons = QtWidgets.QHBoxLayout()
 
-        name = "widget_results_chooser_groups"
+        name = "widget_results_chooser_experiment"
         self.widget_result_chooser = ResultsChooserWidget(self, name)
+
+        # Density functions of the conditions, for their histograms
+        self.BT_get_pdf = PYAFButton(self, "get_pdf", "Get PDF")
 
         # self.list_values = PYAFComboBox(self, "values")
         # self.list_values.addItem("Values")
@@ -194,6 +197,7 @@ class ResultsExperimentWidget(PYAFWidget):
 
         self.HL_hist_buttons.addWidget(self.widget_result_chooser)
         # self.HL_hist_buttons.addWidget(self.list_values)
+        self.HL_hist_buttons.addWidget(self.BT_get_pdf)
         self.HL_hist_buttons.addStretch(1)
 
         # Buttons for calculations/actions on stats
@@ -242,8 +246,8 @@ class ResultsExperimentWidget(PYAFWidget):
         No fetch_group_data() here, it would overwrite the mode value when
         doing get_pdf in single results.
         """
-        widgets_list.widget_results_chooser_groups.update_widget()
-        widgets_list.widget_results_hist_options_groups.update_widget()
+        widgets_list.widget_results_chooser_experiment.update_widget()
+        self.widget_options.update_widget()
         self.update_GUI("all")
         self.update_MPL()
 
@@ -425,6 +429,10 @@ class ResultsExperimentWidget(PYAFWidget):
 
         if button == "auto_group":
             self.auto_group_conditions()
+
+        if button == "get_pdf":
+            stat_tools.get_pdf()
+            self.update_widget()
 
     def update_GUI(self, what):
         """Update the GUI."""

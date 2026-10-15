@@ -724,6 +724,7 @@ class ResultsSingleWidget(PYAFWidget):
                 widgets_list.widget_events_per_scan.raise_()
 
         elif button == "dfs":
+            shared.exp.dfs_mode = "single"
             if widgets_list.widget_dfs is None:
                 # Create new widget
                 DFSWidget(self)
@@ -732,6 +733,7 @@ class ResultsSingleWidget(PYAFWidget):
                 widgets_list.widget_dfs.resize(350, 400)
                 widgets_list.widget_dfs.show()
             else:
+                widgets_list.widget_dfs.update_widget()
                 # Bring to front
                 widgets_list.widget_dfs.activateWindow()
                 widgets_list.widget_dfs.raise_()

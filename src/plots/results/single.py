@@ -30,7 +30,8 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-"""Plots the results of the single files as violins (one per file)."""
+"""Plots the results of the single files (one violin per file) or of the
+groups (one violin per group)."""
 
 import matplotlib
 import numpy
@@ -59,6 +60,9 @@ BOX_WIDTH = 0.12
 class PlotSingleResults(PlotResults):
     """Plots the results of the displayed files, one violin per file."""
 
+    # "single" (plots tab) or "groups" (grouped plots tab)
+    MODE = "single"
+
     def __init__(self, parent):
         super().__init__(parent)
 
@@ -67,13 +71,14 @@ class PlotSingleResults(PlotResults):
         self.ylabel = self.xlabel
         self.xlabel = None
 
-        self.names, self.values, self.colors = get_displayed_values()
+        self.names, self.values, self.colors = \
+            get_displayed_values(self.MODE)
 
         self.plot_fig()
 
     def plot_fig(self):
         """Draw the violins."""
-        opts = get_violin_options(shared.exp)
+        opts = get_violin_options(shared.exp, self.MODE)
         ax = self.axes
 
         if self.parent.single and self.names:
@@ -87,7 +92,11 @@ class PlotSingleResults(PlotResults):
                              opts["background"] == "White")
 
         if not self.names:
-            ax.text(0.5, 0.5, "Tick some files in the table to display them",
+            if self.MODE == "groups":
+                text = "Put files in groups (Plots tab) and tick the groups"
+            else:
+                text = "Tick some files in the table to display them"
+            ax.text(0.5, 0.5, text,
                     ha="center", va="center", transform=ax.transAxes)
             ax.set_xticks([])
             ax.set_yticks([])
@@ -275,23 +284,34 @@ def van_der_corput(n, base=2):
     return value
 
 
-def get_displayed_values():
-    """Values of the files ticked in the results table.
+def get_displayed_values(mode="single"):
+    """Values of the files (mode "single") or of the groups (mode "groups")
+    ticked in their table.
 
-    Returns the names, the values and the colors of the files. For the
-    loading rates, the values are the loading rates (the forces are not
-    used).
+    Returns the names, the values and the colors. For the loading rates,
+    the values are the loading rates (the forces are not used).
     """
     names = []
     values = []
     colors = []
 
-    if shared.single_data is None:
+    if mode == "groups":
+        all_data = shared.groups_data
+        # The first group is the None group (the files without group)
+        items = shared.exp.groups_list
+        first = 1
+    else:
+        all_data = shared.single_data
+        items = shared.exp.results_list
+        first = 0
+
+    if all_data is None:
         return names, values, colors
 
-    for i, data in enumerate(shared.single_data):
-        result = shared.exp.results_list[i]
-        if not result.display:
+    for i in range(first, min(len(all_data), len(items))):
+        data = all_data[i]
+        item = items[i]
+        if not item.display:
             continue
 
         if shared.exp.results_type == "loading_rates":
@@ -304,8 +324,11 @@ def get_displayed_values():
         if data.size == 0:
             continue
 
-        names.append(get_short_name(result))
+        if mode == "groups":
+            names.append(item.name)
+        else:
+            names.append(get_short_name(item))
         values.append(data)
-        colors.append(result.color)
+        colors.append(item.color)
 
     return names, values, colors

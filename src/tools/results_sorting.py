@@ -220,25 +220,27 @@ class GetResults:
                 if widgets_list.widget_progressbar is not None:
                     widgets_list.widget_progressbar.update()
 
+        # No values: NaN (the mode is computed with update_groups_modes)
+        val = numpy.nan
         if self.type != "loading_rates":
             for i in range(len(groups)):
                 if groups[i]:
                     values.append([numpy.mean(groups[i]),
                                    numpy.median(groups[i]),
-                                   numpy.std(groups[i]), 0])
+                                   numpy.std(groups[i]), val])
                 else:
-                    values.append([0, 0, 0, 0])
+                    values.append([val, val, val, val])
 
         elif self.type == "loading_rates":
             for i in range(len(groups)):
                 if groups_forces[i]:
                     values.append([numpy.mean(groups_lr[i]),
                                    numpy.median(groups_lr[i]),
-                                   numpy.std(groups_lr[i]), 0])
+                                   numpy.std(groups_lr[i]), val])
 
                     groups[i] = numpy.array([groups_forces[i], groups_lr[i]])
                 else:
-                    values.append([0, 0, 0, 0])
+                    values.append([val, val, val, val])
         # print(f"Groups:{[groups, values]}")
         return [groups, values]
 

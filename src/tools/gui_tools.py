@@ -391,6 +391,24 @@ class CenteredCellRadioButton(QtWidgets.QWidget):
         self.setLayout(layout)
 
 
+class FullCellWidget(QtWidgets.QWidget):
+    """A widget filling its cell of a tablewidget.
+
+    A widget put directly in a cell takes the size of its contents when it
+    is added to a visible table: in a layout, it keeps the size of the cell.
+    """
+
+    def __init__(self, widget):
+        super().__init__()
+
+        self.widget = widget
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.setLayout(layout)
+
+
 class CenteredCellComboBox(QtWidgets.QWidget):
     """A centered drop down list for the tablewidgets."""
 

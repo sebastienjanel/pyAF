@@ -30,14 +30,13 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-"""Options of the violin plot of the results of the single files."""
+"""Options of the violin plots of the plots and grouped plots tabs."""
 
 from qtpy import QtWidgets
 from ... import consts
 from ... import shared
 from ... import widgets_list
 from ... import experiment
-from ...experiment import get_violin_options as get_exp_violin_options
 from ...tools import misc_tools, palettes, stat_tools
 from ...tools.gui_tools import PYAFButton, PYAFCheckBox, PYAFComboBox, \
     PYAFInput
@@ -55,18 +54,19 @@ ZEROS_TOOLTIP = (
     "are removed.")
 
 
-def get_violin_options():
-    """Options of the violin plot of the current experiment."""
-    return get_exp_violin_options(shared.exp)
-
-
 class ViolinOptionsWidget(PYAFWidget):
-    """Options of the violin plot of the plots tab."""
+    """Options of the violin plot of the plots tab (mode "single") or of the
+    grouped plots tab (mode "groups").
 
-    def __init__(self, parent, name):
+    The parent has the table of the rows (tableWidget), the plot
+    (MPL_canva), update_MPL and update_GUI.
+    """
+
+    def __init__(self, parent, name, mode="single"):
         super().__init__(parent, name)
 
         self.parent = parent
+        self.mode = mode
 
         box = QtWidgets.QGroupBox("Violin plot")
         form = QtWidgets.QFormLayout()
@@ -113,7 +113,7 @@ class ViolinOptionsWidget(PYAFWidget):
         self.list_palette.setToolTip(
             "Palettes of ggplot2: its default (hue), viridis, Okabe-Ito\n"
             "(colorblind safe), the journals' palettes of ggsci and the\n"
-            "ColorBrewer ones. Custom: the colors chosen file by file.")
+            "ColorBrewer ones. Custom: the colors chosen row by row.")
 
         self.BT_color = PYAFButton(self, "rows_color", "Rows...", size=60)
         self.BT_color.setToolTip(
@@ -143,7 +143,7 @@ class ViolinOptionsWidget(PYAFWidget):
 
         self.CB_counts = PYAFCheckBox(self, "show_counts", "Number of values")
         self.CB_counts.setToolTip(
-            "Display the number of values under the names of the files")
+            "Display the number of values under the names")
 
         self.CB_zeros = PYAFCheckBox(self, "zeros", "Remove \u2264 0")
         self.CB_zeros.setToolTip(ZEROS_TOOLTIP)
@@ -186,7 +186,7 @@ class ViolinOptionsWidget(PYAFWidget):
 
     def update_widget(self):
         """Display the current options."""
-        options = get_violin_options()
+        options = self.get_options()
         self.list_inner.setCurrentIndex(INNER.index(options["inner"]))
         self.list_points.setCurrentIndex(POINTS.index(options["points"]))
         self.list_density_norm.setCurrentIndex(
@@ -209,7 +209,7 @@ class ViolinOptionsWidget(PYAFWidget):
 
     def list_updated(self, name):
         """Called when a list is changed."""
-        options = get_violin_options()
+        options = self.get_options()
         if name == "inner":
             options["inner"] = INNER[self.list_inner.currentIndex()]
         elif name == "points":
@@ -219,8 +219,12 @@ class ViolinOptionsWidget(PYAFWidget):
                 DENSITY_NORM[self.list_density_norm.currentIndex()]
         elif name == "palette":
             options["palette"] = self.list_palette.currentText()
-            experiment.apply_palette(shared.exp)
+            experiment.apply_palette(shared.exp, self.mode)
         self.replot()
+
+    def get_options(self):
+        """Options of the violin plot."""
+        return experiment.get_violin_options(shared.exp, self.mode)
 
     def button_clicked(self, name):
         """Called when a button is clicked."""
@@ -229,31 +233,31 @@ class ViolinOptionsWidget(PYAFWidget):
 
     def change_rows_color(self):
         """Ask for a color for the rows selected in the table."""
-        table = widgets_list.widget_results_single.tableWidget
+        table = self.parent.tableWidget
         rows = sorted(index.row()
                       for index in table.selectionModel().selectedRows())
         if not rows:
             QtWidgets.QMessageBox.information(
                 self, "Color of the rows",
-                "Select the rows of the files in the table first (click on "
-                "a row, Shift or Cmd/Ctrl + click for several rows).")
+                "Select the rows in the table first (click on a row, Shift "
+                "or Cmd/Ctrl + click for several rows).")
             return
         if consts.UNIT_TESTING:
             return
-        color = misc_tools.ask_user_for_color(
-            shared.exp.results_list[rows[0]].color)
+        items = experiment.get_plotted_items(shared.exp, self.mode)
+        color = misc_tools.ask_user_for_color(items[rows[0]].color)
         if color is False:
             return
         for row in rows:
-            shared.exp.results_list[row].color = color
+            items[row].color = color
         # The colors do not follow a palette anymore
-        get_violin_options()["palette"] = palettes.CUSTOM
+        self.get_options()["palette"] = palettes.CUSTOM
         self.update_widget()
         self.replot()
 
     def checkbox_clicked(self, name):
         """Called when a checkbox is clicked."""
-        options = get_violin_options()
+        options = self.get_options()
         if name == "cut":
             options["cut"] = self.CB_cut.isChecked()
         elif name == "log_scale":
@@ -268,8 +272,7 @@ class ViolinOptionsWidget(PYAFWidget):
             options["y_mode"] = "manual" if manual else "auto"
             if manual:
                 # Start from the current limits of the plot
-                ymin, ymax = widgets_list.widget_results_single.MPL_canva \
-                    .canvas.axes.get_ylim()
+                ymin, ymax = self.parent.MPL_canva.canvas.axes.get_ylim()
                 options["y_min"], options["y_max"] = ymin, ymax
             self.update_widget()
         elif name == "zeros":
@@ -281,13 +284,15 @@ class ViolinOptionsWidget(PYAFWidget):
 
     def input_updated(self, name):
         """Called when an input is changed."""
-        options = get_violin_options()
+        options = self.get_options()
         if name == "bw_adjust":
             options["bw_adjust"] = self.IN_bw_adjust.get_float_value()
             # The modes of the table use the same density estimate
-            if shared.single_values is not None:
+            if self.mode == "groups":
+                stat_tools.update_groups_modes()
+            else:
                 stat_tools.update_single_modes()
-                widgets_list.widget_results_single.update_GUI("table_labels")
+            self.parent.update_GUI("table_labels")
         elif name == "y_min":
             options["y_min"] = self.IN_y_min.get_float_value()
         elif name == "y_max":
@@ -296,4 +301,4 @@ class ViolinOptionsWidget(PYAFWidget):
 
     def replot(self):
         """Redraw the violins with the new options."""
-        widgets_list.widget_results_single.update_MPL()
+        self.parent.update_MPL()

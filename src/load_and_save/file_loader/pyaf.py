@@ -206,13 +206,8 @@ class LoaderPYAF:
                 nm = " (from " + fname + ")"
                 shared.exp.groups_list[group_max_id + i - 1].name += nm
 
-                # - 2 because : -1 is because we start at 1 (skip None group)
-                # The other -1 is because insertRow needs the position of the
-                # last row.
-                if wl.widget_results_groups is not None:
-                    pos = group_max_id + i - 2
-                    wl.widget_results_groups.tableWidget.insertRow(pos)
-                    wl.widget_results_groups.add_row_in_tablewidget_groups(pos)
+            if wl.widget_results_groups is not None:
+                wl.widget_results_groups.reset_table()
 
         # Create the datasets
         for i in range(more_offset, more_offset + nbr_files, 1):

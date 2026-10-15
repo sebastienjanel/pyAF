@@ -244,6 +244,10 @@ def change_color():
                 elif tab == 4:
                     # Skip group 0 == None group
                     shared.exp.groups_list[row_id + 1].color = color
+                    # The colors do not follow a palette anymore
+                    experiment.get_violin_options(
+                        shared.exp, "groups")["palette"] = palettes.CUSTOM
+                    widgets_list.widget_violin_options_groups.update_widget()
 
         # Update the plot
         if tab == 3:

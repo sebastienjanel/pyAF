@@ -195,8 +195,10 @@ class Experiment:
 
         self.hist_single_plot_selected = "hist"
 
-        # Options of the violin plot of the single results (plots tab)
+        # Options of the violin plots of the single results (plots tab) and
+        # of the groups (grouped plots tab)
         self.violin_single = default_violin_options()
+        self.violin_groups = default_violin_options()
         self.hist_groups_plot_selected = "hist"
 
         # Selected flatten order
@@ -384,10 +386,14 @@ def default_violin_options():
         "background": "Theme"}           # Theme or White
 
 
-def get_violin_options(exp):
-    """Options of the violin plot of an experiment (the defaults for the
-    missing ones, e.g. for the files saved before they were added)."""
-    saved = getattr(exp, "violin_single", None)
+def get_violin_options(exp, mode="single"):
+    """Options of a violin plot of an experiment (the defaults for the
+    missing ones, e.g. for the files saved before they were added).
+
+    mode is "single" (plots tab) or "groups" (grouped plots tab).
+    """
+    attribute = "violin_" + mode
+    saved = getattr(exp, attribute, None)
     options = default_violin_options()
     if saved is None:
         # Files saved before the violins: keep the colors of the files
@@ -396,19 +402,28 @@ def get_violin_options(exp):
     # Names of the first versions
     options["points"] = {"Strip": "Jitter", "Swarm": "Beeswarm"}.get(
         options["points"], options["points"])
-    exp.violin_single = options
+    setattr(exp, attribute, options)
     return options
 
 
-def apply_palette(exp):
-    """Sets the colors of the results with the palette of the violin plot
-    (nothing for the custom colors)."""
-    name = get_violin_options(exp)["palette"]
+def get_plotted_items(exp, mode="single"):
+    """Results (plots tab) or groups (grouped plots tab, without the None
+    group) of an experiment: the rows of the table."""
+    if mode == "groups":
+        return exp.groups_list[1:]
+    return exp.results_list
+
+
+def apply_palette(exp, mode="single"):
+    """Sets the colors of the results or of the groups with the palette of
+    their violin plot (nothing for the custom colors)."""
+    name = get_violin_options(exp, mode)["palette"]
     if name == palettes.CUSTOM:
         return
-    colors = palettes.get_colors(name, len(exp.results_list))
-    for result, color in zip(exp.results_list, colors):
-        result.color = color
+    items = get_plotted_items(exp, mode)
+    colors = palettes.get_colors(name, len(items))
+    for item, color in zip(items, colors):
+        item.color = color
 
 
 class ConditionGroup:
