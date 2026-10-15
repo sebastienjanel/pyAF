@@ -135,7 +135,8 @@ class LoaderPYAF:
         if not self.load_more:
             # Load general prefs (only for the first load)
             # In load more, the preferences from the first .pyAF file are kept.
-            do_not_copy = ["filenames_list", "results_list"]
+            # The theme is a preference of the application, not of the file
+            do_not_copy = ["filenames_list", "results_list", "current_theme"]
             # Some times while decoding general_pref they can be decoded into bytes.
             # This will cause an error.
             for key in list(general_prefs.keys()):

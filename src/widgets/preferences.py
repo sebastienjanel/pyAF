@@ -41,7 +41,7 @@ from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFComboBox
-from ..gui_styles.theme_handler import theme_handler
+from ..gui_styles.theme_handler import set_theme
 from .. import widgets_list
 
 
@@ -275,8 +275,8 @@ class PreferencesWidget(PYAFWidget):
             selected_theme = shared.exp.theme_list[self.list_theme.currentIndex()]
             # Set selected theme
             shared.exp.current_theme = selected_theme
-            # Apply selected theme
-            theme_handler(selected_theme)
+            # Apply selected theme (kept for the next launches)
+            set_theme(selected_theme)
             # Update plots to apply plot theme
             self.update_plots()
 

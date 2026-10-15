@@ -4,7 +4,8 @@ Python application for fitting Hertz model to different force curves
 from qtpy.QtWidgets import QApplication
 import os
 import sys
-from qtpy.QtCore import QDir, QEvent, QFile, QObject, QTextStream
+from qtpy.QtCore import QDir, QEvent, QFile, QObject, QSettings, \
+    QTextStream
 from qtpy.QtWidgets import QGroupBox
 from ..tools.misc_tools import get_resource_path
 import matplotlib.pyplot as plt
@@ -27,6 +28,19 @@ def curve_color(name):
     """Colour of a curve (approach, retraction, pause or modulation) for
     the current theme."""
     return CURVE_COLORS.get(current_theme, CURVE_COLORS["Dark"])[name]
+
+
+def saved_theme():
+    """Theme chosen in the preferences (kept between the launches of pyAF),
+    dark at the first launch."""
+    theme = QSettings().value("theme", "Dark")
+    return theme if theme in ("Light", "Dark") else "Dark"
+
+
+def set_theme(theme):
+    """Apply a theme and keep it for the next launches."""
+    theme_handler(theme)
+    QSettings().setValue("theme", theme)
 
 
 def theme_handler(theme):

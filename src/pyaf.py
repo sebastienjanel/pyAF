@@ -153,7 +153,7 @@ if multiprocessing.current_process().name == "MainProcess":
     from src.widgets.plugins import PluginsWidget
     from src.widgets.preferences import PreferencesWidget
     from src.utils import discarding
-    from src.gui_styles.theme_handler import theme_handler
+    from src.gui_styles.theme_handler import theme_handler, saved_theme
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -1197,7 +1197,8 @@ def main(app=None, files=None):
     # Init the GUI for the main window
     if app is None:
         app = QtWidgets.QApplication(["pyAF"])
-        theme_handler("Dark")
+        # Theme of the preferences (dark at the first launch)
+        theme_handler(saved_theme())
 
     if not consts.AUTOLOAD:
         value = True

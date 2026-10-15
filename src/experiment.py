@@ -294,8 +294,10 @@ class Experiment:
 
         # Available Themes
         self.theme_list = ["Light", "Dark"]
-        # Light theme is the default
-        self.current_theme = "Dark"
+        # Theme of the application (see gui_styles.theme_handler): a
+        # preference of pyAF, not saved with the experiments
+        from .gui_styles import theme_handler
+        self.current_theme = theme_handler.current_theme
 
     @property
     def current_data(self):
