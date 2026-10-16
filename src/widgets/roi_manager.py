@@ -69,7 +69,7 @@ class RoiManagerWidget(PYAFWidget):
         self.TW.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.TW.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.TW.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        labels = ["", "", "", "Pixels", "Area [nm^2]", "Color", ""]
+        labels = ["", "", "", "Pixels", "Area [µm²]", "Color", ""]
         self.TW.setHorizontalHeaderLabels(labels)
         self.TW.setFixedWidth(460)
         self.TW.setColumnWidth(0, 40)
@@ -105,6 +105,11 @@ class RoiManagerWidget(PYAFWidget):
             "corrected, not the computations. Define the ROI as substrate\n"
             "first.")
         self.BT_discard = PYAFButton(self, "discard", "Discard from ROI")
+        self.BT_volume = PYAFButton(self, "volume", "Compute volume")
+        self.BT_volume.setToolTip(
+            "Volume between the zero-force topography and the plane of the\n"
+            "selected substrate ROI, over the whole map. Define the ROI as\n"
+            "substrate first.")
 
         self.VL_options.addWidget(self.input_size)
         self.VL_options.addWidget(self.radiobutton_square)
@@ -112,10 +117,11 @@ class RoiManagerWidget(PYAFWidget):
         self.VL_options.addWidget(self.radiobutton_dot)
         self.VL_options.addWidget(self.button_add)
         self.VL_options.addWidget(self.button_remove)
+        self.VL_options.addWidget(self.BT_discard)
         self.VL_options.addWidget(self.button_invert)
         self.VL_options.addWidget(self.BT_glass)
         self.VL_options.addWidget(self.BT_planefit)
-        self.VL_options.addWidget(self.BT_discard)
+        self.VL_options.addWidget(self.BT_volume)
         self.VL_options.addStretch(1)
 
         self.HL.addWidget(self.TW)
@@ -300,6 +306,9 @@ class RoiManagerWidget(PYAFWidget):
             self.update_widget()
             widgets_list.widget_compute.update_GUI("roi_list_height_corr")
 
+        elif button == "volume":
+            self.show_volume(data)
+
         elif button == "planefit":
             rows = [item.row()
                     for item in self.TW.selectionModel().selectedRows()]
@@ -334,6 +343,35 @@ class RoiManagerWidget(PYAFWidget):
         if widgets_list.widget_multimeshgrids is not None:
             widgets_list.widget_multimeshgrids.update_widget()
         self.update_3D(data)
+
+    def show_volume(self, data):
+        """Computes the volume above the selected substrate ROI and displays
+        it."""
+        rows = [item.row() for item in self.TW.selectionModel().selectedRows()]
+        if not rows or data.roi_list[rows[0]].glass_coeffs is None:
+            return
+        res = planefit.get_volume(data, data.roi_list[rows[0]])
+        x_size, y_size = res["pixel_size"]
+        title = ("Volume relative to the plane of the substrate ROI " +
+                 str(rows[0] + 1))
+        text = ("Zero-force topography, whole map\n\n"
+                "Net volume: %.4g µm³\n"
+                "Above the plane: %.4g µm³\n"
+                "Below the plane: %.4g µm³\n"
+                "Maximum height: %.4g nm\n\n"
+                "%d pixels of %.4g × %.4g nm") % (
+                    res["net"] * 1e-9, res["above"] * 1e-9,
+                    res["below"] * 1e-9, res["max_height"], res["pixels"],
+                    x_size, y_size)
+        if res["no_topography"]:
+            text += ("\n%d pixels without topography (no contact point) are "
+                     "not counted") % res["no_topography"]
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle("Volume - " + data.filename)
+        box.setText(title)
+        box.setInformativeText(text)
+        box.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        box.exec()
 
     @staticmethod
     def update_3D(data):
@@ -404,7 +442,7 @@ class RoiManagerWidget(PYAFWidget):
         # Add the rows to the tablewidget
         for i in range(len(data.roi_list)):
             self.TW.insertRow(i)
-            self.TW.setRowHeight(i, 25)
+            self.TW.setRowHeight(i, 32)
 
             # Index
             label = QtWidgets.QLabel()
@@ -438,7 +476,8 @@ class RoiManagerWidget(PYAFWidget):
             one_area = xsize * ysize
             label = QtWidgets.QLabel()
             label.setFont(self.parent.parent.smallfont)
-            label.setText(str(len(data.roi_list[i].values) * one_area))
+            area = len(data.roi_list[i].values) * one_area * 1e-6
+            label.setText("%.4g" % area)
             self.TW.setCellWidget(i, 4, gui_tools.CenteredCellwidget(label))
 
             # Color
@@ -447,7 +486,8 @@ class RoiManagerWidget(PYAFWidget):
             for j in range(len(data.roi_color_names)):
                 colorlist.addItem(data.roi_color_names[j])
             colorlist.setCurrentIndex(data.roi_list[i].color)
-            self.TW.setCellWidget(i, 5, colorlist)
+            # In a layout, to keep the size of the cell
+            self.TW.setCellWidget(i, 5, gui_tools.FullCellWidget(colorlist))
 
             # Glass
             label = QtWidgets.QLabel()
@@ -518,6 +558,7 @@ class RoiManagerWidget(PYAFWidget):
             self.BT_planefit.setText(
                 "Remove planefit" if applied else "Planefit")
             self.BT_planefit.setEnabled(applied or substrate)
+            self.BT_volume.setEnabled(substrate and data.stiffness_calculated)
 
     def input_updated(self, name):
         """Called when an input is updated."""
@@ -533,7 +574,7 @@ class RoiManagerWidget(PYAFWidget):
         if name == "colorlist":
             for i in range(len(data.roi_list)):
                 cell = self.TW.cellWidget(i, 5)
-                data.roi_list[i].color = cell.currentIndex()
+                data.roi_list[i].color = cell.widget.currentIndex()
             self.parent.MPL_canvas1.canvas.update_blit("all")
 
             update_roi_on_multimeshgrids_widget()

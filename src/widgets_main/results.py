@@ -339,9 +339,9 @@ class ResultsWidget(PYAFWidget):
 
         self.HL_buttons = QtWidgets.QHBoxLayout()
         self.HL_buttons.addWidget(self.BT_multi_meshgrids)
+        self.HL_buttons.addWidget(self.BT_roi_manager)
         self.HL_buttons.addWidget(self.BT_profiles)
         self.HL_buttons.addWidget(self.BT_slices)
-        self.HL_buttons.addWidget(self.BT_roi_manager)
         self.HL_buttons.addWidget(self.BT_display_in_3D)
         self.HL_buttons.addWidget(self.BT_used_parameters)
         self.HL_buttons.addStretch(1)

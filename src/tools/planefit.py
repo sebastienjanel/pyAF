@@ -143,3 +143,33 @@ def reset_color_scales(data):
         if data.stiffness_calculated and data.max_topo is not None:
             opts = data.color_opts_topo
             opts[1], opts[2], opts[3] = 0, data.max_topo, data.max_topo / 2.0
+
+
+def get_volume(data, roi):
+    """Volume between the zero-force topography and the plane of a substrate
+    ROI (fitted when the ROI was defined as substrate), over the whole map.
+
+    Returns a dict (volumes in nm^3): the net volume (heights above and
+    below the plane), the volumes above and below the plane, the number of
+    pixels used and the number of pixels without topography (no contact
+    point: not counted).
+    """
+    x_size = data.scan_size_x / data.nbr_pixels_x
+    y_size = data.scan_size_y / data.nbr_pixels_y
+    topo = numpy.array(data.topography, dtype=float)
+    grid_x, grid_y = numpy.meshgrid(
+        numpy.arange(topo.shape[0]) * x_size,
+        numpy.arange(topo.shape[1]) * y_size, indexing="ij")
+    plane = math_tools.polyval2d(grid_x, grid_y,
+                                 numpy.asarray(roi.glass_coeffs, dtype=float))
+    heights = topo - plane
+    finite = numpy.isfinite(heights)
+    heights = heights[finite]
+    area = x_size * y_size
+    return {"net": float(heights.sum() * area),
+            "above": float(heights[heights > 0].sum() * area),
+            "below": float(heights[heights < 0].sum() * area),
+            "pixels": int(heights.size),
+            "no_topography": int((~finite).sum()),
+            "max_height": float(heights.max()) if heights.size else numpy.nan,
+            "pixel_size": (x_size, y_size)}
