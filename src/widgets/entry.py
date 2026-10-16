@@ -146,6 +146,8 @@ class EntryWidget(QtWidgets.QDialog):
         #path = os.path.normpath(self.im_path + "/fix.png")
         im = numpy.array(Image.open(get_resource_path("fix.png")).convert("RGBA"))
         self.labelfixed.setPixmap(misc_tools.get_pixmap(im))
+        # Width of the image (fixed and changing parts)
+        self.image_width = im.shape[1] + self.image_list[0].shape[1]
 
         self.VL_entry.addLayout(self.HL_image)
 
@@ -231,6 +233,18 @@ class EntryWidget(QtWidgets.QDialog):
         Is called at launch.
         """
         self.logger.debug("EntryWidget init first UI")
+
+        # Article to cite, below the image
+        doi = "https://doi.org/10.1039/C8NR08955H"
+        label_cite = QtWidgets.QLabel(
+            "When using the program, cite the original article: "
+            "<i>Stiffness tomography of eukaryotic intracellular "
+            "compartments by atomic force microscopy</i> (Nanoscale, 2019, "
+            "11, 10320-10328).<br>DOI <a href=\"" + doi + "\">" + doi + "</a>")
+        label_cite.setWordWrap(True)
+        label_cite.setOpenExternalLinks(True)
+        label_cite.setFixedWidth(self.image_width)
+        self.VL_entry.addWidget(label_cite)
 
         # Define loading button and mode
         HL_mode = QtWidgets.QHBoxLayout()
