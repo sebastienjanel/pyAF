@@ -430,15 +430,12 @@ class RoiManagerWidget(PYAFWidget):
 
     def update_results(self):
         """Update the results in the results tables."""
-        if self.parent.parent.tabs.currentIndex() != 3:
-            # Update later if we go on results tab
+        if self.parent.parent.tabs.currentIndex() in (3, 4):
+            # A plots tab is displayed: recompute the values now (the values
+            # are recomputed when going to the plots tabs from the others)
+            widgets_list.widget_results_single.schedule_refresh()
+        else:
             self.parent.parent.update_results = True
-        elif self.parent.parent.tabs.currentIndex() == 3:
-            # We are on the results tab, we should update directly
-            widgets_list.widget_results_single.update_widget()
-        elif self.parent.parent.tabs.currentIndex() == 4:
-            # We are on the results tab, we should update directly
-            widgets_list.widget_results_groups.update_widget()
 
     def checkbox_clicked(self, checkbox, cb_id):
         """Called when a checkbox is clicked."""
