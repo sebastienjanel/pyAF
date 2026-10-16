@@ -467,8 +467,9 @@ class ComputeWidget(PYAFWidget):
         self.list_roi_glass.setFixedSize(100, 26)  # Fixed width to prevent stretching
 
         # Noise floor input (Label + Input Box)
-        self.label_noise_floor = QtWidgets.QLabel("Noise floor [nm]:")  # Label for noise floor
-        self.IN_noise_floor = PYAFInput(self, "noise_floor", "", width=50)  # Input box for noise floor
+        self.label_noise_floor = QtWidgets.QLabel(
+            "Noise floor: discard the first")  # Label for noise floor
+        self.IN_noise_floor = PYAFInput(self, "noise_floor", "[nm]", width=50)  # Input box for noise floor
         self.IN_noise_floor.input.setValidator(
             misc_tools.validator("UF_or_empty"))  # Validation
 
