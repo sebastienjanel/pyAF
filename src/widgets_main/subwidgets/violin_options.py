@@ -69,6 +69,7 @@ class ViolinOptionsWidget(PYAFWidget):
         self.mode = mode
 
         box = QtWidgets.QGroupBox("Violin plot")
+        self.box = box
         form = QtWidgets.QFormLayout()
         form.setLabelAlignment(form.labelAlignment())
 
@@ -206,6 +207,16 @@ class ViolinOptionsWidget(PYAFWidget):
         self.IN_y_max.changeValue(misc_tools.format_number(options["y_max"]))
         self.IN_y_min.setEnabled(manual)
         self.IN_y_max.setEnabled(manual)
+
+        # The loading rates are plotted as forces vs loading rates (no
+        # violins): only the colors, the background and the Y limits apply
+        violins = shared.exp.results_type != "loading_rates"
+        self.box.setTitle("Violin plot" if violins
+                          else "Force vs loading rate plot")
+        for widget in (self.list_inner, self.list_points,
+                       self.list_density_norm, self.IN_bw_adjust,
+                       self.CB_cut, self.CB_log, self.CB_counts):
+            widget.setEnabled(violins)
 
     def list_updated(self, name):
         """Called when a list is changed."""

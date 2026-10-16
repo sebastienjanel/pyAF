@@ -43,6 +43,7 @@ from .plot_results import PlotResults
 from ... import shared
 from ...gui_styles import theme_handler
 from ...experiment import get_short_name, get_violin_options
+from ...tools import dfs_tools
 
 # Maximum horizontal shift of the values with the jitter (the space of a
 # file is 1)
@@ -80,6 +81,10 @@ class PlotSingleResults(PlotResults):
         """Draw the violins."""
         opts = get_violin_options(shared.exp, self.MODE)
         ax = self.axes
+
+        if shared.exp.results_type == "loading_rates":
+            self.plot_loading_rates(opts)
+            return
 
         if self.parent.single and self.names:
             # Separate window: wide enough for the files (1.3 inch each)
@@ -197,6 +202,86 @@ class PlotSingleResults(PlotResults):
                 tick.set_rotation_mode("anchor")
 
         self.start_plot()
+
+    def plot_loading_rates(self, opts):
+        """Force vs loading rate (log scale), for the dynamic force
+        spectroscopy: the events of each file (or group), their median point
+        with the quartiles, and the Bell-Evans fits of the DFS window."""
+        ax = self.axes
+        self.fig.set_frameon(self.parent.single or
+                             opts["background"] == "White")
+        items = dfs_tools.get_items(self.MODE)
+
+        if not items:
+            if self.MODE == "groups":
+                text = "Put files in groups (Plots tab) and tick the groups"
+            else:
+                text = "Tick some files in the table to display them"
+            ax.text(0.5, 0.5, text,
+                    ha="center", va="center", transform=ax.transAxes)
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            for name, forces, lrs, color, _ in items:
+                positive = lrs > 0
+                label = name + " (n=" + str(forces.size)
+                if not positive.all():
+                    # No place for them on the log scale
+                    label += ", " + str(int((~positive).sum())) + \
+                        " with r ≤ 0 not shown"
+                label += ")"
+                ax.scatter(lrs[positive], forces[positive], s=6,
+                           color=color, alpha=0.35, linewidths=0, zorder=2)
+                r, f, r_q, f_q = dfs_tools.median_point(forces, lrs)
+                if r > 0:
+                    ax.errorbar(
+                        r, f, xerr=[[r - r_q[0]], [r_q[1] - r]],
+                        yerr=[[f - f_q[0]], [f_q[1] - f]], fmt="o",
+                        markersize=8, color=color, markeredgecolor="black",
+                        ecolor="black", elinewidth=1, capsize=3, zorder=4,
+                        label=label)
+                else:
+                    ax.scatter([], [], color=color, label=label)
+
+            self.plot_dfs_fits(ax)
+            ax.set_xscale("log")
+            ax.legend(fontsize="small", loc="upper left")
+
+        if opts["y_mode"] == "manual":
+            ax.set_ylim(opts["y_min"], opts["y_max"])
+        ax.set_xlabel("Loading rate [pN/s]", fontproperties=self.font)
+        ax.set_ylabel("Force [pN]", fontproperties=self.font)
+        self.xlabel = None
+        self.ylabel = None
+        if opts["background"] == "White":
+            set_white_background(self.fig, ax)
+        self.start_plot()
+
+    def plot_dfs_fits(self, ax):
+        """Lines of the displayed Bell-Evans fits, with the points of the
+        binned fits."""
+        number = 0
+        for fit in dfs_tools.get_fits(self.MODE):
+            number += 1
+            if not fit.get("display") or fit["method"] == "old":
+                continue
+            r = numpy.array(fit["points_r"])
+            line_r = numpy.logspace(numpy.log10(r.min()),
+                                    numpy.log10(r.max()), 50)
+            # Fit in SI units, plot in pN and pN/s
+            line_f = (fit["a"] * numpy.log(line_r * 1e-12) + fit["b"]) * 1e12
+            if numpy.isfinite(fit["x"]):
+                label = ("Fit " + str(number) + ": x = " +
+                         "%.3g nm, koff = %.3g s$^{-1}$" % (fit["x"] * 1e9,
+                                                           fit["koff"]))
+            else:
+                label = "Fit " + str(number) + ": slope ≤ 0"
+            ax.plot(line_r, line_f, "-", color="red", linewidth=2, zorder=5,
+                    label=label)
+            if fit["method"] == "binned":
+                ax.plot(r, fit["points_f"], "s", markersize=6,
+                        markerfacecolor="none", markeredgecolor="red",
+                        zorder=5)
 
     @staticmethod
     def plot_boxes(ax, values, notch):

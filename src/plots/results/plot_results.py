@@ -352,10 +352,15 @@ class PlotResults(MainPlot):
         """Plot the fit for the DFS experiment."""
         if self.lr_fits is not None and self.lr_fits:
             for fit in self.lr_fits:
-                if fit[4]:
-                    x = [fit[2], fit[3]]
-                    y = [fit[0] * fit[2] + fit[1], fit[0] * fit[3] + fit[1]]
-                    self.axes.plot(x, y, "r", linewidth=2)
+                # Bell-Evans fits (see dfs_tools), the old ones are not drawn
+                if not isinstance(fit, dict) or not fit.get("display") or \
+                        fit["method"] == "old":
+                    continue
+                r = numpy.array(fit["points_r"])
+                x = numpy.logspace(numpy.log10(r.min()),
+                                   numpy.log10(r.max()), 50)
+                y = (fit["a"] * numpy.log(x * 1e-12) + fit["b"]) * 1e12
+                self.axes.plot(x, y, "r", linewidth=2)
 
     def prepare_min_max_x(self, ranges):
         """Method used to prepare the min max values for the x axis."""

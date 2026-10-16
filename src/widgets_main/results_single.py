@@ -733,7 +733,7 @@ class ResultsSingleWidget(PYAFWidget):
                 DFSWidget(self)
                 label = "Dynamic force spectroscopy"
                 widgets_list.widget_dfs.setWindowTitle(label)
-                widgets_list.widget_dfs.resize(350, 400)
+                widgets_list.widget_dfs.resize(600, 420)
                 widgets_list.widget_dfs.show()
             else:
                 widgets_list.widget_dfs.update_widget()
