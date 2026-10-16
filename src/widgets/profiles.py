@@ -36,6 +36,7 @@ from ..plots.PYAFPlot import PYAFPlot
 from ..tools import math_tools
 from ..tools.gui_tools import PYAFInput
 import numpy
+from ..tools import planefit
 from ..tools.PYAFWidget import PYAFWidget
 from .. import shared
 
@@ -64,6 +65,8 @@ class ProfileWidget(PYAFWidget):
         d_x = (dt.scan_size_x / float(dt.topography.shape[0])) / 1000.0
         d_y = (dt.scan_size_y / float(dt.topography.shape[1])) / 1000.0
         d_xy = numpy.sqrt((d_x ** 2 + d_y ** 2))
+        # Heights with the planefit of the file
+        topo = planefit.topo_map(dt)
 
         self.profiles_x = []
         self.profiles_z = []
@@ -86,7 +89,7 @@ class ProfileWidget(PYAFWidget):
                     self.profiles_x[profile].append(count)
                 i = pl[profile][0][count]
                 j = pl[profile][1][count]
-                val = dt.topography[i][j] / 1000.0
+                val = topo[i][j] / 1000.0
                 self.profiles_z[profile].append(val)
 
         self.VL = QtWidgets.QVBoxLayout()

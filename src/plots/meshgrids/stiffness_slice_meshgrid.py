@@ -33,6 +33,7 @@
 
 import numpy
 from .plot_meshgrid import PlotMeshGrid
+from ...tools import planefit
 
 
 class PlotStiffnessSliceMeshGrid(PlotMeshGrid):
@@ -45,11 +46,15 @@ class PlotStiffnessSliceMeshGrid(PlotMeshGrid):
 
         _, step, _ = self.data.get_used_indentation()
 
+        # Heights with the planefit of the file (from the substrate plane):
+        # the slice is parallel to the substrate
+        topo = planefit.topo_map(self.data)
+
         for i in range(self.nbr_pixels_x):
             for j in range(self.nbr_pixels_y):
                 values = self.data.stiffness_array[i][j]
                 # Distance between the surface and the slice
-                dist = self.data.topography[i][j] - height
+                dist = topo[i][j] - height
                 depth = -1
                 if dist > 0:
                     if step:
