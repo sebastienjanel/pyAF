@@ -374,77 +374,42 @@ def set_user_path(settings, path):
     matplotlib.rcParams["savefig.directory"] = path
 
 
+def elasticity_name(datas=None):
+    """Name of the elasticity results of the files (all the files by
+    default): Stiffness when computed by Tomography (slope model, N/m),
+    Elasticity / Stiffness when the files are mixed."""
+    if datas is None:
+        datas = shared.exp.list
+    models = {data.used_stiffness_model_selected for data in datas
+              if data.stiffness_calculated}
+    if models == {3}:
+        return "Stiffness"
+    if 3 in models:
+        return "Elasticity / Stiffness"
+    return "Elasticity"
+
+
+# Meshgrid types, by id (id of the radio button in the results tab)
+MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
+                  "stiffness_corr", "stiffness_corr_slice", "work",
+                  "rupture_force", "events_per_curve",
+                  "events_rupture_force", "visco_e0", "visco_fluidity",
+                  "visco_tan_delta")
+
+
 def get_meshgrid_type_as_string(mesh_id):
     """Given a meshgrid id, return the type as a string."""
-    if mesh_id == 0:
-        return "piezo"
-    elif mesh_id == 1:
-        return "topo"
-    elif mesh_id == 2:
-        return "stiffness"
-    elif mesh_id == 3:
-        return "stiffness_slice"
-    elif mesh_id == 4:
-        return "stiffness_corr"
-    elif mesh_id == 5:
-        return "stiffness_corr_slice"
-    elif mesh_id == 6:
-        return "work"
-    elif mesh_id == 7:
-        return "rupture_force"
-    elif mesh_id == 8:
-        return "events_per_curve"
-    elif mesh_id == 9:
-        return "events_rupture_force"
+    return MESHGRID_TYPES[mesh_id]
 
 
 def get_meshgrid_type_by_id(meshgrid_type):
     """Given a meshgrid type, return the type as an id."""
-    if meshgrid_type == "piezo":
-        mesh_id = 0
-    elif meshgrid_type == "topo":
-        mesh_id = 1
-    elif meshgrid_type == "stiffness":
-        mesh_id = 2
-    elif meshgrid_type == "stiffness_slice":
-        mesh_id = 3
-    elif meshgrid_type == "stiffness_corr":
-        mesh_id = 4
-    elif meshgrid_type == "stiffness_corr_slice":
-        mesh_id = 5
-    elif meshgrid_type == "work":
-        mesh_id = 6
-    elif meshgrid_type == "rupture_force":
-        mesh_id = 7
-    elif meshgrid_type == "events_per_curve":
-        mesh_id = 8
-    elif meshgrid_type == "events_rupture_force":
-        mesh_id = 9
-    return mesh_id
+    return MESHGRID_TYPES.index(meshgrid_type)
 
 
 def get_color_opts_by_meshgrid_type(data, meshgrid_type):
     """Return the colorscale depending on the meshgrid type."""
-    if meshgrid_type == "piezo":
-        return data.color_opts_piezo
-    elif meshgrid_type == "topo":
-        return data.color_opts_topo
-    elif meshgrid_type == "stiffness":
-        return data.color_opts_stiffness
-    elif meshgrid_type == "work":
-        return data.color_opts_work
-    elif meshgrid_type == "rupture_force":
-        return data.color_opts_rupture_force1
-    elif meshgrid_type == "events_per_curve":
-        return data.color_opts_events_per_curve
-    elif meshgrid_type == "events_rupture_force":
-        return data.color_opts_rupture_force2
-    elif meshgrid_type == "stiffness_slice":
-        return data.color_opts_stiffness
-    elif meshgrid_type == "stiffness_corr":
-        return data.color_opts_stiffness
-    elif meshgrid_type == "stiffness_corr_slice":
-        return data.color_opts_stiffness
+    return data.get_color_opts(meshgrid_type)
 
 
 def get_results_type_from_id(results_type):
@@ -465,6 +430,12 @@ def get_results_type_from_id(results_type):
         result_id = "loading_rates"
     elif results_type == 7:
         result_id = "events_distance"
+    elif results_type == 8:
+        result_id = "visco_e0"
+    elif results_type == 9:
+        result_id = "visco_fluidity"
+    elif results_type == 10:
+        result_id = "visco_tan_delta"
 
     return result_id
 
@@ -721,6 +692,10 @@ def reset_computation(data_id, computation_type):
             shared.exp.temp_file.create_tables_for_results(
                 str(data_id),
                 "loading_rates")
+
+    if computation_type in ("viscoelasticity", "all"):
+        data.visco_calculated = False
+        data.visco_results = None
 
     data.display_curve_type = "defl_ext"
     data.update()

@@ -273,7 +273,7 @@ class RoiManagerWidget(PYAFWidget):
 
         elif button == "glass":
             x_size = data.scan_size_x / data.nbr_pixels_x
-            y_size = data.scan_size_x / data.nbr_pixels_x
+            y_size = data.scan_size_y / data.nbr_pixels_y
 
             for item in self.TW.selectionModel().selectedRows():
                 index = item.row()

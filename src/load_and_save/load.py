@@ -46,6 +46,9 @@ from .. import widgets_list
 from .. import shared
 from .. import consts
 
+# Maps of the viscoelasticity (same color scale in all the files at load)
+VISCO_MAPS = ("visco_e0", "visco_fluidity", "visco_tan_delta")
+
 
 class Load:
     """Class to load AFM files or .pyaf files in pyAF.
@@ -335,6 +338,7 @@ def update_colors_at_load():
     found_stiffness = False
     found_work_and_rupture_force1_calculated = False
     found_events_calculated = False
+    visco = None
 
     for i in range(len(shared.exp.list)):
         data = shared.exp.list[i]
@@ -351,6 +355,10 @@ def update_colors_at_load():
             found_work_and_rupture_force1_calculated = True
             work = copy.deepcopy(data.color_opts_work)
             force1 = copy.deepcopy(data.color_opts_rupture_force1)
+
+        if data.visco_calculated and visco is None:
+            visco = [copy.deepcopy(data.get_color_opts(mt))
+                     for mt in VISCO_MAPS]
 
         if data.events_calculated and found_events_calculated is False:
             found_events_calculated = True
@@ -372,3 +380,7 @@ def update_colors_at_load():
         if found_events_calculated:
             dt.color_opts_events_per_curve = copy.deepcopy(events)
             dt.color_opts_rupture_force2 = copy.deepcopy(force2)
+
+        if visco is not None:
+            for mt, opts in zip(VISCO_MAPS, visco):
+                dt.get_color_opts(mt)[:] = copy.deepcopy(opts)

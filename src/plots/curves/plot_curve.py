@@ -214,7 +214,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 curve_x = self.curve_approach[0]
                 curve_y = self.curve_approach[1]
 
-            self.axes.plot(curve_x, curve_y, curve_color("approach"), label="Approach")
+            self.axes.plot(curve_x, curve_y, color=curve_color("approach"),
+                           label="Approach", **self.curve_style())
 
             if self.display_raw_data and self.curve_type == "defl_ext" \
                     and pt != "fit_preview" and pt != "tilt_curve_preview":
@@ -239,7 +240,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 if self.curve_approach is not None:
                     curve_y += self.curve_approach[0][-1]
 
-            self.axes.plot(curve_x, curve_y, curve_color("pause"), label="Pause")
+            self.axes.plot(curve_x, curve_y, color=curve_color("pause"),
+                           label="Pause", **self.curve_style())
 
         if self.curve_modulation is not None and (pt == "curve_dataa" or pt == "curve_datab"):
             # Display raw data only if asked, on the curve on the data tab
@@ -263,7 +265,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 else:
                     curve_y += self.curve_approach[0][-1]
 
-            self.axes.plot(curve_x, curve_y, curve_color("modulation"), label="Modulation")
+            self.axes.plot(curve_x, curve_y, color=curve_color("modulation"),
+                           label="Modulation", **self.curve_style())
 
         # Plot the retraction curve
         if self.curve_retraction is not None:
@@ -286,7 +289,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 curve_x = self.curve_retraction[2][positions[0]:positions[1]]
                 curve_y = numpy.flipud(self.curve_retraction[0][positions[0]:positions[1]])
 
-            self.axes.plot(curve_x, curve_y, curve_color("retraction"), label="Retract")
+            self.axes.plot(curve_x, curve_y, color=curve_color("retraction"),
+                           label="Retract", **self.curve_style())
 
             if self.display_raw_data and self.curve_type == "defl_ext" \
                     and pt != "fit_preview" and pt != "tilt_curve_preview":
@@ -580,6 +584,14 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
         # Do the actual plotting, is defined in MainPlot class
         self.start_plot()
+
+    def curve_style(self):
+        """Style of the data of the curves: dots (default) or lines
+        (preferences). The fits are drawn with lines."""
+        dots = self.settings.value("CurvesAsDots", True)
+        if dots in ("false", False):
+            return {"linestyle": "-"}
+        return {"linestyle": "none", "marker": ".", "markersize": 3}
 
     def set_lims(self):
         """Set the x, y limits of the plots.

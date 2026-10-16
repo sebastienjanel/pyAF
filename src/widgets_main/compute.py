@@ -32,6 +32,7 @@
 
 """Main compute widget, used to compute elasticity, events, forces, ..."""
 
+import os
 from .. import shared
 from .. import widgets_list
 from .. import experiment
@@ -58,6 +59,7 @@ from ..plots.PYAFPlot import PYAFPlot
 from ..compute_tools.stiffness.main import Stiffness
 from ..compute_tools.work_and_rupture_force.main import WorkAndRuptureForce
 from ..compute_tools.stiffness_correction import StiffnessCorrection
+from ..compute_tools.viscoelasticity import main as visco_main
 from ..compute_tools.loading_rates import GetLoadingRate
 from ..compute_tools.events import GetEvents
 from ..tools.PYAFWidget import PYAFWidget
@@ -81,6 +83,7 @@ class ComputeWidget(PYAFWidget):
         self.compute_stiffness = Stiffness()
         self.compute_work_and_rupture_force = WorkAndRuptureForce()
         self.stiffness_correction = StiffnessCorrection()
+        self.compute_visco = visco_main.ViscoCompute()
         self.compute_events = GetEvents()
         self.get_lr = GetLoadingRate()
 
@@ -517,17 +520,119 @@ class ComputeWidget(PYAFWidget):
         VL_stiff_corr.addWidget(self.BT_height_corr)
         VL_stiff_corr.addStretch(1)
 
+        # Options centered in the tab (the spacing balances the compute
+        # button), as in the other tabs
         HL_stiff_corr = QtWidgets.QHBoxLayout()
+        HL_stiff_corr.addSpacing(self.BT_height_corr.width())
+        HL_stiff_corr.addStretch(1)
         HL_stiff_corr.addLayout(VL_stiff_corr_opts)
         HL_stiff_corr.addStretch(1)
         HL_stiff_corr.addLayout(VL_stiff_corr)
 
         self.widget_stiff_corr.setLayout(HL_stiff_corr)
 
+        # --- Viscoelasticity -------------------------------------------------
+
+        self.widget_visco = QtWidgets.QWidget()
+
+        label = QtWidgets.QLabel(
+            "Ting fit of the approach and the retraction (power-law "
+            "rheology, Efremov et al. 2017; B.E.C.: Tejedor & Garcia "
+            "2025).\nUses the point of contact, the baseline, the model and "
+            "the modulus of the elasticity fit (Fitting).\n"
+            "Model and fit procedure of PyFMRheo: "
+            "github.com/DyNaMo-INSERM/PyFMlab_DyNaMo")
+        label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        # Small text, below the parameters
+        label.setFont(gui_tools.font_of_size(
+            max(label.font().pointSize() - 2, 8)))
+
+        self.Box_visco = QtWidgets.QGroupBox("Ting fit")
+        GL_visco = QtWidgets.QGridLayout()
+        GL_visco.setVerticalSpacing(4)
+
+        self.label_visco_solver = QtWidgets.QLabel("Solver :")
+        self.list_visco_solver = PYAFComboBox(self, "visco_solver")
+        self.list_visco_solver.addItem("Analytical (constant speeds)")
+        self.list_visco_solver.addItem("Numerical (measured indentation)")
+        HL_solver = QtWidgets.QHBoxLayout()
+        HL_solver.addWidget(self.label_visco_solver)
+        HL_solver.addWidget(self.list_visco_solver)
+        HL_solver.addStretch(1)
+
+        self.CB_visco_bec = PYAFCheckBox(
+            self, "visco_bec", "Bottom effect correction (B.E.C. tab)")
+        self.CB_visco_bec.setToolTip(
+            "Height of the sample defined in the B.E.C. tab (substrate ROI "
+            "or sample height). Uses the numerical solver.")
+        self.CB_visco_drag = PYAFCheckBox(
+            self, "visco_drag_correction", "Correct viscous drag")
+        self.CB_visco_drag.setToolTip(
+            "The retract baseline is shifted by the viscous drag of the "
+            "cantilever: its offset from the approach baseline is removed.")
+        self.IN_visco_offset = PYAFInput(
+            self, "visco_contact_offset", "Baseline before contact [nm]",
+            60)
+        self.IN_visco_offset.setToolTip(
+            "Part of the curve before the point of contact included in the "
+            "fit (as the contact_offset of PyFMRheo): the time of contact is "
+            "fitted, it can move from the point of contact of the elasticity "
+            "fit.")
+        self.IN_visco_offset.input.setValidator(misc_tools.validator("UF"))
+        self.IN_visco_points = PYAFInput(
+            self, "visco_nbr_points", "Points (downsampling)", 60)
+        self.IN_visco_points.setToolTip(
+            "The curve is averaged down to this number of points before the "
+            "fit (as pts_downsample in PyFMRheo): the numerical solver "
+            "grows with the square of the number of points.")
+        self.IN_visco_points.input.setValidator(
+            misc_tools.validator("MI", bottom=20))
+        self.CB_visco_beta_auto = PYAFCheckBox(
+            self, "visco_beta_auto",
+            "Automatic initial fluidity (0.05 if E > 10 kPa, else 0.25)")
+        self.IN_visco_beta = PYAFInput(
+            self, "visco_beta_init", "Initial fluidity", 60)
+        self.IN_visco_beta.input.setValidator(
+            misc_tools.validator("RF", bottom=0.01, top=0.99, decimal=3))
+
+        GL_visco.addLayout(HL_solver, 0, 0)
+        GL_visco.addWidget(self.CB_visco_bec, 1, 0)
+        GL_visco.addWidget(self.CB_visco_drag, 2, 0)
+        GL_visco.addWidget(self.IN_visco_offset, 0, 1)
+        GL_visco.addWidget(self.IN_visco_points, 1, 1)
+        GL_visco.addWidget(self.CB_visco_beta_auto, 2, 1)
+        GL_visco.addWidget(self.IN_visco_beta, 3, 1)
+        GL_visco.setColumnStretch(2, 1)
+        self.Box_visco.setLayout(GL_visco)
+
+        VL_visco_opts = QtWidgets.QVBoxLayout()
+        VL_visco_opts.addWidget(self.Box_visco)
+        VL_visco_opts.addWidget(label)
+        VL_visco_opts.addStretch(1)
+
+        self.BT_visco = PYAFButton(self, "compute_visco", "Compute")
+        self.BT_visco.setFixedSize(100, 100)
+        self.BT_visco.setObjectName("primaryButton")
+        VL_visco = QtWidgets.QVBoxLayout()
+        VL_visco.addStretch(1)
+        VL_visco.addWidget(self.BT_visco)
+        VL_visco.addStretch(1)
+
+        # Options centered in the tab (the spacing balances the compute
+        # button), as in the other tabs
+        HL_visco = QtWidgets.QHBoxLayout()
+        HL_visco.addSpacing(self.BT_visco.width())
+        HL_visco.addStretch(1)
+        HL_visco.addLayout(VL_visco_opts)
+        HL_visco.addStretch(1)
+        HL_visco.addLayout(VL_visco)
+        self.widget_visco.setLayout(HL_visco)
+
         # --- Set up page -----------------------------------------------------
 
         self.tabs.addTab(self.widget_app, "Elasticity")
         self.tabs.addTab(self.widget_stiff_corr, "B.E.C.")
+        self.tabs.addTab(self.widget_visco, "Viscoelasticity")
         self.tabs.addTab(self.widget_ret, "Work, Rupture force")
         self.tabs.addTab(self.widget_events, "Unbinding events")
         self.tabs.addTab(self.widget_loading_rates, "Loading rates")
@@ -612,19 +717,23 @@ class ComputeWidget(PYAFWidget):
         # Reset zoomed in position
         shared.zoomed_in_element = 0
 
-        if self.tabs.currentIndex() == 0:
+        widget = self.tabs.currentWidget()
+        if widget is self.widget_app:
             shared.exp.compute_type = "stiffness"
             self.BT_next_zoom_element.setEnabled(False)
-        elif self.tabs.currentIndex() == 1:
+        elif widget is self.widget_stiff_corr:
             shared.exp.compute_type = "stiffness_corr"
             self.BT_next_zoom_element.setEnabled(False)
-        elif self.tabs.currentIndex() == 2:
+        elif widget is self.widget_visco:
+            shared.exp.compute_type = "viscoelasticity"
+            self.BT_next_zoom_element.setEnabled(False)
+        elif widget is self.widget_ret:
             shared.exp.compute_type = "work_and_rupture_force"
             self.BT_next_zoom_element.setEnabled(True)
-        elif self.tabs.currentIndex() == 3:
+        elif widget is self.widget_events:
             shared.exp.compute_type = "events"
             self.BT_next_zoom_element.setEnabled(True)
-        elif self.tabs.currentIndex() == 4:
+        elif widget is self.widget_loading_rates:
             shared.exp.compute_type = "loading_rates"
             self.BT_next_zoom_element.setEnabled(True)
 
@@ -686,6 +795,23 @@ class ComputeWidget(PYAFWidget):
                 self.BT_height_corr.setEnabled(True)
             else:
                 self.BT_height_corr.setEnabled(False)
+
+        if element == "visco" or element == "all":
+            self.list_visco_solver.setCurrentIndex(
+                1 if data.visco_bec else data.visco_solver)
+            self.list_visco_solver.setEnabled(not data.visco_bec)
+            self.CB_visco_bec.setChecked(data.visco_bec)
+            self.CB_visco_drag.setChecked(data.visco_drag_correction)
+            self.IN_visco_offset.changeValue(data.visco_contact_offset)
+            self.IN_visco_points.changeValue(data.visco_nbr_points)
+            self.CB_visco_beta_auto.setChecked(data.visco_beta_auto)
+            self.IN_visco_beta.changeValue(data.visco_beta_init)
+            self.IN_visco_beta.setEnabled(not data.visco_beta_auto)
+            # The elasticity fit is needed (and a height for the B.E.C.)
+            reason = visco_main.check_file(data)
+            self.BT_visco.setEnabled(reason is None)
+            self.BT_visco.setToolTip(
+                "" if reason is None else "Not available: " + reason)
 
         if element == "roi_list_height_corr" or element == "all":
             # Remove old items
@@ -822,6 +948,9 @@ class ComputeWidget(PYAFWidget):
 
             self.update_GUI("BT_height_correction")
 
+        elif name == "visco_solver":
+            data.visco_solver = self.list_visco_solver.currentIndex()
+
         elif name == "list2":
             self.parent.file_changed("list2")
 
@@ -873,11 +1002,24 @@ class ComputeWidget(PYAFWidget):
             else:
                 data.user_h = None
 
+        elif field == "visco_contact_offset":
+            data.visco_contact_offset = self.IN_visco_offset.get_float_value()
+
+        elif field == "visco_nbr_points":
+            data.visco_nbr_points = self.IN_visco_points.get_int_value()
+
+        elif field == "visco_beta_init":
+            data.visco_beta_init = self.IN_visco_beta.get_float_value()
+
         self.update_MPL("MPL_canvas")
         self.update_GUI("BT_height_correction")
+        self.update_GUI("visco")
 
-    def finish_computation(self, warnings=None):
-        """At the end of the computation, display the errors and refresh the GUI."""
+    def finish_computation(self, warnings=None, notes=None):
+        """At the end of the computation, display the errors and refresh the GUI.
+
+        notes: text added to the final message (displayed as a warning).
+        """
         # Indentation range not attained on some pixels (final message)
         range_text = None
 
@@ -987,6 +1129,9 @@ class ComputeWidget(PYAFWidget):
             # No errors
             found_error_list = [True]
 
+        if notes:
+            range_text = notes if range_text is None else range_text + notes
+
         # Check if we can update the data
         ok = False
         for item in found_error_list:
@@ -1017,6 +1162,7 @@ class ComputeWidget(PYAFWidget):
             widgets_list.widget_fit_param_jocs.update_widget()
             widgets_list.widget_fit_param_jocs_events.update_widget()
             self.update_GUI("BT_height_correction")
+            self.update_GUI("visco")
             self.update_GUI("get_lr")
             # Update the results tab (especially the plot, so that it is
             # initialized and not empty)
@@ -1255,6 +1401,42 @@ class ComputeWidget(PYAFWidget):
 
             self.finish_computation()
 
+        elif button == "compute_visco":
+            # Update all the parameters if needed
+            apply_to_all.apply_to_all("calc_options")
+
+            calc_list = list(range(len(shared.exp.list))) \
+                if shared.exp.calc_all else [shared.exp.id_selected]
+            # Overwrite calc_list with a list defined externally
+            if shared.force_calc_list is not None:
+                calc_list = shared.force_calc_list
+
+            skipped = []
+            for calc_id in calc_list:
+                data = shared.exp.list[calc_id]
+                reason = visco_main.check_file(data)
+                if reason is not None:
+                    skipped.append(os.path.basename(data.filename) + " : " +
+                                   reason)
+                    continue
+                self.logger.debug("Viscoelasticity %s", data.filename)
+                self.compute_visco.compute(calc_id)
+                # Add a result to the result's tab if needed
+                experiment.add_result(calc_id, data.filename)
+                if shared.exp.results_type is None:
+                    shared.exp.results_type = "visco_e0"
+                if self.compute_visco.nbr_failed:
+                    skipped.append(
+                        os.path.basename(data.filename) + " : the fit failed "
+                        "for " + str(self.compute_visco.nbr_failed) +
+                        " curves (NaN)")
+
+            notes = None
+            if skipped:
+                notes = "<ul>" + "".join("<li>" + text + "</li>"
+                                         for text in skipped) + "</ul>"
+            self.finish_computation(notes=notes)
+
         elif button == "get_lr":
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
@@ -1344,7 +1526,8 @@ class ComputeWidget(PYAFWidget):
             if shared.exp.compute_type == "stiffness":
                 # Only one element, the POC
                 val = None
-            elif shared.exp.compute_type == "stiffness_corr":
+            elif shared.exp.compute_type in ("stiffness_corr",
+                                             "viscoelasticity"):
                 # No element to display here
                 val = None
             elif shared.exp.compute_type == "work_and_rupture_force":
@@ -1412,6 +1595,17 @@ class ComputeWidget(PYAFWidget):
         # elif checkbox == "tomography":
             # state = self.CB_tomography.isChecked()
             # shared.exp.list[shared.exp.id_selected].tomography = state
+
+        elif checkbox == "visco_bec":
+            data.visco_bec = self.CB_visco_bec.isChecked()
+            self.update_GUI("visco")
+
+        elif checkbox == "visco_drag_correction":
+            data.visco_drag_correction = self.CB_visco_drag.isChecked()
+
+        elif checkbox == "visco_beta_auto":
+            data.visco_beta_auto = self.CB_visco_beta_auto.isChecked()
+            self.update_GUI("visco")
 
         elif checkbox == "zoom_in":
             data.auto_zoom_in = self.CB_zoom_in.isChecked()

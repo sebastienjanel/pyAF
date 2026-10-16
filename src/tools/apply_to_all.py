@@ -91,6 +91,8 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
             elif (mt == "events_per_curve" or mt == "events_rupture_force") \
                     and dt.events_calculated:
                 dt.meshgrid_type = mt
+            elif mt.startswith("visco_") and dt.visco_calculated:
+                dt.meshgrid_type = mt
             elif mt == "piezo":
                 dt.meshgrid_type = mt
 
@@ -167,6 +169,9 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
                 copy.deepcopy(cur.color_opts_rupture_force1)
             dt.color_opts_events_per_curve = \
                 copy.deepcopy(cur.color_opts_events_per_curve)
+            for name in ("color_opts_visco_e0", "color_opts_visco_fluidity",
+                         "color_opts_visco_tan_delta"):
+                setattr(dt, name, copy.deepcopy(getattr(cur, name)))
             dt.stiffness_color_log = getattr(cur, "stiffness_color_log",
                                              False)
             dt.color_saturation = cur.color_saturation
@@ -230,6 +235,14 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
                 dt = exp.list[i]
                 cur = exp.list[oldid]
                 dt.user_h = cur.user_h
+
+        if exp.compute_type == "viscoelasticity" or mode == "all":
+            cur = exp.list[oldid]
+            for dt in exp.list:
+                for name in ("solver", "bec", "contact_offset", "nbr_points",
+                             "beta_auto", "beta_init", "drag_correction"):
+                    setattr(dt, "visco_" + name,
+                            getattr(cur, "visco_" + name))
 
         if exp.compute_type == "work_and_rupture_force" or mode == "all":
             for i in range(len(exp.list)):

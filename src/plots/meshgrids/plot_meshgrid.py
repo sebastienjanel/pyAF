@@ -318,7 +318,8 @@ class PlotMeshGrid(MainPlot):
         scale can not start at 0: the minimum is then the lowest positive
         value of the map."""
         mesh = self.mesh_type
-        if mesh is None or not str(mesh).startswith("stiffness") or \
+        if mesh is None or not (str(mesh).startswith("stiffness") or
+                                mesh == "visco_e0") or \
                 not getattr(self.data, "stiffness_color_log", False) or \
                 self.data_meshgrid is None:
             return None

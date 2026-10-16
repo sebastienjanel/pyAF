@@ -175,11 +175,19 @@ class ResultsWidget(PYAFWidget):
         self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force1, 7)
         self.GRP_mesh_type.addButton(self.RBT_mesh_events_per_curve, 8)
         self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force2, 9)
+        # Viscoelasticity (Ting fit)
+        self.RBT_mesh_visco_e0 = QtWidgets.QRadioButton("E0 (visco.)")
+        self.RBT_mesh_visco_fluidity = QtWidgets.QRadioButton("Fluidity")
+        self.RBT_mesh_visco_tan_delta = QtWidgets.QRadioButton(
+            "Loss tangent (tan \u03b4)")
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_e0, 10)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_fluidity, 11)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_tan_delta, 12)
 
         self.GL_mesh_options = QtWidgets.QGridLayout()
         # Same spacing between all the rows (the style's default spacing
         # depends on the neighbouring widgets)
-        self.GL_mesh_options.setVerticalSpacing(8)
+        self.GL_mesh_options.setVerticalSpacing(4)
         self.VL_meshgrid_options = QtWidgets.QVBoxLayout()
         self.VL_meshgrid_options.setContentsMargins(0, 0, 0, 0)
 
@@ -197,6 +205,11 @@ class ResultsWidget(PYAFWidget):
 
         self.GL_mesh_options.addWidget(self.RBT_mesh_events_per_curve, 2, 2)
         self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force2, 3, 2)
+
+        # Viscoelasticity below the elasticity
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_e0, 4, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_fluidity, 5, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_tan_delta, 6, 1)
 
         self.VL_meshgrid_options.addLayout(self.GL_mesh_options)
         self.VL_meshgrid_options.addStretch(1)
@@ -235,12 +248,14 @@ class ResultsWidget(PYAFWidget):
         self.RB_force_events = QtWidgets.QRadioButton("Force curve (events)")
         self.RB_indentation_curve = QtWidgets.QRadioButton("Indentation curve")
         self.RB_residuals = QtWidgets.QRadioButton("Residuals plot")
+        self.RB_visco = QtWidgets.QRadioButton("Viscoelastic fit")
         self.BT_group_type_of_curve.addButton(self.RB_defl_ext, 0)
         self.BT_group_type_of_curve.addButton(self.RB_force_ext, 1)
         self.BT_group_type_of_curve.addButton(self.RB_force, 2)
         self.BT_group_type_of_curve.addButton(self.RB_force_events, 3)
         self.BT_group_type_of_curve.addButton(self.RB_indentation_curve, 4)
         self.BT_group_type_of_curve.addButton(self.RB_residuals, 5)
+        self.BT_group_type_of_curve.addButton(self.RB_visco, 6)
 
         self.BT_group_trace_or_retrace = PYAFButtonGroup(
             self, "button_group_trace_or_retrace")
@@ -285,7 +300,7 @@ class ResultsWidget(PYAFWidget):
         self.GL_curves_options = QtWidgets.QGridLayout()
         # Same spacing between all the rows (the style's default spacing
         # depends on the neighbouring widgets)
-        self.GL_curves_options.setVerticalSpacing(8)
+        self.GL_curves_options.setVerticalSpacing(4)
         self.VL_curves_options = QtWidgets.QVBoxLayout()
         widgets_list.widget_progressbar.update()
 
@@ -296,6 +311,7 @@ class ResultsWidget(PYAFWidget):
         self.GL_curves_options.addWidget(self.RB_force_events, 3, 0)
         self.GL_curves_options.addWidget(self.RB_indentation_curve, 4, 0)
         self.GL_curves_options.addWidget(self.RB_residuals, 5, 0)
+        self.GL_curves_options.addWidget(self.RB_visco, 6, 0)
         # Col 2
         self.GL_curves_options.addWidget(self.radiobutton_both, 0, 1)
         self.GL_curves_options.addWidget(self.radiobutton_trace, 1, 1)
@@ -414,6 +430,8 @@ class ResultsWidget(PYAFWidget):
             data.events_display_results_filter_dist = True
             data.events_results_display_joc = True
             data.events_results_display_fit_joc = True
+        elif mt.startswith("visco_") and data.visco_calculated:
+            data.display_curve_type = "visco"
         elif mt in ("piezo", "topo"):
             # Default display of the curves, without the results
             data.display_curve_type = "defl_ext"
@@ -466,6 +484,10 @@ class ResultsWidget(PYAFWidget):
             val = data.events_calculated
             self.RBT_mesh_events_per_curve.setEnabled(val)
             self.RBT_mesh_rupture_force2.setEnabled(val)
+            val = data.visco_calculated
+            self.RBT_mesh_visco_e0.setEnabled(val)
+            self.RBT_mesh_visco_fluidity.setEnabled(val)
+            self.RBT_mesh_visco_tan_delta.setEnabled(val)
 
             # Check the button
             index = misc_tools.get_meshgrid_type_by_id(data.meshgrid_type)
@@ -528,6 +550,9 @@ class ResultsWidget(PYAFWidget):
             self.RB_residuals.setEnabled(
                 data.stiffness_calculated and data.used_perform_fit)
 
+            # Viscoelastic fit
+            self.RB_visco.setEnabled(data.visco_calculated)
+
             # A curve type applied from another file can be missing here
             if not curve_type_available(data, data.display_curve_type):
                 data.display_curve_type = "defl_ext"
@@ -545,6 +570,8 @@ class ResultsWidget(PYAFWidget):
                 self.RB_indentation_curve.setChecked(True)
             elif data.display_curve_type == "residuals":
                 self.RB_residuals.setChecked(True)
+            elif data.display_curve_type == "visco":
+                self.RB_visco.setChecked(True)
 
             # Enable or disable radiobuttons for approach or retraction
             if data.display_curve_type == "force":
@@ -575,6 +602,12 @@ class ResultsWidget(PYAFWidget):
 
             elif data.display_curve_type == "residuals":
                 self.radiobutton_trace.setEnabled(True)
+                self.radiobutton_retrace.setEnabled(False)
+                self.radiobutton_both.setEnabled(False)
+
+            elif data.display_curve_type == "visco":
+                # Approach and retraction, in time
+                self.radiobutton_trace.setEnabled(False)
                 self.radiobutton_retrace.setEnabled(False)
                 self.radiobutton_both.setEnabled(False)
 
@@ -841,6 +874,8 @@ class ResultsWidget(PYAFWidget):
                 data.display_curve_type = "indentation"
             elif curve_type == 5:
                 data.display_curve_type = "residuals"
+            elif curve_type == 6:
+                data.display_curve_type = "visco"
 
             tp = data.display_curve_type
             self.logger.debug("Changing curve type, %s", tp)

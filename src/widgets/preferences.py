@@ -81,6 +81,12 @@ class PreferencesWidget(PYAFWidget):
         self.CB_raw_data = PYAFCheckBox(self, "raw_data", text)
         self.CB_raw_data.setToolTip(tip)
 
+        text = "Curves drawn with dots (all curves)"
+        tip = ("Unchecked, the points of the curves are joined by lines. "
+               "The fits are always drawn with lines.")
+        self.CB_curves_dots = PYAFCheckBox(self, "curves_dots", text)
+        self.CB_curves_dots.setToolTip(tip)
+
         text = "Display fit noise on curves (Compute)"
         tip = "The fit noises are computed on the fitting segments."
         self.CB_fit_noise = PYAFCheckBox(self, "fit_noise", text)
@@ -126,6 +132,7 @@ class PreferencesWidget(PYAFWidget):
         self.VL.addWidget(self.CB_rand_ctrl)
         self.VL.addWidget(self.CB_zero_defl)
         self.VL.addWidget(self.CB_raw_data)
+        self.VL.addWidget(self.CB_curves_dots)
         self.VL.addWidget(self.CB_fit_noise)
         self.VL.addWidget(self.CB_remember_to_save)
         self.VL.addWidget(self.CB_mesh_style)
@@ -151,6 +158,9 @@ class PreferencesWidget(PYAFWidget):
             "DisplayRawData",
             False)
         self.CB_raw_data.setChecked(display_raw_data)
+
+        dots = self.settings.value("CurvesAsDots", True)
+        self.CB_curves_dots.setChecked(dots not in ("false", False))
 
         remember = self.settings.value("RememberMeToSave", True)
         self.CB_remember_to_save.setChecked(remember)
@@ -191,6 +201,15 @@ class PreferencesWidget(PYAFWidget):
             self.settings.setValue("ZeroDefl", value)
 
             # Update the plots
+            widgets_list.widget_data.curve.update_plot()
+            widgets_list.widget_results.update_MPL("MPL_canvas2")
+            widgets_list.widget_compute.update_MPL("MPL_canvas")
+            if widgets_list.widget_curve_mod is not None:
+                widgets_list.widget_curve_mod.update_MPL("MPL_canvas")
+
+        elif name == "curves_dots":
+            self.settings.setValue("CurvesAsDots",
+                                   self.CB_curves_dots.isChecked())
             widgets_list.widget_data.curve.update_plot()
             widgets_list.widget_results.update_MPL("MPL_canvas2")
             widgets_list.widget_compute.update_MPL("MPL_canvas")

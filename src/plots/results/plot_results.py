@@ -39,6 +39,7 @@ import seaborn as sns
 
 from ..plot_main import MainPlot
 from ... import shared
+from ...tools.results_sorting import VISCO_TYPES
 
 
 class PlotResults(MainPlot):
@@ -180,6 +181,11 @@ class PlotResults(MainPlot):
                 self.xlabel = ""
             else:
                 self.xlabel = "Loading rate [pN/s]"
+        elif rt in VISCO_TYPES:
+            if self.plot_selected == "box":
+                self.xlabel = ""
+            else:
+                self.xlabel = VISCO_TYPES[rt]["label"]
 
         if pt == "results_single":
             if self.plot_selected == "box":
@@ -197,6 +203,8 @@ class PlotResults(MainPlot):
                     self.ylabel = "Distance [nm]"
                 elif rt == "loading_rates":
                     self.ylabel = "Loading rate [pN/s]"
+                elif rt in VISCO_TYPES:
+                    self.ylabel = VISCO_TYPES[rt]["label"]
             else:
                 if shared.exp.norm_hist_single:
                     self.ylabel = r"Probability density"

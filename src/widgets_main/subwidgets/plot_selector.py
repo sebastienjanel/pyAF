@@ -49,7 +49,7 @@ class PlotSelectorWidget(PYAFWidget):
             self.parent_widget = widgets_list.widget_data
 
         # Same order as the plots of the data tab. The time plots are only
-        # available for the JPK files
+        # available for the files with a time (JPK, Nanoscope)
         self.plot_types = ("Deflection vs Z position", "Force vs distance",
                            "Deflection vs Time", "Z position vs Time")
         self.time_plots = (2, 3)
@@ -112,7 +112,7 @@ class PlotSelectorWidget(PYAFWidget):
                 if model.item(i).isEnabled()]
 
     def set_time_plots(self, enabled):
-        """Enable or disable the time plots (only for the JPK files)."""
+        """Enable or disable the time plots (files with a time)."""
         model = self.list_plot_types.model()
         for i in self.time_plots:
             model.item(i).setEnabled(enabled)

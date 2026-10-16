@@ -46,6 +46,7 @@ from .meshgrids.stiffness_slice_meshgrid import PlotStiffnessSliceMeshGrid
 from .meshgrids.stiffness_slice_corr_meshgrid import \
     PlotStiffnessSliceCorrMeshGrid
 from .meshgrids.work_meshgrid import PlotWorkMeshGrid
+from .meshgrids.visco_meshgrid import PlotViscoMeshGrid
 from .meshgrids.rupture_force1_meshgrid import PlotRuptureForce1MeshGrid
 from .meshgrids.rupture_force2_meshgrid import PlotRuptureForce2MeshGrid
 from .meshgrids.events_per_curve_meshgrid import PlotEventsPerCurveMeshGrid
@@ -97,6 +98,7 @@ from .curves.results.force_dist import ResultsForceDist
 from .curves.results.indentation import ResultsIndentation
 # Residuals
 from .curves.results.residuals import ResultsResiduals
+from .curves.results.visco import ResultsVisco
 
 # Events
 from .curves.results.force_events import ResultsForceEvents
@@ -248,6 +250,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                 self.canvas = PlotStiffnessCorrMeshGrid(self)
             elif mesh == "stiffness_corr_slice" and dt.stiffness_corrected:
                 self.canvas = PlotStiffnessSliceCorrMeshGrid(self)
+            elif mesh.startswith("visco_") and dt.visco_calculated:
+                self.canvas = PlotViscoMeshGrid(self)
             else:
                 # Plot an empty meshgrid
                 self.canvas = PlotEmptyMeshGrid(self)
@@ -292,6 +296,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ResultsForceEvents(self)
                 elif c_type == "residuals":
                     self.canvas = ResultsResiduals(self)
+                elif c_type == "visco":
+                    self.canvas = ResultsVisco(self)
             elif p_type == "fit_preview":
                 if ct == "stiffness":
                     self.canvas = ComputeStiffness(self)
@@ -310,6 +316,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                             self.canvas = ComputeEventsDetectionMSF(self)
                 elif ct == "loading_rates":
                     self.canvas = ComputeLoadingRates(self)
+                elif ct == "viscoelasticity":
+                    self.canvas = ResultsVisco(self)
         elif p_type == "results_single":
                 self.canvas = PlotSingleResults(self)
         elif p_type == "results_groups":
@@ -416,4 +424,6 @@ def curve_type_available(data, curve_type):
         return data.events_calculated
     if curve_type == "residuals":
         return data.stiffness_calculated and data.used_perform_fit
+    if curve_type == "visco":
+        return data.visco_calculated
     return True

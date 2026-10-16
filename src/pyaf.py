@@ -797,6 +797,10 @@ class MainWindow(QtWidgets.QMainWindow):
             if data.events_calculated is False:
                 data.display_curve_type = "defl_ext"
 
+        elif data.display_curve_type == "visco":
+            if not data.visco_calculated:
+                data.display_curve_type = "defl_ext"
+
         # Uncheck some options if they are not aviable
         if data.stiffness_calculated is False:
             if data.display_poc:

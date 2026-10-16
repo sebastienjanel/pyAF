@@ -46,6 +46,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from ..tools import gui_tools
 from ..tools import misc_tools
 from ..tools import math_tools
+from ..tools import curve_tools
 from ..tools import events_refresher
 from ..utils import meshgrid_menu
 from ..tools.gui_tools import PYAFInput
@@ -235,7 +236,8 @@ class DataWidget(PYAFWidget):
         self.curve_size = [490, 350]
         sizes = [self.curve_size[0] / 72.0, self.curve_size[1] / 72.0, 72.0]
         # The time plots (curve_1 and curve_2) are only available for the
-        # JPK files, but are always created: the files can be of different
+        # files with a time (JPK, Nanoscope), but are always created: the
+        # files can be of different
         # types (see update_plot_selector)
         self.canvas_stack = QtWidgets.QStackedWidget()
         self.canvas_curve = QtWidgets.QWidget()
@@ -440,25 +442,28 @@ class DataWidget(PYAFWidget):
         self.update_curves()
 
     def update_curves(self):
-        """Update the curves (the time plots only for the JPK files)."""
+        """Update the curves (the time plots only for the files with a time)."""
         self.curve.update_plot()
         self.curve_3.update_plot()
-        if self.is_jpk():
+        if self.has_time():
             self.curve_1.update_plot()
             self.curve_2.update_plot()
 
-    def is_jpk(self, data=None):
-        """True for the JPK files (selected file by default), which have
-        the time plots."""
+    def has_time(self, data=None):
+        """True for the files with the time plots (selected file by
+        default): the JPK files (time of the file) and the Nanoscope files
+        (time computed from the ramp, see curve_tools)."""
         if data is None:
             data = shared.exp.list[shared.exp.id_selected]
-        return data.file_type in JPK_FILE_TYPES
+        if data.file_type in JPK_FILE_TYPES:
+            return True
+        return curve_tools.get_nanoscope_times(data, 2, 2) is not None
 
     def update_plot_selector(self):
         """Display the selected plot. The time plots are only available for
-        the JPK files."""
+        the files with a time (JPK, Nanoscope)."""
         selector = self.plot_selector
-        selector.set_time_plots(self.is_jpk())
+        selector.set_time_plots(self.has_time())
         index = selector.list_plot_types.currentIndex()
         self.canvas_stack.setCurrentIndex(index)
 

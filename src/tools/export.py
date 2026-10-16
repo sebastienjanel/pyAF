@@ -141,7 +141,8 @@ def export_results(folder):
     # Replicates
     for res_type in ("stiffness", "work", "rupture_force", "events_forces",
                      "events_per_curve", "events_rupture_force",
-                     "loading_rates", "events_distance"):
+                     "loading_rates", "events_distance") + \
+            tuple(results_sorting.VISCO_TYPES):
         write_group_file(res_type, folder)
         wl.widget_progressbar.update()
 
@@ -204,6 +205,19 @@ def write_unfiltered(pre, data):
                     for index, i, j in pixels()
                     for lr in data.loading_rates[i][j]])
 
+    if data.visco_calculated:
+        # All the parameters of the Ting fit (nan: not fitted)
+        maps = [data.visco_e0, data.visco_fluidity, data.visco_tan_delta,
+                data.get_visco_result("tc"), data.get_visco_result("f0"),
+                data.get_visco_result("r2"), data.get_visco_result("height")]
+        write_file(pre + "_viscoelasticity.txt",
+                   "Index\tXpos\tYpos\tE0 (Pa)\tFluidity\t"
+                   "Loss tangent (tan delta)\tTime of contact (s)\t"
+                   "F0 (N)\tR2\tB.E.C. height (nm)",
+                   [start(index, i, j) +
+                    "\t".join(str(float(m[i][j])) for m in maps)
+                    for index, i, j in pixels()])
+
 
 def write_filtered(pre, row, data):
     """Writes the results of a row as in the plots. Returns the number of
@@ -254,6 +268,12 @@ def write_filtered(pre, row, data):
         write_file(pre + "_loading_rates.txt",
                    "Index\tXpos\tYpos\tLoading rate (N/s)",
                    lines(get("loading_rates")))
+
+    if data.visco_calculated:
+        for res_type, values in results_sorting.VISCO_TYPES.items():
+            write_file(pre + "_" + values["column"] + ".txt",
+                       "Index\tXpos\tYpos\t" + values["export"],
+                       lines(get(res_type)))
 
     return nbr_events
 
@@ -371,6 +391,12 @@ def get_r_tables(row, data):
             stats.append(describe(df, name))
             curve_tables.append(df)
 
+    if data.visco_calculated:
+        for force_type, values in results_sorting.VISCO_TYPES.items():
+            df = table(get(force_type), values["column"])
+            stats.append(describe(df, values["column"]))
+            curve_tables.append(df)
+
     if data.events_calculated:
         for force_type, name in (("events_per_curve", "events_per_curve"),
                                  ("events_rupture_force", "event_max_force")):
@@ -441,6 +467,8 @@ def write_group_file(res_type, folder):
             "events_rupture_force": (1e-12, "Event max. force (N)"),
             "loading_rates": (1e-12, "Loading rates (N/s)"),
             "events_distance": (1e-9, "Event's distance (m)"),
+            **{name: (1 / values["factor"], values["export"])
+               for name, values in results_sorting.VISCO_TYPES.items()},
         }[res_type]
         convert = lambda v: v * factor  # noqa: E731
 

@@ -880,6 +880,11 @@ class WidgetAFM2(QtWidgets.QWidget):
         afm_id = shared.layer_list[layer_id].afm_id
         data = shared.exp.list[afm_id]
 
+        # Stiffness when computed by Tomography
+        name = misc_tools.elasticity_name([data])
+        self.RBT_stiffness.setText(name)
+        self.RBT_stiffness_sq.setText(name + " (squares)")
+
         if data.opengl_afm_flat_view:
             self.RBT_2D.setChecked(True)
             self.RBT_stiffness_sq.setEnabled(True)

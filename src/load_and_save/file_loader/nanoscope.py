@@ -531,6 +531,8 @@ class LoaderNanoscope:
 
         # Define provisory arrays to store the raw curve
         if self.peakforce:
+            # PeakForce frequency (Hz), for the time of the curves
+            data.pft_freq = self.pft_freq
             prov_app = numpy.zeros([f_samples])
             prov_re = numpy.zeros([f_samples])
             # I am forced to impose this condition, since the sync_distance value

@@ -39,6 +39,21 @@ from ..tools import curve_tools
 from ..tools import event_filter_tools
 from .. import widgets_list
 
+# Results of the viscoelasticity (Ting fit): name in the lists, label of
+# the plots (displayed values: value * factor), name and unit in the
+# exports (SI), column name in the R export
+VISCO_TYPES = {
+    "visco_e0": {"name": "E0 (visco.)", "label": "E0 [kPa]",
+                 "factor": 1e-3, "export": "E0 (Pa)", "column": "visco_e0"},
+    "visco_fluidity": {"name": "Fluidity", "label": "Fluidity",
+                       "factor": 1.0, "export": "Fluidity",
+                       "column": "fluidity"},
+    "visco_tan_delta": {"name": "Loss tangent (tan \u03b4)",
+                        "label": "tan \u03b4", "factor": 1.0,
+                        "export": "Loss tangent (tan delta)",
+                        "column": "tan_delta"},
+}
+
 
 class GetResults:
     """Results fetching class."""
@@ -144,6 +159,8 @@ class GetResults:
                 result = [forces, lr]
         elif self.type == "events_distance":
             result = self.prepare_events_distance()
+        elif self.type in VISCO_TYPES:
+            result = self.prepare_visco()
 
         result = self.remove_zeros(result)
 
@@ -464,6 +481,42 @@ class GetResults:
 
         else:
             return numpy.array(array) * 1e15  # in fJ
+
+    def prepare_visco(self):
+        """Results of the viscoelasticity (E0, fluidity or loss tangent).
+
+        The curves which could not be fitted (nan) are not in the values
+        of the plots; they are exported as nan.
+        """
+        dt = self.data
+
+        if not dt.visco_calculated:
+            return []
+
+        values = getattr(dt, self.type)
+        factor = VISCO_TYPES[self.type]["factor"]
+        export = self.export in ("single", "r_format")
+        if self.roi_id != 0:
+            roi_vals = dt.roi_list[self.roi_id - 1].values
+
+        array = []
+        export_array = []
+        index = 0
+        for i in range(dt.nbr_pixels_x):
+            for j in range(dt.nbr_pixels_y):
+                if dt.discarded_curves[i][j] == 0 and \
+                        (self.roi_id == 0 or
+                         math_tools.in_list(roi_vals, [i, j])):
+                    value = float(values[i][j])
+                    if export:
+                        export_array.append([index, i, j, value])
+                    elif numpy.isfinite(value):
+                        array.append(value * factor)
+                index += 1
+
+        if export:
+            return export_array
+        return numpy.array(array)
 
     def prepare_rupture_force1(self):
         """Get the rupture forces."""

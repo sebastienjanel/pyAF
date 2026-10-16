@@ -77,7 +77,7 @@ class Columns:
                  "Sd", "Mode"]
 
         if self.results_type == "stiffness":
-            names += ["Slice", "Roi", "Corr."]
+            names += ["Slice", "Roi", "B.E.C."]
 
         elif self.results_type == "events_forces" or \
                 self.results_type == "events_per_curve" or \
@@ -427,7 +427,7 @@ class ResultsSingleWidget(PYAFWidget):
         if rtype == "stiffness":
             self.add_cell_at_pos("Slice", row_index)
 
-            self.add_cell_at_pos("Corr.", row_index)
+            self.add_cell_at_pos("B.E.C.", row_index)
 
             self.add_cell_at_pos("Roi", row_index)
 
@@ -565,7 +565,7 @@ class ResultsSingleWidget(PYAFWidget):
             ind = gui_tools.CenteredCellComboBox(list_indent_hist)
             self.tableWidget.setCellWidget(row_index, column_pos, ind)
 
-        elif name == "Corr.":
+        elif name == "B.E.C.":
             # Add list for the stiffness correction
             corr_list = PYAFComboBox(self, None)
             corr_list.setFont(self.parent.smallfont)
@@ -666,7 +666,7 @@ class ResultsSingleWidget(PYAFWidget):
                 cell = self.tableWidget.cellWidget(i, col.position)
                 result.dist_to_joc = cell.list.currentIndex()
 
-            col = self.columns.get_column("Corr.")
+            col = self.columns.get_column("B.E.C.")
             if col is not None and col.visibility:
                 cell = self.tableWidget.cellWidget(i, col.position)
                 sub_type = cell.list.currentIndex()

@@ -31,6 +31,7 @@
 
 """Options for the meshgrids."""
 
+import numpy
 from qtpy import QtCore, QtWidgets
 from ..single import robust_max
 from ..tools import apply_to_all
@@ -308,6 +309,16 @@ class PlotOptionsWidget(PYAFWidget):
             elif mt == "events_per_curve":
                 data.colortable_max_value = data.max_nbr_events
                 data.colortable_middle_value = data.max_nbr_events / 2.0
+            elif mt == "visco_tan_delta":
+                # Diverging scale centered on tan delta = 1
+                data.colortable_min_value = 0.0
+                data.colortable_max_value = 2.0
+                data.colortable_middle_value = 1.0
+            elif mt.startswith("visco_"):
+                high = robust_max(getattr(data, mt))
+                if high is not None:
+                    data.colortable_max_value = high
+                    data.colortable_middle_value = high / 2.0
             elif mt == "piezo":
                 data.colortable_max_value = data.max_piezo
                 data.colortable_middle_value = data.max_piezo / 2.0
@@ -407,13 +418,24 @@ class PlotOptionsWidget(PYAFWidget):
         elif mt == "events_per_curve":
             name, unit, factor = "Max. number of events", "events", 1
             val, val_all = data.max_nbr_events, exp.global_max_nbr_events
+        elif mt.startswith("visco_"):
+            name, unit, factor = {
+                "visco_e0": ("Max. E0", "kPa", 1e-3),
+                "visco_fluidity": ("Max. fluidity", "", 1),
+                "visco_tan_delta": ("Max. tan \u03b4", "", 1)}[mt]
+            values = numpy.asarray(getattr(data, mt), dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(values.max()) if values.size else 0.0
+            val_all = None
 
         def fmt(value):
             if mt == "events_per_curve":
                 return str(int(value))
+            if mt in ("visco_fluidity", "visco_tan_delta"):
+                return str(round(float(value) * factor, 3))
             return str(round(float(value) * factor, 2))
 
-        text = name + " : " + fmt(val) + " " + unit
+        text = (name + " : " + fmt(val) + " " + unit).rstrip()
         if exp.apply_to_all_data and val_all is not None:
             text += " (all files : " + fmt(val_all) + " " + unit + ")"
 
@@ -438,11 +460,11 @@ class PlotOptionsWidget(PYAFWidget):
 
         self.CB_nan_transp.setChecked(data.nan_color_transparent)
 
-        # Log scale only for the elasticity maps
+        # Log scale only for the elasticity and E0 maps
         self.CB_log.setChecked(getattr(data, "stiffness_color_log", False))
         self.CB_log.setEnabled(mt in ("stiffness", "stiffness_slice",
                                       "stiffness_corr",
-                                      "stiffness_corr_slice"))
+                                      "stiffness_corr_slice", "visco_e0"))
 
     def update_parent_elements(self):
         """This method is called to update some elements from the parents widget.
@@ -491,6 +513,9 @@ def color_value_conversion(data, field):
             return 1.0, 0.0
         # kPa to Pa
         return 1e3, 0.0
+    elif mt == "visco_e0":
+        # kPa to Pa
+        return 1e3, 0.0
     elif mt == "work":
         # fJ to J
         return 1e-15, 0.0
@@ -519,8 +544,10 @@ def displayed_color_value(data, field):
     elif mt == "work":
         # Work values can be small, keep significant digits
         return float(f"{value:.4g}")
-    elif mt in ("rupture_force", "events_rupture_force"):
+    elif mt in ("rupture_force", "events_rupture_force", "visco_e0"):
         return round(value, 2)
+    elif mt in ("visco_fluidity", "visco_tan_delta"):
+        return round(value, 3)
     return float(f"{value:.7g}")
 
 

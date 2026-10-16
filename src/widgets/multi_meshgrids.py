@@ -112,6 +112,9 @@ class MultiMeshgridsWidget(PYAFWidget):
         self.list_choser.addItem("Detachment force")
         self.list_choser.addItem("Events per curve")
         self.list_choser.addItem("Event max. force")
+        self.list_choser.addItem("E0 (visco.)")
+        self.list_choser.addItem("Fluidity")
+        self.list_choser.addItem("Loss tangent (tan \u03b4)")
         self.list_choser.fit_to_contents()
 
         self.CB_display_roi = PYAFCheckBox(self, "display_roi", "Display ROIs")
@@ -198,6 +201,12 @@ class MultiMeshgridsWidget(PYAFWidget):
 
         meshgrid_type = shared.exp.multi_meshgrid_type
         meshgrid_type = misc_tools.get_meshgrid_type_by_id(meshgrid_type)
+        # Stiffness when computed by Tomography
+        name = misc_tools.elasticity_name()
+        for index, suffix in ((2, ""), (3, " Slice"), (4, " (BEC)"),
+                              (5, " Slice (BEC)")):
+            self.list_choser.setItemText(index, name + suffix)
+        self.list_choser.fit_to_contents()
         self.list_choser.setCurrentIndex(meshgrid_type)
 
         self.update_MPL()

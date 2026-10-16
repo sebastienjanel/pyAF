@@ -291,6 +291,16 @@ class Stiffness:
         self.temp_file.flush_file()
         data.stiffness_calculated = True
 
+        # The viscoelasticity uses the points of contact and the moduli of
+        # the elasticity fit: to be computed again
+        if data.visco_calculated:
+            data.visco_calculated = False
+            data.visco_results = None
+            if data.meshgrid_type.startswith("visco_"):
+                data.meshgrid_type = "stiffness"
+            if data.display_curve_type == "visco":
+                data.display_curve_type = "defl_ext"
+
         # Close the progressbar and return
         widgets_list.widget_progressbar.close()
 
