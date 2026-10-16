@@ -77,19 +77,19 @@ class Columns:
                  "Sd", "Mode"]
 
         if self.results_type == "stiffness":
-            names += ["Slice", "Roi", "B.E.C."]
+            names += ["Slice", "ROI", "B.E.C."]
 
         elif self.results_type == "events_forces" or \
                 self.results_type == "events_per_curve" or \
                 self.results_type == "events_rupture_force" or \
                 self.results_type == "loading_rates":
-            names += ["Slope filter", "Distance filter", "Roi"]
+            names += ["Slope filter", "Distance filter", "ROI"]
 
         elif self.results_type == "events_distance":
-            names += ["Slope filter", "Distance filter", "Event(s)", "Roi"]
+            names += ["Slope filter", "Distance filter", "Event(s)", "ROI"]
 
         else:
-            names += ["Roi"]
+            names += ["ROI"]
 
         for index, name in enumerate(names):
             self.list.append(Column(index, name))
@@ -429,7 +429,7 @@ class ResultsSingleWidget(PYAFWidget):
 
             self.add_cell_at_pos("B.E.C.", row_index)
 
-            self.add_cell_at_pos("Roi", row_index)
+            self.add_cell_at_pos("ROI", row_index)
 
         elif rtype == "events_forces" or rtype == "events_per_curve" or \
                 rtype == "events_rupture_force" or rtype == "loading_rates" \
@@ -441,13 +441,13 @@ class ResultsSingleWidget(PYAFWidget):
             if rtype == "events_distance":
                 self.add_cell_at_pos("Event(s)", row_index)
 
-                self.add_cell_at_pos("Roi", row_index)
+                self.add_cell_at_pos("ROI", row_index)
 
             else:
-                self.add_cell_at_pos("Roi", row_index)
+                self.add_cell_at_pos("ROI", row_index)
 
         else:
-            self.add_cell_at_pos("Roi", row_index)
+            self.add_cell_at_pos("ROI", row_index)
 
     def add_cell_at_pos(self, name, row_index):
         """Add a cell to a colum, by name and row index."""
@@ -531,7 +531,7 @@ class ResultsSingleWidget(PYAFWidget):
             label = gui_tools.CenteredCellwidget(label_mode)
             self.tableWidget.setCellWidget(row_index, column_pos, label)
 
-        elif name == "Roi":
+        elif name == "ROI":
             roi_list = PYAFComboBox(self, None)
             roi_list.setFont(self.parent.smallfont)
             roi_list.addItem("None")
@@ -650,7 +650,7 @@ class ResultsSingleWidget(PYAFWidget):
                 result.display = cell.checkbox.isChecked()
 
             # Rois
-            col = self.columns.get_column("Roi")
+            col = self.columns.get_column("ROI")
             if col is not None and col.visibility:
                 cell = self.tableWidget.cellWidget(i, col.position)
                 roi_id = cell.list.currentIndex()
@@ -983,7 +983,7 @@ class ResultsSingleWidget(PYAFWidget):
 
             shared.exp.results_list[row_index].roi = newindex
 
-            col = self.columns.get_column("Roi").position
+            col = self.columns.get_column("ROI").position
             if col is not None:
                 cell = self.tableWidget.cellWidget(row_index, col)
                 cell.list.setCurrentIndex(newindex)
