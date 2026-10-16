@@ -210,9 +210,10 @@ class MainPlot:
                 self.empty_bbox = cv.copy_from_bbox(self.axes.bbox)
                 self.current_bbox = cv.copy_from_bbox(self.axes.bbox)
 
+                self.clear_blit_artists()
+                self.draw_corrupted()
                 self.draw_roi("all")
                 self.draw_profiles("all")
-                self.draw_corrupted()
                 self.draw_red_square()
 
                 # If it's for a save (meshgrid)

@@ -563,3 +563,6 @@ class ROI:
         self.color = 0
         self.glass_coeffs = None
         self.values = []
+        # Pixels whose curves were discarded with "Discard data" (to keep
+        # them again)
+        self.discarded = []

@@ -387,10 +387,7 @@ class PlotMeshGrid(MainPlot):
             verts = numpy.array([(x1, y1), (x2, y2), (x3, y3), (x4, y4)])
             coll = PolyCollection([verts], facecolors="none",
                                   edgecolors="r", linewidths=2)
-            self.axes.add_collection(coll)
-
-            if self.parent.canvas is not None:
-                self.axes.draw_artist(coll)
+            self.add_blit_artist(coll)
 
     def draw_profiles(self, mode, profile=None,
                       profile_id=None, closing=False):
@@ -459,10 +456,7 @@ class PlotMeshGrid(MainPlot):
 
         coll = LineCollection(verts, linewidths=2,
                               colors=color, linestyle="solid")
-
-        self.axes.add_collection(coll)
-        if self.parent.canvas is not None:
-            self.axes.draw_artist(coll)
+        self.add_blit_artist(coll)
 
     def draw_roi(self, mode, roi=None, roi_mask=None):
         """Draw the ROIS on a meshgrid."""
@@ -518,85 +512,74 @@ class PlotMeshGrid(MainPlot):
         pcoll_np = PolyCollection(all_verts, facecolors=color,
                                   edgecolors=color, linewidth=1)
         pcoll_np.set_alpha(alpha)
-        self.axes.add_collection(pcoll_np)
+        self.add_blit_artist(pcoll_np)
+
+    def add_blit_artist(self, artist):
+        """Adds an artist drawn over the meshgrid (ROIs, profiles, discarded
+        curves...) and draws it. The artists of the previous redraw are
+        removed by clear_blit_artists (else they pile up in the axes and the
+        meshgrid gets slower at each mouse move)."""
+        self.__dict__.setdefault("blit_artists", []).append(artist)
+        self.axes.add_collection(artist)
         if self.parent.canvas is not None:
-            self.axes.draw_artist(pcoll_np)
+            self.axes.draw_artist(artist)
+
+    def clear_blit_artists(self):
+        """Removes the artists drawn over the meshgrid at the last redraw
+        (the drawn image is not changed)."""
+        for artist in self.__dict__.get("blit_artists", []):
+            try:
+                artist.remove()
+            except (ValueError, NotImplementedError):
+                pass
+        self.blit_artists = []
+
+    def pixel_squares(self, positions):
+        """Corners of the squares of the pixels."""
+        squares = []
+        for i, j in positions:
+            x0, y0 = i * self.x_size, j * self.y_size
+            x1, y1 = x0 + self.x_size, y0 + self.y_size
+            squares.append([(x1, y1), (x1, y0), (x0, y0), (x0, y1)])
+        return squares
 
     def draw_corrupted(self):
-        """Draws a sign on the meshgrid when a curve is corrupted.
+        """Draws a sign on the meshgrid when a curve is discarded.
 
-        (Grey square and a red cross)
+        (White square and a red cross, all the curves in one collection)
         """
+        artists = []
         if (self.data.discarded_curves is not None
                 and shared.exp.meshgrid_display_discarded):
-            for i in range(self.nbr_pixels_x):
-                for j in range(self.nbr_pixels_y):
-                    if self.data.discarded_curves[i][j]:
-                        x1 = i * self.x_size + self.x_size
-                        y1 = j * self.y_size + self.y_size
-                        x2 = i * self.x_size + self.x_size
-                        y2 = j * self.y_size
-                        x3 = i * self.x_size
-                        y3 = j * self.y_size
-                        x4 = i * self.x_size
-                        y4 = j * self.y_size + self.y_size
-
-                        verts = numpy.array([(x1, y1), (x2, y2),
-                                             (x3, y3), (x4, y4)])
-                        coll = PolyCollection([verts],
-                                              facecolors="w", edgecolors="w")
-                        self.axes.add_collection(coll)
-
-                        if self.parent.canvas is not None:
-                            self.axes.draw_artist(coll)
-
-                        verts = numpy.array([(x1, y1), (x3, y3)])
-                        coll = LineCollection(
-                            [verts],
-                            linewidths=1,
-                            colors="r",
-                            linestyle="solid")
-                        self.axes.add_collection(coll)
-
-                        if self.parent.canvas is not None:
-                            self.axes.draw_artist(coll)
-
-                        verts = numpy.array([(x2, y2), (x4, y4)])
-                        coll = LineCollection(
-                            [verts],
-                            linewidths=1,
-                            colors="r",
-                            linestyle="solid")
-                        self.axes.add_collection(coll)
-
-                        if self.parent.canvas is not None:
-                            self.axes.draw_artist(coll)
+            positions = numpy.argwhere(
+                numpy.asarray(self.data.discarded_curves) != 0)
+            if len(positions):
+                squares = self.pixel_squares(positions)
+                crosses = []
+                for (p1, p2, p3, p4) in squares:
+                    crosses.append([p1, p3])
+                    crosses.append([p2, p4])
+                artists = [PolyCollection(squares, facecolors="w",
+                                          edgecolors="w"),
+                           LineCollection(crosses, linewidths=1, colors="r",
+                                          linestyle="solid")]
+        for artist in artists:
+            self.add_blit_artist(artist)
 
     def draw_missing_z(self):
         """Draws a sign on the meshgrid when a z value in a piezo image is missing.
 
         (Blue square)
         """
-        if (shared.exp.missing_z_positions is not None \
+        artists = []
+        if (shared.exp.missing_z_positions is not None
                 and shared.exp.meshgrid_display_missing_z):
-            for x, y in shared.exp.missing_z_positions:
-                x1 = x * self.x_size + self.x_size
-                y1 = y * self.y_size + self.y_size
-                x2 = x * self.x_size + self.x_size
-                y2 = y * self.y_size
-                x3 = x * self.x_size
-                y3 = y * self.y_size
-                x4 = x * self.x_size
-                y4 = y * self.y_size + self.y_size
-
-                verts = numpy.array([(x1, y1), (x2, y2),
-                                     (x3, y3), (x4, y4)])
-                coll = PolyCollection([verts],
-                                      facecolors="b", edgecolors="b")
-                self.axes.add_collection(coll)
-
-                if self.parent.canvas is not None:
-                    self.axes.draw_artist(coll)
+            squares = self.pixel_squares(shared.exp.missing_z_positions)
+            if squares:
+                artists = [PolyCollection(squares, facecolors="b",
+                                          edgecolors="b")]
+        for artist in artists:
+            self.add_blit_artist(artist)
 
     def update_blit(self, mode, roi=None, roi_mask=None, profile=None,
                     profile_id=None, closing=False):
@@ -604,8 +587,17 @@ class PlotMeshGrid(MainPlot):
 
         http://matplotlib.org/examples/animation/animation_blit_qt4.html
         """
+        self.clear_blit_artists()
+
+        if mode == "discarded":
+            # Redraw everything (the saved background has the old marks)
+            mode = "all"
+
+        # The clean backgrounds are saved 100 ms after a redraw of the
+        # meshgrid (refresh_blitting): nothing to restore before
         if mode == "all":
-            self.parent.restore_region(self.empty_bbox)
+            if self.empty_bbox is not None:
+                self.parent.restore_region(self.empty_bbox)
 
         elif mode == "preview_add" or mode == "preview_erase" or \
                 mode == "profile_preview" or \
@@ -620,7 +612,8 @@ class PlotMeshGrid(MainPlot):
 
         elif mode == "local_add" or mode == "local_erase":
             if self.first_blit:
-                self.parent.restore_region(self.current_bbox)
+                if self.current_bbox is not None:
+                    self.parent.restore_region(self.current_bbox)
                 self.first_blit = False
             else:
                 bbox = self.fig.canvas.copy_from_bbox(self.axes.bbox)
@@ -629,6 +622,12 @@ class PlotMeshGrid(MainPlot):
         if (self.plot_type in ("meshgrid", "meshgrid_data",
                                "meshgrid_tilt_check")):
             if self.plot_type != "meshgrid_tilt_check":
+                # Discarded curves under the ROIs and the profiles (else they
+                # hide them). The previews and the local drawings start from
+                # a background which has them already
+                if mode == "all":
+                    self.draw_corrupted()
+
                 # Draw ROI first
                 if roi is not None or mode == "all":
                     self.draw_roi(mode, roi, roi_mask)
@@ -640,10 +639,6 @@ class PlotMeshGrid(MainPlot):
             if mode == "all" and self.parent is not None:
                 self.current_bbox = \
                     self.parent.copy_from_bbox(self.axes.bbox)
-
-            if self.plot_type != "meshgrid_tilt_check":
-                # Draw corrupted curves if needed
-                self.draw_corrupted()
 
         if self.mesh_type in ("piezo", "topo") or self.plot_type == "small_meshgrid_compute":
             self.draw_missing_z()
