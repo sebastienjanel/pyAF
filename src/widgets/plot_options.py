@@ -34,6 +34,7 @@
 from qtpy import QtCore, QtWidgets
 from ..tools import apply_to_all
 from ..tools import misc_tools
+from ..tools import planefit
 from ..tools.colortables import ColorTables
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFButton
@@ -294,6 +295,12 @@ class PlotOptionsWidget(PYAFWidget):
                 data.colortable_middle_value = data.max_topo / 2.0
 
             data.colortable_min_value = 0
+
+            if mt in ("piezo", "topo") and \
+                    planefit.get_planefit_roi(data) is not None:
+                # Planefitted heights: their whole range (negative values
+                # around the substrate)
+                planefit.reset_color_scales(data)
 
             # Apply to all if needed
             apply_to_all.apply_to_all("display_options", oldid=self.data_id)

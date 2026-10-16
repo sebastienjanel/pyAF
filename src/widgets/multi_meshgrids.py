@@ -103,7 +103,7 @@ class MultiMeshgridsWidget(PYAFWidget):
 
         self.list_choser = PYAFComboBox(self, "list_choser")
         self.list_choser.addItem("Piezo height")
-        self.list_choser.addItem("Topography")
+        self.list_choser.addItem("Topography (zero force)")
         self.list_choser.addItem("Elasticity")
         self.list_choser.addItem("Elasticity Slice")
         self.list_choser.addItem("Elasticity (BEC)")

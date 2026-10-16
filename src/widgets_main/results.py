@@ -153,7 +153,7 @@ class ResultsWidget(PYAFWidget):
 
         self.GRP_mesh_type = PYAFButtonGroup(self, "BTG_meshgrid_type")
         self.RBT_mesh_piezo = QtWidgets.QRadioButton("Piezo height")
-        self.RBT_mesh_topography = QtWidgets.QRadioButton("Topography")
+        self.RBT_mesh_topography = QtWidgets.QRadioButton("Topography (zero force)")
         self.RBT_mesh_stiffness = QtWidgets.QRadioButton()
         self.RBT_mesh_stiffness_slice = QtWidgets.QRadioButton()
         self.RBT_mesh_stiffness_corr = QtWidgets.QRadioButton(

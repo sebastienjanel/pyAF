@@ -32,8 +32,10 @@
 """Main vtk layer."""
 
 import vtk
+import numpy
 from ... import shared
 from ... import widgets_list
+from ...tools import planefit
 
 
 class Layer:
@@ -161,7 +163,8 @@ class Layer:
         else:
             # Disable z axis if asked
             if self.display_z_scale:
-                self.actor_axes.SetZAxisRange(0, self.data.max_topo / 1000.0)
+                top = numpy.nanmax(planefit.topo_map(self.data))
+                self.actor_axes.SetZAxisRange(0, top / 1000.0)
             else:
                 self.actor_axes.SetZAxisRange(0, 0)
             self.actor_axes.SetZAxisVisibility(self.display_z_scale)

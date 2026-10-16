@@ -33,6 +33,7 @@
 
 import numpy
 from .plot_meshgrid import PlotMeshGrid
+from ...tools import planefit
 
 
 class PlotTopoMeshGrid(PlotMeshGrid):
@@ -44,7 +45,8 @@ class PlotTopoMeshGrid(PlotMeshGrid):
     def __init__(self, parent):
         super().__init__(parent)
 
-        self.temp_array[:] = self.data.topography
+        # With the planefit of the ROI manager
+        self.temp_array[:] = planefit.topo_map(self.data)
         # Mask the nans (no POC found), so that matplotlib displays them with
         # the nan color
         self.temp_array = numpy.ma.masked_where(

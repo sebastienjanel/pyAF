@@ -414,6 +414,11 @@ class SingleFile:
         self.applied_flatten_order = None
         self.flatten_applied = False
 
+        # Planefit of the height maps with a substrate ROI as zero plane (see
+        # tools.planefit): index of the ROI in roi_list
+        self.planefit_applied = False
+        self.planefit_roi = None
+
         # Preview values for the tilt limits
         self.tilt_limit_1 = 200
         self.tilt_limit_2 = 400

@@ -36,6 +36,7 @@ import numpy
 from ... import widgets_list
 from ...tools.colortables import ColorTables
 from .common import center_data
+from ...tools import planefit
 
 
 def get_topography_for_geometry(data):
@@ -44,8 +45,9 @@ def get_topography_for_geometry(data):
     Pixels where no point of contact was found have a nan topography. VTK
     needs finite coordinates, so these pixels are drawn at the lowest
     topography level (they have no stiffness value and are colored as nan).
+    The planefit of the file is applied.
     """
-    topo = numpy.array(data.topography, dtype=float)
+    topo = planefit.topo_map(data)
     finite = numpy.isfinite(topo)
     topo[~finite] = topo[finite].min() if finite.any() else 0.0
     return topo
