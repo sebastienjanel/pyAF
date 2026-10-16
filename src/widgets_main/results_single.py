@@ -119,6 +119,9 @@ class Columns:
                     name_list.append("")
                 elif column.name == "Sd":
                     name_list.append("S.D.")
+                elif column.name == "Group":
+                    # The groups are the replicates of the SuperPlots
+                    name_list.append("Replicate")
                 else:
                     name_list.append(column.name)
         return name_list
@@ -285,9 +288,8 @@ class ResultsSingleWidget(PYAFWidget):
         self.setLayout(self.GL_results_data)
         widgets_list.widget_progressbar.update()
 
+        # The values are computed when the plots tabs are opened
         self.reset_table()
-        if self.settings.value("refreshHistsAtLoad"):
-            stat_tools.get_values()
 
         self.update_widget()
 
@@ -709,7 +711,6 @@ class ResultsSingleWidget(PYAFWidget):
                 self.update_widget()
 
                 stat_tools.fetch_group_data()
-                stat_tools.fetch_conditions_data()
                 widgets_list.widget_results_groups.update_widget()
                 widgets_list.widget_results_experiment.update_widget()
             finally:
@@ -817,41 +818,17 @@ class ResultsSingleWidget(PYAFWidget):
         #     elif shared.exp.hist_values_or_frequencies == "frequencies":
         #         self.list_values.setCurrentIndex(1)
 
-    def display_selected(self, disable_security=False):
+    def display_selected(self):
         """Display all the selected results."""
-        display_selected = True
+        for item in self.tableWidget.selectionModel().selectedRows():
+            row_index = item.row()
+            col = self.columns.get_column("CB").position
+            if col is not None:
+                cellwidget = self.tableWidget.cellWidget(row_index, col)
+                cellwidget.checkbox.setChecked(True)
+                shared.exp.results_list[row_index].display = True
 
-        # Check if too many plots will be displayed and ask the user if he
-        # wanted to do this.
-        if disable_security is False:
-            count = 0
-            for item in self.tableWidget.selectionModel().selectedRows():
-                count += 1
-            if count >= 10:
-                text = "You are trying to display more than 10 histograms." + \
-                    "This may be slow !"
-                # Create a message box
-                msg = QtWidgets.QMessageBox()
-                msg.setText("Display plots")
-                msg.setInformativeText(text)
-                msg.setIcon(QtWidgets.QMessageBox.Critical)
-                msg.addButton(QtWidgets.QMessageBox.Ok)
-                msg.addButton(QtWidgets.QMessageBox.Abort)
-                ret = msg.exec_()
-
-                if ret == QtWidgets.QMessageBox.Abort:
-                    display_selected = False
-
-        if display_selected:
-            for item in self.tableWidget.selectionModel().selectedRows():
-                row_index = item.row()
-                col = self.columns.get_column("CB").position
-                if col is not None:
-                    cellwidget = self.tableWidget.cellWidget(row_index, col)
-                    cellwidget.checkbox.setChecked(True)
-                    shared.exp.results_list[row_index].display = True
-
-            self.update_MPL()
+        self.update_MPL()
 
     def hide_selected(self):
         """Hide all selected results."""
@@ -1080,16 +1057,16 @@ class ResultsSingleWidget(PYAFWidget):
         action.setMenu(self.submenu_columns)
 
         # Groups (as in the grouped plots tab)
-        action = QtWidgets.QAction("Add group", self)
+        action = QtWidgets.QAction("Add replicate", self)
         action.triggered.connect(self.add_group)
         menu.addAction(action)
-        action = QtWidgets.QAction("Rename groups", self)
+        action = QtWidgets.QAction("Rename replicates", self)
         action.triggered.connect(
             widgets_list.widget_results_groups.rename_groups)
         menu.addAction(action)
 
         # Batch change groups
-        action = QtWidgets.QAction("Change selected groups", self)
+        action = QtWidgets.QAction("Change selected replicates", self)
         menu.addAction(action)
         self.submenu_groups = QtWidgets.QMenu()
         for group in shared.exp.groups_list:

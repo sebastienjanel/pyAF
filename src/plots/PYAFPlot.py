@@ -56,8 +56,7 @@ from .meshgrids.empty_meshgrid import PlotEmptyMeshGrid
 from .meshgrids.tilt_check import PlotTiltCheckMeshGrid
 from .results.single import PlotSingleResults
 from .results.groups import PlotGroupedResults
-from .results.experiment import PlotExperimentResults
-from .results.stats import PlotExperimentStats
+from .results.superplot import PlotSuperPlot
 from .slices.plot_slices import PlotSlices
 from .events_per_scan.plot_events_per_scan import PlotEventsPerScan
 from .profiles.plot_profiles import PlotProfiles
@@ -312,9 +311,7 @@ class PYAFPlot(FigureCanvasQTAgg):
         elif p_type == "results_groups":
             self.canvas = PlotGroupedResults(self)
         elif p_type == "results_experiment":
-            self.canvas = PlotExperimentResults(self)
-        elif p_type == "results_stats":
-            self.canvas = PlotExperimentStats(self)
+            self.canvas = PlotSuperPlot(self)
         elif p_type == "meshgrid_slices":
             self.canvas = PlotSlices(self)
         elif p_type == "events_per_scan":

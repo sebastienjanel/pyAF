@@ -36,7 +36,7 @@ import numpy
 from .. import shared
 from .. import widgets_list
 from .. import experiment
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..tools import stat_tools
 from ..tools import gui_tools
 from ..tools.gui_tools import PYAFButton
@@ -54,9 +54,13 @@ from ..experiment import ResultGroup
 from .subwidgets.result_header import QCheckableHeader
 
 # Columns of the table (the values share the remaining space)
-COLUMNS = ("CB", "Group", "Files", "Condition", "Mean", "Median", "S.D.",
-           "Mode")
-WIDTHS = {"CB": 35, "Group": 350, "Files": 70, "Condition": 350}
+COLUMNS = ("CB", "Group", "Files", "Experiment", "Condition", "Mean",
+           "Median", "S.D.", "Mode")
+WIDTHS = {"CB": 35, "Group": 300, "Files": 70, "Experiment": 90,
+          "Condition": 300}
+# Names of the columns displayed (the groups are the replicates of the
+# SuperPlots)
+LABELS = {"CB": "", "Group": "Replicate"}
 
 
 def col(name):
@@ -140,7 +144,12 @@ class ResultsGroupsWidget(PYAFWidget):
         policy = QtCore.Qt.ScrollBarAlwaysOff
         self.tableWidget.setHorizontalScrollBarPolicy(policy)
         self.tableWidget.setHorizontalHeaderLabels(
-            ["" if name == "CB" else name for name in COLUMNS])
+            [LABELS.get(name, name) for name in COLUMNS])
+        self.tableWidget.horizontalHeaderItem(col("Experiment")).setToolTip(
+            "Replicates of different conditions done in the same experiment "
+            "(same day)\nhave the same number: colors of the SuperPlots and "
+            "pairing of the paired tests.\nEmpty: order of the replicate in "
+            "its condition.")
         headers = self.tableWidget.horizontalHeader()
         headers.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         headers.customContextMenuRequested.connect(self.popUpMenuTableHeader)
@@ -261,13 +270,29 @@ class ResultsGroupsWidget(PYAFWidget):
         line_edit.setFont(self.parent.smallfont)
         line_edit.setAlignment(QtCore.Qt.AlignCenter)
         line_edit.setFrame(False)
-        line_edit.setToolTip("Name of the group (edit it)")
+        line_edit.setToolTip("Name of the replicate (edit it)")
         line_edit.editingFinished.connect(
             lambda r=row, e=line_edit: self.name_edited(r, e))
         self.tableWidget.setCellWidget(
             row, col("Group"), gui_tools.FullCellWidget(line_edit))
 
-        # Condition (Experiment Plots tab)
+        # Experiment number (empty: order of the replicate in its condition)
+        order = [g.group_id for g in shared.exp.groups_list[1:]
+                 if g.condition == group.condition].index(group.group_id) + 1
+        experiment = QtWidgets.QLineEdit()
+        experiment.setFont(self.parent.smallfont)
+        experiment.setAlignment(QtCore.Qt.AlignCenter)
+        experiment.setFrame(False)
+        experiment.setValidator(QtGui.QIntValidator(1, 999))
+        experiment.setPlaceholderText(str(order))
+        number = getattr(group, "experiment", None)
+        experiment.setText(str(number) if number else "")
+        experiment.editingFinished.connect(
+            lambda r=row, e=experiment: self.experiment_edited(r, e))
+        self.tableWidget.setCellWidget(
+            row, col("Experiment"), gui_tools.FullCellWidget(experiment))
+
+        # Condition (SuperPlots tab)
         conditions = PYAFComboBox(self, None)
         conditions.setFont(self.parent.smallfont)
         for condition in shared.exp.conditions_list:
@@ -288,7 +313,15 @@ class ResultsGroupsWidget(PYAFWidget):
             self.tableWidget.setCellWidget(
                 row, col(name), gui_tools.CenteredCellwidget(label))
         self.files_labels[-1].setToolTip(
-            "Number of files in the group (column Group of the Plots tab)")
+            "Number of files in the replicate (column Replicate of the "
+            "Plots tab)")
+
+    def experiment_edited(self, row, line_edit):
+        """The experiment number of a replicate was edited."""
+        group = shared.exp.groups_list[row + 1]
+        text = line_edit.text().strip()
+        group.experiment = int(text) if text else None
+        widgets_list.widget_results_experiment.update_widget()
 
     def name_edited(self, row, line_edit):
         """A group name was edited."""
@@ -310,7 +343,6 @@ class ResultsGroupsWidget(PYAFWidget):
     def conditions_changed(self, *args):
         """A condition was changed: update the experiment plots tab."""
         self.save_hist_prefs()
-        stat_tools.fetch_conditions_data()
         widgets_list.widget_results_experiment.update_widget()
 
     def checkbox_clicked(self, name, row):
@@ -404,7 +436,7 @@ class ResultsGroupsWidget(PYAFWidget):
         if widgets_list.widget_rename_groups is None:
             # Create new widget
             RenameGroupsWidget(self)
-            widgets_list.widget_rename_groups.setWindowTitle("Rename groups")
+            widgets_list.widget_rename_groups.setWindowTitle("Rename replicates")
             widgets_list.widget_rename_groups.activateWindow()
             widgets_list.widget_rename_groups.show()
         else:
@@ -460,12 +492,12 @@ class ResultsGroupsWidget(PYAFWidget):
         menu.addSeparator()
 
         # Add group
-        action = QtWidgets.QAction("Add group", self)
+        action = QtWidgets.QAction("Add replicate", self)
         action.triggered.connect(self.add_group)
         menu.addAction(action)
 
         # Rename groups
-        action = QtWidgets.QAction("Rename groups", self)
+        action = QtWidgets.QAction("Rename replicates", self)
         action.triggered.connect(self.rename_groups)
         menu.addAction(action)
 

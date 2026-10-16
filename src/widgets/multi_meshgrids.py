@@ -112,6 +112,7 @@ class MultiMeshgridsWidget(PYAFWidget):
         self.list_choser.addItem("Detachment force")
         self.list_choser.addItem("Events per curve")
         self.list_choser.addItem("Event max. force")
+        self.list_choser.fit_to_contents()
 
         self.CB_display_roi = PYAFCheckBox(self, "display_roi", "Display ROIs")
 

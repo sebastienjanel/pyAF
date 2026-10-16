@@ -165,23 +165,6 @@ class EntryWidget(QtWidgets.QDialog):
         self.label_triangle.mousePressEvent = lambda event: self.change_mode()
         self.label_mode.mousePressEvent = lambda event: self.change_mode()
 
-        # Define checkbox for advanced mode
-        label = "Refresh histograms at load (slower)"
-        self.checkbox = PYAFCheckBox(self, "refresh", label)
-        if self.settings.contains("refreshHistsAtLoad"):
-            # Get the value
-            if self.settings.value("refreshHistsAtLoad") == "true":
-                self.refresh = True
-            elif self.settings.value("refreshHistsAtLoad") == "false":
-                self.refresh = False
-            else:
-                self.refresh = self.settings.value("refreshHistsAtLoad")
-
-        else:
-            # Default value
-            self.refresh = True
-        self.checkbox.setChecked(self.refresh)
-
         # Path and buttons for advanced modes
         self.label_path = QtWidgets.QLabel()
         self.label_path.setFont(self.smallfont)
@@ -288,9 +271,10 @@ class EntryWidget(QtWidgets.QDialog):
         self.tableWidget.horizontalHeader().setStretchLastSection(True)
 
         # Define check all checkbox
-        checkbox = QtWidgets.QCheckBox("Select all")
-        checkbox.setChecked(True)
-        checkbox.clicked.connect(lambda: self.checkbox_clicked("check_all"))
+        self.checkbox = QtWidgets.QCheckBox("Select all")
+        self.checkbox.setChecked(True)
+        self.checkbox.clicked.connect(
+            lambda: self.checkbox_clicked("check_all"))
 
         HL = QtWidgets.QHBoxLayout()
         # Add the button to load the selected data
@@ -312,7 +296,7 @@ class EntryWidget(QtWidgets.QDialog):
         HL.addWidget(self.BT_load)
 
         self.VL_entry.addWidget(self.tableWidget)
-        self.VL_entry.addWidget(checkbox)
+        self.VL_entry.addWidget(self.checkbox)
         self.VL_entry.addLayout(HL)
         self.VL_entry.addLayout(self.GL_advanced)
 
@@ -323,7 +307,6 @@ class EntryWidget(QtWidgets.QDialog):
 
         if self.display_advanced:
             self.display_advanced = False
-            self.checkbox.setParent(None)
             self.BT_reset_path.setParent(None)
             self.BT_change_path.setParent(None)
             self.label_path.setParent(None)
@@ -332,10 +315,9 @@ class EntryWidget(QtWidgets.QDialog):
             self.label_triangle.setPixmap(pixmap)
         else:
             self.display_advanced = True
-            self.GL_advanced.addWidget(self.checkbox, 0, 0, 1, 1)
-            self.GL_advanced.addWidget(self.BT_reset_path, 1, 0)
-            self.GL_advanced.addWidget(self.BT_change_path, 1, 1)
-            self.GL_advanced.addWidget(self.label_path, 1, 2)
+            self.GL_advanced.addWidget(self.BT_reset_path, 0, 0)
+            self.GL_advanced.addWidget(self.BT_change_path, 0, 1)
+            self.GL_advanced.addWidget(self.label_path, 0, 2)
             self.label_mode.setText("Hide")
             pixmap = misc_tools.get_pixmap(self.triangle_down)
             self.label_triangle.setPixmap(pixmap)
@@ -601,10 +583,6 @@ class EntryWidget(QtWidgets.QDialog):
                 if self.files_info[i]["enabled"]:
                     self.tableWidget.cellWidget(i, 0).checkbox.setChecked(val)
                     self.files_info[i]["checked"] = val
-
-        elif name == "refresh":
-            val = self.checkbox.isChecked()
-            self.settings.setValue("refreshHistsAtLoad", val)
 
     def list_updated(self, i):
         """Method called when a list is clicked."""

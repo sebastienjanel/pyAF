@@ -223,8 +223,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(wl.widget_compute, "Compute")
         self.tabs.addTab(wl.widget_results, "Results")
         self.tabs.addTab(wl.widget_results_single, "Plots")
-        self.tabs.addTab(wl.widget_results_groups, "Grouped Plots")
-        self.tabs.addTab(wl.widget_results_experiment, "Experiment Plots")
+        self.tabs.addTab(wl.widget_results_groups, "Replicates")
+        self.tabs.addTab(wl.widget_results_experiment, "SuperPlots")
 
         # Create the main menu of pyAF
         self.list_actions = menu.create_menu(self)
@@ -1010,12 +1010,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.list_actions["duplicate_row"].setEnabled(False)
             self.list_actions["remove_row"].setEnabled(False)
             self.list_actions["row_color"].setEnabled(True)
-            text = "Change color of row (Groups)"
+            text = "Change color of row (Replicates)"
             self.list_actions["row_color"].setText(text)
 
         # Plots tabs, coming from the other tabs: recompute the values (the
         # curves, the ROIs or the computations may have changed)
-        if self.tabs.currentIndex() in (3, 4) and \
+        if self.tabs.currentIndex() in (3, 4, 5) and \
                 previous_tab is not None and previous_tab < 3:
             wl.widget_results_single.button_clicked("refresh_hist")
             self.update_results = False

@@ -304,13 +304,10 @@ def get_hist_refresh_range(exp, loading=False):
     The grouped results preparation is very fast so no need to display a
     progressbar for it.
     """
-    # At load, if the results are not refreshed, no need to display a
-    # progressbar
+    # At load, the results are not computed (they are when the plots tabs
+    # are opened)
     if loading:
-        settings = QtCore.QSettings()
-        refresh_hist_at_load = settings.value("refreshHistsAtLoad")
-        if not refresh_hist_at_load:
-            return 0
+        return 0
 
     # Progressbar for single results
     progressbar_range = 0

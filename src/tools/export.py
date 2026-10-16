@@ -89,8 +89,9 @@ def export_results(folder):
     """Exports the results as text files.
 
     The results are saved as filtered (results displayed in the plots) and
-    unfiltered (raw results). The grouped results are also saved, with a file
-    listing the groups, their condition and their files.
+    unfiltered (raw results). The results of the replicates (the groups) are
+    also saved, with a file listing the replicates, their condition and their
+    files.
     """
     rows = exported_rows()
     Progressbar()
@@ -103,7 +104,7 @@ def export_results(folder):
     os.mkdir(folder)
     os.mkdir(folder + "/filtered")
     os.mkdir(folder + "/unfiltered")
-    os.mkdir(folder + "/groups")
+    os.mkdir(folder + "/replicates")
 
     # Unfiltered data (all the curves, one file per checked row)
     for _, result, data in rows:
@@ -137,7 +138,7 @@ def export_results(folder):
         write_file(folder + "/filtered/Events_per_scan.txt",
                    "Index\tName\tNumber of events", per_scan)
 
-    # Groups
+    # Replicates
     for res_type in ("stiffness", "work", "rupture_force", "events_forces",
                      "events_per_curve", "events_rupture_force",
                      "loading_rates", "events_distance"):
@@ -311,14 +312,14 @@ CURVE_KEYS = ["curve_index", "x_pos", "y_pos"]
 
 
 def file_info(result, data):
-    """Columns describing the row: condition, group and file."""
+    """Columns describing the row: condition, replicate and file."""
     group, condition = group_and_condition(result)
     return {"condition": condition.name,
-            "group": group.name,
+            "replicate": group.name,
             "name": result.name,
             "file_name": data.filename,
             "condition_id": condition.condition_id,
-            "group_id": group.group_id,
+            "replicate_id": group.group_id,
             "file_id": result.data_id}
 
 
@@ -411,10 +412,10 @@ def describe(df, name):
 
 
 def write_group_file(res_type, folder):
-    """Write file containing the grouped results.
+    """Write file containing the results of the replicates (the groups).
 
-    Each group is written in a column. The columns are separated by
-    semi-colons; a group with less values has empty cells.
+    Each replicate is written in a column. The columns are separated by
+    semi-colons; a replicate with less values has empty cells.
 
     NOTE: The results_sorting.py file provides the values used here.
     All the values have been scaled to be displayed directly in the sotware.
@@ -464,12 +465,12 @@ def write_group_file(res_type, folder):
     lines = [";".join(values[line_id] if line_id < len(values) else ""
                       for _, values in columns)
              for line_id in range(max_len)]
-    write_file(folder + "/groups/Groups_" + res_type + ".txt",
+    write_file(folder + "/replicates/Replicates_" + res_type + ".txt",
                title + "\r\n" + ";".join(name for name, _ in columns), lines)
 
 
 def write_info_file(folder):
-    """Writes a file containing the list of groups (with their condition)
+    """Writes a file containing the list of replicates (with their condition)
     and of their rows."""
     lines = []
     for group in shared.exp.groups_list[1:]:
@@ -479,4 +480,4 @@ def write_info_file(folder):
             if result.group == group.group_id:
                 lines.append(result.name)
         lines.append("------------------------------------------")
-    write_file(folder + "/info.txt", "Groups and their files", lines)
+    write_file(folder + "/info.txt", "Replicates and their files", lines)

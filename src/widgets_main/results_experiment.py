@@ -30,614 +30,344 @@
 # knowledge of the CeCILL license and that you accept its terms.
 
 """Widget displaying histograms and results (Grouped)."""
+"""SuperPlots tab: the conditions, with one dot per map, the replicate
+means and the tests on the replicates (Lord et al., J Cell Biol 2020)."""
 
-from itertools import combinations
+import csv
 import logging
+import os
+
+import numpy
+from qtpy import QtCore, QtWidgets
+
 from .. import shared
 from .. import widgets_list
-from qtpy import QtCore, QtGui, QtWidgets
-from ..tools import gui_tools
-from ..tools import stat_tools
-from ..tools.gui_tools import PYAFComboBox
-from ..widgets_main.subwidgets.result_chooser import ResultsChooserWidget
-from ..widgets_main.subwidgets.result_experiment_options import \
-    ResultsExperimentOptionsWidget
-from ..widgets_small.rename_conditions import RenameConditionsWidget
+from ..experiment import ConditionGroup
 from ..plots.PYAFPlot import PYAFPlot
+from ..tools import gui_tools
+from ..tools import misc_tools
+from ..tools import superplot_tools
+from ..tools.gui_tools import PYAFButton, PYAFCheckBox, PYAFComboBox
+from ..tools.gui_tools import PYAFTableWidget
 from ..tools.PYAFWidget import PYAFWidget
-from ..tools.gui_tools import PYAFTableWidget, PYAFButton
-from ..experiment import ConditionGroup, SampleGroup
-from .subwidgets.result_header import QCheckableHeader
-from ..widgets.sample_grouping_dialog import SampleGroupingDialog
+from ..widgets_main.results_single import PLOT_MIN_HEIGHT
+from ..widgets_main.subwidgets.result_chooser import ResultsChooserWidget
+from ..widgets_small.rename_conditions import RenameConditionsWidget
+
+CONDITION_COLUMNS = ("", "Condition", "Replicates", "Maps", "Curves",
+                     "Mean", "S.D.", "95% CI")
+TEST_COLUMNS = ("Comparison", "Test", "N", "p-value", "")
+
+
+def number(value):
+    """Value as text (4 significant digits)."""
+    if value is None or not numpy.isfinite(value):
+        return "–"
+    return "%.4g" % value
 
 
 class ResultsExperimentWidget(PYAFWidget):
-    """Widget displaying histograms and results (Grouped).
+    """SuperPlots tab.
 
-    This widget is in the fifth tab of PYAF. It is called from the QMainWindow
-    in main.py.
+    Hierarchy: condition > replicate (the groups of the plots tab) > map
+    (file) > curves. Each map gives one value (median of its curves), each
+    replicate the mean of its maps, and the tests compare the replicates of
+    each condition with the ones of the control (n = number of replicates).
     """
 
     def __init__(self, parent):
-        super().__init__(parent,
-                         "widget_results_experiment")
+        super().__init__(parent, "widget_results_experiment")
 
-        # Load the settings
         self.settings = QtCore.QSettings()
-
-        # Load the logger
         self.logger = logging.getLogger()
-
+        self.parent = parent
         self.canvas_resolution = parent.canvas_resolution
         self.canvas_size = [780, 350]
-        self.hist_checkboxes = []
-        self.stats_checkboxes = []
-        self.groups_sample_size_labels = []
-        self.groups_means_labels = []
-        self.groups_medians_labels = []
-        self.groups_sds_labels = []
-        self.groups_modes_labels = []
-        self.groups_pvalue_labels = []
-        self.groups_significance_labels = []
-
         sizes = [self.canvas_size[0] / self.canvas_resolution,
                  self.canvas_size[1] / self.canvas_resolution,
                  self.canvas_resolution]
 
-        # Canvas for the histograms (groups)
-        self.canvas_stack = QtWidgets.QStackedWidget()
+        # Plot, filling the available space
+        self.canva = QtWidgets.QWidget()
+        self.MPL_canva = PYAFPlot(self, "results_experiment", self.canva,
+                                  sizes)
+        self.SA_plot = QtWidgets.QScrollArea()
+        self.SA_plot.setWidget(self.MPL_canva)
+        self.SA_plot.setWidgetResizable(False)
+        self.SA_plot.setVerticalScrollBarPolicy(
+            QtCore.Qt.ScrollBarAlwaysOff)
+        self.SA_plot.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.SA_plot.setMinimumHeight(PLOT_MIN_HEIGHT)
+        self.SA_plot.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                   QtWidgets.QSizePolicy.Expanding)
+        self.plot_resize_timer = QtCore.QTimer(self)
+        self.plot_resize_timer.setSingleShot(True)
+        self.plot_resize_timer.timeout.connect(self.update_MPL)
+        self.SA_plot.viewport().installEventFilter(self)
 
-        self.canvas_hist = QtWidgets.QWidget()
-        self.canvas_hist.setFixedSize(self.canvas_size[0], self.canvas_size[1])
-        self.MPL_canvas_hist = PYAFPlot(self, "results_experiment", self.canvas_hist, sizes)
-        self.MPL_canvas_hist.mpl_connect("button_press_event", self.canvas_press)
+        # Options
+        box = QtWidgets.QGroupBox("SuperPlot")
+        form = QtWidgets.QFormLayout()
+        self.list_control = PYAFComboBox(self, "control")
+        self.list_control.setToolTip(
+            "The other conditions are compared to this one")
+        self.list_paired = PYAFComboBox(self, "paired")
+        self.list_paired.addItem("Unpaired")
+        self.list_paired.addItem("Paired (same exp.)")
+        self.list_paired.setToolTip(
+            "Unpaired: Welch t-test (one comparison) or Dunnett's test "
+            "(several).\nPaired: the replicates with the same Experiment "
+            "number (Replicates tab)\nare compared with paired t-tests "
+            "(Holm correction for several).")
+        self.list_error = PYAFComboBox(self, "error")
+        self.list_error.addItem("SD")
+        self.list_error.addItem("95% CI")
+        self.list_error.setToolTip(
+            "Error bars of the mean of the replicates")
+        self.list_paired.fit_to_contents()
+        self.list_error.fit_to_contents()
+        self.CB_log = PYAFCheckBox(self, "log", "Log scale (plot and tests)")
+        self.CB_curves = PYAFCheckBox(self, "curves", "All the curves")
+        self.CB_curves.setToolTip(
+            "Violin of all the curves of the condition in the background")
+        self.CB_white = PYAFCheckBox(self, "white", "White background")
+        form.addRow("Control", self.list_control)
+        form.addRow("Replicates", self.list_paired)
+        form.addRow("Error bars", self.list_error)
+        form.addRow(self.CB_log)
+        form.addRow(self.CB_curves)
+        form.addRow(self.CB_white)
+        box.setLayout(form)
+        self.widget_options = box
 
-        self.canvas_stats = QtWidgets.QWidget()
-        self.canvas_stats.setFixedSize(self.canvas_size[0], self.canvas_size[1])
-        self.MPL_canvas_stats = PYAFPlot(self, "results_stats", self.canvas_stats, sizes)
-        self.MPL_canvas_stats.mpl_connect("button_press_event", self.canvas_press)
-
-        self.canvas_stack.addWidget(self.MPL_canvas_hist)
-        self.canvas_stack.addWidget(self.MPL_canvas_stats)
-
-        name = "widget_results_hist_options_experiment"
-        self.widget_options = ResultsExperimentOptionsWidget(self, name)
-
-        # The histogram's data and statistical results
-        self.GL_tableWidget_groups = QtWidgets.QGridLayout()
-
-        # Histogram data ###############################################################################################
-
-        # Number of rows
-        rows = len(shared.exp.conditions_list) - 1
-        # Define small sizes, will for the tablewidget to shrink so that the
-        # window fits for 13 inch screens.
-        hist_w = 256
-        hist_h = 50
-        self.tableWidget = PYAFTableWidget(hist_w, hist_h, rows, 7)
-        behavior = QtWidgets.QAbstractItemView.SelectRows
-        self.tableWidget.setSelectionBehavior(behavior)
-        self.tableWidget.horizontalHeader().setHighlightSections(False)
-        policy = QtCore.Qt.ScrollBarAlwaysOff
-        self.tableWidget.setHorizontalScrollBarPolicy(policy)
-        labels = ["", "Condition", "Sample size", "Mean", "Median", "S.D.", "Mode"]
-        custom_header = QCheckableHeader(QtCore.Qt.Horizontal, self.tableWidget)
-        self.tableWidget.setHorizontalHeader(custom_header)
-        self.tableWidget.setHorizontalHeaderLabels(labels)
-        hist_headers = self.tableWidget.horizontalHeader()
-        hist_headers.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        hist_headers.customContextMenuRequested. \
-            connect(self.popUpMenuTableHeaderGroups)
-
-        self.tableWidget.verticalHeader().hide()
-        for i in range(len(shared.exp.conditions_list) - 1):
-            self.add_row_in_tablewidget_conditions(i)
-
-        # Let the tablewidget expand
-        pol = QtWidgets.QSizePolicy.MinimumExpanding
-        sizePolicy = QtWidgets.QSizePolicy(pol, pol)
-        self.tableWidget.setSizePolicy(sizePolicy)
-
-        # Let only the name column be stretched
-        self.tableWidget.setColumnWidth(0, 35)  # Minimal size for checkboxes
-        hist_headers.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-
-        # Stats table ##################################################################################################
-
-        # Number of rows
-        rows = len(shared.exp.sample_groups)
-        # Define small sizes, will for the tablewidget to shrink so that the
-        # window fits for 13 inch screens.
-        stats_w = 50
-        stats_h = 50
-        self.stats_tableWidget = PYAFTableWidget(stats_w, stats_h, rows, 4)
-        behavior = QtWidgets.QAbstractItemView.SelectRows
-        self.stats_tableWidget.setSelectionBehavior(behavior)
-        self.stats_tableWidget.horizontalHeader().setHighlightSections(False)
-        policy = QtCore.Qt.ScrollBarAlwaysOff
-        self.stats_tableWidget.setHorizontalScrollBarPolicy(policy)
-        labels = ["", "Pair", "P-Value", "Significance"]
-        custom_header = QCheckableHeader(QtCore.Qt.Horizontal, self.stats_tableWidget)
-        self.stats_tableWidget.setHorizontalHeader(custom_header)
-        self.stats_tableWidget.setHorizontalHeaderLabels(labels)
-        stats_headers = self.stats_tableWidget.horizontalHeader()
-        stats_headers.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        # headers.customContextMenuRequested. \
-        # connect(self.popUpMenuTableHeaderGroups)
-
-        self.stats_tableWidget.verticalHeader().hide()
-
-        # Set maximum size for stats widget
-        max_w = 650
-        self.stats_tableWidget.setMaximumWidth(max_w)
-
-        # Let the tablewidget expand
-        pol = QtWidgets.QSizePolicy.MinimumExpanding
-        sizePolicy = QtWidgets.QSizePolicy(pol, pol)
-        self.stats_tableWidget.setSizePolicy(sizePolicy)
-
-        # Let only the name column be stretched
-        self.stats_tableWidget.setColumnWidth(0, 35)  # Minimal size for checkboxes
-        stats_headers.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-
-        widgets_list.widget_progressbar.update()
-
-        # Buttons for calculations/actions on histograms
-        self.HL_hist_buttons = QtWidgets.QHBoxLayout()
-
+        # Results type and buttons
+        self.HL_buttons = QtWidgets.QHBoxLayout()
         name = "widget_results_chooser_experiment"
         self.widget_result_chooser = ResultsChooserWidget(self, name)
+        self.BT_export = PYAFButton(self, "export", "Export CSV")
+        self.BT_export.setToolTip(
+            "One row per map: condition, replicate, experiment, map value, "
+            "number of curves, replicate mean")
+        self.HL_buttons.addWidget(self.widget_result_chooser)
+        self.HL_buttons.addStretch(1)
+        self.HL_buttons.addWidget(self.BT_export)
 
-        # Density functions of the conditions, for their histograms
-        self.BT_get_pdf = PYAFButton(self, "get_pdf", "Get PDF")
+        # Conditions and tests
+        self.TW_conditions = self.make_table(CONDITION_COLUMNS)
+        self.TW_conditions.setColumnWidth(0, 35)
+        header = self.TW_conditions.horizontalHeader()
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        header.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        header.customContextMenuRequested.connect(self.popUpMenuTableHeader)
+        self.TW_tests = self.make_table(TEST_COLUMNS)
+        self.TW_tests.horizontalHeader().setSectionResizeMode(
+            0, QtWidgets.QHeaderView.Stretch)
+        self.TW_tests.setColumnWidth(1, 170)
+        self.TW_tests.setColumnWidth(2, 45)
+        self.TW_tests.setColumnWidth(3, 90)
+        self.TW_tests.setColumnWidth(4, 50)
+        self.HL_tables = QtWidgets.QHBoxLayout()
+        self.HL_tables.addWidget(self.TW_conditions, 3)
+        self.HL_tables.addWidget(self.TW_tests, 2)
 
-        # self.list_values = PYAFComboBox(self, "values")
-        # self.list_values.addItem("Values")
-        # self.list_values.addItem("Frequencies")
+        layout = QtWidgets.QGridLayout()
+        layout.addWidget(self.SA_plot, 0, 0)
+        layout.addWidget(self.widget_options, 0, 1, QtCore.Qt.AlignTop)
+        layout.addLayout(self.HL_buttons, 1, 0, 1, 2)
+        layout.addLayout(self.HL_tables, 2, 0, 1, 2)
+        layout.setRowStretch(0, 3)
+        layout.setRowStretch(2, 2)
+        layout.setColumnStretch(0, 1)
+        self.setLayout(layout)
 
-        self.HL_hist_buttons.addWidget(self.widget_result_chooser)
-        # self.HL_hist_buttons.addWidget(self.list_values)
-        self.HL_hist_buttons.addWidget(self.BT_get_pdf)
-        self.HL_hist_buttons.addStretch(1)
-
-        # Buttons for calculations/actions on stats
-        self.HL_stats_buttons = QtWidgets.QHBoxLayout()
-
-        self.BT_add_rule = PYAFButton(self, "add_rule", "Add rule")
-        self.BT_auto_group = PYAFButton(self, "auto_group", "Auto group")
-
-        self.HL_stats_buttons.addWidget(self.BT_add_rule)
-        self.HL_stats_buttons.addWidget(self.BT_auto_group)
-        self.HL_stats_buttons.addStretch(1)
-
-        # Leave some blank space on the right
-        spacer = QtWidgets.QSpacerItem(30, 10)
-
-        self.GL_tableWidget_groups.addWidget(self.tableWidget, 0, 0)
-        self.GL_tableWidget_groups.addLayout(self.HL_hist_buttons, 1, 0)
-        self.GL_tableWidget_groups.addWidget(self.stats_tableWidget, 0, 1)
-        self.GL_tableWidget_groups.addLayout(self.HL_stats_buttons, 1, 1)
-        self.GL_tableWidget_groups.addItem(spacer, 0, 2, 1, 1)
-
-        # Connect header checkboxes
-        # hist_headers.all_selected.connect(lambda: self.check_all(mode="hist"))
-        # stats_headers.all_selected.connect(lambda: self.check_all(mode="stats"))
-
-        self.GL_results_data = QtWidgets.QGridLayout()
-        self.GL_results_data.addWidget(self.widget_options, 0, 0)
-        self.GL_results_data.addWidget(self.canvas_stack, 0, 1)
-        self.GL_results_data.addLayout(self.GL_tableWidget_groups, 1, 0, 1, 0)
-
-        self.setLayout(self.GL_results_data)
         widgets_list.widget_progressbar.update()
-
-        stat_tools.fetch_conditions_data()
-
         self.update_widget()
+
+    @staticmethod
+    def make_table(columns):
+        """Table with the given columns."""
+        table = PYAFTableWidget(256, 50, 0, len(columns))
+        table.setHorizontalHeaderLabels(columns)
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        table.horizontalHeader().setHighlightSections(False)
+        table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        table.verticalHeader().hide()
+        pol = QtWidgets.QSizePolicy.MinimumExpanding
+        table.setSizePolicy(QtWidgets.QSizePolicy(pol, pol))
+        return table
+
+    def eventFilter(self, obj, event):
+        """Redraw the plot when the visible area is resized."""
+        if obj is self.SA_plot.viewport() and \
+                event.type() == QtCore.QEvent.Resize:
+            self.plot_resize_timer.start(150)
+        return super().eventFilter(obj, event)
 
     def update_MPL(self):
-        """Update the plot."""
-        self.MPL_canvas_hist.update_plot()
-        self.MPL_canvas_stats.update_plot()
+        """Update the plot (at the size of the visible area)."""
+        viewport = self.SA_plot.viewport().size()
+        size = QtCore.QSize(viewport.width(),
+                            max(viewport.height(), PLOT_MIN_HEIGHT))
+        if self.MPL_canva.size() != size:
+            self.MPL_canva.resize(size)
+        self.MPL_canva.update_plot()
 
     def update_widget(self):
-        """Updates the widget.
-
-        No fetch_group_data() here, it would overwrite the mode value when
-        doing get_pdf in single results.
-        """
+        """Update the options, the tables and the plot."""
         widgets_list.widget_results_chooser_experiment.update_widget()
-        self.widget_options.update_widget()
-        self.update_GUI("all")
+        options = superplot_tools.get_options()
+
+        # Control: one of the conditions
+        names = [c.name for c in shared.exp.conditions_list[1:]]
+        ids = [c.condition_id for c in shared.exp.conditions_list[1:]]
+        if options["control"] not in ids and ids:
+            options["control"] = ids[0]
+        self.list_control.blockSignals(True)
+        self.list_control.clear()
+        for name in names:
+            self.list_control.addItem(name)
+        if ids:
+            self.list_control.setCurrentIndex(ids.index(options["control"]))
+        self.list_control.fit_to_contents()
+        self.list_control.blockSignals(False)
+        self.list_paired.setCurrentIndex(1 if options["paired"] else 0)
+        self.list_error.setCurrentIndex(
+            1 if options["error"] == "95% CI" else 0)
+        self.CB_log.setChecked(options["log"])
+        self.CB_curves.setChecked(options["curves"])
+        self.CB_white.setChecked(options["background"] == "White")
+
+        self.update_tables()
         self.update_MPL()
 
-    def canvas_press(self, event):
-        """Called when clicking on the plot."""
-        if event.button == 3 and event.inaxes == self.MPL_canvas_hist.canvas.axes:
-            # Position of the mouse on screen (the matplotlib event position
-            # is in physical pixels, twice the Qt pixels on Retina screens)
-            pos = QtGui.QCursor.pos()
-            self.popUpMenu(pos, "histogram_groups")
+    def update_tables(self):
+        """Values of the conditions and results of the tests."""
+        options = superplot_tools.get_options()
+        data = {c["id"]: c for c in superplot_tools.get_data()}
+
+        table = self.TW_conditions
+        table.setRowCount(0)
+        for row, condition in enumerate(shared.exp.conditions_list[1:]):
+            table.insertRow(row)
+            table.setRowHeight(row, 30)
+            cb = gui_tools.CenteredCellCheckbox(self, "display", row)
+            cb.checkbox.setChecked(condition.display)
+            table.setCellWidget(row, 0, cb)
+            texts = [condition.name] + ["–"] * 6
+            item = data.get(condition.condition_id)
+            if item is not None:
+                s = superplot_tools.summary(item)
+                texts = [condition.name, str(s["n"]), str(s["maps"]),
+                         str(s["curves"]), number(s["mean"]),
+                         number(s["sd"]), number(s["ci"])]
+            for col, text in enumerate(texts, start=1):
+                label = QtWidgets.QLabel(text)
+                label.setFont(self.parent.smallfont)
+                table.setCellWidget(row, col,
+                                    gui_tools.CenteredCellwidget(label))
+
+        table = self.TW_tests
+        table.setRowCount(0)
+        tests = superplot_tools.compare(list(data.values()), options)
+        for row, test in enumerate(tests):
+            table.insertRow(row)
+            table.setRowHeight(row, 30)
+            texts = [test["name"], test["test"], str(test["n"]),
+                     number(test["p"]), superplot_tools.stars(test["p"])]
+            for col, text in enumerate(texts):
+                label = QtWidgets.QLabel(text)
+                label.setFont(self.parent.smallfont)
+                if test["note"]:
+                    label.setToolTip(test["note"])
+                table.setCellWidget(row, col,
+                                    gui_tools.CenteredCellwidget(label))
 
     def list_updated(self, name):
-        """Called when a list is updated."""
-        #if name == "values":
-        #    if self.list_values.currentIndex() == 0:
-        #        shared.exp.hist_values_or_frequencies = "values"
-        #    else:
-        #        shared.exp.hist_values_or_frequencies = "frequencies"
+        """An option changed."""
+        options = superplot_tools.get_options()
+        if name == "control":
+            index = self.list_control.currentIndex()
+            if index >= 0:
+                options["control"] = \
+                    shared.exp.conditions_list[index + 1].condition_id
+        elif name == "paired":
+            options["paired"] = self.list_paired.currentIndex() == 1
+        elif name == "error":
+            options["error"] = self.list_error.currentText()
+        self.update_tables()
+        self.update_MPL()
 
-        self.update_GUI("table_labels")
-        widgets_list.widget_results_groups.update_GUI("list_values")
-        widgets_list.widget_results_groups.update_GUI("table_labels")
-
-    def add_row_in_tablewidget_conditions(self, i):
-        """Adds a row in the groups results table."""
-        # Default row height is 30, but it is too big
-        self.tableWidget.setRowHeight(i, 40)
-
-        center = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
-        condition = shared.exp.conditions_list[i + 1]
-
-        # Checkbox (hide or display result)
-        cb = gui_tools.CenteredCellCheckbox(self, "display_result_hist", i)
-        self.tableWidget.setCellWidget(i, 0, cb)
-        self.tableWidget.cellWidget(i, 0).checkbox.setChecked(condition.display)
-        self.hist_checkboxes.append(cb)
-        self.check_checkboxes_state(mode="hist")
-
-        item = QtWidgets.QTableWidgetItem(str(condition.name))
-        # Do not add Qt.IsEditable here, will disable editing capability
-        item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)
-        item.setFont(self.parent.smallfont)
-        item.setTextAlignment(center)
-        self.tableWidget.setItem(i, 1, item)
-
-        label_sample_size = QtWidgets.QLabel()
-        label_sample_size.setFont(self.parent.smallfont)
-        self.groups_sample_size_labels.append(label_sample_size)
-        label = gui_tools.CenteredCellwidget(label_sample_size)
-        self.tableWidget.setCellWidget(i, 2, label)
-
-        label_mean = QtWidgets.QLabel()
-        label_mean.setFont(self.parent.smallfont)
-        self.groups_means_labels.append(label_mean)
-        label = gui_tools.CenteredCellwidget(label_mean)
-        self.tableWidget.setCellWidget(i, 3, label)
-
-        label_median = QtWidgets.QLabel()
-        label_median.setFont(self.parent.smallfont)
-        self.groups_medians_labels.append(label_median)
-        label = gui_tools.CenteredCellwidget(label_median)
-        self.tableWidget.setCellWidget(i, 4, label)
-
-        label_sd = QtWidgets.QLabel()
-        label_sd.setFont(self.parent.smallfont)
-        self.groups_sds_labels.append(label_sd)
-        label = gui_tools.CenteredCellwidget(label_sd)
-        self.tableWidget.setCellWidget(i, 5, label)
-
-        label_mode = QtWidgets.QLabel()
-        label_mode.setFont(self.parent.smallfont)
-        self.groups_modes_labels.append(label_mode)
-        label = gui_tools.CenteredCellwidget(label_mode)
-        self.tableWidget.setCellWidget(i, 6, label)
-
-    def add_row_in_stats_tablewidget_conditions(self, i):
-        """Adds a row in the experiment results statistics table."""
-        # Default row height is 30, but it is too big
-        self.stats_tableWidget.setRowHeight(i, 40)
-
-        center = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
-        pair = shared.exp.sample_groups[i]
-        condition1 = shared.exp.conditions_list[pair[0]]
-        condition2 = shared.exp.conditions_list[pair[1]]
-
-        # Checkbox (hide or display result)
-        cb = gui_tools.CenteredCellCheckbox(self, "display_result_stats", i)
-        self.stats_tableWidget.setCellWidget(i, 0, cb)
-        # self.tableWidget.cellWidget(i, 0).checkbox.setChecked(condition.display) # Implement stat result class
-        self.stats_checkboxes.append(cb)
-        self.check_checkboxes_state(mode="stats")
-
-        item = QtWidgets.QTableWidgetItem(f"{condition1.name} - {condition2.name}")
-        # Do not add Qt.IsEditable here, will disable editing capability
-        item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)
-        item.setFont(self.parent.smallfont)
-        item.setTextAlignment(center)
-        self.stats_tableWidget.setItem(i, 1, item)
-
-        label_pvalue = QtWidgets.QLabel()
-        label_pvalue.setFont(self.parent.smallfont)
-        self.groups_pvalue_labels.append(label_pvalue)
-        label = gui_tools.CenteredCellwidget(label_pvalue)
-        self.stats_tableWidget.setCellWidget(i, 2, label)
-
-        label_significance = QtWidgets.QLabel()
-        label_significance.setFont(self.parent.smallfont)
-        self.groups_significance_labels.append(label_significance)
-        label = gui_tools.CenteredCellwidget(label_significance)
-        self.stats_tableWidget.setCellWidget(i, 3, label)
-
-    def checkbox_clicked(self, name, row):
-        """Called when a checkbox is clicked."""
-        if name == "display_result_hist":
-            # +1 = empty group (None)
-            condition_id = row + 1
-
-            # Save the value
-            val = self.tableWidget.cellWidget(row, 0).checkbox.isChecked()
-            shared.exp.conditions_list[condition_id].display = val
-
-            # Check hist checkboxes state
-            self.check_checkboxes_state(mode="hist")
-
-            # Refresh plot
-            self.update_MPL()
-
-        if name == "display_result_stats":
-            # +1 = empty group (None)
-            condition_id = row + 1
-
-            # Save the value
-            val = self.tableWidget.cellWidget(row, 0).checkbox.isChecked()
-            shared.exp.conditions_list[condition_id].display = val
-
-            # Check stats checkboxes state
-            self.check_checkboxes_state(mode="stats")
-
-            # Refresh plot
-            self.update_MPL()
-
-    def check_checkboxes_state(self, mode):
-        """Checks the state of all the checkboxes in the experiment results widget"""
-        if mode == "hist":
-            states = [c.checkbox.isChecked() for c in self.hist_checkboxes]
-            hist_headers = self.tableWidget.horizontalHeader()
-            all_checked_flag = False not in states
-            hist_headers.changeState(all_checked_flag)
-
-        elif mode == "stats":
-            states = [c.checkbox.isChecked() for c in self.stats_checkboxes]
-            stats_headers = self.stats_tableWidget.horizontalHeader()
-            all_checked_flag = False not in states
-            stats_headers.changeState(all_checked_flag)
-
-    def check_all(self, mode):
-        """Checks or unchecks all checkboxes in the table based on the state of the header checkbox"""
-        if mode == "hist":
-            headers = self.tableWidget.horizontalHeader()
-            checkboxes_list = self.hist_checkboxes
-
-        elif mode == "stats":
-            headers = self.stats_tableWidget.horizontalHeader()
-            checkboxes_list = self.stats_checkboxes
-
-        else:
-            checkboxes_list = []
-
-        for c in checkboxes_list:
-            c.checkbox.setChecked(headers.select_all)
-            shared.exp.groups_list[int(c.cell_id)].display = headers.select_all
-
-        self.update_widget()
+    def checkbox_clicked(self, name, row=None):
+        """An option or the display of a condition changed."""
+        options = superplot_tools.get_options()
+        if name == "display":
+            row = int(row)
+            value = self.TW_conditions.cellWidget(row, 0).checkbox.isChecked()
+            shared.exp.conditions_list[row + 1].display = value
+        elif name == "log":
+            options["log"] = self.CB_log.isChecked()
+        elif name == "curves":
+            options["curves"] = self.CB_curves.isChecked()
+        elif name == "white":
+            options["background"] = \
+                "White" if self.CB_white.isChecked() else "Default"
+        self.update_tables()
+        self.update_MPL()
 
     def button_clicked(self, button):
-        """Method called upon a click on a button."""
-        if button == "add_rule":
-            self.open_sample_grouping_dialog()
+        """Export of the values."""
+        if button == "export":
+            self.export_csv()
 
-        if button == "auto_group":
-            self.auto_group_conditions()
-
-        if button == "get_pdf":
-            stat_tools.get_pdf()
-            self.update_widget()
-
-    def update_GUI(self, what):
-        """Update the GUI."""
-        if what == "table_labels" or what == "all":
-            if shared.conditions_values is not None:
-                for i in range(len(shared.conditions_values)):
-                    norm = shared.exp.norm_hist_experiment
-                    if shared.conditions_factors is not None and norm is False:
-                        factor = shared.conditions_factors[i]
-                        print(factor)
-                    elif shared.conditions_factors is None or norm:
-                        factor = 1.0
-
-                    sample_size = str(0)
-                    mean = str(0)
-                    median = str(0)
-                    std = str(0)
-                    mode = str(0)
-
-                    values = [0, 0, 0, 0]
-
-                    if shared.exp.hist_values_or_frequencies == "values":
-                        values = shared.conditions_values[i]
-                        factor = 1.0
-                    else:
-                        if shared.conditions_frequencies is not None:
-                            if shared.conditions_frequencies[i]:
-                                values = shared.conditions_frequencies[i]
-
-                    # Write the labels
-                    if values[0] != 0:
-                        sample_size = str(values[0])
-                    if values[1] != 0:
-                        mean = str(round(values[1] * factor, 6))
-                    if values[2] != 0:
-                        median = str(round(values[2] * factor, 6))
-                    if values[3] != 0 and values[3] is not None:
-                        std = str(round(values[3] * factor, 6))
-                    if values[4] != 0:
-                        mode = str(round(values[4] * factor, 6))
-
-                    self.groups_sample_size_labels[i - 1].setText(sample_size)
-                    self.groups_means_labels[i - 1].setText(mean)
-                    self.groups_medians_labels[i - 1].setText(median)
-                    self.groups_sds_labels[i - 1].setText(std)
-                    self.groups_modes_labels[i - 1].setText(mode)
-
-        if what == "stat_table_labels" or what == "all":
-            pass
-
-        # if what == "list_values" or what == "all":
-        #    if shared.exp.hist_values_or_frequencies == "values":
-        #        self.list_values.setCurrentIndex(0)
-        #    elif shared.exp.hist_values_or_frequencies == "frequencies":
-        #        self.list_values.setCurrentIndex(1)
+    def export_csv(self):
+        """Saves the values of the maps and of the replicates."""
+        rows = superplot_tools.export_rows(superplot_tools.get_data())
+        if not rows:
+            return
+        path = misc_tools.get_user_path(self.settings)
+        name = "superplot_" + str(shared.exp.results_type) + ".csv"
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Export the SuperPlot values", os.path.join(path, name),
+            "CSV (*.csv)")
+        if not filename:
+            return
+        if not filename.lower().endswith(".csv"):
+            filename += ".csv"
+        misc_tools.set_user_path(self.settings, os.path.dirname(filename))
+        with open(filename, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
+        gui_tools.show_success(self, "Export complete",
+                               "Values exported to " + filename)
 
     def add_condition(self):
         """Add a new condition."""
         val = len(shared.exp.conditions_list)
         shared.exp.conditions_list.append(ConditionGroup(val))
-        self.tableWidget.insertRow(val - 1)
-        self.add_row_in_tablewidget_conditions(val - 1)
-        # Set the color. Go through the list and determine a color
-        # periodically.
-        # -2 because we don't take into account the first "None" group
-        pos = len(shared.exp.groups_list) - 2
-        while pos >= len(shared.colors_list):
-            pos = pos - len(shared.colors_list)
+        pos = (val - 1) % len(shared.colors_list)
         shared.exp.conditions_list[-1].color = shared.colors_list[pos]
-
-        # Update the tablewidget (will also refresh this tab)
-        widgets_list.widget_results_single.reset_table()  # Implement reset group table, but how? Do not eliminate all choices by user.
-
-    def open_sample_grouping_dialog(self):
-        """Open the advanced options for the statistical analysis Window."""
-        if widgets_list.widget_sample_grouping_dialog is None:
-            # Create new widget
-            SampleGroupingDialog(self)
-            widgets_list.widget_sample_grouping_dialog.activateWindow()
-            widgets_list.widget_sample_grouping_dialog.show()
-        else:
-            # Bring to front
-            widgets_list.widget_sample_grouping_dialog.activateWindow()
-            widgets_list.widget_sample_grouping_dialog.raise_()
-
-    def auto_group_conditions(self):
-        group_size = 2    # Allow user to change it depending on the statistical test
-        conditions_indices = [c.condition_id for c in shared.exp.conditions_list[1:]]
-        groups = combinations(conditions_indices, group_size)   # Ignore index 0 corresponding to None.
-        for grp in groups:
-            self.add_sample_group(grp)
-
-    def filter_sample_conditions(self):
-        sample_pairs = []
-        rows = len(shared.exp.conditions_list) - 1
-        for i in range(rows):
-            cond1 = i + 1
-            for cond in shared.exp.conditions_list:
-                if cond.name == self.tableWidget.cellWidget(i, 2).currentText():
-                    cond2 = cond.condition_id
-                    sample_pair = self.order_sample_pair((cond1, cond2))
-                    sample_pairs.append(sample_pair)
-
-        samp_groups_copy = shared.exp.sample_groups.copy()
-
-        for i in range(len(shared.exp.sample_groups)):
-            pair = shared.exp.sample_groups[i]
-            if pair not in sample_pairs:
-                samp_groups_copy.remove(pair)
-                self.stats_tableWidget.removeRow(i)
-
-        shared.exp.sample_groups = samp_groups_copy
-
-    def add_sample_group(self, sample_pair):
-        """Add a new sample group."""
-
-        if sample_pair not in shared.exp.sample_groups:
-            val = len(shared.exp.sample_groups)
-            shared.exp.sample_groups_list.append(SampleGroup(val))
-            shared.exp.sample_groups.append(sample_pair)
-            self.stats_tableWidget.insertRow(val)
-            self.add_row_in_stats_tablewidget_conditions(val)
-            # Set the color. Go through the list and determine a color
-            # periodically.
-            pos = len(shared.exp.sample_groups_list) - 1
-            while pos >= len(shared.colors_list):
-                pos = pos - len(shared.colors_list)
-            shared.exp.sample_groups_list[-1].color = shared.colors_list[pos]
-            # Update the tablewidget (will also refresh this tab)
-            widgets_list.widget_results_single.reset_table()  # Implement reset group table, but how? Do not eliminate all choices by user.
-
-        else:
-            return
-
-
-    def change_lr_display_mode(self, ptype):
-        """Change the type of plot which is displayed for the loading rates.
-
-        Can be either a scatter plot or a single point per loading rate.
-        """
-        if ptype == "histogram_groups":
-            if shared.exp.hist_lr_groups_display_mode == "scatter":
-                shared.exp.hist_lr_groups_display_mode = "points"
-            elif shared.exp.hist_lr_groups_display_mode == "points":
-                shared.exp.hist_lr_groups_display_mode = "scatter"
-            self.update_MPL()
+        widgets_list.widget_results_groups.reset_table()
+        self.update_widget()
 
     def rename_conditions(self):
-        """Method to display a widget with inputs to rename the groups."""
+        """Widget with inputs to rename the conditions."""
         if widgets_list.widget_rename_conditions is None:
-            # Create new widget
             RenameConditionsWidget(self)
-            widgets_list.widget_rename_conditions.setWindowTitle("Rename Conditions")
-            widgets_list.widget_rename_conditions.activateWindow()
+            widgets_list.widget_rename_conditions.setWindowTitle(
+                "Rename Conditions")
             widgets_list.widget_rename_conditions.show()
-        else:
-            # Bring to front
-            widgets_list.widget_rename_conditions.activateWindow()
-            widgets_list.widget_rename_conditions.raise_()
+        widgets_list.widget_rename_conditions.activateWindow()
+        widgets_list.widget_rename_conditions.raise_()
 
-    def popUpMenuTableHeaderGroups(self, pos):
-        """Pop up menu displayed on the headers of the groups table."""
-        # Get the global pos for the menu
-        pos = self.tableWidget.mapToGlobal(pos)
-
-        # Create menu
+    def popUpMenuTableHeader(self, pos):
+        """Menu of the header of the conditions table."""
+        pos = self.TW_conditions.mapToGlobal(pos)
         menu = QtWidgets.QMenu()
-
-        # Add group
-        action = QtWidgets.QAction("Add Condition", self)
+        action = QtWidgets.QAction("Add condition", self)
         action.triggered.connect(self.add_condition)
         menu.addAction(action)
-
-        # Rename groups
-        action = QtWidgets.QAction("Rename Conditions", self)
+        action = QtWidgets.QAction("Rename conditions", self)
         action.triggered.connect(self.rename_conditions)
         menu.addAction(action)
-
-        # Display menu
-        menu.popup(pos, menu.menuAction())
-        menu.exec_()
-
-    def popUpMenu(self, pos, ptype):
-        """Right click menu for the results plots."""
-        # Create menu
-        menu = QtWidgets.QMenu()
-
-        if shared.exp.results_type == "loading_rates":
-            if ptype == "histogram_single":
-                if shared.exp.hist_lr_single_display_mode == "scatter":
-                    txt = "Single point"
-                elif shared.exp.hist_lr_single_display_mode == "points":
-                    txt = "Scatter"
-            elif ptype == "histogram_groups":
-                if shared.exp.hist_lr_groups_display_mode == "scatter":
-                    txt = "Single point"
-                elif shared.exp.hist_lr_groups_display_mode == "points":
-                    txt = "Scatter"
-
-            # Display as scatter or single point with error bars
-            action = QtWidgets.QAction(txt, self)
-            action.triggered.connect(
-                lambda: self.change_lr_display_mode(ptype))
-            menu.addAction(action)
-
-        # Display menu
-        menu.popup(pos, menu.menuAction())
-        menu.exec_()
+        menu.exec(pos)

@@ -567,8 +567,8 @@ class PYAFComboBox(QtWidgets.QComboBox):
         font = QtGui.QFont(self.font())
         font.setBold(True)
         metrics = QtGui.QFontMetrics(font)
-        longest = max(metrics.horizontalAdvance(self.itemText(i))
-                      for i in range(self.count()))
+        longest = max((metrics.horizontalAdvance(self.itemText(i))
+                       for i in range(self.count())), default=0)
         self.setStyleSheet(
             "QComboBox { min-width: " + str(longest + 30) + "px; }")
 

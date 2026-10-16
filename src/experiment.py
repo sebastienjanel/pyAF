@@ -362,10 +362,13 @@ class ResultGroup:
         if self.group_id == 0:
             self.name = "None"
         else:
-            self.name = "Group " + str(group_id)
+            self.name = "Replicate " + str(group_id)
         self.color = None  # Color for the histograms
 
         self.condition = 0  # 0 = No condition
+        # Experiment of the replicate (SuperPlots colors and pairing), None:
+        # its order in its condition
+        self.experiment = None
 
 
 def default_violin_options():

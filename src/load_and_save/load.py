@@ -124,7 +124,6 @@ class Load:
             widgets_list.widget_results_groups.update_widget()
 
             # Refetch results for the conditions
-            stat_tools.fetch_conditions_data()
             widgets_list.widget_results_experiment.update_widget()
 
             # Update the widgets

@@ -98,7 +98,7 @@ class PlotSingleResults(PlotResults):
 
         if not self.names:
             if self.MODE == "groups":
-                text = "Put files in groups (Plots tab) and tick the groups"
+                text = "Put files in replicates (Plots tab) and tick the replicates"
             else:
                 text = "Tick some files in the table to display them"
             ax.text(0.5, 0.5, text,
@@ -214,7 +214,7 @@ class PlotSingleResults(PlotResults):
 
         if not items:
             if self.MODE == "groups":
-                text = "Put files in groups (Plots tab) and tick the groups"
+                text = "Put files in replicates (Plots tab) and tick the replicates"
             else:
                 text = "Tick some files in the table to display them"
             ax.text(0.5, 0.5, text,

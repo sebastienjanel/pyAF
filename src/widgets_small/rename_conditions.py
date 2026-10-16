@@ -86,15 +86,8 @@ class RenameConditionsWidget(PYAFWidget):
             # Update the names in the lists of the grouped plots tab
             widgets_list.widget_results_groups.reset_table()
 
-            tw = widgets_list.widget_results_experiment.tableWidget
-
-            # Update the names in the histogram's group's list
-            for i in range(1, len(shared.exp.conditions_list), 1):
-                name = shared.exp.conditions_list[i].name
-                tw.item(i - 1, 1).setText(name)
-
-            # Update the groups plot
-            widgets_list.widget_results_experiment.update_MPL()
+            # Update the SuperPlots tab
+            widgets_list.widget_results_experiment.update_widget()
 
             # Close widget
             self.close()

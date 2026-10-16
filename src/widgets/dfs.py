@@ -77,7 +77,7 @@ class DFSWidget(PYAFWidget):
         self.HL = QtWidgets.QHBoxLayout()
         self.GRP_buttons = PYAFButtonGroup(self, "GRP_buttons")
         self.RBT_single = QtWidgets.QRadioButton("Files (plots tab)")
-        self.RBT_groups = QtWidgets.QRadioButton("Groups (grouped plots)")
+        self.RBT_groups = QtWidgets.QRadioButton("Speeds (replicates tab)")
         self.GRP_buttons.addButton(self.RBT_single, 0)
         self.GRP_buttons.addButton(self.RBT_groups, 1)
         self.HL.addWidget(self.RBT_single)
@@ -90,7 +90,7 @@ class DFSWidget(PYAFWidget):
         self.list_method.addItem("Medians per file")
         self.list_method.addItem("Binned events")
         self.list_method.setToolTip(
-            "Medians per file: one point per displayed file (or group), at "
+            "Medians per file: one point per displayed file (or speed), at "
             "the median loading rate\nand the median force of its events "
             "(several files at different speeds).\n\nBinned events: the "
             "events of the displayed files are put in bins of loading rate\n"
@@ -200,7 +200,8 @@ class DFSWidget(PYAFWidget):
         else:
             self.RBT_groups.setChecked(True)
 
-        what = "group" if mode == "groups" else "file"
+        # For the DFS, the replicates are the speeds
+        what = "speed" if mode == "groups" else "file"
         self.list_method.setItemText(0, "Medians per " + what)
         self.IN_bins.setEnabled(self.method() == "binned")
         nbr = len(dfs_tools.get_items(mode))

@@ -1018,7 +1018,6 @@ class ComputeWidget(PYAFWidget):
             stat_tools.get_values()
             widgets_list.widget_results_single.reset_table()
             stat_tools.fetch_group_data()
-            stat_tools.fetch_conditions_data()
             widgets_list.widget_results_single.update_widget()
             widgets_list.widget_results_groups.update_widget()
             widgets_list.widget_results_experiment.update_widget()

@@ -192,7 +192,7 @@ def new_fit(mode, method, nbr_bins=10):
         mode, method, nbr_bins)
     if len(points_r) < 2:
         if method == "medians":
-            what = "groups" if mode == "groups" else "files"
+            what = "speeds" if mode == "groups" else "files"
             return ("At least 2 " + what + " with a positive median "
                     "loading rate must be displayed (ticked) for the fit.")
         return ("Not enough events with a positive loading rate for " +
