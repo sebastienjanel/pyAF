@@ -198,11 +198,11 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
                 dt.tip_radius = cur.tip_radius
                 dt.tip_angle = cur.tip_angle
                 dt.poisson_ratio = cur.poisson_ratio
-                # Calculus/Tomography or Fitting (perform_fit follows)
+                # Tomography or Fitting (perform_fit follows)
                 dt.stiffness_mode = cur.stiffness_mode
                 dt.fit_range_type = cur.fit_range_type
                 # All the ranges (the indentation ones are also used by
-                # Calculus/Tomography, whatever the fit range type)
+                # Tomography, whatever the fit range type)
                 dt.indentation_start = cur.indentation_start
                 dt.indentation_stop = cur.indentation_stop
                 dt.indentation_step = cur.indentation_step

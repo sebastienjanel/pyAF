@@ -33,7 +33,6 @@
 
 from ... import shared
 from ... import widgets_list
-from ... import consts
 from qtpy import QtCore, QtWidgets
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools.gui_tools import PYAFInput, PYAFComboBox
@@ -128,29 +127,26 @@ class StiffnessParamsWidget(PYAFWidget):
         self.STK_data_selection.addWidget(self.force_selection)
         self.STK_data_selection.addWidget(self.indentation_selection)
 
-        # Checkboxes
-        label = "Stiffness tomography"
-        self.CB_tomography = PYAFCheckBox(self, "tomography", label)
-        # self.CB_perform_fit = PYAFCheckBox(self, "perform_fit", "Perform fit")
-
         widgets_list.widget_progressbar.update()
 
         self.VL_params_stiff = QtWidgets.QVBoxLayout()
         # Display the start parameter only in advanced mode
 
         if self.name == "widget_calculus":
-            self.VL_list_calc = QtWidgets.QVBoxLayout()
-            if consts.ADVANCED:
-                self.VL_list_calc.addWidget(self.IN_start)
-                self.VL_list_calc.addWidget(self.IN_step)
-                # By default tomography is set to False. We display the Kasas
-                # model only in advanced mode.
-                self.VL_list_calc.addWidget(self.CB_tomography)
-            else:
-                self.VL_list_calc.addWidget(self.IN_step)
-
-            self.VL_list_calc.addStretch(1)
-            self.VL_params_stiff.addLayout(self.VL_list_calc)
+            # Tomography: segments of the indentation (the inputs are not in
+            # the stacked widget of the fit ranges, which is not used here)
+            self.STK_data_selection.setParent(None)
+            self.IN_stop.setToolTip("0: up to the end of the indentation")
+            self.IN_step.setToolTip("0: a single segment")
+            box_segments = QtWidgets.QGroupBox("Segments")
+            VL_segments = QtWidgets.QVBoxLayout()
+            VL_segments.addWidget(self.IN_start)
+            VL_segments.addWidget(self.IN_stop)
+            VL_segments.addWidget(self.IN_step)
+            VL_segments.addStretch(1)
+            box_segments.setLayout(VL_segments)
+            self.VL_params_stiff.setContentsMargins(0, 0, 0, 0)
+            self.VL_params_stiff.addWidget(box_segments)
 
         elif self.name == "widget_fitting":
 
@@ -205,10 +201,7 @@ class StiffnessParamsWidget(PYAFWidget):
         self.IN_min_indentation.changeValue(data.fit_min_indentation)
         self.IN_poc_window.changeValue(data.fit_poc_window)
 
-        if self.name == "widget_calculus":
-            self.CB_tomography.setChecked(data.tomography)
-
-        elif self.name == "widget_fitting":
+        if self.name == "widget_fitting":
             val = data.fit_range_type
             self.list_range_mode.setCurrentIndex(val)
             self.STK_data_selection.setCurrentIndex(val)
@@ -268,20 +261,3 @@ class StiffnessParamsWidget(PYAFWidget):
                 data.fit_poc_window = self.IN_poc_window.get_float_value()
 
         widgets_list.widget_compute.update_MPL("MPL_canvas")
-
-    def checkbox_clicked(self, checkbox):
-        """Called when a checkbox is clicked."""
-
-        if checkbox == "tomography":
-            state = self.CB_tomography.isChecked()
-            data = shared.exp.list[shared.exp.id_selected]
-            data.tomography = state
-
-            if state:
-                # Stiffness tomography uses the slope model
-                data.stiffness_model_selected = 3
-                compute = widgets_list.widget_compute
-                compute.update_GUI("stiffness_model_selected")
-                compute.update_GUI("grid_model_options")
-
-        # widgets_list.widget_compute.update_MPL("MPL_canvas")

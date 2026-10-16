@@ -327,7 +327,7 @@ class SingleFile:
         self.events_results_filter_slope_max = 0
 
         # Information for the models
-        # 0 Calculus/Tomography, 1 Fit (perform_fit is derived from it)
+        # 0 Tomography, 1 Fit (perform_fit is derived from it)
         self.stiffness_mode = 1
         self.stiffness_model_selected = 0  # Select Hertz by default
         self.tip_radius = 75
@@ -352,7 +352,7 @@ class SingleFile:
         # Store the parameters used for the computation
         self.used_deflection_sensitivity = None
         self.used_stiffness_model_selected = None
-        # Calculus/Tomography or Fitting, and fit range type (see
+        # Tomography or Fitting, and fit range type (see
         # used_perform_fit and get_used_fit_range_type)
         self.used_stiffness_mode = None
         self.used_fit_range_type = None
@@ -935,7 +935,7 @@ class SingleFile:
     @property
     def perform_fit(self):
         """True if the stiffness is computed by fitting (Fitting selected),
-        False for Calculus/Tomography. Derived from stiffness_mode, so that
+        False for Tomography. Derived from stiffness_mode, so that
         the computation always matches the displayed choice."""
         return self.stiffness_mode == 1
 

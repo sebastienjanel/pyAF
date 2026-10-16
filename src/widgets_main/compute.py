@@ -269,17 +269,22 @@ class ComputeWidget(PYAFWidget):
         self.VL_fit_params_stiff = QtWidgets.QVBoxLayout()
 
         self.GRP_stiffness_params = PYAFButtonGroup(self, "stiffness_params")
-        self.RBT_calculus_params = QtWidgets.QRadioButton("Calculus/Tomography")
+        self.RBT_calculus_params = QtWidgets.QRadioButton("Tomography")
+        self.RBT_calculus_params.setToolTip(
+            "Stiffness tomography: slope of each segment of the indentation "
+            "(Slope model)")
         self.RBT_fitting_params = QtWidgets.QRadioButton("Fitting")
+        self.RBT_fitting_params.setToolTip(
+            "Fit of the elasticity on the indentation (Hertz type models)")
         self.GRP_stiffness_params.addButton(self.RBT_calculus_params, 0)
         self.GRP_stiffness_params.addButton(self.RBT_fitting_params, 1)
 
         BOX_stiffness_mode = QtWidgets.QGroupBox("Computation method")
         HL_stiffness_mode = QtWidgets.QHBoxLayout()
         HL_stiffness_mode.addStretch(1)
-        HL_stiffness_mode.addWidget(self.RBT_calculus_params)
-        HL_stiffness_mode.addStretch(1)
         HL_stiffness_mode.addWidget(self.RBT_fitting_params)
+        HL_stiffness_mode.addStretch(1)
+        HL_stiffness_mode.addWidget(self.RBT_calculus_params)
         HL_stiffness_mode.addStretch(1)
         BOX_stiffness_mode.setLayout(HL_stiffness_mode)
 
@@ -586,7 +591,7 @@ class ComputeWidget(PYAFWidget):
 
         self.STK_stiffness_mode.setCurrentIndex(data.stiffness_mode)
 
-        # Calculus/Tomography and Fitting parameters (start, segment size,
+        # Tomography and Fitting parameters (start, segment size,
         # ranges) of the selected file
         self.widget_calculus.update_widget()
         self.widget_fitting.update_widget()
@@ -652,6 +657,19 @@ class ComputeWidget(PYAFWidget):
             self.CB_apply_to_all.setChecked(shared.exp.apply_to_all_compute)
 
         if element == "stiffness_model_selected" or element == "all":
+            # Tomography: Slope model only. Fitting: the other models (files
+            # saved with the previous Calculus mode)
+            tomography = not data.perform_fit
+            if tomography and data.stiffness_model_selected != 3:
+                data.stiffness_model_selected = 3
+                data.tomography = 1
+            elif not tomography and data.stiffness_model_selected == 3:
+                data.stiffness_model_selected = 0
+            for index in range(len(self.models)):
+                if (index == 3) == tomography:
+                    gui_tools.enable_combobox_item(self.list_models, index)
+                else:
+                    gui_tools.disable_combobox_item(self.list_models, index)
             self.list_models.setCurrentIndex(data.stiffness_model_selected)
 
             self.update_MPL("MPL_canvas")
@@ -704,36 +722,25 @@ class ComputeWidget(PYAFWidget):
                 self.IN_tip_radius.input.setText(str(data.tip_radius))
                 self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-                # Enable fit options
-                self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 1:
                 self.IN_tip_radius.setParent(None)
                 self.IN_tip_angle.input.setText(str(data.tip_angle))
                 self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-                # Enable fit options
-                self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 2:
                 self.IN_tip_radius.setParent(None)
                 self.IN_tip_angle.input.setText(str(data.tip_angle))
                 self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-                # Enable fit options
-                self.RBT_fitting_params.setEnabled(True)
             elif data.stiffness_model_selected == 3:
                 self.IN_tip_radius.setParent(None)
                 self.IN_tip_angle.setParent(None)
                 self.IN_poisson.setParent(None)
-                # No fit for the slope model: Calculus/Tomography only
-                data.stiffness_mode = 0
-                self.RBT_fitting_params.setEnabled(False)
             if data.stiffness_model_selected == 4:
                 self.IN_tip_angle.setParent(None)
                 self.IN_tip_radius.input.setText(str(data.tip_radius))
                 self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-                # Enable fit options
-                self.RBT_fitting_params.setEnabled(True)
 
             self.IN_poisson.input.setText(str(data.poisson_ratio))
 
@@ -1323,6 +1330,14 @@ class ComputeWidget(PYAFWidget):
         elif button == "stiffness_params":
             value = self.GRP_stiffness_params.checkedId()
             data.stiffness_mode = value
+            # Tomography: slope of the segments. Fitting: Hertz by default
+            if value == 0:
+                data.stiffness_model_selected = 3
+                data.tomography = 1
+            elif data.stiffness_model_selected == 3:
+                data.stiffness_model_selected = 0
+            self.update_GUI("grid_model_options")
+            self.update_GUI("stiffness_model_selected")
             self.update_widget()
 
         elif button == "next_zoom_element":

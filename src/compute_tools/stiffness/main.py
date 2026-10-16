@@ -99,6 +99,14 @@ class Stiffness:
         # update here)
         data.update()
 
+        # Tomography: slope of each segment. Fitting: a Hertz type model
+        # (files saved with the previous Calculus mode)
+        if not data.perform_fit:
+            data.stiffness_model_selected = 3
+            data.tomography = 1
+        elif data.stiffness_model_selected == 3:
+            data.stiffness_model_selected = 0
+
         misc_tools.save_used_params(data, "stiffness")
 
         # Create a progressbar which is displayed during the computations
@@ -229,7 +237,7 @@ class Stiffness:
         # Store the base to get a minimal value to correct the pocs array
         base = []
         step = data.indentation_step
-        # The indentation stop applies to Calculus/Tomography and to the
+        # The indentation stop applies to Tomography and to the
         # indentation range mode of the fit
         stop = data.used_indentation_stop
         check_stop = stop != 0 and \
