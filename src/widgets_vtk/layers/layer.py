@@ -473,7 +473,7 @@ class Fiducials:
                 actor.GetProperty().SetColor([1.0, 1.0, 1.0])
             else:
                 # Set the defined color for the other fiducials
-                actor.GetProperty().SetColor(self.color)
+                actor.GetProperty().SetColor(self.color[:3])
 
             self.actors_list.append(actor)
 

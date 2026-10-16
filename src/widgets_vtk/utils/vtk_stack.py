@@ -37,14 +37,9 @@ import itk
 
 def get_stack_images(input_image):
     """Create a list of images."""
-    image_type = itk.Image[itk.UC, 3]
-
     # Convert from ITK to VTK image
-    itk_vtk_converter = itk.ImageToVTKImageFilter[image_type].New()
-    itk_vtk_converter.SetInput(input_image)
-    itk_vtk_converter.Update()
     image_data = vtk.vtkImageData()
-    image_data.DeepCopy(itk_vtk_converter.GetOutput())
+    image_data.DeepCopy(itk.vtk_image_from_image(input_image))
 
     # Number of slices in the stack
     nbr_slices = image_data.GetDimensions()[2]

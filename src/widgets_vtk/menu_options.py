@@ -62,7 +62,6 @@ class MenuOptionsWidget(QtWidgets.QWidget):
         self.tab_afm = WidgetAFM(self)
         self.tab_afm2 = WidgetAFM2(self)
 
-        self.tab_HR = None
         self.tab_Optics = None
         self.tab_glass = None
         self.tab_isosurface = None
@@ -98,10 +97,6 @@ class MenuOptionsWidget(QtWidgets.QWidget):
             self.tab_Optics = WidgetOptics(self)
             self.tabs.addTab(self.tab_Optics, "Image")
             self.tab_Optics.update_widget()
-        elif shared.layer_list[row].type == "HR":
-            self.tab_HR = WidgetOptics(self)
-            self.tabs.addTab(self.tab_HR, "HR")
-            self.tab_HR.update_widget()
         elif shared.layer_list[row].type == "glass":
             self.tab_glass = WidgetGlass(self)
             self.tabs.addTab(self.tab_glass, "Substrate")
@@ -323,9 +318,6 @@ class WidgetOptics(QtWidgets.QWidget):
             self.VL.addWidget(self.BT_LUT_max_col)
             self.VL.addWidget(self.IN_threshold)
 
-        elif self.type == "HR":
-            self.BT_HR_color = PYAFButton(self, "HR_color", "HR Color", 200)
-            self.VL.addWidget(self.BT_HR_color)
 
         if self.type == "stack":
             self.IN_slide = PYAFInput(self, "input_slide", "Slide", width=100)
@@ -424,10 +416,6 @@ class WidgetOptics(QtWidgets.QWidget):
                 layer.lut_invert = True
 
             layer.update_actor()
-
-        elif button == "HR_color":
-            # self.colorwidget_HR = MPQColorDialog(self, "HR_color")
-            pass
 
         elif button == "apply":
             layer.update_actor()
@@ -622,7 +610,7 @@ class WidgetGlass(QtWidgets.QWidget):
 
         self.setLayout(self.VL)
 
-    def checkbox_clicked(self):
+    def checkbox_clicked(self, _name=None):
         """Called when a checkbox is clicked."""
         layer_id = widgets_list.widget_vtk.get_current_layer()
         layer = shared.layer_list[layer_id]
@@ -770,7 +758,7 @@ class WidgetAFM2(QtWidgets.QWidget):
         self.GRP_surf_type.addButton(self.RBT_topo_surf, 3)
         self.VL_radio_buttons.addWidget(self.RBT_stiffness)
         self.VL_radio_buttons.addWidget(self.RBT_stiffness_sq)
-        # self.VL_radio_buttons.addWidget(self.RBT_topo_dots)
+        self.VL_radio_buttons.addWidget(self.RBT_topo_dots)
         self.VL_radio_buttons.addWidget(self.RBT_topo_surf)
 
         # Add 3 bouttons to chose the type of smoothing

@@ -51,7 +51,6 @@ def create_layer(layer_type, path=None, isosurf_stack_id=None, iso_file=None):
     elif layer_type == "isosurface":
         filenames = [iso_file]
 
-    print(filenames)
 
     wg = widgets_list.widget_vtk
 
@@ -59,8 +58,6 @@ def create_layer(layer_type, path=None, isosurf_stack_id=None, iso_file=None):
         # Add the layer
         if layer_type == "single_image":
             ok = wg.canvas.addSingleImageLayer(path)
-        elif layer_type == "HR":
-            ok = wg.canvas.addOpticsHRLayer(path)
         elif layer_type == "stack":
             ok = wg.canvas.addStackLayer(path)
         elif layer_type == "isosurface":

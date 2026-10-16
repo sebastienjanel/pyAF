@@ -139,7 +139,6 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         # Only allowed if itk is imported
         if consts.ALLOW_ITK is False:
             self.BT_load_stack.setEnabled(False)
-        self.BT_load_hr = PYAFButton(self, "load_hr", "Load HR")
         self.BT_add_glass = PYAFButton(self, "add_glass", "Add substrate")
         self.BT_fiducials = PYAFButton(self, "fiducials", "Fiducials")
         self.BT_lock_top = PYAFButton(self, "lock_top", "View from top")
@@ -162,7 +161,6 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         self.VL.addWidget(self.BT_load)
         if consts.ADVANCED:
             self.VL.addWidget(self.BT_load_stack)
-            self.VL.addWidget(self.BT_load_hr)
         self.VL.addWidget(self.BT_add_glass)
         self.VL.addWidget(self.BT_fiducials)
         self.VL.addWidget(self.BT_lock_top)
@@ -216,8 +214,6 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             label_name.setText(shared.exp.list[data_id].filename)
         elif layer_type == "single_image":
             label_name.setText(layer.filename)
-        elif layer_type == "opticsHR":
-            label_name.setText("path")
         elif layer_type == "glass":
             roi_id = layer.roi_id
             nm = shared.exp.list[layer.afm_id].filename
@@ -312,6 +308,10 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         layer = shared.layer_list[row]
         self.parent.canvas.style.HighlightProp(layer.actor)
 
+        # Color scale of the selected AFM layer
+        if layer.type == "afm":
+            self.parent.update_scalar_bar()
+
         # Update the current widget
         self.update_widget()
 
@@ -371,16 +371,6 @@ class MenuLayerListWidget(QtWidgets.QWidget):
                 if shared.VTK_first is False:
                     widg.canvas.interactor.GetRenderWindow().Render()
 
-        elif button == "color_glass":
-            index = widgets_list.widget_vtk.get_current_layer()
-            dt = shared.exp.list[index]
-            val = misc_tools.ask_user_for_color(dt.opengl_glass_color)
-            if val is not False:
-                dt.opengl_glass_color = [val[0], val[1], val[2], 1.0]
-
-                if shared.VTK_first is False:
-                    widg.canvas.interactor.GetRenderWindow().Render()
-
         elif button == "scales_white":
             widgets_list.widget_vtk.scales_color = [1.0, 1.0, 1.0, 1.0]
             for layer in shared.layer_list:
@@ -403,9 +393,6 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         elif button == "load_stack":
             create_layer("stack")
 
-        elif button == "load_hr":
-            widgets_list.widget_vtk.tab_HR.button_clicked("load")
-
         elif button == "add_glass":
             if widgets_list.widget_vtk_glass_choser is None:
                 # Ask the user which ROIs he wants to chose
@@ -420,12 +407,10 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             widgets_list.widget_vtk.canvas.lock_top()
 
         elif button == "colorscale":
-            # For the moment, depending on the first layer only
-            # (not clean ...)
-            if shared.exp.list[0].opengl_display_colorbar:
-                shared.exp.list[0].opengl_display_colorbar = False
-            else:
-                shared.exp.list[0].opengl_display_colorbar = True
+            # Display or hide the color scale for all the files
+            display = not shared.exp.list[0].opengl_display_colorbar
+            for data in shared.exp.list:
+                data.opengl_display_colorbar = display
 
             widgets_list.widget_vtk.update_scalar_bar()
 
@@ -457,13 +442,41 @@ class MenuLayerListWidget(QtWidgets.QWidget):
                 self.BT_resample.setEnabled(False)
 
         elif button == "resample":
-            tw = self.tableWidget
-            for item in tw.selectionModel().selectedRows():
-                index = item.row()
-                resample_images(index)
+            self.resample(index)
 
         elif button == "isosurface":
             create_layer("isosurface")
+
+    def resample(self, index):
+        """Cuts the selected image along the drawn square, saves it where the
+        user wants and proposes to load it."""
+        if index is None or shared.layer_list[index].type != "single_image":
+            QtWidgets.QMessageBox.warning(
+                self, "ITK resample",
+                "Select the image (tiff) layer to resample.")
+            return
+
+        layer = shared.layer_list[index]
+        settings_path = misc_tools.get_user_path(self.settings)
+        name = os.path.splitext(layer.filename)[0] + "_resampled.tiff"
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save the resampled image",
+            os.path.join(settings_path, name), "TIFF (*.tiff *.tif)")
+        if not path:
+            return
+        if not path.lower().endswith((".tif", ".tiff")):
+            path += ".tiff"
+        misc_tools.set_user_path(self.settings, os.path.dirname(path))
+
+        resample_images(index, path)
+
+        answer = QtWidgets.QMessageBox.question(
+            self, "ITK resample",
+            "The resampled image was saved to:\n" + path +
+            "\n\nLoad it in the 3D view?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if answer == QtWidgets.QMessageBox.Yes:
+            create_layer("single_image", path)
 
     def toggle_clicked(self, toogle):
         """Called when a toogle is clicked."""

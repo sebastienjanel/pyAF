@@ -31,6 +31,7 @@
 
 """Miscellaneous tools for pyAF."""
 
+import re
 import os
 import sys
 import copy
@@ -568,17 +569,18 @@ def get_tiff_calibration(path):
                 string += char.decode("latin-1")
             string = repr(string)
 
-            # \xb5m == um
-            string1 = string.split("Voxel_size_X: ")[1]
-            xcal = float(string1.split(" \\xb5m")[0]) * 1e-6
-            string2 = string.split("Voxel_size_Y: ")[1]
-            ycal = float(string2.split(" \\xb5m")[0]) * 1e-6
-            string3 = string.split("Voxel_size_Z: ")[1]
-            zcal = float(string3.split(" \\xb5m")[0]) * 1e-6
+            # Sizes in um (written \xb5m or µm)
+            cal = []
+            for axis in ("X", "Y", "Z"):
+                found = re.search("Voxel_size_" + axis + r": ([0-9.eE+-]+) "
+                                  r"(?:\\xb5|\u00b5)m", string)
+                if found is None:
+                    raise IndexError
+                cal.append(float(found.group(1)) * 1e-6)
 
-            return [xcal, ycal, zcal]
+            return cal
 
-        except IndexError:
+        except (IndexError, ValueError):
             pass
 
         try:
@@ -596,7 +598,7 @@ def get_tiff_calibration(path):
 
             return [xcal, ycal, 0]
 
-        except IndexError:
+        except (IndexError, ValueError):
             pass
 
         # Return nothing

@@ -59,6 +59,10 @@ class FiducialsWidget(PYAFWidget):
         # Load the settings
         self.settings = QtCore.QSettings()
 
+        # Font of the table
+        self.smallfont = QtWidgets.QApplication.font()
+        self.smallfont.setPointSize(12)
+
         self.VL = QtWidgets.QVBoxLayout()
 
         HL = QtWidgets.QHBoxLayout()
@@ -120,12 +124,13 @@ class FiducialsWidget(PYAFWidget):
             # Get saved path
             settings_path = misc_tools.get_user_path(self.settings)
 
-            filename = QtWidgets.QFileDialog.getOpenFileName(directory=settings_path)
+            filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+                directory=settings_path)
 
             if not filename:
                 return
             else:
-                fiducials_file = open(filename, "rb")
+                fiducials_file = open(filename, "r")
 
                 # Skip first line
                 fiducials_file.readline()
@@ -136,14 +141,15 @@ class FiducialsWidget(PYAFWidget):
                 for line in fiducials_file:
                     values = line.split()
                     # Add X, Y positions
-                    # Last line is ['\x00']; so it has a length of 1, skip it
-                    if len(values) != 1:
+                    # Skip the empty lines (the last line is ['\x00'])
+                    if len(values) >= 3:
                         val1 = float(values[1]) * 1e3
                         val2 = float(values[2]) * 1e3
                         pos = [val1, val2, 0.0]
                         positions.append(pos)
                         display.append(True)
 
+                fiducials_file.close()
                 current_layer.fiducials.add_to_fiducials(positions, display)
 
         elif button == "add":
@@ -225,7 +231,7 @@ class FiducialsWidget(PYAFWidget):
 
             # Index
             label = QtWidgets.QLabel()
-            label.setFont(self.parent.parent.smallfont)
+            label.setFont(self.smallfont)
             label.setText(str(i + 1))
             cw = gui_tools.CenteredCellwidget(label)
             self.tableWidget.setCellWidget(i, 0, cw)
@@ -238,19 +244,19 @@ class FiducialsWidget(PYAFWidget):
             # X
             item = QLineEditForTableWidet(self, "posx", i)
             item.setText(str(positions[i][0]))
-            item.setFont(self.parent.parent.smallfont)
+            item.setFont(self.smallfont)
             self.tableWidget.setCellWidget(i, 2, item)
 
             # Y
             item = QLineEditForTableWidet(self, "posy", i)
             item.setText(str(positions[i][1]))
-            item.setFont(self.parent.parent.smallfont)
+            item.setFont(self.smallfont)
             self.tableWidget.setCellWidget(i, 3, item)
 
             # Z
             item = QLineEditForTableWidet(self, "posz", i)
             item.setText(str(positions[i][2]))
-            item.setFont(self.parent.parent.smallfont)
+            item.setFont(self.smallfont)
             self.tableWidget.setCellWidget(i, 4, item)
 
         # Update the input field for the sizes

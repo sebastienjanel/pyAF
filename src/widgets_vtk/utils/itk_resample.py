@@ -31,14 +31,20 @@
 
 """Uses tiffs to make a tiff stack."""
 
-import itk
 import math
-from pyAF.src import shared
-from pyAF.src import widgets_list
+import itk
+import numpy
+from PIL import Image
+from vtkmodules.util import numpy_support
+from ... import shared
+from ... import widgets_list
 
 
-def resample_images(layer_id):
-    """Function used to make a tiff stack out of single tiffs of different sizes."""
+def resample_images(layer_id, path):
+    """Cuts the image of a layer along the drawn square (with the position,
+    angle and pixel size of the layer) and saves it as a tiff in path.
+
+    Used to make a tiff stack out of single tiffs of different sizes."""
     layer_list = shared.layer_list
     layer = layer_list[layer_id]
     wl = widgets_list.widget_vtk
@@ -87,19 +93,22 @@ def resample_images(layer_id):
     # New position
     pos = [rec[0] - act_x0, -(rec[1] - act_y0)]
 
-    resample_filter, _ = resample(itk_img, angle, wanted_size, pos, orig_size)
+    resample_filter, spacing = resample(
+        itk_img, angle, wanted_size, pos, orig_size)
+    resample_filter.Update()
 
-    write_to_tiff(resample_filter.GetOutput(), layer_id)
+    write_to_tiff(resample_filter.GetOutput(), spacing, path)
 
 
-def write_to_tiff(img, layer_id):
-    """Write the tiff to disk."""
-    writer_type = itk.Image[itk.UC, 2]
-    writer = itk.ImageFileWriter[writer_type].New()
-
-    writer.SetInput(img)
-    writer.SetFileName("layer_" + str(layer_id) + ".tiff")
-    writer.Update()
+def write_to_tiff(img, spacing, path):
+    """Write the tiff to disk, with the pixel size [um] in the description
+    (as in the tiffs exported by ImageJ, read back by pyAF)."""
+    array = itk.array_from_image(img).astype(numpy.uint8)
+    description = ("Voxel_size_X: " + repr(float(spacing[0])) + " \xb5m\n"
+                   "Voxel_size_Y: " + repr(float(spacing[1])) + " \xb5m\n"
+                   "Voxel_size_Z: 0.0 \xb5m\n")
+    Image.fromarray(array).save(
+        path, tiffinfo={270: description.encode("latin-1")})
 
 
 def get_itk_image_from_vtk_tiff_2D(vtk_tiff):
@@ -107,15 +116,12 @@ def get_itk_image_from_vtk_tiff_2D(vtk_tiff):
     vtk_tiff.Update()
     vtk_tiff_imageData = vtk_tiff.GetOutput()
 
-    input_type = itk.Image[itk.UC, 2]
-
-    vtk_to_itk_converter = itk.VTKImageToImageFilter[input_type].New()
-    vtk_to_itk_converter.SetInput(vtk_tiff_imageData)
-    vtk_to_itk_converter.Update()
-
-    itk_input_image = vtk_to_itk_converter.GetOutput()
-
-    return itk_input_image
+    # The 2D tiff is read as a volume with a single slice
+    dims = vtk_tiff_imageData.GetDimensions()
+    scalars = vtk_tiff_imageData.GetPointData().GetScalars()
+    array = numpy_support.vtk_to_numpy(scalars).reshape(dims[1], dims[0], -1)
+    return itk.image_from_array(numpy.ascontiguousarray(
+        array[:, :, 0], dtype=numpy.uint8))
 
 
 def resample(itk_image, angle, wanted_size, position, orig_size):

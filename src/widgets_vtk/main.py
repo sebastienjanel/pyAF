@@ -176,12 +176,27 @@ class OpenglWidget(PYAFWidget):
             self.canvas.interactor.GetRenderWindow().Render()
 
 
+def colorbar_data():
+    """File whose color scale is displayed: the selected AFM layer, else the
+    first AFM layer of the window."""
+    afm_layers = [layer for layer in shared.layer_list if layer.type == "afm"]
+    widget = widgets_list.widget_vtk
+    if widget is not None:
+        index = widget.get_current_layer()
+        if index is not None and shared.layer_list[index].type == "afm":
+            return shared.exp.list[shared.layer_list[index].afm_id]
+    if afm_layers:
+        return shared.exp.list[afm_layers[0].afm_id]
+    return shared.exp.list[0]
+
+
 def get_color_bar():
     """Create a lookup table for the colorbar
 
-    (Defined with the values of the first layer)
+    (Defined with the values of the selected AFM layer, or of the first AFM
+    layer of the window)
     """
-    data = shared.exp.list[0]
+    data = colorbar_data()
 
     lut = vtk.vtkLookupTable()
     lut.SetNumberOfColors(4)

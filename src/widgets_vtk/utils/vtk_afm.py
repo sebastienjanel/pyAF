@@ -826,7 +826,10 @@ def get_surface_as_points(self, data, mode):
     glyph3D.SetInputData(polydata)
     glyph3D.Update()
 
-    return glyph3D
+    # Highest point, for the z scale (as for the surface)
+    z_max = 0 if data.opengl_afm_flat_view else float(numpy.max(topo))
+
+    return glyph3D.GetOutput(), z_max
 
 
 def get_actor_profile(sizes, trans, z_scale, profile, polydata_tomo):

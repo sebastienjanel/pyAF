@@ -43,7 +43,6 @@ vtkmodules.qt.PyQtImpl = qtpy.API_NAME
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 from .layers.layer_afm import LayerAFM
 from .layers.layer_single_image import LayerSingleImage
-from .layers.layer_optics_HR import LayerOpticsHR
 from .layers.layer_glass import LayerGlass
 from .. import widgets_list
 
@@ -178,13 +177,6 @@ class VTKWidget(QtWidgets.QWidget):
             return True
         else:
             return False
-
-    def addOpticsHRLayer(self, path):
-        """Adds an high resolution optics layer"""
-        shared.layer_list.append(LayerOpticsHR(self, path))
-        if shared.VTK_first is False:
-            self.renderer.Render()
-        return True
 
     def addGlassLayer(self, layer_id, afm_id, roi_id):
         """Adds glass layers."""

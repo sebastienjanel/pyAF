@@ -31,6 +31,8 @@
 
 """A progressbar."""
 
+import time
+
 from qtpy import QtCore, QtGui, QtWidgets
 from .. import widgets_list
 from ..tools.PYAFWidget import PYAFWidget
@@ -55,6 +57,7 @@ class Progressbar(PYAFWidget):
         self.widget_VL.addStretch(1)
         self.setLayout(self.widget_VL)
         self.counter = 0
+        self.last_events = 0.0
         self.progressbar.setRange(0, 0)
         self.adjustSize()
         self.show()
@@ -77,7 +80,12 @@ class Progressbar(PYAFWidget):
         """Update by one step (or by the given number of steps)."""
         self.counter += steps
         self.progressbar.setValue(self.counter - 1)
-        QtCore.QCoreApplication.processEvents()
+        # Process the events (redraw) at most every 50 ms: processing them
+        # at each step is slow, and also redraws the 3D view each time
+        now = time.monotonic()
+        if now - self.last_events > 0.05:
+            self.last_events = now
+            QtCore.QCoreApplication.processEvents()
 
     def set_label(self, text):
         """Update the label's text."""

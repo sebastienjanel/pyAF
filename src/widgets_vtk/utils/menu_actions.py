@@ -37,8 +37,14 @@ from ... import shared
 
 def remove_layer():
     """Can be called from the menu to delete a layer from VTK."""
-    # Get the current layer
+    if widgets_list.widget_vtk is None:
+        # No 3D window
+        return
+
+    # Get the current layer (the last layer can not be removed)
     layer_id = widgets_list.widget_vtk.get_current_layer()
+    if layer_id is None or len(shared.layer_list) < 2:
+        return
 
     # Remove from 3D
     shared.layer_list[layer_id].delete()
@@ -69,6 +75,10 @@ def copy_pos():
 
     The position is copied to an internal clipboard in shared.
     """
+    if widgets_list.widget_vtk is None:
+        # No 3D window
+        return
+
     # Get the current layer
     layer_id = widgets_list.widget_vtk.get_current_layer()
     layer = shared.layer_list[layer_id]
@@ -97,36 +107,29 @@ def paste_pos():
 
     The position is taken from the internal clipboard in shared.
     """
+    if widgets_list.widget_vtk is None:
+        # No 3D window
+        return
+
     # Get the values from the clipboard
     vals = shared.clipboard_layer_positions
+    if not vals:
+        # Nothing copied
+        return
 
     # Get the current layer
     layer_id = widgets_list.widget_vtk.get_current_layer()
     layer = shared.layer_list[layer_id]
 
-    old_angle = layer.angle
-
-    # Paste the values
-    layer.pos_x = vals["x"]
-    layer.pos_y = vals["y"]
-    layer.pos_z = vals["z"]
-    layer.angle = vals["angle"]
-
-    # Update the sizes only for tiff layers
-    if vals["type"] == "optics":
-        layer.size_x = vals["size_x"]
-        layer.size_y = vals["size_y"]
-        layer.size_z = vals["size_z"]
-        layer.res_x = vals["res_x"]
-        layer.res_y = vals["res_y"]
-        layer.res_z = vals["res_z"]
-
-    if vals["type"] == "afm":
-        # For AFM layers, just change the position
-        layer.translate(0, 0, 0)
-        layer.rotate(None, None, increment=(old_angle - layer.angle))
-
-    if vals["type"] == "optics":
-        # For tiff layers, reinitialize the size
+    # Update the sizes only between tiff layers
+    images = ("single_image", "stack")
+    if vals["type"] in images and layer.type in images:
+        for key in ("size_x", "size_y", "size_z", "res_x", "res_y", "res_z"):
+            setattr(layer, key, vals[key])
         layer.update_actor()
-        widgets_list.widget_vtk.menu.tab_Optics.update_widget()
+        widgets_list.widget_vtk.menu_options.tab_Optics.update_widget()
+
+    # Move the layer to the copied position and angle
+    layer.translate(vals["x"] - layer.pos_x, vals["y"] - layer.pos_y,
+                    vals["z"] - layer.pos_z)
+    layer.rotate(None, None, new_angle=vals["angle"])
