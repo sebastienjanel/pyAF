@@ -36,7 +36,7 @@ from .. import shared
 from .. import widgets_list
 
 
-def apply_to_all(mode, option=None, oldid=None):
+def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
     """Used to apply preferences to all files in the experiment.
 
     Lets says you want to change the values of a colorscale for a meshgrid in
@@ -153,10 +153,11 @@ def apply_to_all(mode, option=None, oldid=None):
             # Colortable colors
             # (important to have deepcopy here because these are lists)
 
-            if cur.is_single is False:
-                # This one is only updated in case of a meshgrid. Else the max
-                # value is 0 and all the meshgrids will have a colorscale
-                # with a maximum set to 0, resulting in an error
+            if cur.is_single is False and piezo_colors:
+                # Only when the scale is changed in the color options: the
+                # piezo heights of the files are not comparable, each file
+                # keeps its own scale otherwise. (Only in case of a meshgrid,
+                # else the max value is 0)
                 dt.color_opts_piezo = copy.deepcopy(cur.color_opts_piezo)
 
             dt.color_opts_topo = copy.deepcopy(cur.color_opts_topo)
@@ -166,6 +167,8 @@ def apply_to_all(mode, option=None, oldid=None):
                 copy.deepcopy(cur.color_opts_rupture_force1)
             dt.color_opts_events_per_curve = \
                 copy.deepcopy(cur.color_opts_events_per_curve)
+            dt.stiffness_color_log = getattr(cur, "stiffness_color_log",
+                                             False)
             dt.color_saturation = cur.color_saturation
             dt.color_negative = cur.color_negative
             dt.color_nan = cur.color_nan

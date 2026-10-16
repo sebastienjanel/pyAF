@@ -33,7 +33,7 @@
 
 import numpy
 import matplotlib
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, LogNorm
 from matplotlib.ticker import MaxNLocator
 from ... import widgets_list
 from ... import shared
@@ -169,6 +169,9 @@ class PlotMeshGrid(MainPlot):
             edgecolor = "face"
             linewidth = 30.0 / 72.0
 
+        # Log color scale (elasticity maps)
+        log_norm = self.get_log_norm()
+
         # Plot the meshgrid
         if self.colormap != "Rainbow 1" and self.colormap != "Cool-Warm" and \
                 self.data_meshgrid is not None:
@@ -184,6 +187,8 @@ class PlotMeshGrid(MainPlot):
 
             if self.mesh_type == "events_per_curve":
                 self.colormap, norm = self.get_events_colorscale(self.colormap)
+            elif log_norm is not None:
+                norm = log_norm
             else:
                 # Define norm with vmin and vmax
                 norm = Normalize(
@@ -217,6 +222,8 @@ class PlotMeshGrid(MainPlot):
             self.colormap, norm = self.colortable.get_color_as_cdict()
             if self.mesh_type == "events_per_curve":
                 self.colormap, norm = self.get_events_colorscale(self.colormap)
+            elif log_norm is not None:
+                norm = log_norm
 
             mesh = self.axes.pcolormesh(self.x_range, self.y_range,
                                         self.data_meshgrid,
@@ -305,6 +312,27 @@ class PlotMeshGrid(MainPlot):
 
         # Do the actual plotting, is defined in MainPlot class
         self.start_plot()
+
+    def get_log_norm(self):
+        """Log color scale of the elasticity maps (None if not asked). A log
+        scale can not start at 0: the minimum is then the lowest positive
+        value of the map."""
+        mesh = self.mesh_type
+        if mesh is None or not str(mesh).startswith("stiffness") or \
+                not getattr(self.data, "stiffness_color_log", False) or \
+                self.data_meshgrid is None:
+            return None
+        vmax = self.colortable_max_value * self.factor
+        vmin = self.colortable_min_value * self.factor
+        if vmin <= 0:
+            values = numpy.asarray(self.data_meshgrid, dtype=float)
+            values = values[numpy.isfinite(values) & (values > 0)]
+            if values.size == 0:
+                return None
+            vmin = float(values.min())
+        if vmax <= vmin:
+            return None
+        return LogNorm(vmin=vmin, vmax=vmax)
 
     def get_events_colorscale(self, colormap):
         """Returns a discrete colorscale for the number of events.

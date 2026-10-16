@@ -241,11 +241,17 @@ class DataWidget(PYAFWidget):
         self.canvas_curve = QtWidgets.QWidget()
         self.canvas_curve_a = QtWidgets.QWidget()
         self.canvas_curve_b = QtWidgets.QWidget()
+        self.canvas_curve_force = QtWidgets.QWidget()
         self.curve = PYAFPlot(self, "curve_data", self.canvas_curve, sizes)
+        # Force vs distance: to check the deflection sensitivity on glass
+        self.curve_3 = PYAFPlot(self, "curve_datac", self.canvas_curve_force,
+                                sizes)
         self.curve_1 = PYAFPlot(self, "curve_dataa", self.canvas_curve_a, sizes)
         self.curve_2 = PYAFPlot(self, "curve_datab", self.canvas_curve_b, sizes)
 
+        # Same order as the plot selector
         self.canvas_stack.addWidget(self.curve)
+        self.canvas_stack.addWidget(self.curve_3)
         self.canvas_stack.addWidget(self.curve_1)
         self.canvas_stack.addWidget(self.curve_2)
 
@@ -254,6 +260,7 @@ class DataWidget(PYAFWidget):
         self.curve.setSizePolicy(sizePolicy)
         self.curve_1.setSizePolicy(sizePolicy)
         self.curve_2.setSizePolicy(sizePolicy)
+        self.curve_3.setSizePolicy(sizePolicy)
         self.canvas_stack.setSizePolicy(sizePolicy)
         self.canvas_mesh.setSizePolicy(sizePolicy)
         self.meshgrid.setSizePolicy(sizePolicy)
@@ -430,7 +437,12 @@ class DataWidget(PYAFWidget):
         # Update the meshgrid
         self.update_plot_selector()
         self.meshgrid.update_plot()
+        self.update_curves()
+
+    def update_curves(self):
+        """Update the curves (the time plots only for the JPK files)."""
         self.curve.update_plot()
+        self.curve_3.update_plot()
         if self.is_jpk():
             self.curve_1.update_plot()
             self.curve_2.update_plot()
@@ -443,21 +455,11 @@ class DataWidget(PYAFWidget):
         return data.file_type in JPK_FILE_TYPES
 
     def update_plot_selector(self):
-        """Display the plot selector and the selected plot for the JPK
-        files, the deflection vs z position plot for the other
-        files."""
-        jpk = self.is_jpk()
-        # Keep the space of the selector if a JPK file is loaded, so that
-        # the plots do not move when changing files
-        any_jpk = any(self.is_jpk(data) for data in shared.exp.list)
-        policy = self.plot_selector.sizePolicy()
-        policy.setRetainSizeWhenHidden(any_jpk)
-        self.plot_selector.setSizePolicy(policy)
-        self.plot_selector.setVisible(jpk)
-        if jpk:
-            index = self.plot_selector.list_plot_types.currentIndex()
-        else:
-            index = 0
+        """Display the selected plot. The time plots are only available for
+        the JPK files."""
+        selector = self.plot_selector
+        selector.set_time_plots(self.is_jpk())
+        index = selector.list_plot_types.currentIndex()
         self.canvas_stack.setCurrentIndex(index)
 
     def change_info_type(self, newtype):
@@ -598,7 +600,7 @@ class DataWidget(PYAFWidget):
                 data.deflection_sensitivity = None
                 self.IN_defl_sens.changeValue(data.deflection_sensitivity)
                 self.BT_reset.setEnabled(False)
-                self.curve.update_plot()
+                self.update_curves()
 
             elif shared.exp.info_selected == "temp":
                 data.temperature = None
@@ -878,6 +880,7 @@ class DataWidget(PYAFWidget):
             if value != misc_tools.format_number(data.spring_constant * 1e9):
                 data.spring_constant = float(value)
                 self.update_GUI("info_selected")
+                self.curve_3.update_plot()
                 QtWidgets.QMessageBox.warning(
                     self,
                     "Info",
@@ -887,7 +890,7 @@ class DataWidget(PYAFWidget):
             if value != str(round(data.deflection_sensitivity, 2)):
                 data.deflection_sensitivity = float(value)
                 self.update_GUI("info_selected")
-                self.curve.update_plot()
+                self.update_curves()
         elif field == "input_temp":
             value = self.IN_temp.get_str_value(True)
             # Compare with the displayed value (in degC)

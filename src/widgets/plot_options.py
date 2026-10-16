@@ -32,6 +32,7 @@
 """Options for the meshgrids."""
 
 from qtpy import QtCore, QtWidgets
+from ..single import robust_max
 from ..tools import apply_to_all
 from ..tools import misc_tools
 from ..tools import planefit
@@ -93,6 +94,13 @@ class PlotOptionsWidget(PYAFWidget):
         label = "Transparent Nan values"
         self.CB_nan_transp = PYAFCheckBox(self, "nan_transp", label)
 
+        # Log color scale (elasticity maps)
+        self.CB_log = PYAFCheckBox(self, "log_scale", "Log scale")
+        self.CB_log.setToolTip(
+            "Logarithmic color scale for the elasticity maps (from the "
+            "lowest positive value\nwhen the minimum is 0): soft and stiff "
+            "regions are both visible (e.g. a cell on glass).")
+
         BT_apply = PYAFButton(self, "button_apply", "Apply")
 
         self.gridlayout_box_colors.addWidget(self.LS_colortable, 0, 0)
@@ -100,13 +108,14 @@ class PlotOptionsWidget(PYAFWidget):
         self.gridlayout_box_colors.addWidget(self.input_max, 2, 0)
         self.gridlayout_box_colors.addWidget(self.input_middle, 3, 0)
         self.gridlayout_box_colors.addWidget(self.input_min, 4, 0)
-        self.gridlayout_box_colors.addWidget(BT_autoscale, 5, 0)
-        self.gridlayout_box_colors.addWidget(BT_sat_color, 6, 0)
-        self.gridlayout_box_colors.addWidget(BT_neg_color, 7, 0)
-        self.gridlayout_box_colors.addWidget(BT_nan_color, 8, 0)
+        self.gridlayout_box_colors.addWidget(self.CB_log, 5, 0)
+        self.gridlayout_box_colors.addWidget(BT_autoscale, 6, 0)
+        self.gridlayout_box_colors.addWidget(BT_sat_color, 7, 0)
+        self.gridlayout_box_colors.addWidget(BT_neg_color, 8, 0)
+        self.gridlayout_box_colors.addWidget(BT_nan_color, 9, 0)
         if self.mode == "vtk":
-            self.gridlayout_box_colors.addWidget(self.CB_nan_transp, 9, 0)
-        self.gridlayout_box_colors.addWidget(BT_apply, 10, 0)
+            self.gridlayout_box_colors.addWidget(self.CB_nan_transp, 10, 0)
+        self.gridlayout_box_colors.addWidget(BT_apply, 11, 0)
 
         self.box_colors.setLayout(self.gridlayout_box_colors)
 
@@ -135,12 +144,19 @@ class PlotOptionsWidget(PYAFWidget):
             shared.exp.apply_to_all_data = self.CB_apply_to_all.isChecked()
 
             # Apply on all
-            apply_to_all.apply_to_all("display_options", oldid=self.data_id)
+            apply_to_all.apply_to_all("display_options", oldid=self.data_id,
+                                      piezo_colors=True)
 
             # Update the plots only if asked
             self.update_parent_elements()
 
             self.update_widget()
+
+        elif what == "log_scale":
+            data.stiffness_color_log = self.CB_log.isChecked()
+            apply_to_all.apply_to_all("display_options", oldid=self.data_id,
+                                      piezo_colors=True)
+            self.update_parent_elements()
 
         elif what == "nan_transp":
             data.nan_color_transparent = self.CB_nan_transp.isChecked()
@@ -250,7 +266,8 @@ class PlotOptionsWidget(PYAFWidget):
             data.colortableid = colortable_id
 
             # Apply to all if needed
-            apply_to_all.apply_to_all("display_options", oldid=self.data_id)
+            apply_to_all.apply_to_all("display_options", oldid=self.data_id,
+                                      piezo_colors=True)
 
             # Update
             self.update_widget()
@@ -271,8 +288,12 @@ class PlotOptionsWidget(PYAFWidget):
             # meshgrids)
             if mt == "stiffness" or mt == "stiffness_slice" or \
                     mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                data.colortable_max_value = data.max_stiffness
-                data.colortable_middle_value = data.max_stiffness / 2.0
+                # Up to the 95th percentile of the values of the map (the
+                # outliers above are drawn with the saturation color)
+                high = robust_max(stiffness_values(data, mt))
+                if high is not None:
+                    data.colortable_max_value = high
+                    data.colortable_middle_value = high / 2.0
             elif mt == "work":
                 data.colortable_max_value = data.max_work
                 data.colortable_middle_value = data.max_work / 2.0
@@ -303,7 +324,8 @@ class PlotOptionsWidget(PYAFWidget):
                 planefit.reset_color_scales(data)
 
             # Apply to all if needed
-            apply_to_all.apply_to_all("display_options", oldid=self.data_id)
+            apply_to_all.apply_to_all("display_options", oldid=self.data_id,
+                                      piezo_colors=True)
 
             self.update_widget()
 
@@ -331,7 +353,8 @@ class PlotOptionsWidget(PYAFWidget):
             if result:
                 # Apply to all if needed
                 apply_to_all.apply_to_all("display_options",
-                                          oldid=self.data_id)
+                                          oldid=self.data_id,
+                                          piezo_colors=True)
 
                 # Update the plots
                 self.update_parent_elements()
@@ -414,6 +437,12 @@ class PlotOptionsWidget(PYAFWidget):
             self.input_middle.setParent(None)
 
         self.CB_nan_transp.setChecked(data.nan_color_transparent)
+
+        # Log scale only for the elasticity maps
+        self.CB_log.setChecked(getattr(data, "stiffness_color_log", False))
+        self.CB_log.setEnabled(mt in ("stiffness", "stiffness_slice",
+                                      "stiffness_corr",
+                                      "stiffness_corr_slice"))
 
     def update_parent_elements(self):
         """This method is called to update some elements from the parents widget.
@@ -517,3 +546,14 @@ def display_bad_value_message(mode=None):
     msg.setIcon(QtWidgets.QMessageBox.Critical)
     msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
     msg.exec_()
+
+
+def stiffness_values(data, meshgrid_type):
+    """Values of the displayed elasticity map (corrected for the B.E.C.
+    maps), for the automatic color scale."""
+    corrected = meshgrid_type.startswith("stiffness_corr") and \
+        data.stiffness_corrected
+    array = data.stiffness_corrected_array if corrected \
+        else data.stiffness_array
+    return [v for i in range(data.nbr_pixels_x)
+            for j in range(data.nbr_pixels_y) for v in array[i][j]]

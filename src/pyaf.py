@@ -683,10 +683,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Update the curves
         if self.tabs.currentIndex() == 0:
-            wl.widget_data.curve.update_plot()
-            if wl.widget_data.is_jpk(data):
-                wl.widget_data.curve_1.update_plot()
-                wl.widget_data.curve_2.update_plot()
+            wl.widget_data.update_curves()
         if self.tabs.currentIndex() == 1:
             wl.widget_compute.update_MPL("MPL_canvas")
         if self.tabs.currentIndex() == 2:

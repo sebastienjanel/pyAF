@@ -380,6 +380,60 @@ class ResultsWidget(PYAFWidget):
         self.update_MPL("MPL_canvas1")
         self.update_MPL("MPL_canvas2")
 
+    @staticmethod
+    def match_curve_to_map(data):
+        """Displays the curve corresponding to the map type, with its
+        options: the approach force curve with the point of contact and the
+        fits for the elasticity, the retraction force curve with the jump of
+        contact, the work and the force for the detachment, the force curve
+        of the events with their annotations, distance filter and jumps of
+        contact for the events, and the default deflection curve for the
+        heights. Returns True if the curve changed."""
+        mt = data.meshgrid_type
+        if mt in ("stiffness", "stiffness_slice", "stiffness_corr",
+                  "stiffness_corr_slice") and data.stiffness_calculated:
+            data.display_curve_type = "force"
+            data.display_trace_retrace = 0
+            data.display_poc = True
+            data.display_fit_poc = True
+            data.display_segments = True
+            data.display_fits_stiffness = True
+        elif mt in ("work", "rupture_force") and \
+                data.work_and_rupture_force1_calculated:
+            data.display_curve_type = "force"
+            data.display_trace_retrace = 1
+            data.display_joc = True
+            data.display_fit_joc = True
+            data.display_surface = True
+            data.display_force = True
+        elif mt in ("events_per_curve", "events_rupture_force") and \
+                data.events_calculated:
+            data.display_curve_type = "results_force_events"
+            data.display_trace_retrace = 1
+            data.events_results_display_annotations = 1
+            data.events_display_results_filter_dist = True
+            data.events_results_display_joc = True
+            data.events_results_display_fit_joc = True
+        elif mt in ("piezo", "topo"):
+            # Default display of the curves, without the results
+            data.display_curve_type = "defl_ext"
+            data.display_trace_retrace = 2
+            data.display_poc = False
+            data.display_fit_poc = False
+            data.display_segments = False
+            data.display_fits_stiffness = False
+            data.display_joc = False
+            data.display_fit_joc = False
+            data.display_surface = False
+            data.display_force = False
+            data.events_results_display_annotations = 0
+            data.events_display_results_filter_dist = False
+            data.events_results_display_joc = False
+            data.events_results_display_fit_joc = False
+        else:
+            return False
+        return True
+
     def update_GUI(self, element):
         """Method to update different GUI elements."""
         data = shared.exp.list[shared.exp.id_selected]
@@ -703,9 +757,14 @@ class ResultsWidget(PYAFWidget):
             value = self.GRP_mesh_type.checkedId()
             data.meshgrid_type = misc_tools.get_meshgrid_type_as_string(value)
             self.logger.debug("Changing meshgrid type, %s", data.meshgrid_type)
+            # The curve corresponding to the map
+            curve_changed = self.match_curve_to_map(data)
             apply_to_all.apply_to_all("display_options")
             # Update the GUI elements
             self.update_MPL("MPL_canvas1")
+            if curve_changed:
+                self.update_GUI("buttons_options_curves")
+                self.update_MPL("MPL_canvas2")
             # Update the list of colortables and the min/max values
             if widgets_list.widget_meshgrid_options is not None:
                 widgets_list.widget_meshgrid_options.update_widget()

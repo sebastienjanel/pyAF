@@ -59,6 +59,25 @@ from . import widgets_list
 from .tools import results_sorting
 
 
+
+# Upper limit of the automatic color scale of the elasticity: percentile of
+# the values (the maximum would let a few outliers squeeze the colors of the
+# other pixels, the values above are drawn with the saturation color)
+SCALE_PERCENTILE = 95
+
+
+def robust_max(values):
+    """Upper limit of a color scale: percentile of the finite values (their
+    maximum if the percentile is not positive), None without values."""
+    values = numpy.asarray(values, dtype=float).ravel()
+    values = values[numpy.isfinite(values)]
+    if values.size == 0:
+        return None
+    high = float(numpy.percentile(values, SCALE_PERCENTILE))
+    if high <= 0:
+        high = float(values.max())
+    return high
+
 class SingleFile:
     """Objet containing the data and options for a single file."""
 
@@ -198,6 +217,8 @@ class SingleFile:
         self.discard_corrupted_curves_applied = False
         self.roi_list = []
         self.roi_color_names = names
+        # Log color scale for the elasticity maps
+        self.stiffness_color_log = False
         self.roi_selected_row = None
 
         # Profiles
@@ -977,11 +998,11 @@ class SingleFile:
             self.opengl_slice_right = self.nbr_pixels_y - 1
 
         # Piezo image
+        # Piezo height: autoscale (0 to the maximum of the file)
         self.max_piezo = numpy.amax(self.piezo_image)
-        median_piezo = numpy.median(self.piezo_image)
-        std_piezo = numpy.std(self.piezo_image)
-        self.color_opts_piezo[2] = median_piezo + 3 * std_piezo
-        self.color_opts_piezo[3] = (median_piezo + 3 * std_piezo) / 2
+        if color:
+            self.color_opts_piezo[2] = self.max_piezo
+            self.color_opts_piezo[3] = self.max_piezo / 2
 
         if self.stiffness_calculated:
             # Update max_stiffness
@@ -996,8 +1017,10 @@ class SingleFile:
             if color:
                 self.color_opts_topo[2] = self.max_topo
                 self.color_opts_topo[3] = self.max_topo / 2.0
-                self.color_opts_stiffness[2] = self.max_stiffness
-                self.color_opts_stiffness[3] = self.max_stiffness / 2.0
+                high = robust_max(array_stiffness)
+                if high is not None:
+                    self.color_opts_stiffness[2] = high
+                    self.color_opts_stiffness[3] = high / 2.0
 
         # Jump of contact and work
         if self.work_and_rupture_force1_calculated:

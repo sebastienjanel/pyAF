@@ -82,21 +82,21 @@ class StiffnessParamsWidget(PYAFWidget):
 
         # Limits of the fit (percentages)
         self.IN_min_indentation = PYAFInput(
-            self, "input_min_indentation", "Min. indentation (% of travel)")
+            self, "input_min_indentation", "Min. indentation (%)")
         self.IN_min_indentation.input.setValidator(
             misc_tools.validator("UF"))
         self.IN_min_indentation.setToolTip(
-            "No fit when the indentation is smaller than this percentage of "
-            "the piezo travel\nafter the contact: the sample is too stiff "
-            "for the cantilever (e.g. glass).\nThe detected point of contact "
-            "is kept (topography), without elasticity value.")
+            "Percentage of the piezo travel after the contact. When the "
+            "indentation is smaller,\nthe sample is too stiff for the "
+            "cantilever (e.g. glass): the point of contact is not\nfitted, "
+            "the elasticity is fitted with the detected point of contact.")
         self.IN_poc_window = PYAFInput(
-            self, "input_poc_window", "Max. POC shift (% of indentation)")
+            self, "input_poc_window", "Max. POC shift (%)")
         self.IN_poc_window.input.setValidator(misc_tools.validator("UF"))
         self.IN_poc_window.setToolTip(
-            "The fit can move the point of contact by at most this "
-            "percentage of the indentation.\nFurther: the detected point of "
-            "contact is kept, without elasticity value.")
+            "Percentage of the indentation: the fit can move the point of "
+            "contact by at most\nthis much. Further, or if the fit fails, "
+            "the elasticity is fitted with the\ndetected point of contact.")
 
         data = shared.exp.list[shared.exp.id_selected]
 
@@ -110,6 +110,7 @@ class StiffnessParamsWidget(PYAFWidget):
         # Force range selection
         self.force_selection = QtWidgets.QWidget(None)
         self.VL_force_selection = QtWidgets.QVBoxLayout()
+        self.VL_force_selection.setContentsMargins(0, 0, 0, 0)
         self.VL_force_selection.addWidget(self.F_start)
         self.VL_force_selection.addWidget(self.F_stop)
         self.VL_force_selection.addStretch(1)
@@ -118,6 +119,7 @@ class StiffnessParamsWidget(PYAFWidget):
         # Indentation range selection
         self.indentation_selection = QtWidgets.QWidget(None)
         self.VL_indentation_selection = QtWidgets.QVBoxLayout()
+        self.VL_indentation_selection.setContentsMargins(0, 0, 0, 0)
         self.VL_indentation_selection.addWidget(self.IN_start)
         self.VL_indentation_selection.addWidget(self.IN_stop)
         self.VL_indentation_selection.addStretch(1)
@@ -153,15 +155,32 @@ class StiffnessParamsWidget(PYAFWidget):
         elif self.name == "widget_fitting":
 
             self.HL_list_range_mode = QtWidgets.QHBoxLayout()
-            self.label_range_mode = QtWidgets.QLabel("Range Mode : ")
+            self.label_range_mode = QtWidgets.QLabel("Range mode")
             self.HL_list_range_mode.addWidget(self.label_range_mode)
             self.HL_list_range_mode.addWidget(self.list_range_mode)
             self.HL_list_range_mode.addStretch(1)
 
-            self.VL_params_stiff.addLayout(self.HL_list_range_mode)
-            self.VL_params_stiff.addWidget(self.STK_data_selection)
-            self.VL_params_stiff.addWidget(self.IN_min_indentation)
-            self.VL_params_stiff.addWidget(self.IN_poc_window)
+            # Range of the data fitted, and limits of the fit, side by side
+            # under the computation method
+            box_range = QtWidgets.QGroupBox("Fit range")
+            VL_range = QtWidgets.QVBoxLayout()
+            VL_range.addLayout(self.HL_list_range_mode)
+            VL_range.addWidget(self.STK_data_selection)
+            box_range.setLayout(VL_range)
+
+            box_adjustment = QtWidgets.QGroupBox("Fit adjustment")
+            VL_adjustment = QtWidgets.QVBoxLayout()
+            VL_adjustment.addWidget(self.IN_min_indentation)
+            VL_adjustment.addWidget(self.IN_poc_window)
+            VL_adjustment.addStretch(1)
+            box_adjustment.setLayout(VL_adjustment)
+
+            HL_boxes = QtWidgets.QHBoxLayout()
+            HL_boxes.setContentsMargins(0, 0, 0, 0)
+            HL_boxes.addWidget(box_range)
+            HL_boxes.addWidget(box_adjustment)
+            self.VL_params_stiff.setContentsMargins(0, 0, 0, 0)
+            self.VL_params_stiff.addLayout(HL_boxes)
 
         self.setLayout(self.VL_params_stiff)
 

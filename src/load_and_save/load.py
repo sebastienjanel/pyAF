@@ -308,12 +308,11 @@ class Load:
             # Create tables to store results (Already done for .pyaf files)
             shared.exp.temp_file.create_tables_for_results(offset, "all")
 
-            # If apply_on_all is activated, update the piezo color for all the
-            # files for the first load. (And if it's not a pyAF file)
-            if shared.exp.apply_to_all_data:
-                for i in range(len(shared.exp.list)):
-                    data = shared.exp.list[i]
-                    data.color_opts_piezo[2] = shared.exp.global_max_piezo
+            # Piezo height: scale of each file (autoscale), the heights of
+            # different files are not comparable
+            data_set.color_opts_piezo[1] = 0
+            data_set.color_opts_piezo[2] = data_set.max_piezo
+            data_set.color_opts_piezo[3] = data_set.max_piezo / 2.0
 
 
 def update_colors_at_load():
@@ -336,10 +335,6 @@ def update_colors_at_load():
     found_stiffness = False
     found_work_and_rupture_force1_calculated = False
     found_events_calculated = False
-
-    # Piezo heigth can be taken from the first file, there is always
-    # a colorscale defined for this one
-    piezo = copy.deepcopy(shared.exp.list[0].color_opts_piezo)
 
     for i in range(len(shared.exp.list)):
         data = shared.exp.list[i]
@@ -365,7 +360,6 @@ def update_colors_at_load():
     # Set the values
     for i in range(len(shared.exp.list)):
         dt = shared.exp.list[i]
-        dt.color_opts_piezo = piezo
 
         if found_stiffness:
             dt.color_opts_topo = copy.deepcopy(topo)

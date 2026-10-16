@@ -67,6 +67,7 @@ from .curves.tilt_correction import PlotTiltPreview
 from .curves.data.data import PlotDataCurve
 from .curves.data.data_a import PlotDataCurveA
 from .curves.data.data_b import PlotDataCurveB
+from .curves.data.data_force import PlotDataCurveForce
 
 # Compute tab =================================================================
 
@@ -259,7 +260,8 @@ class PYAFPlot(FigureCanvasQTAgg):
               and dt.is_single is False):
             self.canvas = PlotFlattenMeshGrid(self)
         elif (p_type in ("curve_results", "fit_preview",
-                         "tilt_curve_preview", "curve_data", "curve_dataa", "curve_datab")):
+                         "tilt_curve_preview", "curve_data", "curve_dataa", "curve_datab",
+                         "curve_datac")):
             ct = shared.exp.compute_type
             if p_type == "curve_data":
                 self.canvas = PlotDataCurve(self)
@@ -267,6 +269,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                 self.canvas = PlotDataCurveA(self)
             elif p_type == "curve_datab":
                 self.canvas = PlotDataCurveB(self)
+            elif p_type == "curve_datac":
+                self.canvas = PlotDataCurveForce(self)
             elif p_type == "tilt_curve_preview":
                 self.canvas = PlotTiltPreview(self)
             elif p_type == "curve_results":

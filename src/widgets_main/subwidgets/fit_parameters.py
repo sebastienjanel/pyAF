@@ -63,7 +63,7 @@ class FitParamsWidget(PYAFWidget):
         VL = QtWidgets.QVBoxLayout()
 
         if self.name == "fit_param_pocs":
-            title = "Point of contact"
+            title = "Initial point of contact"
         elif self.name == "fit_param_jocs":
             title = "Jump of contact"
         elif self.name == "fit_param_jocs_events":

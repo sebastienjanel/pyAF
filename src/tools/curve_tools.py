@@ -51,7 +51,7 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
     i, j = pos[0], pos[1]
 
     valid_modes = ["compute", "fit_preview", "tilt_curve_preview",
-                   "curve_results", "curve_data", "curve_dataa", "curve_datab", "next_event", "save_event",
+                   "curve_results", "curve_data", "curve_dataa", "curve_datab", "curve_datac", "next_event", "save_event",
                    "details_widget", "results_sorting", "compute_no_shared"]
 
     if mode not in valid_modes:
@@ -215,7 +215,7 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
         sg_smoothing_width = dt["sg_smoothing_width"]
         sg_smoothing_uniform = dt["sg_smoothing_uniform"]
 
-    elif mode == "curve_data" or mode == "curve_dataa" or mode == "curve_datab":
+    elif mode in ("curve_data", "curve_dataa", "curve_datab", "curve_datac"):
         tilt_applied = False
         sg_smoothing_enabled = False
 

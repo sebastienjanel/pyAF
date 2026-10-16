@@ -320,6 +320,7 @@ CURVE_MAP_TYPES = {
     "curve_data": "meshgrid_data",
     "curve_dataa": "meshgrid_data",
     "curve_datab": "meshgrid_data",
+    "curve_datac": "meshgrid_data",
     "fit_preview": "small_meshgrid_compute",
     "curve_results": "meshgrid"}
 

@@ -31,10 +31,11 @@
 
 """Widget used to go through the curves."""
 
-from qtpy import QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from ... import widgets_list
 from ...tools.gui_tools import PYAFButton
+from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
 
 
@@ -47,17 +48,37 @@ class PlotSelectorWidget(PYAFWidget):
         if self.name == "plot_selector_data":
             self.parent_widget = widgets_list.widget_data
 
-        self.plot_types = ("Deflection vs Z position", "Deflection vs Time", "Z position vs Time")
+        # Same order as the plots of the data tab. The time plots are only
+        # available for the JPK files
+        self.plot_types = ("Deflection vs Z position", "Force vs distance",
+                           "Deflection vs Time", "Z position vs Time")
+        self.time_plots = (2, 3)
 
         self.BT_back = PYAFButton(self, "back", "<", size=60)
         self.BT_forward = PYAFButton(self, "forward", ">", size=60)
 
-        self.list_plot_types = QtWidgets.QComboBox()
+        self.list_plot_types = PYAFComboBox(self, None)
 
         for plot_type in self.plot_types:
             self.list_plot_types.addItem(plot_type)
+        self.list_plot_types.setItemData(
+            1, "Force vs tip-sample distance (Z position - deflection). On a "
+            "hard substrate\n(glass), the contact is vertical when the "
+            "deflection sensitivity is right.", QtCore.Qt.ToolTipRole)
+        # Wide enough for the longest plot type
+        self.list_plot_types.fit_to_contents()
 
         self.list_plot_types.activated.connect(lambda: self.list_updated("plot_types"))
+
+        # Zoom on the contact of the force vs distance plot
+        self.CB_zoom = QtWidgets.QCheckBox("Zoom on contact")
+        self.CB_zoom.setToolTip(
+            "Force vs distance: zoom on the contact of the approach curve, to "
+            "see if it is vertical\non a hard substrate (deflection "
+            "sensitivity).")
+        zoom = QtCore.QSettings().value("ForceDistanceZoom", False)
+        self.CB_zoom.setChecked(zoom not in ("false", False, None))
+        self.CB_zoom.clicked.connect(self.zoom_clicked)
 
         self.HL_select_curve = QtWidgets.QHBoxLayout()
         self.HL_select_curve.addStretch(1)
@@ -66,36 +87,66 @@ class PlotSelectorWidget(PYAFWidget):
         self.HL_select_curve.addWidget(self.BT_forward)
         self.HL_select_curve.addStretch(1)
 
-        self.setLayout(self.HL_select_curve)
+        HL_zoom = QtWidgets.QHBoxLayout()
+        HL_zoom.addStretch(1)
+        HL_zoom.addWidget(self.CB_zoom)
+        HL_zoom.addStretch(1)
+        VL = QtWidgets.QVBoxLayout()
+        VL.setContentsMargins(0, 0, 0, 0)
+        VL.addLayout(self.HL_select_curve)
+        VL.addLayout(HL_zoom)
+        self.setLayout(VL)
 
+        self.update_widget()
+
+    def zoom_clicked(self):
+        """Zoom on the contact of the force vs distance plot (or not)."""
+        QtCore.QSettings().setValue("ForceDistanceZoom",
+                                    self.CB_zoom.isChecked())
+        self.parent_widget.curve_3.update_plot()
+
+    def available(self):
+        """Indexes of the available plot types."""
+        model = self.list_plot_types.model()
+        return [i for i in range(len(self.plot_types))
+                if model.item(i).isEnabled()]
+
+    def set_time_plots(self, enabled):
+        """Enable or disable the time plots (only for the JPK files)."""
+        model = self.list_plot_types.model()
+        for i in self.time_plots:
+            model.item(i).setEnabled(enabled)
+        if self.list_plot_types.currentIndex() not in self.available():
+            self.list_plot_types.setCurrentIndex(0)
         self.update_widget()
 
     def update_widget(self):
         """Update the widget."""
-        if self.list_plot_types.currentIndex() == 0:
-            self.BT_back.setEnabled(False)
-
-        else:
-            self.BT_back.setEnabled(True)
-
-        if self.list_plot_types.currentIndex() == len(self.plot_types) - 1:
-            self.BT_forward.setEnabled(False)
-
-        else:
-            self.BT_forward.setEnabled(True)
+        available = self.available()
+        index = self.list_plot_types.currentIndex()
+        # The zoom is only for the force vs distance plot
+        self.CB_zoom.setEnabled(index == 1)
+        self.BT_back.setEnabled(any(i < index for i in available))
+        self.BT_forward.setEnabled(any(i > index for i in available))
 
     def button_clicked(self, button):
         """Called when a button is clicked."""
         index = self.list_plot_types.currentIndex()
 
+        available = self.available()
+        before = [i for i in available if i < index]
+        after = [i for i in available if i > index]
+        if (button == "back" and not before) or \
+                (button == "forward" and not after):
+            return
         if button == "back":
-            new_index = index - 1
+            new_index = max(before)
             self.list_plot_types.setCurrentIndex(new_index)
             self.parent_widget.canvas_stack.setCurrentIndex(new_index)
             self.update_widget()
 
         if button == "forward":
-            new_index = index + 1
+            new_index = min(after)
             self.list_plot_types.setCurrentIndex(new_index)
             self.parent_widget.canvas_stack.setCurrentIndex(new_index)
             self.update_widget()
