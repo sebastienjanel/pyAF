@@ -70,6 +70,8 @@ STIFFNESS_OPTIONS = {
     "indentation_step": "indentation_step",
     "force_start": "force_start",
     "force_stop": "force_stop",
+    "fit_min_indentation": "fit_min_indentation",
+    "fit_poc_window": "fit_poc_window",
     "model_selected": "model_selected",
     "tomography": "tomography",
     "coeff": "coeff"}

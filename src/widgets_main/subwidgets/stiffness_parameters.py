@@ -80,6 +80,24 @@ class StiffnessParamsWidget(PYAFWidget):
         self.F_stop = PYAFInput(self, "input_stop_f", "Stop (%)")
         self.F_stop.input.setValidator(misc_tools.validator("UI"))
 
+        # Limits of the fit (percentages)
+        self.IN_min_indentation = PYAFInput(
+            self, "input_min_indentation", "Min. indentation (% of travel)")
+        self.IN_min_indentation.input.setValidator(
+            misc_tools.validator("UF"))
+        self.IN_min_indentation.setToolTip(
+            "No fit when the indentation is smaller than this percentage of "
+            "the piezo travel\nafter the contact: the sample is too stiff "
+            "for the cantilever (e.g. glass).\nThe detected point of contact "
+            "is kept (topography), without elasticity value.")
+        self.IN_poc_window = PYAFInput(
+            self, "input_poc_window", "Max. POC shift (% of indentation)")
+        self.IN_poc_window.input.setValidator(misc_tools.validator("UF"))
+        self.IN_poc_window.setToolTip(
+            "The fit can move the point of contact by at most this "
+            "percentage of the indentation.\nFurther: the detected point of "
+            "contact is kept, without elasticity value.")
+
         data = shared.exp.list[shared.exp.id_selected]
 
         self.IN_start.changeValue(data.indentation_start)
@@ -142,6 +160,8 @@ class StiffnessParamsWidget(PYAFWidget):
 
             self.VL_params_stiff.addLayout(self.HL_list_range_mode)
             self.VL_params_stiff.addWidget(self.STK_data_selection)
+            self.VL_params_stiff.addWidget(self.IN_min_indentation)
+            self.VL_params_stiff.addWidget(self.IN_poc_window)
 
         self.setLayout(self.VL_params_stiff)
 
@@ -163,6 +183,8 @@ class StiffnessParamsWidget(PYAFWidget):
         self.IN_step.changeValue(data.indentation_step)
         self.F_start.changeValue(data.force_start)
         self.F_stop.changeValue(data.force_stop)
+        self.IN_min_indentation.changeValue(data.fit_min_indentation)
+        self.IN_poc_window.changeValue(data.fit_poc_window)
 
         if self.name == "widget_calculus":
             self.CB_tomography.setChecked(data.tomography)
@@ -216,6 +238,15 @@ class StiffnessParamsWidget(PYAFWidget):
         if field == "input_stop_f":
             if self.F_stop.input.text() != "":
                 data.force_stop = self.F_stop.get_int_value()
+
+        if field == "input_min_indentation":
+            if self.IN_min_indentation.input.text() != "":
+                data.fit_min_indentation = \
+                    self.IN_min_indentation.get_float_value()
+
+        if field == "input_poc_window":
+            if self.IN_poc_window.input.text() != "":
+                data.fit_poc_window = self.IN_poc_window.get_float_value()
 
         widgets_list.widget_compute.update_MPL("MPL_canvas")
 

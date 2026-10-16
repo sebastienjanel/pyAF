@@ -184,6 +184,8 @@ class Stiffness:
             "fit_range_type": data.fit_range_type,
             "force_start": data.force_start,
             "force_stop": data.force_stop,
+            "fit_min_indentation": data.fit_min_indentation,
+            "fit_poc_window": data.fit_poc_window,
             "model_selected": data.stiffness_model_selected,
             "tomography": data.tomography,
             "trig_threshold": data.trig_threshold,

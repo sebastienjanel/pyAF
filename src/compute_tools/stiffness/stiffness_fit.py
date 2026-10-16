@@ -45,6 +45,9 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
     Hertz model using Levenberg-Marquard(least squares) algorithm."""
 
     model_selected = o_params["model_selected"]
+    # Exponent of the indentation in the model (for the fit with a fixed
+    # point of contact)
+    exponent = {0: 1.5, 1: 2.0, 2: 2.0, 4: 1.0}.get(model_selected)
 
     if model_selected == 0:
         # Hertz with sphere
@@ -82,6 +85,15 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
     # Get data for the fit.
     delta, data_to_fit, final_fit, first, stop, poc_index_i, poc_pos_i, \
         poc_found = fit_tools.prepare_data_hertzfit(app, dt, fit_params)
+
+    # Indentation at the end of the curve (from the detected point of
+    # contact), and piezo travel after the contact [m]
+    max_indentation = numpy.max(delta) if len(delta) else 0.0
+    travel = app[0][-1] - app[0][poc_index_i] if poc_found else 0.0
+    # Sample too stiff for the cantilever (e.g. glass): the deflection
+    # follows the piezo, the indentation is too small to be fitted
+    too_stiff = travel > 0 and max_indentation < \
+        o_params["fit_min_indentation"] / 100.0 * travel
 
     if not poc_found or len(delta) <= 1 or len(data_to_fit) <= 1:
         # No initial POC or no data to fit: no stiffness value, keep the
@@ -131,14 +143,27 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         masked_data_to_fit = numpy.r_[data_to_fit[0:stop], filtered_df["data_to_fit"].values]
         masked_delta = numpy.r_[delta[0:stop], filtered_df["delta"].values]
 
-        delta0_fit, e0_fit = fit_tools.do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit)
+        if too_stiff:
+            # No free fit of the point of contact (it can not be found by
+            # the fit without indentation)
+            delta0_fit, e0_fit = numpy.nan, numpy.nan
+        else:
+            delta0_fit, e0_fit = fit_tools.do_hertz_fit(
+                fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit)
 
-        if numpy.isnan(e0_fit):
-            # The fit failed: no stiffness value (displayed as nan and
-            # excluded from the results), keep the initial POC
+        # The fit can move the point of contact by a part of the indentation
+        # (delta0_fit is relative to the detected point of contact)
+        window = o_params["fit_poc_window"] / 100.0 * max_indentation
+
+        if numpy.isnan(e0_fit) or abs(delta0_fit) > window:
+            # Too stiff sample, failed fit, or point of contact moved too
+            # far: fit of the elasticity only, with the detected point of
+            # contact
             poc_index_fit = poc_index_i
             real_poc = poc_pos_i
-            stiffness = []
+            e_fixed = fit_tools.fit_e_fixed_poc(
+                masked_delta, masked_data_to_fit, sm.coeff, exponent)
+            stiffness = [] if numpy.isnan(e_fixed) else [e_fixed]
         else:
             poc_index_fit = (numpy.abs(delta - delta0_fit)).argmin() + first
             real_poc = [app[0][poc_index_fit] * 1e09, app[1][poc_index_fit] * 1e09]

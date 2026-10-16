@@ -30,6 +30,16 @@ def prepare_data_hertzfit(app, dt, fit_params):
     k = dt["spring_constant"] * 1e9
     fcapp = curve_tools.get_force_curves(app[0], app[1], poc_pos_i, k)
 
+    if poc_found:
+        # Baseline of the search of the point of contact (deflection vs
+        # piezo, fitted just before the contact): subtracted from the
+        # deflection, so that the force is 0 before the contact as for the
+        # point of contact (the tilt correction leaves a slope)
+        baseline = final_fit[0] * np.asarray(app[0]) + final_fit[1]
+        baseline -= final_fit[0] * poc_pos_i[0] + final_fit[1]
+        fcapp[1] = fcapp[1] - baseline * k
+        fcapp[0] = fcapp[0] + baseline
+
     app[0] = app[0] * 1e-09
     app[1] = app[1] * 1e-09
     fcapp[0] = fcapp[0] * 1e-09
@@ -75,13 +85,29 @@ def prepare_data_hertzfit(app, dt, fit_params):
     delta = fcapp[0][first::]
     data_to_fit = fcapp[1][first::]
 
-    # Calculate tilt and substract it from the curve. Careful!! Is this done somewhere else?
-    # if dt["substract_tilt"]:
-    offset_no_tilt = np.median(data_to_fit[0:stop])
-    data_to_fit = data_to_fit - offset_no_tilt
+    if not poc_found:
+        # No baseline: the median of the beginning of the curve is used
+        offset_no_tilt = np.median(data_to_fit[0:stop])
+        data_to_fit = data_to_fit - offset_no_tilt
 
     return delta, data_to_fit, final_fit, first, stop, poc_index_i, poc_pos_i, \
         poc_found
+
+
+def fit_e_fixed_poc(delta, force, coeff, exponent):
+    """Elasticity fitted with the point of contact fixed at delta = 0.
+
+    The model F = coeff * E * delta ** exponent (0 before the contact) is
+    linear in E: least squares solution, E = sum(F g) / sum(g g) with
+    g = coeff * delta ** exponent. Returns nan without indentation.
+    """
+    if exponent is None:
+        return np.nan
+    g = coeff * np.power(np.clip(np.asarray(delta, float), 0, None), exponent)
+    norm = np.sum(g * g)
+    if not np.isfinite(norm) or norm <= 0:
+        return np.nan
+    return float(np.sum(np.asarray(force, float) * g) / norm)
 
 
 def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):

@@ -317,6 +317,12 @@ class SingleFile:
         self.indentation_step = 0
         self.force_start = 0
         self.force_stop = 100
+        # Fit: no fit if the indentation is smaller than this percentage of
+        # the piezo travel after the contact (sample too stiff for the
+        # cantilever), and no value if the fit moves the point of contact by
+        # more than this percentage of the indentation
+        self.fit_min_indentation = 5
+        self.fit_poc_window = 25
         self.tomography = 0
         self.lr_coef = 0.33
         #self.mfev = 50
@@ -334,6 +340,8 @@ class SingleFile:
         self.used_poisson_ratio = None
         self.used_indentation_start = None
         self.used_force_start = None
+        self.used_fit_min_indentation = None
+        self.used_fit_poc_window = None
         self.used_indentation_stop = None
         self.used_force_stop = None
         self.used_indentation_step = None
