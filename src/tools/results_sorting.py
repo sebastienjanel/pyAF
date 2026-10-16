@@ -137,7 +137,11 @@ class GetResults:
             result = self.prepare_rupture_force2()
         elif self.type == "loading_rates":
             forces, lr = self.prepare_loading_rates()
-            result = [forces, lr]
+            if self.export in ("single", "r_format"):
+                # Rows of the export
+                result = forces
+            else:
+                result = [forces, lr]
         elif self.type == "events_distance":
             result = self.prepare_events_distance()
 
@@ -403,20 +407,12 @@ class GetResults:
 
                             # To export the data to a file, prepare the array
                             if self.export == "single" and found:
-                                _, step, tomography = \
-                                    dt.get_used_indentation()
-                                z = k * step
-                                if not tomography:
-                                    sl = "0 - " + str(z + step)
-                                else:
-                                    sl = str(z) + " - " + str(z + step)
-
                                 export_array.append(
-                                    [index, i, j, sl, array[-1]])
+                                    [index, i, j, k, array[-1]])
 
                             if self.export == "r_format" and found:
                                 export_array.append(
-                                    [index, i, j, array[-1]])
+                                    [index, i, j, array[-1], k])
 
                     index += 1
 
@@ -530,8 +526,10 @@ class GetResults:
                             array.extend(forces)
 
                         if self.export == "single" or self.export == "r_format":
-                            for k in range(len(forces)):
-                                export_array.append([index, i, j, forces[k]])
+                            events = self.get_data_from_curve(
+                                i, j, "kept_events")
+                            for force, z in zip(forces, events):
+                                export_array.append([index, i, j, force, z])
 
                 index += 1
 
@@ -554,6 +552,8 @@ class GetResults:
 
         tp = "events_per_curve"
         array = []
+        export_array = []
+        index = 0
         for i in range(dt.nbr_pixels_x):
             for j in range(dt.nbr_pixels_y):
                 if dt.discarded_curves[i][j] == 0:
@@ -566,8 +566,17 @@ class GetResults:
 
                         array.append(nbr)
 
+                        if self.export == "single" or self.export == "r_format":
+                            export_array.append([index, i, j, nbr])
+
+                index += 1
+
             if widgets_list.widget_progressbar is not None:
                 widgets_list.widget_progressbar.update()
+
+        if self.export == "single" or self.export == "r_format":
+            # Returning for export function
+            return export_array
 
         return numpy.array(array)
 
@@ -580,6 +589,8 @@ class GetResults:
             return []
 
         array = []
+        export_array = []
+        index = 0
         for i in range(dt.nbr_pixels_x):
             for j in range(dt.nbr_pixels_y):
                 if dt.discarded_curves[i][j] == 0:
@@ -594,8 +605,18 @@ class GetResults:
                         if forces:
                             array.append(max(forces))
 
+                            if self.export in ("single", "r_format"):
+                                export_array.append(
+                                    [index, i, j, max(forces)])
+
+                index += 1
+
             if widgets_list.widget_progressbar is not None:
                 widgets_list.widget_progressbar.update()
+
+        if self.export == "single" or self.export == "r_format":
+            # Returning for export function
+            return export_array
 
         return numpy.array(array) * 1e12  # in pN
 
@@ -605,8 +626,6 @@ class GetResults:
 
         if dt.events_calculated is False:
             return []
-
-        f_dist = dt.events_forces_distance
 
         array = []
         export_array = []
@@ -626,10 +645,13 @@ class GetResults:
                             array.extend(res)
 
                         if self.export == "single" or self.export == "r_format":
-                            if res:
-                                for k in range(len(res)):
-                                    export_array.append(
-                                        [index, i, j, f_dist[i][j][k]])
+                            events = self.get_data_from_curve(
+                                i, j, "kept_events")
+                            if self.select == 1:
+                                # Only the last event
+                                events = events[:1]
+                            for dist, z in zip(res, events):
+                                export_array.append([index, i, j, dist, z])
 
                 index += 1
 
@@ -670,9 +692,12 @@ class GetResults:
                             array_lr.extend(lr)
 
                         if self.export == "single" or self.export == "r_format":
-                            for loading_rate in lr:
+                            events = self.get_data_from_curve(
+                                i, j, "kept_events")
+                            for loading_rate, force, z in zip(
+                                    lr, forces, events):
                                 export_array.append(
-                                    [index, i, j, loading_rate])
+                                    [index, i, j, loading_rate, z, force])
 
                 index += 1
 
@@ -696,6 +721,8 @@ class GetResults:
             curve_tools.get_curve(self.data, [i, j], mode="results_sorting")
 
         if retraction is None:
+            if type_of_data == "kept_events":
+                return []
             if type_of_data == "events_per_curve":
                 return 0
             elif type_of_data == "forces_per_curve":
@@ -725,7 +752,7 @@ class GetResults:
                 return [], []
             elif tp == "events_per_curve" or tp == "events_rupture_force":
                 return 0
-            elif tp == "events_distance":
+            elif tp == "events_distance" or tp == "kept_events":
                 return []
 
         forces = self.data.events_forces[i][j]
@@ -735,6 +762,11 @@ class GetResults:
 
         # Make sure positions are integers.
         event_pos = event_pos.astype("uint32")
+
+        if type_of_data == "kept_events":
+            # Indexes of the events kept by the filters
+            return [z for z in range(len(forces))
+                    if self.filter_event(re[0][event_pos[z]], slopes[z])]
 
         if type_of_data == "events_per_curve":
             nbr_events = 0
@@ -803,17 +835,18 @@ class GetResults:
 
         if shared.exp.hist_remove_zeros:
             if self.export == "single" or self.export == "r_format":
-                if self.type == "loading_rates":
-                    array = array[0]  # In this case the wanted data is in 0
+                # Column of the value in the rows of the export (the slice
+                # comes before the elasticity in the txt export, the zeros of
+                # the loading rates are removed with the forces as in the
+                # plots)
+                if self.type == "stiffness" and self.export == "single":
+                    col = 4
+                elif self.type == "loading_rates":
+                    col = 5
+                else:
+                    col = 3
 
-                new_array = []
-
-                for line in array:
-                    # Stiffness result arrays incorporate an additional parameter sl (segment length)
-                    if line[-1] > 0:
-                        new_array.append(line)
-
-                array = new_array
+                array = [line for line in array if line[col] > 0]
 
             else:
                 # For normal usage or group exports
