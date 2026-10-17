@@ -32,6 +32,7 @@
 """Plots the profiles as a line."""
 
 import numpy
+from ...tools import planefit
 from ... import widgets_list
 from ... import shared
 from ..plot_main import MainPlot
@@ -50,7 +51,8 @@ class PlotProfiles(MainPlot):
         self.pr_x = []
         self.pr_z = []
         pl = self.data.profile_list
-        pocs = self.data.topography
+        # Heights with the planefit of the file
+        pocs = planefit.topo_map(self.data)
 
         for pr in range(len(pl)):
             self.pr_x.append([])

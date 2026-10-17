@@ -31,7 +31,7 @@
 
 """Widget allowing to change the scales of the plot in the slices widget."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFInput

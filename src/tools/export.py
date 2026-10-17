@@ -30,7 +30,7 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-"""Exports the results as text files."""
+"""Exports the results as text files (txt files, or a csv table for R)."""
 
 import os
 import shutil
@@ -40,67 +40,63 @@ import numpy as np
 
 from .. import shared
 from .. import widgets_list as wl
-from ..tools import math_tools as mt
 from ..tools import results_sorting
 from ..widgets.progressbar import Progressbar
+
+
+def write_file(path, header, lines):
+    """Writes a tab separated text file."""
+    with open(path, "wb") as newfile:
+        newfile.write((header + "\r\n").encode(encoding="UTF-8"))
+        for line in lines:
+            newfile.write((line + "\r\n").encode(encoding="UTF-8"))
+
+
+def exported_rows():
+    """The checked rows of the plots tab: (row index, result, data)."""
+    rows = []
+    for row, result in enumerate(shared.exp.results_list):
+        if result.display:
+            rows.append((row, result, shared.exp.list[result.data_id]))
+    return rows
+
+
+def group_and_condition(result):
+    """The group and the condition (objects) of a row."""
+    group = shared.exp.groups_list[result.group]
+    condition = shared.exp.conditions_list[group.condition]
+    return group, condition
+
+
+def elasticity_title(data):
+    """Title of the elasticity column (the slope model gives a stiffness)."""
+    if data.used_stiffness_model_selected == 3:
+        return "Stiffness (N/m)"
+    return "Elasticity (Pa)"
+
+
+def slice_label(data, i, j, k):
+    """Indentation segment [nm] of the slice k of the curve [i, j]."""
+    start, step, tomography = data.get_used_indentation()
+    if step == 0:
+        # A single segment, up to the indentation reached by the curve
+        return str(start) + " - " + str(round(float(data.indentation[i][j]), 1))
+    low = start + k * step if tomography else start
+    return str(low) + " - " + str(start + (k + 1) * step)
 
 
 def export_results(folder):
     """Exports the results as text files.
 
-    The results are saved as filtered (results displayed in the histograms)
-    and unfiltered (raw results). The groups histograms are also saved.
-
-    A file is also saved with the list of which file belongs to which group.
+    The results are saved as filtered (results displayed in the plots) and
+    unfiltered (raw results). The results of the replicates (the groups) are
+    also saved, with a file listing the replicates, their condition and their
+    files.
     """
+    rows = exported_rows()
     Progressbar()
     wl.widget_progressbar.set_label("Exporting")
-
-    progressbar_range = 0
-    for row in range(len(shared.exp.results_list)):
-        data_id = shared.exp.results_list[row].data_id
-        if shared.exp.results_list[row].display:
-            data = shared.exp.list[data_id]
-            # Filtered and unfiltered single
-            if data.stiffness_calculated:
-                progressbar_range += 2
-            if data.stiffness_corrected:
-                progressbar_range += 2
-            if data.work_and_rupture_force1_calculated:
-                progressbar_range += 4
-            if data.events_calculated:
-                progressbar_range += 2
-            if data.loading_rates_calculated:
-                progressbar_range += 2
-            # Filtered and unfiltered events per scan
-            if data.events_calculated:
-                progressbar_range += 2
-            # Filtered and unfilterd distances of the events
-            if data.events_calculated:
-                progressbar_range += 2
-
-        # Groups
-        groups = []
-        if shared.exp.results_list[row].group != 0:
-            grp = shared.exp.results_list[row].group
-            if mt.in_list(groups, grp) is False:
-                groups.append(shared.exp.results_list[row].group)
-                data = shared.exp.list[data_id]
-                if data.stiffness_calculated:
-                    progressbar_range += 1
-                if data.stiffness_corrected:
-                    progressbar_range += 1
-                if data.work_and_rupture_force1_calculated:
-                    progressbar_range += 2
-                if data.events_calculated:
-                    progressbar_range += 2
-                if data.loading_rates_calculated:
-                    progressbar_range += 1
-                # Distance of the events
-                if data.events_calculated:
-                    progressbar_range += 1
-
-    wl.widget_progressbar.set_range(0, progressbar_range)
+    wl.widget_progressbar.set_range(0, 2 * len(rows) + 8)
 
     # Create folders
     if os.path.exists(folder):
@@ -108,243 +104,47 @@ def export_results(folder):
     os.mkdir(folder)
     os.mkdir(folder + "/filtered")
     os.mkdir(folder + "/unfiltered")
-    os.mkdir(folder + "/groups")
+    os.mkdir(folder + "/replicates")
 
-    # Save unfiltered data
-    for row in range(len(shared.exp.results_list)):
-        data_id = shared.exp.results_list[row].data_id
-        if shared.exp.results_list[row].display:
-            data = shared.exp.list[data_id]
-
-            pre = folder + "/unfiltered/" + data.filename
-
-            # Stiffness
-            if data.stiffness_calculated:
-                newfile = open(pre + "_elasticity.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tSlice\tElasticity (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.stiffness_array[0])):
-                    for j in range(len(data.stiffness_array[0])):
-                        for k in range(0, len(data.stiffness_array[i][j])):
-                            E = data.stiffness_array[i][j][k]
-                            z = k * data.indentation_step
-                            if not data.tomography:
-                                sl = "0 - " + str(z + data.indentation_step)
-                            else:
-                                sl = str(z) + " - " + \
-                                    str(z + data.indentation_step)
-
-                            text = str(index + 1) + "\t" + \
-                                str(i + 1) + "\t" + \
-                                str(j + 1) + "\t" + \
-                                sl + "\t" + \
-                                str(E) + "\r\n"
-
-                            newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Work
-            if data.work_and_rupture_force1_calculated:
-                newfile = open(pre + "_work.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tWork (J)\r\n".encode(encoding='UTF-8',errors='strict')
-)
-                index = 0
-                for i in range(len(data.work[0])):
-                    for j in range(len(data.work[0])):
-                        text = str(index + 1) + "\t" + \
-                            str(i + 1) + "\t" + \
-                            str(j + 1) + "\t" + \
-                            str(data.work[i][j]) + "\r\n"
-
-                        newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Rupture force1
-            if data.work_and_rupture_force1_calculated:
-                newfile = open(pre + "_rupture_force1.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tRupture force (N)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.rupture_force1[0])):
-                    for j in range(len(data.rupture_force1[0])):
-                        text = str(index + 1) + "\t" + \
-                            str(i + 1) + "\t" + \
-                            str(j + 1) + "\t" + \
-                            str(data.rupture_force1[i][j]) + "\r\n"
-
-                        newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Events force
-            if data.events_calculated:
-                newfile = open(pre + "_events_forces.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tEvent Force (N)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.events_forces[0])):
-                    for j in range(len(data.events_forces[0])):
-                        for k in range(len(data.events_forces[i][j])):
-                            text = str(index + 1) + "\t" + \
-                                str(i + 1) + "\t" + \
-                                str(j + 1) + "\t" + \
-                                str(data.events_forces[i][j][k]) + "\r\n"
-
-                            newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Loading rates
-            if data.loading_rates_calculated:
-                newfile = open(pre + "_loading_rates.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tLoading rate (N/s)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.events_forces[0])):
-                    for j in range(len(data.events_forces[0])):
-                        for k in range(len(data.events_forces[i][j])):
-                            text = str(index + 1) + "\t" + \
-                                str(i + 1) + "\t" + \
-                                str(j + 1) + "\t" + \
-                                str(data.loading_rates[i][j][k]) + "\r\n"
-
-                            newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Event's distance
-            if data.events_calculated:
-                newfile = open(pre + "_event_distance.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tDistance (m)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.events_forces_distance[0])):
-                    for j in range(len(data.events_forces_distance[0])):
-                        for k in range(len(data.events_forces_distance[i][j])):
-                            text = str(index + 1) + "\t" + \
-                                str(i + 1) + "\t" + \
-                                str(j + 1) + "\t" + \
-                                str(data.events_forces_distance[i][j][k]) + \
-                                "\r\n"
-
-                            newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
+    # Unfiltered data (all the curves, one file per checked row)
+    for _, result, data in rows:
+        write_unfiltered(folder + "/unfiltered/" + data.filename, data)
+        wl.widget_progressbar.update()
 
     # Events per scan (unfiltered)
-    found_events = False
-    for i in range(len(shared.exp.results_list)):
-        if shared.exp.results_list[i].display:
-            data_id = shared.exp.results_list[i].data_id
-            if shared.exp.list[data_id].events_calculated:
-                found_events = True
-
-    if found_events:
-        index = 0
-        newfile = open(folder + "/unfiltered/Events_per_scan.txt", "wb")
-        newfile.write("Index\tFilename\tNumber of events\r\n".encode(encoding='UTF-8',errors='strict'))
-        for a in range(len(shared.exp.results_list)):
-            if shared.exp.results_list[a].display:
-                val = 0
-                data_id = shared.exp.results_list[a].data_id
-                data = shared.exp.list[data_id]
-                name = shared.exp.results_list[a].name
-                if data.events_calculated:
-                    for i in range(len(data.events_forces[0])):
-                        for j in range(len(data.events_forces[0])):
-                            for k in range(len(data.events_forces[i][j])):
-                                val += 1
-                text = str(index) + "\t" + name + "\t" + str(val) + "\r\n"
-                newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-                wl.widget_progressbar.update()
-            index += 1
-        newfile.close()
-
-    # Save filtered data
-    for row in range(len(shared.exp.results_list)):
-        data_id = shared.exp.results_list[row].data_id
-        if shared.exp.results_list[row].display:
-            data = shared.exp.list[data_id]
-            name = shared.exp.results_list[row].name
-            pre = folder + "/filtered/" + name
-            # Stiffness
-            if data.stiffness_calculated:
-                newfile = open(pre + "_elasticity.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tSlice\tElasticity (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="stiffness")
-                write_single_filtered(array, newfile, "stiffness")
-                newfile.close()
-
-            # Work
-            if data.work_and_rupture_force1_calculated:
-                newfile = open(pre + "_work.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tWork (J)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="work")
-                write_single_filtered(array, newfile, "work")
-                newfile.close()
-
-            # Rupture force1
-            if data.work_and_rupture_force1_calculated:
-                newfile = open(pre + "_rupture_force1.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tRupture force (N)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="rupture_force")
-                write_single_filtered(array, newfile, "rupture_force")
-                newfile.close()
-
-            # Events force
+    if any(data.events_calculated for _, _, data in rows):
+        lines = []
+        for index, (_, result, data) in enumerate(rows):
             if data.events_calculated:
-                newfile = open(pre + "_events_forces.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tEvent Force (N)\tSlope\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="events_forces")
-                write_single_filtered(array, newfile, "events_forces")
-                newfile.close()
+                val = sum(len(data.events_forces[i][j])
+                          for i in range(data.nbr_pixels_x)
+                          for j in range(data.nbr_pixels_y))
+                lines.append(str(index + 1) + "\t" + result.name + "\t" +
+                             str(val))
+        write_file(folder + "/unfiltered/Events_per_scan.txt",
+                   "Index\tName\tNumber of events", lines)
 
-            # Loading rates
-            if data.loading_rates_calculated:
-                newfile = open(pre + "_loading_rates.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tLoading rate (N/s)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="loading_rates")
-                write_single_filtered(array, newfile, "loading_rates")
-                newfile.close()
+    # Filtered data (as in the plots: ROI, slice, filters of the row)
+    per_scan = []
+    for index, (row, result, data) in enumerate(rows):
+        pre = folder + "/filtered/" + result.name
+        nbr = write_filtered(pre, row, data)
+        if nbr is not None:
+            per_scan.append(str(index + 1) + "\t" + result.name + "\t" +
+                            str(nbr))
+        wl.widget_progressbar.update()
 
-            # Event's distance
-            if data.events_calculated:
-                newfile = open(pre + "_event_distance.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tDistance (m)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="events_distance")
-                write_single_filtered(array, newfile, "events_distance")
-                newfile.close()
+    if per_scan:
+        write_file(folder + "/filtered/Events_per_scan.txt",
+                   "Index\tName\tNumber of events", per_scan)
 
-            wl.widget_progressbar.update()
-
-    # Groups
-    write_group_file("stiffness", folder)
-    write_group_file("work", folder)
-    write_group_file("rupture_force", folder)
-    write_group_file("events_forces", folder)
-    write_group_file("events_per_curve", folder)
-    write_group_file("loading_rates", folder)
-    write_group_file("events_distance", folder)
+    # Replicates
+    for res_type in ("stiffness", "work", "rupture_force", "events_forces",
+                     "events_per_curve", "events_rupture_force",
+                     "loading_rates", "events_distance") + \
+            tuple(results_sorting.VISCO_TYPES):
+        write_group_file(res_type, folder)
+        wl.widget_progressbar.update()
 
     # Infos
     write_info_file(folder)
@@ -354,327 +154,358 @@ def export_results(folder):
     return True
 
 
-def export_results_r(folder, stats_flag=True):
+def write_unfiltered(pre, data):
+    """Writes the raw results of a file (all the curves)."""
+    nx, ny = data.nbr_pixels_x, data.nbr_pixels_y
+
+    def pixels():
+        index = 0
+        for i in range(nx):
+            for j in range(ny):
+                yield index, i, j
+                index += 1
+
+    def start(index, i, j):
+        return str(index + 1) + "\t" + str(i + 1) + "\t" + str(j + 1) + "\t"
+
+    if data.stiffness_calculated:
+        lines = [start(index, i, j) + slice_label(data, i, j, k) + "\t" +
+                 str(data.stiffness_array[i][j][k])
+                 for index, i, j in pixels()
+                 for k in range(len(data.stiffness_array[i][j]))]
+        write_file(pre + "_elasticity.txt",
+                   "Index\tXpos\tYpos\tSlice (nm)\t" + elasticity_title(data),
+                   lines)
+
+    if data.work_and_rupture_force1_calculated:
+        write_file(pre + "_work.txt", "Index\tXpos\tYpos\tWork (J)",
+                   [start(index, i, j) + str(data.work[i][j])
+                    for index, i, j in pixels()])
+        write_file(pre + "_rupture_force1.txt",
+                   "Index\tXpos\tYpos\tRupture force (N)",
+                   [start(index, i, j) + str(data.rupture_force1[i][j])
+                    for index, i, j in pixels()])
+
+    if data.events_calculated:
+        write_file(pre + "_events_forces.txt",
+                   "Index\tXpos\tYpos\tEvent Force (N)",
+                   [start(index, i, j) + str(force)
+                    for index, i, j in pixels()
+                    for force in data.events_forces[i][j]])
+        write_file(pre + "_event_distance.txt",
+                   "Index\tXpos\tYpos\tDistance (m)",
+                   [start(index, i, j) + str(dist)
+                    for index, i, j in pixels()
+                    for dist in data.events_forces_distance[i][j]])
+
+    if data.loading_rates_calculated:
+        write_file(pre + "_loading_rates.txt",
+                   "Index\tXpos\tYpos\tLoading rate (N/s)",
+                   [start(index, i, j) + str(lr)
+                    for index, i, j in pixels()
+                    for lr in data.loading_rates[i][j]])
+
+    if data.visco_calculated:
+        # All the parameters of the Ting fit (nan: not fitted)
+        maps = [data.visco_e0, data.visco_fluidity, data.visco_tan_delta,
+                data.get_visco_result("tc"), data.get_visco_result("f0"),
+                data.get_visco_result("r2"), data.get_visco_result("height")]
+        write_file(pre + "_viscoelasticity.txt",
+                   "Index\tXpos\tYpos\tE0 (Pa)\tFluidity\t"
+                   "Loss tangent (tan delta)\tTime of contact (s)\t"
+                   "F0 (N)\tR2\tB.E.C. height (nm)",
+                   [start(index, i, j) +
+                    "\t".join(str(float(m[i][j])) for m in maps)
+                    for index, i, j in pixels()])
+
+
+def write_filtered(pre, row, data):
+    """Writes the results of a row as in the plots. Returns the number of
+    kept events (None without events)."""
+    def get(force_type):
+        util = results_sorting.GetResults(export="single")
+        return util.get_results_single(result_id=row, force_type=force_type)
+
+    def lines(array, value_col=3):
+        return [str(line[0] + 1) + "\t" + str(line[1] + 1) + "\t" +
+                str(line[2] + 1) + "\t" + str(line[value_col])
+                for line in array]
+
+    if data.stiffness_calculated:
+        array = get("stiffness")
+        write_file(pre + "_elasticity.txt",
+                   "Index\tXpos\tYpos\tSlice (nm)\t" + elasticity_title(data),
+                   [str(line[0] + 1) + "\t" + str(line[1] + 1) + "\t" +
+                    str(line[2] + 1) + "\t" +
+                    slice_label(data, line[1], line[2], line[3]) + "\t" +
+                    str(line[4])
+                    for line in array])
+
+    if data.work_and_rupture_force1_calculated:
+        write_file(pre + "_work.txt", "Index\tXpos\tYpos\tWork (J)",
+                   lines(get("work")))
+        write_file(pre + "_rupture_force1.txt",
+                   "Index\tXpos\tYpos\tRupture force (N)",
+                   lines(get("rupture_force")))
+
+    nbr_events = None
+    if data.events_calculated:
+        write_file(pre + "_events_forces.txt",
+                   "Index\tXpos\tYpos\tEvent Force (N)",
+                   lines(get("events_forces")))
+        per_curve = get("events_per_curve")
+        nbr_events = int(sum(line[3] for line in per_curve))
+        write_file(pre + "_events_per_curve.txt",
+                   "Index\tXpos\tYpos\tEvents per curve", lines(per_curve))
+        write_file(pre + "_event_max_force.txt",
+                   "Index\tXpos\tYpos\tEvent max. force (N)",
+                   lines(get("events_rupture_force")))
+        write_file(pre + "_event_distance.txt",
+                   "Index\tXpos\tYpos\tDistance (m)",
+                   lines(get("events_distance")))
+
+    if data.loading_rates_calculated:
+        write_file(pre + "_loading_rates.txt",
+                   "Index\tXpos\tYpos\tLoading rate (N/s)",
+                   lines(get("loading_rates")))
+
+    if data.visco_calculated:
+        for res_type, values in results_sorting.VISCO_TYPES.items():
+            write_file(pre + "_" + values["column"] + ".txt",
+                       "Index\tXpos\tYpos\t" + values["export"],
+                       lines(get(res_type)))
+
+    return nbr_events
+
+
+def export_results_r(path, stats_flag=True):
+    """Export the results of the checked rows as a csv table for R.
+
+    One line per curve, or per event for the curves with events (the values
+    of the curve are repeated on the lines of its events). The values are
+    filtered as in the plots and are in SI units (elasticity in Pa, or the
+    stiffness in N/m for the slope model, work in J, forces in N, loading
+    rates in N/s, distances in m, indentation in nm). The descriptive
+    statistics of each row are saved in a second file (_stats).
     """
-    Export results in a friendly R format.
-    """
+    if not path.lower().endswith(".csv"):
+        path += ".csv"
 
-    data_df = pd.DataFrame()
+    tables = []
+    stats = []
+    for row, result, data in exported_rows():
+        curves, events, row_stats = get_r_tables(row, data)
 
-    if stats_flag:
-        data_df_stats = pd.DataFrame()
-
-    for row in range(len(shared.exp.results_list)):
-        data_id = shared.exp.results_list[row].data_id
-        if shared.exp.results_list[row].display:
-            data = shared.exp.list[data_id]
-            row_df = pd.DataFrame()
-
-            if stats_flag:
-                row_df_stats = pd.DataFrame()
-
-            results_util = results_sorting.GetResults(export="r_format")
-
-            if data.stiffness_calculated:
-                print("Shape of data.indentation:", data.indentation.shape)
-
-                # Convert CArray to a NumPy array and flatten it
-                flattened_indentation = np.array(data.indentation).flatten()
-                print("Length of flattened indentation:", flattened_indentation.shape)
-
-                # Get the filtered stiffness data (ROI only)
-                stiffness_array = results_util.get_results_single(result_id=row, force_type="stiffness")
-                stiffness = pd.DataFrame(stiffness_array, columns=["curve_index", "x_pos", "y_pos", "elasticity"])
-
-                # Filter the indentation data to match the ROI
-                # Assuming stiffness_array contains the ROI-filtered data, we need to filter indentation accordingly
-                # Create a mask for the ROI
-                roi_mask = np.zeros(data.indentation.shape, dtype=bool)
-                for curve in stiffness_array:
-                    i, j = int(curve[1]), int(curve[2])  # x_pos and y_pos
-                    roi_mask[i, j] = True
-
-                # Flatten the mask and filter the indentation data
-                flattened_mask = roi_mask.flatten()
-                roi_indentation = flattened_indentation[flattened_mask]
-
-                # Assign the filtered indentation data to the stiffness DataFrame
-                stiffness["indentation"] = roi_indentation
-                print("Length of elasticity indentation:", len(stiffness["indentation"]))
-
-                if stats_flag:
-                    stiffness_stats = stiffness.describe()
-                    ft_stats = export_descriptive_stats(stiffness_stats, "elasticity")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, stiffness)
-
-            # Repeat the same logic for other data types (work, rupture_force, etc.)
-            if data.work_and_rupture_force1_calculated:
-                work_array = results_util.get_results_single(result_id=row, force_type="work")
-                work = pd.DataFrame(work_array, columns=["curve_index", "x_pos", "y_pos", "work"])
-
-                if stats_flag:
-                    work_stats = work.describe()
-                    ft_stats = export_descriptive_stats(work_stats, "work")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, work)
-
-            if data.work_and_rupture_force1_calculated:
-                rupture_force_array = results_util.get_results_single(result_id=row, force_type="rupture_force")
-                rupture_force = pd.DataFrame(rupture_force_array, columns=["curve_index", "x_pos", "y_pos", "rupture_force"])
-
-                if stats_flag:
-                    rupture_force_stats = rupture_force.describe()
-                    ft_stats = export_descriptive_stats(rupture_force_stats, "rupture_force")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, rupture_force)
-
-            if data.loading_rates_calculated:
-                events_forces_array = results_util.get_results_single(result_id=row, force_type="events_forces")
-                events_forces = pd.DataFrame(events_forces_array, columns=["curve_index", "x_pos", "y_pos", "events_forces"])
-
-                if stats_flag:
-                    events_forces_stats = events_forces.describe()
-                    ft_stats = export_descriptive_stats(events_forces_stats, "events_forces")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, events_forces)
-
-            if data.events_calculated:
-                loading_rates_array = results_util.get_results_single(result_id=row, force_type="loading_rates")
-                loading_rates = pd.DataFrame(loading_rates_array, columns=["curve_index", "x_pos", "y_pos", "loading_rates"])
-
-                if stats_flag:
-                    loading_rates_stats = loading_rates.describe()
-                    ft_stats = export_descriptive_stats(loading_rates_stats, "loading_rates")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, loading_rates)
-
-            if data.events_calculated:
-                events_distance_array = results_util.get_results_single(result_id=row, force_type="events_distance")
-                events_distance = pd.DataFrame(events_distance_array, columns=["curve_index", "x_pos", "y_pos", "events_distance"])
-
-                if stats_flag:
-                    events_distance_stats = events_distance.describe()
-                    ft_stats = export_descriptive_stats(events_distance_stats, "events_distance")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, events_distance)
-
-            # Add information about the file
-            res = shared.exp.results_list[row]
-            group_id = res.group
-
-            grp = shared.exp.groups_list[group_id]
-            condition_id = grp.condition
-
-            row_df.insert(0, 'condition', condition_id)
-            row_df.insert(1, 'group', group_id)
-            row_df.insert(2, 'file_id', data_id)
-            row_df.insert(3, 'file_name', data.filename)
-
-            data_df = merge_dfs(data_df, row_df, on=None)
-
-            if stats_flag:
-                row_df_stats.insert(0, 'condition', condition_id)
-                row_df_stats.insert(1, 'group', group_id)
-                row_df_stats.insert(2, 'file_id', data_id)
-                row_df_stats.insert(3, 'file_name', data.filename)
-
-                data_df_stats = merge_dfs(data_df_stats, row_df_stats, on=None)
-
-    data_df.to_csv(folder)
-
-    if stats_flag:
-        data_df_stats.to_csv(folder + "_stats")
-
-
-def export_descriptive_stats(variable_df_stats, variable_name):
-    """
-    Export descriptive statistics (Mean, Median, Mod, Min, Max) in a friendly R format.
-    """
-    out_df = pd.DataFrame()
-    for stat_field in variable_df_stats.index.values.tolist():
-        val = variable_df_stats.loc[stat_field, variable_name]
-        out_df[stat_field + "_" + variable_name] = [val]
-
-    return out_df
-
-
-def merge_dfs(df1, df2, how='outer', on=["curve_index", "x_pos", "y_pos"]):
-
-    if df1.empty:
-        mdf = df2
-
-    elif df2.empty:
-        mdf = df1
-
-    else:
-        mdf = pd.merge(df1, df2, how=how, on=on)
-        mdf.drop_duplicates()
-
-        if on is not None:
-            mdf.sort_values(by=on)
-
-    return mdf
-
-
-def write_single_filtered(array, newfile, mode):
-    """Writes results to the file for one line.
-
-    Do not forget to shift the indices from 0 to 1 for the users
-    """
-    for line in array:
-        if mode == "stiffness":
-            txt = str(line[0] + 1) + "\t"\
-                + str(line[1] + 1) + "\t"\
-                + str(line[2] + 1) + "\t"\
-                + str(line[3]) + "\t"\
-                + str(line[4]) + "\r\n"
-
+        if curves is None and events is None:
+            continue
+        if curves is None:
+            table = events
+        elif events is None:
+            table = curves
         else:
-            txt = str(line[0] + 1) + "\t"\
-                + str(line[1] + 1) + "\t"\
-                + str(line[2] + 1) + "\t"\
-                + str(line[3]) + "\r\n"\
+            table = pd.merge(curves, events, how="outer", on=CURVE_KEYS)
+        keys = [key for key in CURVE_KEYS + ["event"] if key in table.columns]
+        if "event" in table.columns:
+            # Integers, empty for the curves without events
+            table["event"] = table["event"].astype("Int64")
+        table = table.sort_values(keys)
+        table = table[keys + [c for c in table.columns if c not in keys]]
 
-        newfile.write(txt.encode(encoding='UTF-8',errors='strict'))
+        info = file_info(result, data)
+        for pos, (name, value) in enumerate(info.items()):
+            table.insert(pos, name, value)
+            row_stats.insert(pos, name, value)
+        tables.append(table)
+        stats.append(row_stats)
+
+    data_df = pd.concat(tables, ignore_index=True) if tables \
+        else pd.DataFrame()
+    data_df.to_csv(path, index=False)
+
+    if stats_flag:
+        stats_df = pd.concat(stats, ignore_index=True) if stats \
+            else pd.DataFrame()
+        stats_df.to_csv(path[:-4] + "_stats.csv", index=False)
+
+
+CURVE_KEYS = ["curve_index", "x_pos", "y_pos"]
+
+
+def file_info(result, data):
+    """Columns describing the row: condition, replicate and file."""
+    group, condition = group_and_condition(result)
+    return {"condition": condition.name,
+            "replicate": group.name,
+            "name": result.name,
+            "file_name": data.filename,
+            "condition_id": condition.condition_id,
+            "replicate_id": group.group_id,
+            "file_id": result.data_id}
+
+
+def get_r_tables(row, data):
+    """Tables of a row for the R export: values per curve, values per event
+    and descriptive statistics."""
+    def get(force_type):
+        util = results_sorting.GetResults(export="r_format")
+        return util.get_results_single(result_id=row, force_type=force_type)
+
+    def table(array, name, event=False):
+        columns = CURVE_KEYS + [name] + (["event"] if event else [])
+        df = pd.DataFrame([line[:len(columns)] for line in array],
+                          columns=columns)
+        # Indexes from 1, as in the txt export
+        for key in CURVE_KEYS + (["event"] if event else []):
+            df[key] = df[key].astype(int) + 1
+        return df
+
+    curve_tables = []
+    event_tables = []
+    stats = []
+
+    if data.stiffness_calculated:
+        array = get("stiffness")
+        df = pd.DataFrame([line[:5] for line in array],
+                          columns=CURVE_KEYS + ["elasticity", "slice"])
+        stats.append(describe(df, "elasticity"))
+        for key in CURVE_KEYS:
+            df[key] = df[key].astype(int) + 1
+        if len(df) and df["slice"].max() > 0:
+            # Tomography: one column per slice
+            df = df.pivot_table(index=CURVE_KEYS, columns="slice",
+                                values="elasticity", aggfunc="first")
+            df.columns = ["elasticity_slice_" + str(int(k) + 1)
+                          for k in df.columns]
+            df = df.reset_index()
+        else:
+            df = df.drop(columns="slice")
+        # Indentation reached by the curves
+        df["indentation"] = [float(data.indentation[x - 1][y - 1])
+                             for x, y in zip(df["x_pos"], df["y_pos"])]
+        curve_tables.append(df)
+
+    if data.work_and_rupture_force1_calculated:
+        for force_type, name in (("work", "work"),
+                                 ("rupture_force", "rupture_force")):
+            df = table(get(force_type), name)
+            stats.append(describe(df, name))
+            curve_tables.append(df)
+
+    if data.visco_calculated:
+        for force_type, values in results_sorting.VISCO_TYPES.items():
+            df = table(get(force_type), values["column"])
+            stats.append(describe(df, values["column"]))
+            curve_tables.append(df)
+
+    if data.events_calculated:
+        for force_type, name in (("events_per_curve", "events_per_curve"),
+                                 ("events_rupture_force", "event_max_force")):
+            df = table(get(force_type), name)
+            stats.append(describe(df, name))
+            curve_tables.append(df)
+
+        types = [("events_forces", "events_forces"),
+                 ("events_distance", "events_distance")]
+        if data.loading_rates_calculated:
+            types.insert(1, ("loading_rates", "loading_rates"))
+        for force_type, name in types:
+            df = table(get(force_type), name, event=True)
+            stats.append(describe(df, name))
+            event_tables.append(df)
+
+    curves = merge_tables(curve_tables, CURVE_KEYS)
+    events = merge_tables(event_tables, CURVE_KEYS + ["event"])
+    row_stats = pd.concat(stats, axis=1) if stats else pd.DataFrame([{}])
+    return curves, events, row_stats
+
+
+def merge_tables(tables, keys):
+    """Outer merge of the tables on the keys (None without table)."""
+    if not tables:
+        return None
+    merged = tables[0]
+    for df in tables[1:]:
+        merged = pd.merge(merged, df, how="outer", on=keys)
+    return merged
+
+
+def describe(df, name):
+    """Descriptive statistics of a column, as one line (count_x, mean_x, std_x,
+    min_x, 25%_x, 50%_x, 75%_x, max_x)."""
+    values = df[name].describe()
+    return pd.DataFrame([{stat + "_" + name: values[stat]
+                          for stat in values.index}])
 
 
 def write_group_file(res_type, folder):
-    """Write file containing the grouped results.
+    """Write file containing the results of the replicates (the groups).
 
-    Each group is written in a column. The columns are separated by
-    semi-colons. If there is no more data in the group, the empty values are
-    written as tabs.
+    Each replicate is written in a column. The columns are separated by
+    semi-colons; a replicate with less values has empty cells.
 
     NOTE: The results_sorting.py file provides the values used here.
     All the values have been scaled to be displayed directly in the sotware.
-    We need to scale them back for exporting in m, Pa, N or J.
+    We need to scale them back for exporting in m, Pa, N, N/s or J.
     """
     if res_type == "stiffness":
-        name = "stiffness"
-        factor = 1e3
-        title = "Elasticity (Pa)"
-    elif res_type == "work":
-        name = "work"
-        factor = 1e-15
-        title = "Detachment work (J)"
-    elif res_type == "rupture_force":
-        name = "rupture_force"
-        factor = 1e-12
-        title = "Detachment force (N)"
-    elif res_type == "events_forces":
-        name = "events_forces"
-        factor = 1e-12
-        title = "Events forces (N)"
-    elif res_type == "events_per_curve":
-        name = "events_per_curve"
-        factor = 1
-        title = "Events per curve"
-    elif res_type == "loading_rates":
-        name = "loading_rates"
-        factor = 1e-12
-        title = "Loading rates"
-    elif res_type == "events_distance":
-        name = "events_distance"
-        factor = 1e9
-        title = "Event's distance (m)"
+        model3 = any(shared.exp.list[res.data_id].used_stiffness_model_selected
+                     == 3 for res in shared.exp.results_list)
+        if shared.exp.hist_log:
+            # log10(E [Pa]) in the plots
+            convert = lambda v: 10 ** v  # noqa: E731
+        elif model3:
+            convert = lambda v: v  # noqa: E731
+        else:
+            convert = lambda v: v * 1e3  # noqa: E731
+        title = "Stiffness (N/m)" if model3 else "Elasticity (Pa)"
+    else:
+        factor, title = {
+            "work": (1e-15, "Detachment work (J)"),
+            "rupture_force": (1e-12, "Detachment force (N)"),
+            "events_forces": (1e-12, "Events forces (N)"),
+            "events_per_curve": (1, "Events per curve"),
+            "events_rupture_force": (1e-12, "Event max. force (N)"),
+            "loading_rates": (1e-12, "Loading rates (N/s)"),
+            "events_distance": (1e-9, "Event's distance (m)"),
+            **{name: (1 / values["factor"], values["export"])
+               for name, values in results_sorting.VISCO_TYPES.items()},
+        }[res_type]
+        convert = lambda v: v * factor  # noqa: E731
 
     results_util = results_sorting.GetResults(export="groups")
-    [groups, _] = results_util.get_results_groups(force_type=name)
+    [groups, _] = results_util.get_results_groups(force_type=res_type)
 
-    group_found = False
-    for group_id in range(len(shared.exp.groups_list)):
-        if len(groups[group_id]) > 0:
-            group_found = True
+    # Values of the groups (group 0 is the None group)
+    columns = []
+    for group_id in range(1, len(shared.exp.groups_list)):
+        values = groups[group_id]
+        if res_type == "loading_rates" and len(values) > 0:
+            # Forces and loading rates
+            values = values[1]
+        if len(values) > 0:
+            name = shared.exp.groups_list[group_id].name
+            columns.append((name, [str(convert(v)) for v in values]))
 
-    if group_found:
-        newfile = open(folder + "/groups/Groups_" + name + ".txt", "wb")
-        newfile.write((title + "\r\n").encode(encoding='UTF-8',errors='strict'))
+    if not columns:
+        return
 
-        # Get the length of the biggest group
-        max_len = 0
-        # Group 0 is an empty group (None value in the list)
-        for group_id in range(1, len(shared.exp.groups_list)):
-            if len(groups[group_id]) > max_len:
-                max_len = len(groups[group_id])
-
-        # Add header
-        header = ""
-        for group_id in range(1, len(shared.exp.groups_list)):
-            if len(groups[group_id]) > 0:
-                is_last_group = True
-                for i in range(group_id, len(shared.exp.groups_list) - 1):
-                    if len(groups[i + 1]) > 0:
-                        is_last_group = False
-                        break
-
-                if is_last_group:
-                    # Last group of the line
-                    separator = ""
-
-                else:
-                    # All the other groups
-                    separator = ";"
-
-                header += shared.exp.groups_list[group_id].name + separator
-
-        newfile.write((header + "\r\n").encode(encoding='UTF-8',errors='strict'))
-
-        # Write lines
-        for line_id in range(max_len):
-            text = ""
-
-            for group_id in range(1, len(shared.exp.groups_list)):
-                if len(groups[group_id]) > 0:
-                    is_last_group = True
-                    for i in range(group_id,
-                                   len(shared.exp.groups_list) - 1):
-                        if len(groups[i + 1]) > 0:
-                            is_last_group = False
-                            break
-
-                    if is_last_group:
-                        # Last group of the line
-                        separator = ""
-                    else:
-                        # All the other groups
-                        separator = ";"
-
-                    if line_id < len(groups[group_id]):
-                        if name == "loading_rates":
-                            val = groups[group_id][1][line_id] * factor
-                        else:
-                            val = groups[group_id][line_id] * factor
-
-                        text += str(val) + separator
-
-                    else:
-                        text += "\t" + separator
-
-            newfile.write((text + "\r\n").encode(encoding='UTF-8',errors='strict'))
-
-        newfile.close()
+    max_len = max(len(values) for _, values in columns)
+    lines = [";".join(values[line_id] if line_id < len(values) else ""
+                      for _, values in columns)
+             for line_id in range(max_len)]
+    write_file(folder + "/replicates/Replicates_" + res_type + ".txt",
+               title + "\r\n" + ";".join(name for name, _ in columns), lines)
 
 
 def write_info_file(folder):
-    """Writes a file containing the list of groups and files."""
-    newfile = open(folder + "/info.txt", "wb")
-
-    for group in shared.exp.groups_list:
-        # Skip first None groups
-        if group.group_id != 0:
-            newfile.write((group.name + "\r\n").encode(encoding='UTF-8',errors='strict'))
-
-            for result in shared.exp.results_list:
-                if result.group == group.group_id:
-                    newfile.write((result.name + "\r\n").encode(encoding='UTF-8',errors='strict'))
-
-        newfile.write("------------------------------------------\r\n".encode(encoding='UTF-8',errors='strict'))
-
-    newfile.close()
+    """Writes a file containing the list of replicates (with their condition)
+    and of their rows."""
+    lines = []
+    for group in shared.exp.groups_list[1:]:
+        condition = shared.exp.conditions_list[group.condition]
+        lines.append(group.name + " (condition: " + condition.name + ")")
+        for result in shared.exp.results_list:
+            if result.group == group.group_id:
+                lines.append(result.name)
+        lines.append("------------------------------------------")
+    write_file(folder + "/info.txt", "Replicates and their files", lines)

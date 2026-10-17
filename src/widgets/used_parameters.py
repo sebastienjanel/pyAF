@@ -31,10 +31,11 @@
 
 """Displays the used parameters for the computation."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.PYAFWidget import PYAFWidget
 from .. import shared
 from .. import widgets_list
+from ..tools import misc_tools
 
 
 class UsedParametersWidget(PYAFWidget):
@@ -48,6 +49,9 @@ class UsedParametersWidget(PYAFWidget):
 
         box_curve_modif = QtWidgets.QGroupBox("General informations")
         box_elasticity = QtWidgets.QGroupBox("Elasticity")
+        # Stiffness when computed by Tomography (see update_widget)
+        self.box_elasticity = box_elasticity
+        box_visco = QtWidgets.QGroupBox("Viscoelasticity")
         box_work_and_rupture_force = QtWidgets.QGroupBox("Work and rupture force")
         box_events = QtWidgets.QGroupBox("Events")
 
@@ -103,6 +107,13 @@ class UsedParametersWidget(PYAFWidget):
         VL.addStretch(1)
 
         box_elasticity.setLayout(VL)
+
+        # Viscoelasticity
+        self.LB_visco = QtWidgets.QLabel("Not computed")
+        VL = QtWidgets.QVBoxLayout()
+        VL.addWidget(self.LB_visco)
+        VL.addStretch(1)
+        box_visco.setLayout(VL)
 
         # Work
         self.LB_joc_skip_start = QtWidgets.QLabel("Not computed")
@@ -162,6 +173,7 @@ class UsedParametersWidget(PYAFWidget):
         # Final Layout
         HL.addWidget(box_curve_modif)
         HL.addWidget(box_elasticity)
+        HL.addWidget(box_visco)
         HL.addWidget(box_work_and_rupture_force)
         HL.addWidget(box_events)
 
@@ -194,9 +206,31 @@ class UsedParametersWidget(PYAFWidget):
         # - Other
         self.LB_defl_sens.setText(
             "Deflection sensitivity (nm/V) : " +
-            str(dt.used_deflection_sensitivity))
+            misc_tools.format_number(dt.used_deflection_sensitivity))
         self.LB_spring_constant.setText(
-            "Spring constant (N/m) : " + str(dt.used_spring_constant * 1e9))
+            "Spring constant (N/m) : " +
+            misc_tools.format_number(dt.used_spring_constant * 1e9))
+
+        # Viscoelasticity
+        if dt.visco_calculated:
+            solver = "Numerical" if dt.used_visco_bec or \
+                dt.used_visco_solver == 1 else "Analytical"
+            beta = "auto" if dt.used_visco_beta_auto else \
+                str(dt.used_visco_beta_init)
+            self.LB_visco.setText(
+                "Solver : " + solver +
+                "\nB.E.C. : " + ("yes" if dt.used_visco_bec else "no") +
+                "\nViscous drag corrected : " +
+                ("yes" if dt.used_visco_drag_correction else "no") +
+                "\nBaseline before contact (nm) : " +
+                str(dt.used_visco_contact_offset) +
+                "\nPoints : " + str(dt.used_visco_nbr_points) +
+                "\nInitial fluidity : " + beta)
+        else:
+            self.LB_visco.setText("Not computed")
+
+        # Stiffness when computed by Tomography
+        self.box_elasticity.setTitle(misc_tools.elasticity_name([dt]))
 
         # Elasticity
         if dt.stiffness_calculated:

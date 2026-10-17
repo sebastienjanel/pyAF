@@ -54,9 +54,11 @@ widget_about = None
 
 # Sub widgets
 widget_results_chooser_single = None
-widget_results_hist_options_single = None
+widget_violin_options_single = None
 widget_results_chooser_groups = None
-widget_results_hist_options_groups = None
+widget_violin_options_groups = None
+widget_results_chooser_experiment = None
+widget_results_hist_options_experiment = None
 widget_curve_selector_data = None
 widget_curve_selector_compute = None
 widget_curve_selector_results = None

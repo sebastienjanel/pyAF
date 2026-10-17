@@ -59,6 +59,28 @@ from . import widgets_list
 from .tools import results_sorting
 
 
+
+# Upper limit of the automatic color scale of the elasticity: percentile of
+# the values (the maximum would let a few outliers squeeze the colors of the
+# other pixels, the values above are drawn with the saturation color)
+SCALE_PERCENTILE = 95
+
+# Results of the viscoelasticity fit (index in data.visco_results)
+VISCO_RESULTS = ("e0", "fluidity", "tc", "f0", "r2", "height")
+
+
+def robust_max(values):
+    """Upper limit of a color scale: percentile of the finite values (their
+    maximum if the percentile is not positive), None without values."""
+    values = numpy.asarray(values, dtype=float).ravel()
+    values = values[numpy.isfinite(values)]
+    if values.size == 0:
+        return None
+    high = float(numpy.percentile(values, SCALE_PERCENTILE))
+    if high <= 0:
+        high = float(values.max())
+    return high
+
 class SingleFile:
     """Objet containing the data and options for a single file."""
 
@@ -105,6 +127,7 @@ class SingleFile:
         self.work_and_rupture_force1_calculated = False
         self.loading_rates_calculated = False
         self.events_calculated = False
+        self.visco_calculated = False
 
         # --- Header informations ---------------------------------------------
         self.file_type = None
@@ -128,6 +151,8 @@ class SingleFile:
         self.nbr_pixels_y = None
         self.x_size = None
         self.y_size = None
+        # True if the z values come from a height sensor, False if they are
+        # calculated from the piezo (None for the old .pyaf files)
         self.zsensor_used = None
         # Note, z_size is not defined as it can be different for each pixel
         # in JPK files. Access this value by using the get_x_dist function
@@ -161,6 +186,8 @@ class SingleFile:
         self.x_factor = None  # Nanoscope
         self.matrix_length = None  # Nanoscope
         self.pause_duration = None  # JPK
+        # PeakForce frequency (Hz) of the Nanoscope PeakForce files
+        self.pft_freq = None
         self.segment_durations = None   # JPK
         self.corrupted_curves = None
 
@@ -174,6 +201,12 @@ class SingleFile:
         self.color_opts_rupture_force1 = [12, 0, 0, 0, 0]
         self.color_opts_events_per_curve = [6, 0, 0, 0, 0]
         self.color_opts_rupture_force2 = [12, 0, 0, 0, 0]
+        # Viscoelasticity: E0 as the elasticity (Viridis), fluidity with
+        # Inferno, loss tangent with a diverging scale centered on 1 (equal
+        # storage and loss moduli: solid-like below, liquid-like above)
+        self.color_opts_visco_e0 = [2, 0, 0, 0, 0]
+        self.color_opts_visco_fluidity = [3, 0, 1, 0.5, 0]
+        self.color_opts_visco_tan_delta = [6, 0, 2, 1, 0]
         self.color_saturation = [1, 1, 1, 1]
         self.color_negative = [0, 0, 0, 1]
         self.color_nan = [0.8, 0.8, 0.8, 1]  # grey
@@ -196,6 +229,8 @@ class SingleFile:
         self.discard_corrupted_curves_applied = False
         self.roi_list = []
         self.roi_color_names = names
+        # Log color scale for the elasticity maps
+        self.stiffness_color_log = False
         self.roi_selected_row = None
 
         # Profiles
@@ -296,14 +331,16 @@ class SingleFile:
         self.events_display_results_filter_dist = False
         self.events_results_display_joc = False
         self.events_results_display_fit_joc = False
-        self.events_results_filter_dist_left = 0
-        self.events_results_filter_dist_right = 0
-        self.events_results_filter_dist_keep_middle = False
+        # Distance filter (see tools.event_filter_tools)
+        self.events_results_filter_dist_min = 0
+        self.events_results_filter_dist_max = 0
+        self.events_results_filter_dist_keep = False
         self.events_results_filter_slope_min = 0
         self.events_results_filter_slope_max = 0
 
         # Information for the models
-        self.stiffness_mode = 1  # 0 Calculus 1 Fit
+        # 0 Tomography, 1 Fit (perform_fit is derived from it)
+        self.stiffness_mode = 1
         self.stiffness_model_selected = 0  # Select Hertz by default
         self.tip_radius = 75
         self.tip_angle = 15  # Note : this is in fact the half-opening angle
@@ -313,27 +350,61 @@ class SingleFile:
         self.indentation_step = 0
         self.force_start = 0
         self.force_stop = 100
-        self.strict_stop = 1
+        # Fit: no fit if the indentation is smaller than this percentage of
+        # the piezo travel after the contact (sample too stiff for the
+        # cantilever), and no value if the fit moves the point of contact by
+        # more than this percentage of the indentation
+        self.fit_min_indentation = 5
+        self.fit_poc_window = 25
         self.tomography = 0
         self.lr_coef = 0.33
         #self.mfev = 50
-        self.perform_fit = False
         self.fit_range_type = 0
 
         # Store the parameters used for the computation
         self.used_deflection_sensitivity = None
         self.used_stiffness_model_selected = None
+        # Tomography or Fitting, and fit range type (see
+        # used_perform_fit and get_used_fit_range_type)
+        self.used_stiffness_mode = None
+        self.used_fit_range_type = None
         self.used_tip_radius = None
         self.used_tip_angle = None
         self.used_poisson_ratio = None
         self.used_indentation_start = None
         self.used_force_start = None
+        self.used_fit_min_indentation = None
+        self.used_fit_poc_window = None
         self.used_indentation_stop = None
         self.used_force_stop = None
         self.used_indentation_step = None
-        self.used_strict_stop = None
         self.used_tomography = None
         self.used_lr_coef = None
+
+        # Viscoelasticity (Ting fit of the approach and the retraction,
+        # power-law rheology, see compute_tools/viscoelasticity)
+        # Solver: 0 analytical (constant indentation velocities), 1
+        # numerical (measured indentation; always used with the bottom
+        # effect correction)
+        self.visco_solver = 1
+        self.visco_bec = False
+        # Part of the curve fitted: indentation > -contact offset [nm]
+        self.visco_contact_offset = 100
+        self.visco_nbr_points = 300
+        # Fluidity: automatic initial value, or the given value
+        self.visco_beta_auto = True
+        self.visco_beta_init = 0.2
+        # Offset of the retraction baseline (viscous drag) corrected
+        self.visco_drag_correction = True
+        # Results [i, j, k], k: VISCO_RESULTS
+        self.visco_results = None
+        self.used_visco_solver = None
+        self.used_visco_bec = None
+        self.used_visco_contact_offset = None
+        self.used_visco_nbr_points = None
+        self.used_visco_beta_auto = None
+        self.used_visco_beta_init = None
+        self.used_visco_drag_correction = None
 
         # Display options
         self.meshgrid_type = "piezo"
@@ -408,6 +479,11 @@ class SingleFile:
         # If the user has flattened the data in pyAF
         self.applied_flatten_order = None
         self.flatten_applied = False
+
+        # Planefit of the height maps with a substrate ROI as zero plane (see
+        # tools.planefit): index of the ROI in roi_list
+        self.planefit_applied = False
+        self.planefit_roi = None
 
         # Preview values for the tilt limits
         self.tilt_limit_1 = 200
@@ -893,6 +969,52 @@ class SingleFile:
         condition = self.loading_rates_calculated
         return self.get_node("/results/loading_rates", condition, True)
 
+    @property
+    def perform_fit(self):
+        """True if the stiffness is computed by fitting (Fitting selected),
+        False for Tomography. Derived from stiffness_mode, so that
+        the computation always matches the displayed choice."""
+        return self.stiffness_mode == 1
+
+    @perform_fit.setter
+    def perform_fit(self, value):
+        self.stiffness_mode = 1 if value else 0
+
+    @property
+    def used_perform_fit(self):
+        """True if the stiffness was computed by fitting.
+
+        Falls back on the current choice for the files saved before this
+        value was stored.
+        """
+        if self.used_stiffness_mode is None:
+            return self.perform_fit
+        return self.used_stiffness_mode == 1
+
+    def get_used_fit_range_type(self):
+        """Returns the fit range type used for the stiffness computation.
+
+        Falls back on the current value for the files saved before this
+        value was stored.
+        """
+        if self.used_fit_range_type is None:
+            return self.fit_range_type
+        return self.used_fit_range_type
+
+    def get_used_indentation(self):
+        """Returns the (start, step, tomography) used for the stiffness
+        computation, to describe the computed segments.
+
+        Falls back on the current parameters for the files saved before these
+        values were stored.
+        """
+        start = self.used_indentation_start
+        step = self.used_indentation_step
+        tomography = self.used_tomography
+        return (self.indentation_start if start is None else start,
+                self.indentation_step if step is None else step,
+                self.tomography if tomography is None else tomography)
+
     def reset_discarded(self):
         """Method used to reset the discarded curve array."""
         empty = numpy.zeros((self.nbr_pixels_x, self.nbr_pixels_y))
@@ -913,11 +1035,11 @@ class SingleFile:
             self.opengl_slice_right = self.nbr_pixels_y - 1
 
         # Piezo image
+        # Piezo height: autoscale (0 to the maximum of the file)
         self.max_piezo = numpy.amax(self.piezo_image)
-        median_piezo = numpy.median(self.piezo_image)
-        std_piezo = numpy.std(self.piezo_image)
-        self.color_opts_piezo[2] = median_piezo + 3 * std_piezo
-        self.color_opts_piezo[3] = (median_piezo + 3 * std_piezo) / 2
+        if color:
+            self.color_opts_piezo[2] = self.max_piezo
+            self.color_opts_piezo[3] = self.max_piezo / 2
 
         if self.stiffness_calculated:
             # Update max_stiffness
@@ -928,12 +1050,14 @@ class SingleFile:
                         array_stiffness.append(self.stiffness_array[i][j][k])
 
             self.max_stiffness = numpy.amax(array_stiffness)
-            self.max_topo = numpy.amax(self.topography)
+            self.max_topo = numpy.nanmax(self.topography)
             if color:
                 self.color_opts_topo[2] = self.max_topo
                 self.color_opts_topo[3] = self.max_topo / 2.0
-                self.color_opts_stiffness[2] = self.max_stiffness
-                self.color_opts_stiffness[3] = self.max_stiffness / 2.0
+                high = robust_max(array_stiffness)
+                if high is not None:
+                    self.color_opts_stiffness[2] = high
+                    self.color_opts_stiffness[3] = high / 2.0
 
         # Jump of contact and work
         if self.work_and_rupture_force1_calculated:
@@ -946,6 +1070,14 @@ class SingleFile:
                 self.color_opts_rupture_force1[2] = self.max_rupture_force1
                 self.color_opts_rupture_force1[3] = \
                     self.max_rupture_force1 / 2.0
+
+        # Viscoelasticity
+        if self.visco_calculated and color:
+            values = self.visco_e0[numpy.isfinite(self.visco_e0)]
+            high = robust_max(values) if len(values) else None
+            if high is not None:
+                self.color_opts_visco_e0[2] = high
+                self.color_opts_visco_e0[3] = high / 2.0
 
         # Events
         if self.events_calculated:
@@ -1180,203 +1312,86 @@ class SingleFile:
             "Please use data.nbr_points_per_pause_curve.")
         return self.nbr_points_per_pause_curve
 
+    def get_visco_result(self, name):
+        """Map of a result of the viscoelasticity fit (nan if not
+        computed)."""
+        if not self.visco_calculated or self.visco_results is None:
+            return numpy.full((self.nbr_pixels_x, self.nbr_pixels_y),
+                              numpy.nan)
+        return self.visco_results[:, :, VISCO_RESULTS.index(name)]
+
+    @property
+    def visco_e0(self):
+        """Modulus E0 of the power law (at t0 = 1 s) [Pa]."""
+        return self.get_visco_result("e0")
+
+    @property
+    def visco_fluidity(self):
+        """Fluidity (exponent of the power law, 0: solid, 1: liquid)."""
+        return self.get_visco_result("fluidity")
+
+    @property
+    def visco_tan_delta(self):
+        """Loss tangent of the power law: tan(pi * fluidity / 2)."""
+        return numpy.tan(numpy.pi * self.visco_fluidity / 2)
+
+    def get_color_opts(self, meshgrid_type=None):
+        """Color options (list) of a meshgrid type (the current one by
+        default)."""
+        mt = self.meshgrid_type if meshgrid_type is None else meshgrid_type
+        if mt in ("stiffness", "stiffness_slice", "stiffness_corr",
+                  "stiffness_corr_slice"):
+            return self.color_opts_stiffness
+        names = {"piezo": "color_opts_piezo",
+                 "topo": "color_opts_topo",
+                 "work": "color_opts_work",
+                 "rupture_force": "color_opts_rupture_force1",
+                 "events_per_curve": "color_opts_events_per_curve",
+                 "events_rupture_force": "color_opts_rupture_force2",
+                 "visco_e0": "color_opts_visco_e0",
+                 "visco_fluidity": "color_opts_visco_fluidity",
+                 "visco_tan_delta": "color_opts_visco_tan_delta"}
+        return getattr(self, names[mt])
+
     @property
     def colortableid(self):
         """Gets the id of the current colortable."""
-        if self.meshgrid_type == "piezo":
-            value = self.color_opts_piezo[0]
-        elif self.meshgrid_type == "topo":
-            value = self.color_opts_topo[0]
-        elif self.meshgrid_type == "stiffness":
-            value = self.color_opts_stiffness[0]
-        elif self.meshgrid_type == "work":
-            value = self.color_opts_work[0]
-        elif self.meshgrid_type == "rupture_force":
-            value = self.color_opts_rupture_force1[0]
-        elif self.meshgrid_type == "events_per_curve":
-            value = self.color_opts_events_per_curve[0]
-        elif self.meshgrid_type == "events_rupture_force":
-            value = self.color_opts_rupture_force2[0]
-        elif self.meshgrid_type == "stiffness_slice":
-            value = self.color_opts_stiffness[0]
-        elif self.meshgrid_type == "stiffness_corr":
-            value = self.color_opts_stiffness[0]
-        elif self.meshgrid_type == "stiffness_corr_slice":
-            value = self.color_opts_stiffness[0]
-        return value
+        return self.get_color_opts()[0]
 
     @colortableid.setter
     def colortableid(self, value):
         """Sets the id of the current colortable."""
-        if self.meshgrid_type == "piezo":
-            self.color_opts_piezo[0] = value
-        elif self.meshgrid_type == "topo":
-            self.color_opts_topo[0] = value
-        elif self.meshgrid_type == "stiffness":
-            self.color_opts_stiffness[0] = value
-        elif self.meshgrid_type == "work":
-            self.color_opts_work[0] = value
-        elif self.meshgrid_type == "rupture_force":
-            self.color_opts_rupture_force1[0] = value
-        elif self.meshgrid_type == "events_per_curve":
-            self.color_opts_events_per_curve[0] = value
-        elif self.meshgrid_type == "events_rupture_force":
-            self.color_opts_rupture_force2[0] = value
-        elif self.meshgrid_type == "stiffness_slice":
-            self.color_opts_stiffness[0] = value
-        elif self.meshgrid_type == "stiffness_corr":
-            self.color_opts_stiffness[0] = value
-        elif self.meshgrid_type == "stiffness_corr_slice":
-            self.color_opts_stiffness[0] = value
+        self.get_color_opts()[0] = value
 
     @property
     def colortable_min_value(self):
         """Gets the min value of the current colortable."""
-        if self.meshgrid_type == "piezo":
-            value = self.color_opts_piezo[1]
-        elif self.meshgrid_type == "topo":
-            value = self.color_opts_topo[1]
-        elif self.meshgrid_type == "stiffness":
-            value = self.color_opts_stiffness[1]
-        elif self.meshgrid_type == "work":
-            value = self.color_opts_work[1]
-        elif self.meshgrid_type == "rupture_force":
-            value = self.color_opts_rupture_force1[1]
-        elif self.meshgrid_type == "events_per_curve":
-            value = self.color_opts_events_per_curve[1]
-        elif self.meshgrid_type == "events_rupture_force":
-            value = self.color_opts_rupture_force2[1]
-        elif self.meshgrid_type == "stiffness_slice":
-            value = self.color_opts_stiffness[1]
-        elif self.meshgrid_type == "stiffness_corr":
-            value = self.color_opts_stiffness[1]
-        elif self.meshgrid_type == "stiffness_corr_slice":
-            value = self.color_opts_stiffness[1]
-        return value
+        return self.get_color_opts()[1]
 
     @colortable_min_value.setter
     def colortable_min_value(self, value):
         """Sets the min value of the current colortable."""
-        if self.meshgrid_type == "piezo":
-            self.color_opts_piezo[1] = value
-        elif self.meshgrid_type == "topo":
-            self.color_opts_topo[1] = value
-        elif self.meshgrid_type == "stiffness":
-            self.color_opts_stiffness[1] = value
-        elif self.meshgrid_type == "work":
-            self.color_opts_work[1] = value
-        elif self.meshgrid_type == "rupture_force":
-            self.color_opts_rupture_force1[1] = value
-        elif self.meshgrid_type == "events_per_curve":
-            self.color_opts_events_per_curve[1] = value
-        elif self.meshgrid_type == "events_rupture_force":
-            self.color_opts_rupture_force2[1] = value
-        elif self.meshgrid_type == "stiffness_slice":
-            self.color_opts_stiffness[1] = value
-        elif self.meshgrid_type == "stiffness_corr":
-            self.color_opts_stiffness[1] = value
-        elif self.meshgrid_type == "stiffness_corr_slice":
-            self.color_opts_stiffness[1] = value
+        self.get_color_opts()[1] = value
 
     @property
     def colortable_max_value(self):
         """Gets the max value of the current colortable."""
-        if self.meshgrid_type == "piezo":
-            value = self.color_opts_piezo[2]
-        elif self.meshgrid_type == "topo":
-            value = self.color_opts_topo[2]
-        elif self.meshgrid_type == "stiffness":
-            value = self.color_opts_stiffness[2]
-        elif self.meshgrid_type == "work":
-            value = self.color_opts_work[2]
-        elif self.meshgrid_type == "rupture_force":
-            value = self.color_opts_rupture_force1[2]
-        elif self.meshgrid_type == "events_per_curve":
-            value = self.color_opts_events_per_curve[2]
-        elif self.meshgrid_type == "events_rupture_force":
-            value = self.color_opts_rupture_force2[2]
-        elif self.meshgrid_type == "stiffness_slice":
-            value = self.color_opts_stiffness[2]
-        elif self.meshgrid_type == "stiffness_corr":
-            value = self.color_opts_stiffness[2]
-        elif self.meshgrid_type == "stiffness_corr_slice":
-            value = self.color_opts_stiffness[2]
-
-        return value
+        return self.get_color_opts()[2]
 
     @colortable_max_value.setter
     def colortable_max_value(self, value):
         """Sets the max value of the current colortable."""
-        if self.meshgrid_type == "piezo":
-            self.color_opts_piezo[2] = value
-        elif self.meshgrid_type == "topo":
-            self.color_opts_topo[2] = value
-        elif self.meshgrid_type == "stiffness":
-            self.color_opts_stiffness[2] = value
-        elif self.meshgrid_type == "work":
-            self.color_opts_work[2] = value
-        elif self.meshgrid_type == "rupture_force":
-            self.color_opts_rupture_force1[2] = value
-        elif self.meshgrid_type == "events_per_curve":
-            self.color_opts_events_per_curve[2] = value
-        elif self.meshgrid_type == "events_rupture_force":
-            self.color_opts_rupture_force2[2] = value
-        elif self.meshgrid_type == "stiffness_slice":
-            self.color_opts_stiffness[2] = value
-        elif self.meshgrid_type == "stiffness_corr":
-            self.color_opts_stiffness[2] = value
-        elif self.meshgrid_type == "stiffness_corr_slice":
-            self.color_opts_stiffness[2] = value
+        self.get_color_opts()[2] = value
 
     @property
     def colortable_middle_value(self):
         """Gets the middle value of the current colortable."""
-        if self.meshgrid_type == "piezo":
-            value = self.color_opts_piezo[3]
-        elif self.meshgrid_type == "topo":
-            value = self.color_opts_topo[3]
-        elif self.meshgrid_type == "stiffness":
-            value = self.color_opts_stiffness[3]
-        elif self.meshgrid_type == "work":
-            value = self.color_opts_work[3]
-        elif self.meshgrid_type == "rupture_force":
-            value = self.color_opts_rupture_force1[3]
-        elif self.meshgrid_type == "events_per_curve":
-            value = self.color_opts_events_per_curve[3]
-        elif self.meshgrid_type == "events_rupture_force":
-            value = self.color_opts_rupture_force2[3]
-        elif self.meshgrid_type == "stiffness_slice":
-            value = self.color_opts_stiffness[3]
-        elif self.meshgrid_type == "stiffness_corr":
-            value = self.color_opts_stiffness[3]
-        elif self.meshgrid_type == "stiffness_corr_slice":
-            value = self.color_opts_stiffness[3]
-
-        return value
+        return self.get_color_opts()[3]
 
     @colortable_middle_value.setter
     def colortable_middle_value(self, value):
         """Sets the middle value of the current colortable."""
-        if self.meshgrid_type == "piezo":
-            self.color_opts_piezo[3] = value
-        elif self.meshgrid_type == "topo":
-            self.color_opts_topo[3] = value
-        elif self.meshgrid_type == "stiffness":
-            self.color_opts_stiffness[3] = value
-        elif self.meshgrid_type == "work":
-            self.color_opts_work[3] = value
-        elif self.meshgrid_type == "rupture_force":
-            self.color_opts_rupture_force1[3] = value
-        elif self.meshgrid_type == "events_per_curve":
-            self.color_opts_events_per_curve[3] = value
-        elif self.meshgrid_type == "events_rupture_force":
-            self.color_opts_rupture_force2[3] = value
-        elif self.meshgrid_type == "stiffness_slice":
-            self.color_opts_stiffness[3] = value
-        elif self.meshgrid_type == "stiffness_corr":
-            self.color_opts_stiffness[3] = value
-        elif self.meshgrid_type == "stiffness_corr_slice":
-            self.color_opts_stiffness[3] = value
+        self.get_color_opts()[3] = value
 
     @property
     def fit_params_poc(self):

@@ -31,7 +31,7 @@
 
 """Small widget asking the user to chose the glass layer to be added."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from ... import shared
 from ... import widgets_list

@@ -1,3 +1,1 @@
-"""
-Python application for fitting Hertz model to different force curves
-"""
+"""Viscoelasticity: Ting fit of the approach and the retraction."""

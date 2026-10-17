@@ -42,7 +42,8 @@ class ColorTables:
 
     def __init__(self, colortableid=None, color_saturation=None,
                  color_negative=None, saturation_limit=None,
-                 middle_value=None, mode=None, color_nan=None):
+                 middle_value=None, mode=None, color_nan=None,
+                 min_value=None):
         self.colortables_list = ["Copper",
                                  "Rainbow 1",
                                  "Viridis",
@@ -80,12 +81,24 @@ class ColorTables:
             self.saturation_limit = float(saturation_limit)
         if middle_value is not None:
             self.middle_value = float(middle_value)
+        # Bottom of the color scale (not used by Rainbow 1 and Cool-Warm,
+        # which start at 0, as in the 2D meshgrids)
+        self.min_value = 0.0 if min_value is None else float(min_value)
         if mode == "scalarMap" and colortableid != 1 and colortableid != 6:
             name = self.colortables_mpl_list[self.colortableid]
-            cNorm = mpl_colors.Normalize(vmin=0,
+            cNorm = mpl_colors.Normalize(vmin=self.min_value,
                                          vmax=self.saturation_limit)
-            self.scalarMap = mpl_cm.ScalarMappable(norm=cNorm,
-                                                   cmap=mpl_plt.get_cmap(name))
+            # Same colors as the 2D meshgrids for the values above the
+            # saturation limit, the negative values and the nans
+            extremes = {}
+            if color_saturation is not None:
+                extremes["over"] = color_saturation
+            if color_negative is not None:
+                extremes["under"] = color_negative
+            if color_nan is not None:
+                extremes["bad"] = color_nan
+            cmap = mpl_plt.get_cmap(name).with_extremes(**extremes)
+            self.scalarMap = mpl_cm.ScalarMappable(norm=cNorm, cmap=cmap)
 
     def get_color_as_list(self, value):
         """Returns the color as a RGBA list."""
@@ -281,9 +294,9 @@ class ColorTables:
                               (1.0, 0.0, 0.0))}
             colormap = mpl_colors.LinearSegmentedColormap("mycolormap",
                                                           cdict, freq)
-            colormap.set_over(self.color_saturation)
-            colormap.set_under(self.color_negative)
-            colormap.set_bad(self.color_nan)
+            colormap = colormap.with_extremes(
+                over=self.color_saturation, under=self.color_negative,
+                bad=self.color_nan)
             norm = mpl_colors.Normalize(vmin=0, vmax=self.saturation_limit)
         elif colortable == "Cool-Warm":
             cdict = {"red": ((0.0, 0.0, 59 / 256.0),
@@ -388,9 +401,9 @@ class ColorTables:
 
             colormap = mpl_colors.LinearSegmentedColormap("mycolormap",
                                                           cdict, 256)
-            colormap.set_over(self.color_saturation)
-            colormap.set_under(self.color_negative)
-            colormap.set_bad(self.color_nan)
+            colormap = colormap.with_extremes(
+                over=self.color_saturation, under=self.color_negative,
+                bad=self.color_nan)
             norm = mpl_colors.Normalize(vmin=0, vmax=self.saturation_limit)
         return colormap, norm
 

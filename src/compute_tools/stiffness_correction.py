@@ -104,7 +104,7 @@ class StiffnessCorrection:
             nf = 0
 
         x_size = data.scan_size_x / data.nbr_pixels_x
-        y_size = data.scan_size_x / data.nbr_pixels_x
+        y_size = data.scan_size_y / data.nbr_pixels_y
 
         for i in range(data.nbr_pixels_x):
             for j in range(data.nbr_pixels_y):

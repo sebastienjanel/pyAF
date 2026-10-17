@@ -32,6 +32,7 @@
 """Plots the curve for the tilt correction."""
 
 from .plot_curve import PlotCurve
+from ...tools import misc_tools
 from ... import shared
 
 
@@ -42,7 +43,7 @@ class PlotTiltPreview(PlotCurve):
         super().__init__(parent)
 
         # Labels
-        self.xlabel = "Scanner Extension [nm]"
+        self.xlabel = misc_tools.z_label(self.data)
         self.ylabel = "Deflection [nm]"
 
         self.curve_approach = self.approach

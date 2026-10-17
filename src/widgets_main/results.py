@@ -37,7 +37,7 @@ from .. import widgets_list
 from .. import shared
 import logging
 from .. import consts
-from PyQt5 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 from ..tools import math_tools
 from ..tools import apply_to_all
 from ..tools import misc_tools
@@ -55,7 +55,7 @@ from ..widgets.roi_manager import RoiManagerWidget
 from ..widgets.events_filters import ChangeFilterWidget
 from ..widgets.used_parameters import UsedParametersWidget
 from ..plots.plot_main import MainPlot
-from ..plots.PYAFPlot import PYAFPlot
+from ..plots.PYAFPlot import PYAFPlot, curve_type_available
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools import events_refresher
 
@@ -75,7 +75,8 @@ class ResultsWidget(PYAFWidget):
         self.logger = logging.getLogger()
 
         # Fixed height for the 2 top boxes, to keep them aligned
-        self.options_boxes_height = 160
+        # Room for the title and the rows of options
+        self.options_boxes_height = 185
 
         self.cursor_mode = "select"
         self.parent = parent
@@ -147,12 +148,12 @@ class ResultsWidget(PYAFWidget):
         self.box_meshgrid = QtWidgets.QGroupBox()
         self.GL_meshgrid = QtWidgets.QGridLayout()
         # Options (meshgrid)
-        self.box_meshgrid_options = QtWidgets.QGroupBox()
+        self.box_meshgrid_options = QtWidgets.QGroupBox("Maps")
         self.box_meshgrid_options.setFixedHeight(self.options_boxes_height)
 
         self.GRP_mesh_type = PYAFButtonGroup(self, "BTG_meshgrid_type")
         self.RBT_mesh_piezo = QtWidgets.QRadioButton("Piezo height")
-        self.RBT_mesh_topography = QtWidgets.QRadioButton("Topography")
+        self.RBT_mesh_topography = QtWidgets.QRadioButton("Topography (zero force)")
         self.RBT_mesh_stiffness = QtWidgets.QRadioButton()
         self.RBT_mesh_stiffness_slice = QtWidgets.QRadioButton()
         self.RBT_mesh_stiffness_corr = QtWidgets.QRadioButton(
@@ -174,8 +175,19 @@ class ResultsWidget(PYAFWidget):
         self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force1, 7)
         self.GRP_mesh_type.addButton(self.RBT_mesh_events_per_curve, 8)
         self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force2, 9)
+        # Viscoelasticity (Ting fit)
+        self.RBT_mesh_visco_e0 = QtWidgets.QRadioButton("E0 (visco.)")
+        self.RBT_mesh_visco_fluidity = QtWidgets.QRadioButton("Fluidity")
+        self.RBT_mesh_visco_tan_delta = QtWidgets.QRadioButton(
+            "Loss tangent (tan \u03b4)")
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_e0, 10)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_fluidity, 11)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_tan_delta, 12)
 
         self.GL_mesh_options = QtWidgets.QGridLayout()
+        # Same spacing between all the rows (the style's default spacing
+        # depends on the neighbouring widgets)
+        self.GL_mesh_options.setVerticalSpacing(4)
         self.VL_meshgrid_options = QtWidgets.QVBoxLayout()
         self.VL_meshgrid_options.setContentsMargins(0, 0, 0, 0)
 
@@ -193,6 +205,11 @@ class ResultsWidget(PYAFWidget):
 
         self.GL_mesh_options.addWidget(self.RBT_mesh_events_per_curve, 2, 2)
         self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force2, 3, 2)
+
+        # Viscoelasticity below the elasticity
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_e0, 4, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_fluidity, 5, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_tan_delta, 6, 1)
 
         self.VL_meshgrid_options.addLayout(self.GL_mesh_options)
         self.VL_meshgrid_options.addStretch(1)
@@ -220,28 +237,30 @@ class ResultsWidget(PYAFWidget):
         # --- Curves ----------------------------------------------------------
 
         # Options curves
-        self.box_curves_options = QtWidgets.QGroupBox()
+        self.box_curves_options = QtWidgets.QGroupBox("Force curves")
         self.box_curves_options.setFixedHeight(self.options_boxes_height)
 
         self.BT_group_type_of_curve = PYAFButtonGroup(
             self, "button_group_type_of_curve")
-        self.RB_defl_ext = QtWidgets.QRadioButton("Deflection - Extension curve")
-        self.RB_force_ext = QtWidgets.QRadioButton("Force - Extension curve")
+        self.RB_defl_ext = QtWidgets.QRadioButton("Deflection - Z curve")
+        self.RB_force_ext = QtWidgets.QRadioButton("Force - Z curve")
         self.RB_force = QtWidgets.QRadioButton("Force - Distance curve")
         self.RB_force_events = QtWidgets.QRadioButton("Force curve (events)")
         self.RB_indentation_curve = QtWidgets.QRadioButton("Indentation curve")
         self.RB_residuals = QtWidgets.QRadioButton("Residuals plot")
+        self.RB_visco = QtWidgets.QRadioButton("Viscoelastic fit")
         self.BT_group_type_of_curve.addButton(self.RB_defl_ext, 0)
         self.BT_group_type_of_curve.addButton(self.RB_force_ext, 1)
         self.BT_group_type_of_curve.addButton(self.RB_force, 2)
         self.BT_group_type_of_curve.addButton(self.RB_force_events, 3)
         self.BT_group_type_of_curve.addButton(self.RB_indentation_curve, 4)
         self.BT_group_type_of_curve.addButton(self.RB_residuals, 5)
+        self.BT_group_type_of_curve.addButton(self.RB_visco, 6)
 
         self.BT_group_trace_or_retrace = PYAFButtonGroup(
             self, "button_group_trace_or_retrace")
         self.radiobutton_trace = QtWidgets.QRadioButton("Approach curve")
-        self.radiobutton_retrace = QtWidgets.QRadioButton("Retraction curve")
+        self.radiobutton_retrace = QtWidgets.QRadioButton("Retract curve")
         self.radiobutton_both = QtWidgets.QRadioButton("Both")
         self.BT_group_trace_or_retrace.addButton(self.radiobutton_trace, 0)
         self.BT_group_trace_or_retrace.addButton(self.radiobutton_retrace, 1)
@@ -269,12 +288,19 @@ class ResultsWidget(PYAFWidget):
         self.BT_group_events.addButton(self.RBT_events_annotations, 1)
         self.CB_events_filter_dist = PYAFCheckBox(
             self, "checkbox_events_filter_dist", "Distance filter")
+        self.CB_events_filter_dist.setToolTip(
+            "Shades in grey the events removed by the distance filter of "
+            "this file.\nTo set up the filter, right-click on the curve "
+            "and choose \"Change distance filter\".")
         self.CB_events_display_joc = PYAFCheckBox(
             self, "checkbox_events_display_joc", "Display Joc")
         self.CB_events_display_fit_joc = PYAFCheckBox(
             self, "checkbox_events_display_fit_joc", "Display Joc fit")
 
         self.GL_curves_options = QtWidgets.QGridLayout()
+        # Same spacing between all the rows (the style's default spacing
+        # depends on the neighbouring widgets)
+        self.GL_curves_options.setVerticalSpacing(4)
         self.VL_curves_options = QtWidgets.QVBoxLayout()
         widgets_list.widget_progressbar.update()
 
@@ -285,6 +311,7 @@ class ResultsWidget(PYAFWidget):
         self.GL_curves_options.addWidget(self.RB_force_events, 3, 0)
         self.GL_curves_options.addWidget(self.RB_indentation_curve, 4, 0)
         self.GL_curves_options.addWidget(self.RB_residuals, 5, 0)
+        self.GL_curves_options.addWidget(self.RB_visco, 6, 0)
         # Col 2
         self.GL_curves_options.addWidget(self.radiobutton_both, 0, 1)
         self.GL_curves_options.addWidget(self.radiobutton_trace, 1, 1)
@@ -328,9 +355,9 @@ class ResultsWidget(PYAFWidget):
 
         self.HL_buttons = QtWidgets.QHBoxLayout()
         self.HL_buttons.addWidget(self.BT_multi_meshgrids)
+        self.HL_buttons.addWidget(self.BT_roi_manager)
         self.HL_buttons.addWidget(self.BT_profiles)
         self.HL_buttons.addWidget(self.BT_slices)
-        self.HL_buttons.addWidget(self.BT_roi_manager)
         self.HL_buttons.addWidget(self.BT_display_in_3D)
         self.HL_buttons.addWidget(self.BT_used_parameters)
         self.HL_buttons.addStretch(1)
@@ -369,6 +396,62 @@ class ResultsWidget(PYAFWidget):
         self.update_MPL("MPL_canvas1")
         self.update_MPL("MPL_canvas2")
 
+    @staticmethod
+    def match_curve_to_map(data):
+        """Displays the curve corresponding to the map type, with its
+        options: the approach force curve with the point of contact and the
+        fits for the elasticity, the retraction force curve with the jump of
+        contact, the work and the force for the detachment, the force curve
+        of the events with their annotations, distance filter and jumps of
+        contact for the events, and the default deflection curve for the
+        heights. Returns True if the curve changed."""
+        mt = data.meshgrid_type
+        if mt in ("stiffness", "stiffness_slice", "stiffness_corr",
+                  "stiffness_corr_slice") and data.stiffness_calculated:
+            data.display_curve_type = "force"
+            data.display_trace_retrace = 0
+            data.display_poc = True
+            data.display_fit_poc = True
+            data.display_segments = True
+            data.display_fits_stiffness = True
+        elif mt in ("work", "rupture_force") and \
+                data.work_and_rupture_force1_calculated:
+            data.display_curve_type = "force"
+            data.display_trace_retrace = 1
+            data.display_joc = True
+            data.display_fit_joc = True
+            data.display_surface = True
+            data.display_force = True
+        elif mt in ("events_per_curve", "events_rupture_force") and \
+                data.events_calculated:
+            data.display_curve_type = "results_force_events"
+            data.display_trace_retrace = 1
+            data.events_results_display_annotations = 1
+            data.events_display_results_filter_dist = True
+            data.events_results_display_joc = True
+            data.events_results_display_fit_joc = True
+        elif mt.startswith("visco_") and data.visco_calculated:
+            data.display_curve_type = "visco"
+        elif mt in ("piezo", "topo"):
+            # Default display of the curves, without the results
+            data.display_curve_type = "defl_ext"
+            data.display_trace_retrace = 2
+            data.display_poc = False
+            data.display_fit_poc = False
+            data.display_segments = False
+            data.display_fits_stiffness = False
+            data.display_joc = False
+            data.display_fit_joc = False
+            data.display_surface = False
+            data.display_force = False
+            data.events_results_display_annotations = 0
+            data.events_display_results_filter_dist = False
+            data.events_results_display_joc = False
+            data.events_results_display_fit_joc = False
+        else:
+            return False
+        return True
+
     def update_GUI(self, element):
         """Method to update different GUI elements."""
         data = shared.exp.list[shared.exp.id_selected]
@@ -380,7 +463,7 @@ class ResultsWidget(PYAFWidget):
             self.RBT_mesh_topography.setEnabled(val)
             self.RBT_mesh_stiffness.setEnabled(val)
             if val:
-                if data.indentation_step == 0:
+                if data.get_used_indentation()[1] == 0:
                     self.RBT_mesh_stiffness_slice.setEnabled(False)
                 else:
                     self.RBT_mesh_stiffness_slice.setEnabled(True)
@@ -389,7 +472,7 @@ class ResultsWidget(PYAFWidget):
             val = data.stiffness_corrected
             self.RBT_mesh_stiffness_corr.setEnabled(val)
             if val:
-                if data.indentation_step == 0:
+                if data.get_used_indentation()[1] == 0:
                     self.RBT_mesh_stiffness_slice_corr.setEnabled(False)
                 else:
                     self.RBT_mesh_stiffness_slice_corr.setEnabled(True)
@@ -401,6 +484,10 @@ class ResultsWidget(PYAFWidget):
             val = data.events_calculated
             self.RBT_mesh_events_per_curve.setEnabled(val)
             self.RBT_mesh_rupture_force2.setEnabled(val)
+            val = data.visco_calculated
+            self.RBT_mesh_visco_e0.setEnabled(val)
+            self.RBT_mesh_visco_fluidity.setEnabled(val)
+            self.RBT_mesh_visco_tan_delta.setEnabled(val)
 
             # Check the button
             index = misc_tools.get_meshgrid_type_by_id(data.meshgrid_type)
@@ -458,7 +545,17 @@ class ResultsWidget(PYAFWidget):
             self.RB_indentation_curve.setEnabled(data.stiffness_calculated)
 
             # Enable residuals option
-            self.RB_residuals.setEnabled(data.perform_fit)
+            # Residuals of the fits: only for a stiffness computed by
+            # fitting
+            self.RB_residuals.setEnabled(
+                data.stiffness_calculated and data.used_perform_fit)
+
+            # Viscoelastic fit
+            self.RB_visco.setEnabled(data.visco_calculated)
+
+            # A curve type applied from another file can be missing here
+            if not curve_type_available(data, data.display_curve_type):
+                data.display_curve_type = "defl_ext"
 
             # Check
             if data.display_curve_type == "defl_ext":
@@ -473,6 +570,8 @@ class ResultsWidget(PYAFWidget):
                 self.RB_indentation_curve.setChecked(True)
             elif data.display_curve_type == "residuals":
                 self.RB_residuals.setChecked(True)
+            elif data.display_curve_type == "visco":
+                self.RB_visco.setChecked(True)
 
             # Enable or disable radiobuttons for approach or retraction
             if data.display_curve_type == "force":
@@ -503,6 +602,12 @@ class ResultsWidget(PYAFWidget):
 
             elif data.display_curve_type == "residuals":
                 self.radiobutton_trace.setEnabled(True)
+                self.radiobutton_retrace.setEnabled(False)
+                self.radiobutton_both.setEnabled(False)
+
+            elif data.display_curve_type == "visco":
+                # Approach and retraction, in time
+                self.radiobutton_trace.setEnabled(False)
                 self.radiobutton_retrace.setEnabled(False)
                 self.radiobutton_both.setEnabled(False)
 
@@ -685,9 +790,14 @@ class ResultsWidget(PYAFWidget):
             value = self.GRP_mesh_type.checkedId()
             data.meshgrid_type = misc_tools.get_meshgrid_type_as_string(value)
             self.logger.debug("Changing meshgrid type, %s", data.meshgrid_type)
+            # The curve corresponding to the map
+            curve_changed = self.match_curve_to_map(data)
             apply_to_all.apply_to_all("display_options")
             # Update the GUI elements
             self.update_MPL("MPL_canvas1")
+            if curve_changed:
+                self.update_GUI("buttons_options_curves")
+                self.update_MPL("MPL_canvas2")
             # Update the list of colortables and the min/max values
             if widgets_list.widget_meshgrid_options is not None:
                 widgets_list.widget_meshgrid_options.update_widget()
@@ -764,6 +874,8 @@ class ResultsWidget(PYAFWidget):
                 data.display_curve_type = "indentation"
             elif curve_type == 5:
                 data.display_curve_type = "residuals"
+            elif curve_type == 6:
+                data.display_curve_type = "visco"
 
             tp = data.display_curve_type
             self.logger.debug("Changing curve type, %s", tp)
@@ -991,12 +1103,9 @@ class ResultsWidget(PYAFWidget):
         elif (ev.button == 3 and
               isinstance(self.MPL_canvas1.canvas, MainPlot) and
               ev.inaxes == self.MPL_canvas1.canvas.axes):
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.MPL_canvas1.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + ev.x
-            y = globalpos.y() + (self.meshgrid_canvas_size[1] - ev.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             meshgrid_menu.create_meshgrid_menu(self, "results", pos)
 
     def canvas_release(self, event):
@@ -1201,12 +1310,9 @@ class ResultsWidget(PYAFWidget):
     def curves_canvas_press(self, event):
         """Called when there is a click on the curve."""
         if event.button == 3 and event.inaxes == self.MPL_canvas2.canvas.axes:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.MPL_canvas2.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.curves_canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             self.popUpMenu(pos, "curve_results")
 
     def change_cursor_mode(self, mode):
@@ -1268,7 +1374,7 @@ class ResultsWidget(PYAFWidget):
 
             if data.events_calculated:
                 menu.addSeparator()
-                action = QtWidgets.QAction("Change dist filter", self)
+                action = QtWidgets.QAction("Change distance filter", self)
                 action.triggered.connect(lambda: self.change_filter("dist"))
                 menu.addAction(action)
 
@@ -1341,13 +1447,7 @@ class ResultsWidget(PYAFWidget):
     def change_filter(self, filter_value):
         """Update the value of the filter for the events."""
         widget = ChangeFilterWidget(self, filter_value)
-        if filter_value == "slope":
-            widget.setWindowTitle("Change slope filter")
-        elif filter_value == "dist":
-            widget.setWindowTitle("Change dist filter")
-        widget.resize(200, 100)
-        widget.activateWindow()
-        widget.show()
+        widget.exec()
 
 
 def prepare_roi(xpos, ypos):

@@ -32,7 +32,7 @@
 """About widget."""
 
 import logging
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from .. import consts
 from ..tools.PYAFWidget import PYAFWidget
 

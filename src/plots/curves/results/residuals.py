@@ -23,7 +23,7 @@ class ResultsResiduals(PlotCurve):
         elif self.data.curve_distance_units == "um":
             self.x_factor = 1e-3
 
-        if self.data.perform_fit:
+        if self.data.used_perform_fit:
             self.get_stiffness_lm_fits()
             self.curve_residuals = self.residuals
             self.segments_fits = None

@@ -30,68 +30,104 @@
 # knowledge of the CeCILL license and that you accept its terms.
 
 """Display a list with results of DFS experiments."""
+"""Window of the dynamic force spectroscopy (Bell-Evans fits)."""
 
-from PyQt5 import QtCore, QtWidgets
+import numpy
+from qtpy import QtCore, QtWidgets
 from ..tools import gui_tools
+from ..tools import misc_tools
+from ..tools import dfs_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFButtonGroup
-from ..tools import math_tools
-import math
-import numpy
+from ..tools.gui_tools import PYAFComboBox
+from ..tools.gui_tools import PYAFInput
 from ..tools.PYAFWidget import PYAFWidget
-from ..widgets.progressbar import Progressbar
 from .. import widgets_list
 from .. import shared
-from ..tools import results_sorting
+
+COLUMNS = ["", "Method", "Points", "x [nm]", "koff [s⁻¹]", "R²"]
+
+
+def number(value, error=None):
+    """Value (with its standard error) as text, 3 significant digits."""
+    if value is None or not numpy.isfinite(value):
+        return "–"
+    text = "%.3g" % value
+    if error is not None and numpy.isfinite(error):
+        text += " ± %.2g" % error
+    return text
 
 
 class DFSWidget(PYAFWidget):
-    """Class displaying a widget with DFS results and compute button.
+    """Bell-Evans fits of the forces vs the loading rates of the files (plots
+    tab) or of the groups (grouped plots tab) displayed in the plot.
 
-    The widget is called from the parent widget (results.py). It displays a
-    list with the results from previous DFS computations (size of the potential
-    barrier (x) in nm and dissociation constant ku (s^-1).
-
-    The compute button lets you start a new computation with the currently
-    selected rows in the result table from the parent widget.
+    The fit F = a ln(r) + b gives the distance to the barrier x = kBT / a and
+    the dissociation rate koff = exp(-b / a) / a.
     """
 
     def __init__(self, parent):
         super().__init__(parent, "widget_dfs")
 
+        self.smallfont = QtWidgets.QApplication.font()
+        self.smallfont.setPointSize(12)
+
         self.VL = QtWidgets.QVBoxLayout()
 
         self.HL = QtWidgets.QHBoxLayout()
         self.GRP_buttons = PYAFButtonGroup(self, "GRP_buttons")
-        self.RBT_single = QtWidgets.QRadioButton("Single results")
-        self.RBT_groups = QtWidgets.QRadioButton("Grouped results")
+        self.RBT_single = QtWidgets.QRadioButton("Files (plots tab)")
+        self.RBT_groups = QtWidgets.QRadioButton("Speeds (replicates tab)")
         self.GRP_buttons.addButton(self.RBT_single, 0)
         self.GRP_buttons.addButton(self.RBT_groups, 1)
-        self.HL.addStretch(1)
         self.HL.addWidget(self.RBT_single)
         self.HL.addWidget(self.RBT_groups)
         self.HL.addStretch(1)
 
-        self.tableWidget = QtWidgets.QTableWidget(0, 3)
-        policy = QtCore.Qt.ScrollBarAlwaysOff
-        self.tableWidget.setHorizontalScrollBarPolicy(policy)
+        # Method of the fit
+        self.HL_method = QtWidgets.QHBoxLayout()
+        self.list_method = PYAFComboBox(self, "method")
+        self.list_method.addItem("Medians per file")
+        self.list_method.addItem("Binned events")
+        self.list_method.setToolTip(
+            "Medians per file: one point per displayed file (or speed), at "
+            "the median loading rate\nand the median force of its events "
+            "(several files at different speeds).\n\nBinned events: the "
+            "events of the displayed files are put in bins of loading rate\n"
+            "with the same number of events; one point per bin, at its "
+            "median loading rate and median force\n(uses the spread of the "
+            "loading rates of a single speed).")
+        self.IN_bins = PYAFInput(self, "bins", "bins", width=40)
+        self.IN_bins.input.setValidator(
+            misc_tools.validator("RI", bottom=3, top=100))
+        self.IN_bins.changeValue(10)
+        self.HL_method.addWidget(QtWidgets.QLabel("Fit points:"))
+        self.HL_method.addWidget(self.list_method)
+        self.HL_method.addWidget(self.IN_bins)
+        self.HL_method.addStretch(1)
+
+        self.LB_info = QtWidgets.QLabel()
+        self.LB_info.setWordWrap(True)
+
+        self.tableWidget = QtWidgets.QTableWidget(0, len(COLUMNS))
         behavior = QtWidgets.QAbstractItemView.SelectRows
         self.tableWidget.setSelectionBehavior(behavior)
         self.tableWidget.horizontalHeader().setHighlightSections(False)
-        self.tableWidget.setHorizontalHeaderLabels(["", "x [nm]", "ku [s^-1]"])
-        self.tableWidget.setFixedWidth(300)
-        self.tableWidget.setColumnWidth(0, 40)
-        self.tableWidget.setColumnWidth(1, 130)
-        self.tableWidget.setColumnWidth(2, 130)
+        self.tableWidget.setHorizontalHeaderLabels(COLUMNS)
+        for col, width in enumerate((30, 130, 60, 110, 130, 60)):
+            self.tableWidget.setColumnWidth(col, width)
+        self.tableWidget.horizontalHeader().setStretchLastSection(True)
         self.tableWidget.verticalHeader().hide()
 
-        self.BT_get_dfs = PYAFButton(self, "get_dfs", "Get values")
+        self.BT_get_dfs = PYAFButton(self, "get_dfs", "Fit")
         self.BT_remove = PYAFButton(self, "remove", "Remove selected")
         self.HL_buttons = QtWidgets.QHBoxLayout()
         self.HL_buttons.addWidget(self.BT_get_dfs)
         self.HL_buttons.addWidget(self.BT_remove)
 
         self.VL.addLayout(self.HL)
+        self.VL.addLayout(self.HL_method)
+        self.VL.addWidget(self.LB_info)
         self.VL.addWidget(self.tableWidget)
         self.VL.addLayout(self.HL_buttons)
         self.setLayout(self.VL)
@@ -99,216 +135,145 @@ class DFSWidget(PYAFWidget):
         self.update_widget()
 
     def input_updated(self, val):
-        """Do nothing here."""
-        pass
+        """Do nothing here (the number of bins is read when fitting)."""
+
+    def list_updated(self, _):
+        """Method of the fit changed."""
+        self.update_widget()
+
+    def method(self):
+        """Selected method."""
+        return "binned" if self.list_method.currentIndex() == 1 \
+            else "medians"
+
+    def update_plot(self):
+        """Redraw the plot of the current tab."""
+        if shared.exp.dfs_mode == "single":
+            widgets_list.widget_results_single.update_MPL()
+        else:
+            widgets_list.widget_results_groups.update_MPL()
 
     def button_clicked(self, button):
-        """Called when the Get values button is clicked.
-
-        Will compute the two values (ku and x) from the DFS experiment.
-        """
-        # Boltzmann constant
-        KB = 1.3806503 * 1e-23
+        """Called when a button is clicked."""
+        mode = shared.exp.dfs_mode
 
         if button == "get_dfs":
-            Progressbar()
-            widgets_list.widget_progressbar.set_label("Fetching data")
-
-            medians_force = []
-            medians_lr = []
-
-            if shared.exp.dfs_mode == "single":
-                wl = widgets_list.widget_results_single
-                table = wl.tableWidget.selectionModel().selectedRows()
-            elif shared.exp.dfs_mode == "groups":
-                wl = widgets_list.widget_results_groups
-                table = wl.tableWidget.selectionModel().selectedRows()
-
-            # Get the range of the progressbar
-            progressbar_range = 0
-            for item in table:
-                row_index = item.row()
-                if shared.exp.dfs_mode == "single":
-                    data_id = shared.exp.results_list[row_index].data_id
-                    lr = shared.exp.list[data_id].loading_rates
-                    progressbar_range += len(lr) * 2
-                elif shared.exp.dfs_mode == "groups":
-                    group_id = row_index + 1
-                    for i in range(len(shared.exp.results_list)):
-                        if group_id == shared.exp.results_list[i].group:
-                            data_id = shared.exp.results_list[i].data_id
-                            lr = shared.exp.list[data_id].loading_rates
-                            progressbar_range += len(lr) * 2
-
-            widgets_list.widget_progressbar.set_range(0, progressbar_range)
-
-            results_util = results_sorting.GetResults()
-
-            if shared.exp.dfs_mode == "single":
-                for item in table:
-                    row_index = item.row()
-                    result_id = shared.exp.results_list[row_index].result_id
-                    res = results_util.get_results_single(
-                        result_id=result_id,
-                        force_type="loading_rates")
-                    array, values = res[0], res[1]
-                    median_lr = values[1]
-                    median_force = numpy.median(array[0])
-                    medians_force.append(median_force * 1e-12)
-                    medians_lr.append(median_lr * 1e-12)
-
-            if shared.exp.dfs_mode == "groups":
-                res = results_util.get_results_groups(
-                    force_type="loading_rates")
-                groups, values = res[0], res[1]
-
-                for item in table:
-                    row_index = item.row()
-                    group_id = row_index + 1
-                    if groups[group_id] != [[], []]:
-                        val = groups[group_id][0]
-                        medians_force.append(numpy.median(val) * 1e-12)
-                        medians_lr.append(values[group_id][1] * 1e-12)
-
-            # F = KBT/x * ln ( r * x / KBTku )
-
-            # F = KBT/x * [ ln (r) + ln ( x/KBTku) ]
-            # F = KBT/x * ln (r) + KBT / x [ ln ( x/KBTku) ]
-            # F = a * ln(r) + b
-            # a = KBT/x and b = KBT / x [ ln ( x/KBTku) ]
-
-            # a = KBT/x --> x = KBT/a
-            #
-            # b = KBT / x [ ln ( x/KBTku) ]
-            # exp(bx/KBT) =  x/KBTku
-            # ku = x/KBT*exp(-bx/KBT)
-
-            T = shared.exp.list[0].temperature
-
-            medians_force = numpy.sort(medians_force, -1)
-            medians_lr = numpy.sort(medians_lr, -1)
-
-            if len(medians_lr) > 0:
-                # Get a fit
-                coeffs, _ = \
-                    math_tools.fit_linear(numpy.log(medians_lr), medians_force)
-
-                x = (T * KB) / coeffs[0]
-                ku = (x / (KB * T)) * math.exp((-coeffs[1] * x) / (KB * T))
-
-                # a, b, minx, maxx, displayed = True
-                coeffs, _ = math_tools.fit_linear(medians_lr, medians_force)
-                params = [coeffs[0], coeffs[1] * 1e12,
-                          numpy.amin(medians_lr) * 1e12,
-                          numpy.amax(medians_lr) * 1e12,
-                          True]
-                result = [x, ku]
-
-                if shared.exp.dfs_mode == "single":
-                    shared.exp.list_dfs_single_fits.append(params)
-                    shared.exp.list_dfs_single_results.append(result)
-                elif shared.exp.dfs_mode == "groups":
-                    shared.exp.list_dfs_groups_fits.append(params)
-                    shared.exp.list_dfs_groups_results.append(result)
-
-                self.update_widget()
-
-                # Update plot (display fits)
-                if shared.exp.dfs_mode == "single":
-                    widgets_list.widget_results_single.update_MPL()
-                elif shared.exp.dfs_mode == "groups":
-                    widgets_list.widget_results_groups.update_MPL()
-
-            # Close progressbar
-            widgets_list.widget_progressbar.close()
+            if shared.exp.results_type != "loading_rates":
+                QtWidgets.QMessageBox.warning(
+                    self, "DFS", "Display the loading rates in the plots "
+                    "tab to fit them.")
+                return
+            nbr_bins = self.IN_bins.get_int_value() or 10
+            result = dfs_tools.new_fit(mode, self.method(), nbr_bins)
+            if isinstance(result, str):
+                QtWidgets.QMessageBox.warning(self, "DFS", result)
+                return
+            dfs_tools.get_fits(mode).append(result)
+            self.update_widget()
+            self.update_plot()
 
         elif button == "GRP_buttons":
             if self.GRP_buttons.checkedId() == 0:
                 shared.exp.dfs_mode = "single"
             elif self.GRP_buttons.checkedId() == 1:
                 shared.exp.dfs_mode = "groups"
-
             self.update_widget()
 
         elif button == "remove":
-            table = self.tableWidget.selectionModel().selectedRows()
-            rows_to_delete = []
-            for item in table:
-                rows_to_delete.append(item.row())
-
-            # It depends which way you have selected
-            # so I need to sort the index array :
-            rows_to_delete = \
-                numpy.sort(numpy.unique(rows_to_delete), -1)[::-1].tolist()
-
-            for row_to_delete in rows_to_delete:
-                self.tableWidget.removeRow(row_to_delete)
-                if shared.exp.dfs_mode == "single":
-                    del shared.exp.list_dfs_single_fits[row_to_delete]
-                    del shared.exp.list_dfs_single_results[row_to_delete]
-                    widgets_list.widget_results_single.update_MPL()
-                elif shared.exp.dfs_mode == "groups":
-                    del shared.exp.list_dfs_groups_fits[row_to_delete]
-                    del shared.exp.list_dfs_groups_results[row_to_delete]
-                    widgets_list.widget_results_groups.update_MPL()
+            rows = sorted({item.row() for item in
+                           self.tableWidget.selectionModel().selectedRows()},
+                          reverse=True)
+            fits = dfs_tools.get_fits(mode)
+            for row in rows:
+                del fits[row]
+                olds = getattr(shared.exp, "list_dfs_" + mode + "_results")
+                if row < len(olds):
+                    del olds[row]
+            self.update_widget()
+            self.update_plot()
 
     def update_widget(self):
-        """update the GUI."""
-        # Check the right radio button
-        if shared.exp.dfs_mode == "single":
+        """Update the GUI."""
+        mode = shared.exp.dfs_mode
+        if mode == "single":
             self.RBT_single.setChecked(True)
-            length = len(shared.exp.list_dfs_single_fits)
-        elif shared.exp.dfs_mode == "groups":
+        else:
             self.RBT_groups.setChecked(True)
-            length = len(shared.exp.list_dfs_groups_fits)
 
-        # Remove old rows from current table
-        for i in range(self.tableWidget.rowCount(), -1, -1):
-            self.tableWidget.removeRow(i)
+        # For the DFS, the replicates are the speeds
+        what = "speed" if mode == "groups" else "file"
+        self.list_method.setItemText(0, "Medians per " + what)
+        self.IN_bins.setEnabled(self.method() == "binned")
+        nbr = len(dfs_tools.get_items(mode))
+        self.LB_info.setText(
+            "Fit F = (kBT/x) ln(r x / (kBT koff)) on the " + what + "s "
+            "displayed in the plot (" + str(nbr) + " " + what +
+            ("s" if nbr != 1 else "") + ").")
 
-        for i in range(length):
+        fits = dfs_tools.get_fits(mode)
+        self.tableWidget.setRowCount(0)
+        for i, fit in enumerate(fits):
             self.tableWidget.insertRow(i)
             self.tableWidget.setRowHeight(i, 25)
 
-            # Checkbox
-            if shared.exp.dfs_mode == "single":
-                display = shared.exp.list_dfs_single_fits[i][4]
-                xvalue = shared.exp.list_dfs_single_results[i][0] * 1e9
-                kuvalue = shared.exp.list_dfs_single_results[i][1]
-            elif shared.exp.dfs_mode == "groups":
-                display = shared.exp.list_dfs_groups_fits[i][4]
-                xvalue = shared.exp.list_dfs_groups_results[i][0] * 1e9
-                kuvalue = shared.exp.list_dfs_groups_results[i][1]
-
             cb = gui_tools.CenteredCellCheckbox(self, "display_fit", i)
             self.tableWidget.setCellWidget(i, 0, cb)
-            self.tableWidget.cellWidget(i, 0).checkbox.setChecked(display)
+            cb.checkbox.setChecked(bool(fit.get("display")))
+            cb.setEnabled(fit["method"] != "old")
 
-            # x
-            label = QtWidgets.QLabel()
-            label.setFont(self.parent.parent.smallfont)
-            label.setText(str(xvalue))
-            centered_label = gui_tools.CenteredCellwidget(label)
-            self.tableWidget.setCellWidget(i, 1, centered_label)
+            if fit["method"] == "old":
+                method = "Old fit (not drawn)"
+            elif fit["method"] == "binned":
+                method = "Binned (" + str(fit["nbr_bins"]) + " bins)"
+            else:
+                method = "Medians"
+            texts = [method, number(fit.get("nbr_points")),
+                     number(fit["x"] * 1e9, fit["sx"] * 1e9),
+                     number(fit["koff"], fit["skoff"]),
+                     number(fit.get("r2"))]
+            tooltip = self.tooltip(fit)
+            for col, text in enumerate(texts, start=1):
+                label = QtWidgets.QLabel(text)
+                label.setFont(self.smallfont)
+                label.setToolTip(tooltip)
+                self.tableWidget.setCellWidget(
+                    i, col, gui_tools.CenteredCellwidget(label))
 
-            # ku
-            label = QtWidgets.QLabel()
-            label.setFont(self.parent.parent.smallfont)
-            label.setText(str(kuvalue))
-            centered_label = gui_tools.CenteredCellwidget(label)
-            self.tableWidget.setCellWidget(i, 2, centered_label)
+    @staticmethod
+    def tooltip(fit):
+        """Details of a fit."""
+        if fit["method"] == "old":
+            return ("Fit of an older version of pyAF (its forces and loading "
+                    "rates were sorted separately: the values are not "
+                    "reliable).")
+        temps = fit["temperatures"]
+        temp = number(fit["temperature"] - 273.15) + " °C"
+        if temps[1] - temps[0] > 0.01:
+            temp += " (mean of " + number(temps[0] - 273.15) + " to " + \
+                number(temps[1] - 273.15) + " °C)"
+        text = ("F = a ln(r) + b (F in N, r in N/s)\n"
+                "a = " + number(fit["a"], fit["sa"]) + " N\n"
+                "b = " + number(fit["b"], fit["sb"]) + " N\n"
+                "x = kBT / a = " + number(fit["x"] * 1e9, fit["sx"] * 1e9) +
+                " nm\nkoff = exp(-b/a) / a = " +
+                number(fit["koff"], fit["skoff"]) + " s⁻¹\n"
+                "R² = " + number(fit["r2"]) + ", T = " + temp + "\n" +
+                str(fit["nbr_points"]) + " points, " +
+                str(fit["nbr_events"]) + " events")
+        if fit["nbr_negative"]:
+            text += "\n" + str(fit["nbr_negative"]) + \
+                " events with a loading rate ≤ 0 not used (log)"
+        if fit["a"] <= 0:
+            text += ("\nThe force does not increase with the loading rate "
+                     "(a ≤ 0): no x and koff")
+        if fit["nbr_points"] < 3:
+            text += "\nNo standard errors with 2 points"
+        return text
 
     def checkbox_clicked(self, checkbox, row):
-        """Called when a checkbox is clicked.
-
-        Hides or displays a DFS fit.
-        """
+        """Hides or displays a fit."""
         if checkbox == "display_fit":
+            row = int(row)
             value = self.tableWidget.cellWidget(row, 0).checkbox.isChecked()
-
-            if shared.exp.dfs_mode == "single":
-                shared.exp.list_dfs_single_fits[row][4] = value
-                widgets_list.widget_results_single.update_MPL()
-            elif shared.exp.dfs_mode == "groups":
-                shared.exp.list_dfs_groups_fits[row][4] = value
-                widgets_list.widget_results_groups.update_MPL()
+            dfs_tools.get_fits(shared.exp.dfs_mode)[row]["display"] = value
+            self.update_plot()

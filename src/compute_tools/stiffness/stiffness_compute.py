@@ -45,8 +45,9 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
         None, [i, j], app, ret, mode="compute", dt=dt)
 
     # Get POC
-    poc_index_before, real_poc, final_fit, _ = search_poc.get_POC(
+    poc_index_before, real_poc, final_fit, fit_segment = search_poc.get_POC(
         app, dt["approach_position"], fit_params)
+    found = search_poc.poc_found(fit_segment)
 
     # Get force curve
     curve_x = app[0]
@@ -57,7 +58,11 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
         dt["spring_constant"])
 
     piez = dt["piezo_image"]
-    poc_corrected = piez + curve_x[len(curve_x) - 1] - real_poc[0]
+    if found:
+        poc_corrected = piez + curve_x[len(curve_x) - 1] - real_poc[0]
+    else:
+        # No POC: no topography value
+        poc_corrected = numpy.nan
 
     # Get stiffness
     segment = slice(poc_index_before, len(resforce[1]))
@@ -66,12 +71,10 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
     curve_x[0] = 0
     curve_y[0] = 0
 
-    indentation_val = 0
+    # Indentation reached, up to the selected stop (if any)
+    indentation_val = numpy.max(curve_x)
     if o_params["indentation_stop"] != 0:
-        indentation_val = o_params["indentation_stop"]
-    
-    else:
-        indentation_val = numpy.max(curve_x)
+        indentation_val = min(o_params["indentation_stop"], indentation_val)
 
     parts = segment_curve(
         curve_x,
@@ -80,18 +83,14 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
         o_params["indentation_stop"],
         o_params["indentation_step"])
 
-    if o_params["model_selected"] == 3:
-        # For the linear fit (slope model), pass all the curve
-        curve = [curve_x, curve_y]
-    else:
-        curve = None
+    # The slope of each segment is fitted on all its points
+    curve = [curve_x, curve_y]
 
-    stiffness_array = compute_stiffness(
-        parts,
-        o_params["coeff"],
-        o_params["model_selected"],
-        o_params["tomography"],
-        curve)
+    if found:
+        stiffness_array = compute_stiffness(parts, curve)
+    else:
+        # No POC: no stiffness value (the default POC is not a measure)
+        stiffness_array = []
 
     return i, j, poc_index_before, real_poc, final_fit, stiffness_array, \
            poc_corrected, smoothing_error, indentation_val
@@ -106,14 +105,16 @@ def get_x_parts(start, stop, step, max_x):
     nbr_segments = 0
     newstop = 0
 
-    # No step, no stop, take whole indentation curve
-    if step == 0 and stop == 0:
-        parts_x.append(start)
-        parts_x.append(max_x)
-        if start >= max_x:
+    # No step: a single segment, up to the stop (or the whole indentation
+    # if there is no stop, or if the stop is not attained)
+    if step == 0:
+        end = max_x if stop == 0 else min(stop, max_x)
+        if start >= end:
             # Very rare case were the poc is set as the last point of the curve
             # Then we return no segment
             return []
+        parts_x.append(start)
+        parts_x.append(end)
         return parts_x
 
     # All existing segments from start to end
@@ -171,83 +172,36 @@ def segment_curve(curve_x, curve_y, start, stop, step):
     return [parts_x, parts_y]
 
 
-def compute_stiffness(parts, coeff, model_selected, tomography, curve):
-    """Computes the actual stiffness for each segment.
-    Returns an array of stiffness (slope) values for model 3 and Young moduli for the others.
-    """
+def compute_stiffness(parts, curve):
+    """Stiffness tomography: slope (stiffness) of each segment of the curve,
+    fitted on all the points of the segment (linear least squares)."""
     parts_x = parts[0]
     parts_y = parts[1]
     stiffness_array = []
 
     if parts_x:
-        if model_selected != 3:
-            for i in range(len(parts_x) - 1):
-                if tomography:
-                    delta_F = parts_y[i + 1] - parts_y[i]
-                    delta_x = (parts_x[i + 1] - parts_x[i]) * 1e-9
-                else:
-                    delta_F = parts_y[i + 1] - parts_y[0]
-                    delta_x = (parts_x[i + 1] - parts_x[0]) * 1e-9
+        curve_x = curve[0]
+        curve_y = curve[1]
 
-                if model_selected == 0:
-                    # Hertz with sphere
-                    young_modulus = coeff * (delta_F / (delta_x ** 1.5))
-                elif model_selected in (1, 2):
-                    # Hertz with cone (1) or Pyramid (2)
-                    young_modulus = coeff * (delta_F / (delta_x ** 2))
-                elif model_selected == 4:
-                    # Flat punch
-                    young_modulus = coeff * (delta_F / delta_x)
+        # Advance count so that curve_x[count] >= parts_x[0]
+        count = 0
+        while count < len(curve_x) and curve_x[count] < parts_x[0]:
+            count += 1
 
-                stiffness_array.append(young_modulus)
+        for i in range(len(parts_x) - 1):
+            seg_x = []
+            seg_y = []
+            # Collect points from the curve until reaching the segment end
+            while count < len(curve_x) and curve_x[count] < parts_x[i + 1]:
+                seg_x.append(curve_x[count] * 1e-9)
+                seg_y.append(curve_y[count])
+                count += 1
+            # Append the boundary point from parts data
+            seg_x.append(parts_x[i + 1] * 1e-9)
+            seg_y.append(parts_y[i + 1])
 
-        elif model_selected == 3:
-            curve_x = curve[0]
-            curve_y = curve[1]
-
-            if tomography:
-                # When tomography is True: use sliding segments from parts_x[i] to parts_x[i+1]
-                count = 0
-                # Advance count so that curve_x[count] >= parts_x[0]
-                while count < len(curve_x) and curve_x[count] < parts_x[0]:
-                    count += 1
-
-                for i in range(len(parts_x) - 1):
-                    seg_x = []
-                    seg_y = []
-                    # Collect points from the curve until reaching the current segment end
-                    while count < len(curve_x) and curve_x[count] < parts_x[i + 1]:
-                        seg_x.append(curve_x[count] * 1e-9)
-                        seg_y.append(curve_y[count])
-                        count += 1
-                    # Append the boundary point from parts data
-                    seg_x.append(parts_x[i + 1] * 1e-9)
-                    seg_y.append(parts_y[i + 1])
-
-                    coeffs, _ = math_tools.fit_linear(seg_x, seg_y)
-                    # Slope is the stiffness
-                    stiffness_array.append(coeffs[0])
-            else:
-                # When tomography is False: every segment starts at parts_x[0]
-                # Find the starting index corresponding to parts_x[0] in curve_x
-                start_idx = 0
-                while start_idx < len(curve_x) and curve_x[start_idx] < parts_x[0]:
-                    start_idx += 1
-
-                for i in range(len(parts_x) - 1):
-                    seg_x = []
-                    seg_y = []
-                    j = start_idx
-                    # Use all points from the beginning until parts_x[i+1]
-                    while j < len(curve_x) and curve_x[j] < parts_x[i + 1]:
-                        seg_x.append(curve_x[j] * 1e-9)
-                        seg_y.append(curve_y[j])
-                        j += 1
-                    seg_x.append(parts_x[i + 1] * 1e-9)
-                    seg_y.append(parts_y[i + 1])
-
-                    coeffs, _ = math_tools.fit_linear(seg_x, seg_y)
-                    stiffness_array.append(coeffs[0])
+            coeffs, _ = math_tools.fit_linear(seg_x, seg_y)
+            # Slope is the stiffness
+            stiffness_array.append(coeffs[0])
 
     return stiffness_array
-

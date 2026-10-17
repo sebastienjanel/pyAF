@@ -37,12 +37,13 @@ You can export your results to a folder.
 
 import copy
 import os
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from .. import consts
+from .. import experiment
 from .. import shared
 from .. import widgets_list
-from ..tools import export, misc_tools, stat_tools
+from ..tools import export, gui_tools, misc_tools, palettes, stat_tools
 
 
 def duplicate_results():
@@ -63,9 +64,12 @@ def duplicate_results():
 
         # Change the name
         newresult.name = result.name + " (Copy)"
+        newresult.short_name = experiment.get_short_name(result) + " (Copy)"
 
         # Append to the results list
         shared.exp.results_list.append(newresult)
+
+    experiment.apply_palette(shared.exp)
 
     # Update the table and the values
     widget.reset_table()
@@ -101,7 +105,10 @@ def rename_result():
         shared.exp.results_list[result_id].name = newname
 
         # Update the GUI
-        widget.tableWidget.cellWidget(result_id, 0).item.setText(newname)
+        column = widget.columns.get_column("File")
+        if column.visibility:
+            widget.tableWidget.cellWidget(
+                result_id, column.position).item.setText(newname)
         widget.update_MPL()
 
 
@@ -137,6 +144,7 @@ def remove_result():
             # Shift indices
             for i in range(len(shared.exp.results_list)):
                 shared.exp.results_list[i].result_id = i
+            experiment.apply_palette(shared.exp)
 
             # Update GUI
             widget.reset_table()
@@ -189,7 +197,8 @@ def export_results(mode):
             export.export_results_r(folder)
 
         QtWidgets.QApplication.beep()
-        QtWidgets.QMessageBox.warning(widget, "Information", "Exporting done.")
+        gui_tools.show_success(widget, "Export complete",
+                               "Results exported to " + str(folder))
 
 
 def change_color():
@@ -228,9 +237,17 @@ def change_color():
             if color is not False:
                 if tab == 3:
                     shared.exp.results_list[row_id].color = color
+                    # The colors do not follow a palette anymore
+                    experiment.get_violin_options(shared.exp)["palette"] = \
+                        palettes.CUSTOM
+                    widgets_list.widget_violin_options_single.update_widget()
                 elif tab == 4:
                     # Skip group 0 == None group
                     shared.exp.groups_list[row_id + 1].color = color
+                    # The colors do not follow a palette anymore
+                    experiment.get_violin_options(
+                        shared.exp, "groups")["palette"] = palettes.CUSTOM
+                    widgets_list.widget_violin_options_groups.update_widget()
 
         # Update the plot
         if tab == 3:

@@ -33,7 +33,7 @@
 
 import pickle
 import shutil
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 from ... import consts
 from ... import shared
@@ -69,7 +69,7 @@ def save_layers(parent):
 
         # Save a global file
         nbr_layers = len(shared.layer_list)
-        global_file = open(folder + "/global.txt", "wb")
+        global_file = open(folder + "/global.txt", "w")
         global_file.write("nbr_layers=" + str(nbr_layers))
         global_file.close()
 
@@ -161,6 +161,11 @@ def save_layers(parent):
 
             if layer.type == "isosurface":
                 to_save["isosurf_orig_layer_id"] = layer.isosurf_orig_layer_id
+
+            if layer.type == "glass":
+                # File and substrate ROI of the substrate
+                to_save["afm_id"] = layer.afm_id
+                to_save["roi_id"] = layer.roi_id
 
             # Save layer's parameters
             path = folder + "/layer_" + str(i) + ".txt"

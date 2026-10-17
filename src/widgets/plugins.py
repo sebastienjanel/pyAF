@@ -33,7 +33,7 @@
 
 import os
 import logging
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools import misc_tools
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFButton

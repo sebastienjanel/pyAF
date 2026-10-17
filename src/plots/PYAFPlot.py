@@ -33,10 +33,11 @@
 
 from .. import shared
 from .. import widgets_list
-from PyQt5 import QtCore, QtWidgets
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from qtpy import QtCore, QtWidgets
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib
+from .plot_main import CURVE_MAP_TYPES, get_map_next_to_curve
 from .meshgrids.piezo_meshgrid import PlotPiezoMeshGrid
 from .meshgrids.topo_meshgrid import PlotTopoMeshGrid
 from .meshgrids.stiffness_meshgrid import PlotStiffnessMeshGrid
@@ -45,6 +46,7 @@ from .meshgrids.stiffness_slice_meshgrid import PlotStiffnessSliceMeshGrid
 from .meshgrids.stiffness_slice_corr_meshgrid import \
     PlotStiffnessSliceCorrMeshGrid
 from .meshgrids.work_meshgrid import PlotWorkMeshGrid
+from .meshgrids.visco_meshgrid import PlotViscoMeshGrid
 from .meshgrids.rupture_force1_meshgrid import PlotRuptureForce1MeshGrid
 from .meshgrids.rupture_force2_meshgrid import PlotRuptureForce2MeshGrid
 from .meshgrids.events_per_curve_meshgrid import PlotEventsPerCurveMeshGrid
@@ -55,8 +57,7 @@ from .meshgrids.empty_meshgrid import PlotEmptyMeshGrid
 from .meshgrids.tilt_check import PlotTiltCheckMeshGrid
 from .results.single import PlotSingleResults
 from .results.groups import PlotGroupedResults
-from .results.experiment import PlotExperimentResults
-from .results.stats import PlotExperimentStats
+from .results.superplot import PlotSuperPlot
 from .slices.plot_slices import PlotSlices
 from .events_per_scan.plot_events_per_scan import PlotEventsPerScan
 from .profiles.plot_profiles import PlotProfiles
@@ -67,6 +68,7 @@ from .curves.tilt_correction import PlotTiltPreview
 from .curves.data.data import PlotDataCurve
 from .curves.data.data_a import PlotDataCurveA
 from .curves.data.data_b import PlotDataCurveB
+from .curves.data.data_force import PlotDataCurveForce
 
 # Compute tab =================================================================
 
@@ -96,6 +98,7 @@ from .curves.results.force_dist import ResultsForceDist
 from .curves.results.indentation import ResultsIndentation
 # Residuals
 from .curves.results.residuals import ResultsResiduals
+from .curves.results.visco import ResultsVisco
 
 # Events
 from .curves.results.force_events import ResultsForceEvents
@@ -162,6 +165,11 @@ class PYAFPlot(FigureCanvasQTAgg):
         self.timer2 = None
         self.timer2a = None
 
+        # Alignment of a curve on the map next to it, after a resize
+        self.align_timer = QtCore.QTimer(self)
+        self.align_timer.setSingleShot(True)
+        self.align_timer.timeout.connect(self.align_with_map)
+
         if min_size is not None:
             # Force the usage of a minimun size (used for multimeshgrids)
             self.setMinimumSize(min_size[0], min_size[1])
@@ -201,6 +209,10 @@ class PYAFPlot(FigureCanvasQTAgg):
         # For multimeshgrid, use the multimeshgrid's type
         if self.plot_type == "multimeshgrid":
             self.mesh_type = shared.exp.multi_meshgrid_type
+        elif self.plot_type == "meshgrid_data":
+            # The map on the data tab is always the piezo height, whatever
+            # the type of map selected on the results tab
+            self.mesh_type = "piezo"
         else:
             self.mesh_type = dt.meshgrid_type
 
@@ -238,6 +250,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                 self.canvas = PlotStiffnessCorrMeshGrid(self)
             elif mesh == "stiffness_corr_slice" and dt.stiffness_corrected:
                 self.canvas = PlotStiffnessSliceCorrMeshGrid(self)
+            elif mesh.startswith("visco_") and dt.visco_calculated:
+                self.canvas = PlotViscoMeshGrid(self)
             else:
                 # Plot an empty meshgrid
                 self.canvas = PlotEmptyMeshGrid(self)
@@ -250,7 +264,8 @@ class PYAFPlot(FigureCanvasQTAgg):
               and dt.is_single is False):
             self.canvas = PlotFlattenMeshGrid(self)
         elif (p_type in ("curve_results", "fit_preview",
-                         "tilt_curve_preview", "curve_data", "curve_dataa", "curve_datab")):
+                         "tilt_curve_preview", "curve_data", "curve_dataa", "curve_datab",
+                         "curve_datac")):
             ct = shared.exp.compute_type
             if p_type == "curve_data":
                 self.canvas = PlotDataCurve(self)
@@ -258,9 +273,17 @@ class PYAFPlot(FigureCanvasQTAgg):
                 self.canvas = PlotDataCurveA(self)
             elif p_type == "curve_datab":
                 self.canvas = PlotDataCurveB(self)
+            elif p_type == "curve_datac":
+                self.canvas = PlotDataCurveForce(self)
             elif p_type == "tilt_curve_preview":
                 self.canvas = PlotTiltPreview(self)
             elif p_type == "curve_results":
+                # The curve type can be applied from another file (apply to
+                # all) where it is available: display the deflection -
+                # extension curve if the results are missing for this file
+                if not curve_type_available(dt, c_type):
+                    c_type = "defl_ext"
+
                 if c_type == "defl_ext":
                     self.canvas = ResultsDeflExt(self)
                 elif c_type == "force_ext":
@@ -273,6 +296,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ResultsForceEvents(self)
                 elif c_type == "residuals":
                     self.canvas = ResultsResiduals(self)
+                elif c_type == "visco":
+                    self.canvas = ResultsVisco(self)
             elif p_type == "fit_preview":
                 if ct == "stiffness":
                     self.canvas = ComputeStiffness(self)
@@ -291,14 +316,14 @@ class PYAFPlot(FigureCanvasQTAgg):
                             self.canvas = ComputeEventsDetectionMSF(self)
                 elif ct == "loading_rates":
                     self.canvas = ComputeLoadingRates(self)
+                elif ct == "viscoelasticity":
+                    self.canvas = ResultsVisco(self)
         elif p_type == "results_single":
                 self.canvas = PlotSingleResults(self)
         elif p_type == "results_groups":
             self.canvas = PlotGroupedResults(self)
         elif p_type == "results_experiment":
-            self.canvas = PlotExperimentResults(self)
-        elif p_type == "results_stats":
-            self.canvas = PlotExperimentStats(self)
+            self.canvas = PlotSuperPlot(self)
         elif p_type == "meshgrid_slices":
             self.canvas = PlotSlices(self)
         elif p_type == "events_per_scan":
@@ -361,7 +386,22 @@ class PYAFPlot(FigureCanvasQTAgg):
             self.resize_timer.start(self.timeout)
             self.timer_is_running = True
 
+        # A curve next to a map is not replotted when resized: align it
+        # again on the map (e.g. at startup the map can be drawn before the
+        # curve has its final size)
+        if p_type in CURVE_MAP_TYPES:
+            self.align_timer.start(self.timeout)
+
         super().resizeEvent(ev)
+
+    def align_with_map(self):
+        """Align a curve on the map displayed next to it."""
+        plot = self.canvas
+        if not hasattr(plot, "align_with_map"):
+            return
+        plot.fig.tight_layout()
+        plot.align_with_map(get_map_next_to_curve(self.plot_type))
+        self.draw_idle()
 
     def delayed_update(self):
         """Update the plots after a certain delay.
@@ -371,3 +411,19 @@ class PYAFPlot(FigureCanvasQTAgg):
         self.timer_is_running = False
         self.resize_timer.stop()
         self.update_plot()
+
+
+def curve_type_available(data, curve_type):
+    """True if the results needed for the curve type are computed."""
+    if curve_type == "force":
+        return (data.stiffness_calculated or
+                data.work_and_rupture_force1_calculated)
+    if curve_type == "indentation":
+        return data.stiffness_calculated
+    if curve_type == "results_force_events":
+        return data.events_calculated
+    if curve_type == "residuals":
+        return data.stiffness_calculated and data.used_perform_fit
+    if curve_type == "visco":
+        return data.visco_calculated
+    return True

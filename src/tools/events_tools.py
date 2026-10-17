@@ -276,8 +276,14 @@ def find_fits_around_middle_pos(curve, positions, fit_size):
                 # +1 because it can happen that effective_length == length
                 # We need at least 2 values to make a fitting segment.
                 effective_length = positions[k + 1][1] - pos + 1
+        # Check if we go out of the boundaries of the curve (on the right),
+        # and keep at least one point for the fit near the end of the curve
+        points_right = len(curve_y) - pos
+        if effective_length > points_right:
+            effective_length = points_right
+        right_step = min(step, points_right - 1)
 
-        seg_right_fit_base = [pos + step, pos + effective_length]
+        seg_right_fit_base = [pos + right_step, pos + effective_length]
         seg_right_fit = [pos, pos + effective_length]
         segment_right = slice(seg_right_fit_base[0], seg_right_fit_base[1])
 
@@ -332,7 +338,6 @@ def find_fits_around_middle_pos(curve, positions, fit_size):
         # correct to false, and define a new effective_length
         for a in range(int(pos), int(pos + effective_length), 1):
             ref = 0
-            # print(f"Out of bounds: a={a}, pos_start={pos_start}")
             current = curve_y[a] - curve_y[pos_start]
             delta2 = abs(2 * (curve_y[pos_start] - curve_y[pos_end]))
             # Case up
@@ -350,9 +355,9 @@ def find_fits_around_middle_pos(curve, positions, fit_size):
             # If the correction is too strong, use a default fit size of
             # step + 1
             if effective_length <= step:
-                effective_length = step + 1
+                effective_length = min(step + 1, points_right)
             # Define new right fits in case we need to correct the fit.
-            seg_right_fit_base = [pos + step, pos + effective_length]
+            seg_right_fit_base = [pos + right_step, pos + effective_length]
             seg_right_fit = [pos, pos + effective_length]
             segment_right = slice(seg_right_fit_base[0], seg_right_fit_base[1])
 
@@ -368,7 +373,7 @@ def find_fits_around_middle_pos(curve, positions, fit_size):
         # less than the step size.
         while coeffs_right[0] < -0.0001 and effective_length > step + 1:
             effective_length -= 1
-            seg_right_fit_base = [pos + step, pos + effective_length]
+            seg_right_fit_base = [pos + right_step, pos + effective_length]
             seg_right_fit = [pos, pos + effective_length]
             segment_right = slice(seg_right_fit_base[0], seg_right_fit_base[1])
             seg1_x = curve_x[segment_right]
@@ -482,7 +487,7 @@ def apply_msf(curve_x, curve_y, window_size):
     d is the difference between the differences between the 2 fits and the data
     points.
     """
-    window_size = int(numpy.fix(window_size / 2) * 2)
+    window_size = int(numpy.trunc(window_size / 2) * 2)
 
     l1 = int(window_size / 2.0)
     d = []

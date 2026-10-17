@@ -31,18 +31,19 @@
 
 """Plots events per scan."""
 
+import numpy
 from ...tools import results_sorting
 from ... import shared
+from ...experiment import get_short_name
 from ..plot_main import MainPlot
 
 
 class PlotEventsPerScan(MainPlot):
     """Plots events per scan.
 
-    For each event a red dot is plotted, so that the user can compare the
-    number of events per scan. The plotted events are coming from the
-    results single table, and are therefore filtered by the user, so that
-    only the wanted events are taken into account.
+    For each ticked row of the table of the plots tab, a red dot shows its
+    number of events, with the same filters, ROI and discarded curves as
+    its values (the n of Events force).
     """
 
     def __init__(self, parent):
@@ -50,14 +51,13 @@ class PlotEventsPerScan(MainPlot):
 
         ev_per_scan = []
 
-        res_util = results_sorting.GetResults(force_type="events_per_curve")
-
-        for i in range(len(shared.exp.results_list)):
-            data_id = shared.exp.results_list[i].data_id
-            if shared.exp.results_list[i].display:
-                res_util.load_data(data_id=data_id)
-                nbr = res_util.count_events_per_scan()
-                ev_per_scan.append([i, nbr, shared.exp.list[data_id].filename])
+        for i, result in enumerate(shared.exp.results_list):
+            if result.display:
+                res_util = results_sorting.GetResults()
+                per_curve = res_util.get_results_single(
+                    result_id=i, force_type="events_per_curve")[0]
+                nbr = int(numpy.sum(per_curve))
+                ev_per_scan.append([i, nbr, get_short_name(result)])
 
         xlabels_indexes = []
         xlabels_names = []

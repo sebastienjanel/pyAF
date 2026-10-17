@@ -32,7 +32,7 @@
 """Tools used to do some statistics and further results sorting."""
 
 import numpy
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from .. import widgets_list
 from .. import shared
 from ..tools import results_sorting
@@ -46,21 +46,13 @@ if module_exists("scipy"):
 
 def get_values():
     """Fetch the results and fill the shared arrays with the values."""
-    # Reset the pdfs, these need to be recalculated
-    shared.single_pdfs_x = None
-    shared.single_pdfs_y = None
-    shared.groups_pdfs_x = None
-    shared.groups_pdfs_y = None
-    shared.conditions_pdfs_x = None
-    shared.conditions_pdfs_y = None
-
     # Display a progressbar (use loading progressbar at load or
     # create a new one for the refreshing button).
     new_bar = False
     if widgets_list.widget_progressbar is None:
         new_bar = True
         Progressbar()
-    widgets_list.widget_progressbar.set_label("Refreshing histograms")
+    widgets_list.widget_progressbar.set_label("Refreshing plots")
     if new_bar:
         # Get the range of the progressbar
         progressbar_range = misc_tools.get_hist_refresh_range(shared.exp)
@@ -81,470 +73,56 @@ def get_values():
 
         # For the plots
         shared.single_data.append(array)
-        shared.single_values.append(values)
+        shared.single_values.append(list(values))
+
+    update_single_modes()
 
     if new_bar:
         widgets_list.widget_progressbar.close()
 
 
-def get_range(mode, themax, data):
-    """Define a range for the plots, depending on the option the user selected."""
-    if mode == "single":
-        if shared.exp.hist_single_x_mode == "auto":
-            r = (0, numpy.mean(data) * 3.0)
-        elif shared.exp.hist_single_x_mode == "max":
-            r = (0, themax)
-        elif shared.exp.hist_single_x_mode == "manual":
-            r = (shared.exp.hist_single_min_x, shared.exp.hist_single_max_x)
-    elif mode == "groups":
-        if shared.exp.hist_groups_x_mode == "auto":
-            r = (0, numpy.mean(data) * 3.0)
-        elif shared.exp.hist_groups_x_mode == "max":
-            r = (0, themax)
-        elif shared.exp.hist_groups_x_mode == "manual":
-            r = (shared.exp.hist_groups_min_x, shared.exp.hist_groups_max_x)
-    elif mode == "experiment":
-        if shared.exp.hist_experiment_x_mode == "auto":
-            r = (0, numpy.mean(data) * 3.0)
-        elif shared.exp.hist_experiment_x_mode == "max":
-            r = (0, themax)
-        elif shared.exp.hist_experiment_x_mode == "manual":
-            r = (shared.exp.hist_experiment_min_x, shared.exp.hist_experiment_max_x)
-
-    return r
-
-
-def get_bins(mode):
-    """Get the number of bins for the histograms."""
-    if mode == "single":
-        if shared.exp.hist_single_bins_mode == "manual":
-            bins = shared.exp.hist_single_bins
-        else:
-            bins = 10
-    elif mode == "groups":
-        if shared.exp.hist_groups_bins_mode == "manual":
-            bins = shared.exp.hist_groups_bins
-        else:
-            bins = 10
-    elif mode == "experiment":
-        if shared.exp.hist_experiment_bins_mode == "manual":
-            bins = shared.exp.hist_experiment_bins
-        else:
-            bins = 10
-    return int(bins)
-
-
-def get_bandwidth(mode):
-    """Get the bandwidth for the PDF fitting."""
-    if mode == "single":
-        if shared.exp.hist_single_bw_mode == "manual":
-            bandwidth = shared.exp.hist_single_bw
-        else:
-            bandwidth = None
-    elif mode == "groups":
-        if shared.exp.hist_groups_bw_mode == "manual":
-            bandwidth = shared.exp.hist_groups_bw
-        else:
-            bandwidth = None
-    elif mode == "experiment":
-        if shared.exp.hist_experiment_bw_mode == "manual":
-            bandwidth = shared.exp.hist_experiment_bw
-        else:
-            bandwidth = None
-
-    return bandwidth
-
-
-def get_frequencies(mode, i):
-    """Get the frequency of a value in the PDF."""
-    if mode == "single":
-        _, _, _, mode_index = shared.single_values[i]
-        pdf = shared.single_pdfs_y[i]
-    elif mode == "groups":
-        _, _, _, mode_index = shared.groups_values[i]
-        pdf = shared.groups_pdfs_y[i]
-    elif mode == "experiment":
-        _, _, _, _, mode_index = shared.conditions_values[i]
-        pdf = shared.conditions_pdfs_y[i]
-
-    return [numpy.mean(pdf), numpy.median(pdf), None, pdf[mode_index]]
-
-
-def get_pdf_and_mode(array, mode):
-    """Returns the probability density function and the mode."""
-    if not module_exists("scipy"):
-        return None, None, None
-
-    # Get a range
-    steps = 500.0
-    themax = int(numpy.amax(array))
-    step_x = themax / steps
-
-    # Get bandwidth. If set to None, the Scott's rule is used
-    bw = get_bandwidth(mode)
-
-    # Get a probability density function, and the mode
-    pdf = stats.kde.gaussian_kde(array, bw_method=bw)
-
-    newpdf_x = []
-    newpdf_y = []
-
-    for i in range(int(steps)):
-        newpdf_x.append(i * step_x)
-        try:
-            newpdf_y.append(pdf(i * step_x)[0])
-        except FloatingPointError:
-            newpdf_y.append(0)
-        widgets_list.widget_progressbar.update()
-
-    max_index = numpy.argmax(newpdf_y)
-
-    return numpy.array(newpdf_x), numpy.array(newpdf_y), max_index
-
-
-def update_counts(mode):
-    """Update the frequencies."""
-    if mode == "single" or mode == "all":
-        shared.single_factors = []
-        shared.single_frequencies = []
-
-        factors = []
-        frequencies = []
-
-        bins = get_bins("single")
-
-        for i in range(len(shared.single_data)):
-            data = shared.single_data[i]
-            if isinstance(data, numpy.ndarray) and data.size > 0:
-                # PDFS are computed on the whole range
-                hist_normed, _ = \
-                    numpy.histogram(data, bins=bins, density=True)
-                hist_normal, _ = \
-                    numpy.histogram(data, bins=bins, density=False)
-
-                # Get a ratio for the factor calculation.
-                # The factor is the link between the normed and non normed
-                # histogram. It will help multiply the PDF in the plots in case
-                # of a non-normed histogram
-
-                for j in range(len(hist_normal)):
-                    if hist_normal[j] != 0 and hist_normed[j] != 0:
-                        factor = hist_normal[j] / hist_normed[j]
-                        break
-
-                factors.append(factor)
-                counts = get_frequencies("single", i)
-
-                frequencies.append(counts)
-
-            else:
-                factors.append(1.0)
-                frequencies.append([0, 0, 0, 0])
-
-        shared.single_factors = factors
-        shared.single_frequencies = frequencies
-
-    if mode == "groups" or mode == "all":
-        # Groups
-        shared.groups_factors = []
-        shared.groups_frequencies = []
-
-        factors = []
-        frequencies = []
-
-        bins = get_bins("groups")
-
-        for i in range(len(shared.groups_data)):
-            data = shared.groups_data[i]
-            if isinstance(data, numpy.ndarray) and data.size > 0:
-                # PDFS are computed on the whole range
-                hist_normed, _ = \
-                    numpy.histogram(data, bins=bins, density=True)
-                hist_normal, _ = \
-                    numpy.histogram(data, bins=bins, density=False)
-
-                # Get a ratio for the factor calculation.
-                # The factor is the link between the normed and non normed
-                # histogram. It will help multiply the PDF in the plots in case
-                # of a non-normed histogram
-
-                for j in range(len(hist_normal)):
-                    if hist_normal[j] != 0 and hist_normed[j] != 0:
-                        factor = hist_normal[j] / hist_normed[j]
-                        break
-
-                factors.append(factor)
-                counts = get_frequencies("groups", i)
-
-                frequencies.append(counts)
-
-            else:
-                factors.append(1.0)
-                frequencies.append([0, 0, 0, 0])
-
-        shared.groups_factors = factors
-        shared.groups_frequencies = frequencies
-
-    if mode == "experiment" or mode == "all":
-        # Groups
-        shared.conditions_factors = []
-        shared.conditions_frequencies = []
-
-        factors = []
-        frequencies = []
-
-        bins = get_bins("experiment")
-
-        for i in range(len(shared.conditions_data)):
-            data = shared.conditions_data[i]
-            if isinstance(data, numpy.ndarray) and data.size > 0:
-                # PDFS are computed on the whole range
-                hist_normed, _ = \
-                    numpy.histogram(data, bins=bins, density=True)
-                hist_normal, _ = \
-                    numpy.histogram(data, bins=bins, density=False)
-
-                # Get a ratio for the factor calculation.
-                # The factor is the link between the normed and non normed
-                # histogram. It will help multiply the PDF in the plots in case
-                # of a non-normed histogram
-
-                for j in range(len(hist_normal)):
-                    if hist_normal[j] != 0 and hist_normed[j] != 0:
-                        factor = hist_normal[j] / hist_normed[j]
-                        break
-
-                factors.append(factor)
-                counts = get_frequencies("experiment", i)
-
-                frequencies.append(counts)
-
-            else:
-                factors.append(1.0)
-                frequencies.append([0, 0, 0, 0])
-
-        shared.conditions_factors = factors
-        shared.conditions_frequencies = frequencies
-
-
-def get_pdfs_and_modes(mode):
-    """Compute the PDF and the mode."""
-    if mode == "single":
-        shared.single_pdfs_x = []
-        shared.single_pdfs_y = []
-
-        # Create a progressbar, this operation is slow
-        prog_range = 0
-        for data in shared.single_data:
-            themin, themax = 0, 0
-            if shared.exp.results_type != "loading_rates":
-                if isinstance(data, numpy.ndarray) and data.size > 0:
-                    themin = numpy.amin(data)
-                    themax = numpy.amax(data)
-            else:
-                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], numpy.ndarray) and data[1].size > 0:
-                    themin = numpy.amin(data[1])
-                    themax = numpy.amax(data[1])
-            prog_range += int(themax - themin)
-
-        #Progressbar()
-        if not hasattr(widgets_list, "widget_progressbar") or widgets_list.widget_progressbar is None:
-            widgets_list.widget_progressbar = Progressbar()
-
-        widgets_list.widget_progressbar.set_label("Getting PDFs (single)")
-        widgets_list.widget_progressbar.set_range(0, prog_range)
-
-        for i in range(len(shared.single_data)):
-            data = shared.single_data[i]
-
-            if shared.exp.results_type != "loading_rates":
-                if isinstance(data, numpy.ndarray) and data.size > 0:
-                    pdf_x, pdf_y, mode_index = get_pdf_and_mode(data, "single")
-                    shared.single_pdfs_x.append(pdf_x)
-                    shared.single_pdfs_y.append(pdf_y)
-                    shared.single_values[i][3] = mode_index
-
-                else:
-                    shared.single_pdfs_x.append([])
-                    shared.single_pdfs_y.append([])
-
-            else:
-                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], numpy.ndarray) and data[1].size > 0:
-                    # 0 = forces, 1 = lr
-                    pdf_x, pdf_y, mode_index = get_pdf_and_mode(
-                        data[1], "single")
-
-                    shared.single_pdfs_x.append(pdf_x)
-                    shared.single_pdfs_y.append(pdf_y)
-                    shared.single_values[i][3] = mode_index
-
-                else:
-                    shared.single_pdfs_x.append([])
-                    shared.single_pdfs_y.append([])
-
-        widgets_list.widget_progressbar.close()
-
-    elif mode == "groups":
-        shared.groups_pdfs_x = []
-        shared.groups_pdfs_y = []
-
-        # Create a progressbar, this operation is slow
-        prog_range = 0
-        for i in range(len(shared.groups_data)):
-            data = shared.groups_data[i]
-
-            # Skip empty or None data
-            if data is None or len(data) == 0:
-                shared.groups_pdfs_x.append([])
-                shared.groups_pdfs_y.append([])
-                continue  # Skip to the next data entry
-
-            themin = 0
-            themax = 0
-            if shared.exp.results_type != "loading_rates":
-                if isinstance(data, numpy.ndarray) and data.size > 0:
-                    themin = numpy.amin(data)
-                    themax = numpy.amax(data)
-            else:
-                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
-                    themin = numpy.amin(data[1])
-                    themax = numpy.amax(data[1])
-            prog_range += int(themax - themin)
-
-        # Progressbar()
-        if not hasattr(widgets_list, "widget_progressbar") or widgets_list.widget_progressbar is None:
-            widgets_list.widget_progressbar = Progressbar()
-
-        widgets_list.widget_progressbar.set_label("Getting PDFs (groups)")
-        widgets_list.widget_progressbar.set_range(0, prog_range)
-
-        for i in range(len(shared.groups_data)):
-            data = shared.groups_data[i]
-            # print(f"groups_data[{i}] type: {type(data)}; len(data): {len(data)}")
-
-            if shared.exp.results_type != "loading_rates":
-                if isinstance(data, numpy.ndarray) and data.size > 0:
-                    pdf_x, pdf_y, mode_index = get_pdf_and_mode(data, "groups")
-                    shared.groups_pdfs_x.append(pdf_x)
-                    shared.groups_pdfs_y.append(pdf_y)
-                    shared.groups_values[i][3] = mode_index
-
-                else:
-                    shared.groups_pdfs_x.append([])
-                    shared.groups_pdfs_y.append([])
-
-            else:
-                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
-                    # 0 = forces, 1 = lr
-                    pdf_x, pdf_y, mode_index = get_pdf_and_mode(
-                        data[1], "groups")
-
-                    shared.groups_pdfs_x.append(pdf_x)
-                    shared.groups_pdfs_y.append(pdf_y)
-                    shared.groups_values[i][3] = mode_index
-
-                else:
-                    shared.groups_pdfs_x.append([])
-                    shared.groups_pdfs_y.append([])
-
-        widgets_list.widget_progressbar.close()
-
-    elif mode == "experiment":
-        shared.conditions_pdfs_x = []
-        shared.conditions_pdfs_y = []
-
-        # Create a progressbar, this operation is slow
-        prog_range = 0
-        for i in range(len(shared.conditions_data)):
-            data = shared.conditions_data[i]
-
-            # Skip empty or None data
-            if data is None or len(data) == 0:
-                # print(f"Skipping empty or None condition data at index {i}")
-                shared.conditions_pdfs_x.append([])
-                shared.conditions_pdfs_y.append([])
-                continue  # Skip to the next data entry
-
-            themin = 0
-            themax = 0
-            if shared.exp.results_type != "loading_rates":
-                if isinstance(data, numpy.ndarray) and data.size > 0:
-                    themin = numpy.amin(data)
-                    themax = numpy.amax(data)
-            else:
-                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[1].size > 0:
-                    themin = numpy.amin(data[1])
-                    themax = numpy.amax(data[1])
-            prog_range += int(themax - themin)
-
-        # Progressbar()
-        if not hasattr(widgets_list, "widget_progressbar") or widgets_list.widget_progressbar is None:
-            widgets_list.widget_progressbar = Progressbar()
-
-        widgets_list.widget_progressbar.set_label("Getting PDFs (experiment)")
-        widgets_list.widget_progressbar.set_range(0, prog_range)
-
-        for i in range(len(shared.conditions_data)):
-            data = shared.conditions_data[i]
-            # print(f"conditions_data[{i}] type: {type(data)}; len(data): {len(data)}")
-
-            if shared.exp.results_type != "loading_rates":
-                if data:
-                    pdf_x, pdf_y, mode_index = get_pdf_and_mode(data, "experiment")
-
-                    shared.conditions_pdfs_x.append(pdf_x)
-                    shared.conditions_pdfs_y.append(pdf_y)
-                    shared.conditions_values[i][4] = mode_index
-
-                else:
-                    shared.conditions_pdfs_x.append([])
-                    shared.conditions_pdfs_y.append([])
-
-            else:
-                if isinstance(data, list) and len(data) > 1 and isinstance(data[1], np.ndarray) and data[
-                        1].size > 0:
-
-                    # 0 = forces, 1 = lr
-                    pdf_x, pdf_y, mode_index = get_pdf_and_mode(
-                        data[1], "experiment")
-
-                    shared.conditions_pdfs_x.append(pdf_x)
-                    shared.conditions_pdfs_y.append(pdf_y)
-                    shared.conditions_values[i][4] = mode_index
-
-                else:
-                    shared.conditions_pdfs_x.append([])
-                    shared.conditions_pdfs_y.append([])
-
-        widgets_list.widget_progressbar.close()
-
-
-def do_statistical_test(test):
-    """Performs selected statistical test."""
-
-    result = []
-
-    for grp in shared.exp.sample_groups:
-
-        if test == "Two-sample T-test":
-            ttest_ind_result = stats.ttest_ind(shared.conditions_data[grp[0]],
-                                               shared.conditions_data[grp[1]],
-                                               nan_policy="omit")
-            # print(ttest_ind_result)
-            result.append((grp, ttest_ind_result))
-
-        elif test == "Paired T-test":
-            if numpy.shape(shared.conditions_data[grp[0]]) == numpy.shape(shared.conditions_data[grp[1]]):
-                ttest_rel_result = stats.ttest_rel(shared.conditions_data[grp[0]],
-                                                   shared.conditions_data[grp[1]],
-                                                   nan_policy="omit")
-                # print(ttest_rel_result)
-                result.append((grp, ttest_rel_result))
-            else:
-                text = """Paired T-test can only be perfomed between samples of same size."""
-                QtWidgets.QMessageBox.warning(None, "Info", text)
-
-    shared.exp.statistical_test_results[test] = result
+def update_single_modes():
+    """Computes the modes of the single results (index 3 of the values),
+    with the density estimate of the violins (same smoothing)."""
+    from ..experiment import get_violin_options
+    bw_adjust = get_violin_options(shared.exp)["bw_adjust"]
+
+    for i, data in enumerate(shared.single_data or []):
+        if shared.exp.results_type == "loading_rates":
+            # 0 = forces, 1 = loading rates
+            data = data[1] if len(data) > 1 else []
+        shared.single_values[i][3] = get_mode(data, bw_adjust)
+
+
+def update_groups_modes():
+    """Computes the modes of the groups (index 3 of the values), with the
+    density estimate of their violins (same smoothing)."""
+    from ..experiment import get_violin_options
+    bw_adjust = get_violin_options(shared.exp, "groups")["bw_adjust"]
+
+    for i, data in enumerate(shared.groups_data or []):
+        if shared.exp.results_type == "loading_rates":
+            # 0 = forces, 1 = loading rates
+            data = data[1] if len(data) > 1 else []
+        shared.groups_values[i][3] = get_mode(data, bw_adjust)
+
+
+def get_mode(data, bw_adjust=1.0):
+    """Mode of the values: maximum of their density estimate (gaussian
+    kernels, Scott's rule for the bandwidth multiplied by bw_adjust).
+
+    NaN if there are no values.
+    """
+    data = numpy.asarray(data, dtype=float).ravel()
+    data = data[numpy.isfinite(data)]
+    if data.size == 0:
+        return numpy.nan
+    if data.size == 1 or numpy.ptp(data) == 0:
+        return data[0]
+    kde = stats.gaussian_kde(data)
+    kde.set_bandwidth(kde.factor * bw_adjust)
+    grid = numpy.linspace(data.min(), data.max(), 1024)
+    return grid[numpy.argmax(kde(grid))]
 
 
 def fetch_group_data():
@@ -557,27 +135,6 @@ def fetch_group_data():
     shared.groups_data = groups
     shared.groups_values = values
 
-
-def fetch_conditions_data():
-    """Fills the conditions_data and conditions_values arrays in shared."""
-    results_util = results_sorting.GetResults()
-
-    # Will return the sorted results
-    [conditions, values] = results_util.get_results_conditions()
-
-    shared.conditions_data = conditions
-    shared.conditions_values = values
-
-    results_util.get_results_statistical()
+    update_groups_modes()
 
 
-def get_pdf():
-    """Get the probability density function for the histogram."""
-    get_pdfs_and_modes("single")
-    update_counts("single")
-
-    get_pdfs_and_modes("groups")
-    update_counts("groups")
-
-    get_pdfs_and_modes("experiment")
-    update_counts("experiment")

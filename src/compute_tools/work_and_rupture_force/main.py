@@ -110,10 +110,11 @@ class WorkAndRuptureForce:
             "joc_noise_multiplicator": data.fitparam_joc_noise_multiplicator,
             "joc_refit_times": data.fitparam_joc_refit_times}
 
-        multiproc.compute("work", calc_id, dt, self.temp_file.filepath)
-
-        # Reopen the hdf5 file
-        self.temp_file.open_file()
+        try:
+            multiproc.compute("work", calc_id, dt, self.temp_file.filepath)
+        finally:
+            # Reopen the hdf5 file (also after an error)
+            self.temp_file.open_file()
 
         data.work_and_rupture_force1_calculated = True
 

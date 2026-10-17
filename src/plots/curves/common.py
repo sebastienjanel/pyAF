@@ -454,6 +454,10 @@ class CommonCurveTools:
             self.residuals = []
             self.chisqr = None
 
+            if len(dt.stiffness_array[self.xpos][self.ypos]) == 0:
+                # The fit failed for this curve: no fit to display
+                return
+
             app, _, _, _, _, _ = \
                 curve_tools.get_curve(dt, [self.xpos, self.ypos],
                                       mode="curve_results")  # get approach curve data
@@ -497,7 +501,7 @@ class CommonCurveTools:
             data_to_fit = fcapp[1][ind::]
 
             # Display elasticity fit within the indentation range selected by user.
-            if dt.used_indentation_stop != 0 and dt.fit_range_type == 1:
+            if dt.used_indentation_stop != 0 and dt.get_used_fit_range_type() == 1:
                 start_f = dt.used_indentation_start * 1e-09  # 0 is the default value.
                 stop_f = dt.used_indentation_stop * 1e-09
 
@@ -526,7 +530,9 @@ class CommonCurveTools:
 
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
-            y[i] = coeff * e0 * numpy.power((delta[i]), 1.5)
+            # No force without indentation (same as the fit models)
+            if delta[i] > 0:
+                y[i] = coeff * e0 * numpy.power((delta[i]), 1.5)
 
         return data - y
 
@@ -534,7 +540,9 @@ class CommonCurveTools:
 
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
-            y[i] = coeff * e0 * numpy.power((delta[i]), 2)
+            # No force without indentation (same as the fit models)
+            if delta[i] > 0:
+                y[i] = coeff * e0 * numpy.power((delta[i]), 2)
 
         return data - y
 
@@ -542,7 +550,9 @@ class CommonCurveTools:
 
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
-            y[i] = coeff * e0 * numpy.power((delta[i]), 2)
+            # No force without indentation (same as the fit models)
+            if delta[i] > 0:
+                y[i] = coeff * e0 * numpy.power((delta[i]), 2)
 
         return data - y
 
@@ -550,12 +560,14 @@ class CommonCurveTools:
 
         y = numpy.zeros(delta.shape)
         for i in range(len(y)):
-            y[i] = coeff * e0 * numpy.power((delta[i]), 1)
+            # No force without indentation (same as the fit models)
+            if delta[i] > 0:
+                y[i] = coeff * e0 * numpy.power((delta[i]), 1)
 
         return data - y
 
     def get_chisqr(self, r):
-        """
+        r"""
         Chi-square: :math:`\chi^2 = \sum_i^N [{\rm Resid}_i]^2`
         """
         return (r**2).sum()

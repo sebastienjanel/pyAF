@@ -31,9 +31,12 @@
 
 """Options for the meshgrids."""
 
-from PyQt5 import QtCore, QtWidgets
+import numpy
+from qtpy import QtCore, QtWidgets
+from ..single import robust_max
 from ..tools import apply_to_all
 from ..tools import misc_tools
+from ..tools import planefit
 from ..tools.colortables import ColorTables
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFButton
@@ -92,6 +95,13 @@ class PlotOptionsWidget(PYAFWidget):
         label = "Transparent Nan values"
         self.CB_nan_transp = PYAFCheckBox(self, "nan_transp", label)
 
+        # Log color scale (elasticity maps)
+        self.CB_log = PYAFCheckBox(self, "log_scale", "Log scale")
+        self.CB_log.setToolTip(
+            "Logarithmic color scale for the elasticity maps (from the "
+            "lowest positive value\nwhen the minimum is 0): soft and stiff "
+            "regions are both visible (e.g. a cell on glass).")
+
         BT_apply = PYAFButton(self, "button_apply", "Apply")
 
         self.gridlayout_box_colors.addWidget(self.LS_colortable, 0, 0)
@@ -99,13 +109,14 @@ class PlotOptionsWidget(PYAFWidget):
         self.gridlayout_box_colors.addWidget(self.input_max, 2, 0)
         self.gridlayout_box_colors.addWidget(self.input_middle, 3, 0)
         self.gridlayout_box_colors.addWidget(self.input_min, 4, 0)
-        self.gridlayout_box_colors.addWidget(BT_autoscale, 5, 0)
-        self.gridlayout_box_colors.addWidget(BT_sat_color, 6, 0)
-        self.gridlayout_box_colors.addWidget(BT_neg_color, 7, 0)
-        self.gridlayout_box_colors.addWidget(BT_nan_color, 8, 0)
+        self.gridlayout_box_colors.addWidget(self.CB_log, 5, 0)
+        self.gridlayout_box_colors.addWidget(BT_autoscale, 6, 0)
+        self.gridlayout_box_colors.addWidget(BT_sat_color, 7, 0)
+        self.gridlayout_box_colors.addWidget(BT_neg_color, 8, 0)
+        self.gridlayout_box_colors.addWidget(BT_nan_color, 9, 0)
         if self.mode == "vtk":
-            self.gridlayout_box_colors.addWidget(self.CB_nan_transp, 9, 0)
-        self.gridlayout_box_colors.addWidget(BT_apply, 10, 0)
+            self.gridlayout_box_colors.addWidget(self.CB_nan_transp, 10, 0)
+        self.gridlayout_box_colors.addWidget(BT_apply, 11, 0)
 
         self.box_colors.setLayout(self.gridlayout_box_colors)
 
@@ -134,12 +145,19 @@ class PlotOptionsWidget(PYAFWidget):
             shared.exp.apply_to_all_data = self.CB_apply_to_all.isChecked()
 
             # Apply on all
-            apply_to_all.apply_to_all("display_options", oldid=self.data_id)
+            apply_to_all.apply_to_all("display_options", oldid=self.data_id,
+                                      piezo_colors=True)
 
             # Update the plots only if asked
             self.update_parent_elements()
 
             self.update_widget()
+
+        elif what == "log_scale":
+            data.stiffness_color_log = self.CB_log.isChecked()
+            apply_to_all.apply_to_all("display_options", oldid=self.data_id,
+                                      piezo_colors=True)
+            self.update_parent_elements()
 
         elif what == "nan_transp":
             data.nan_color_transparent = self.CB_nan_transp.isChecked()
@@ -157,115 +175,71 @@ class PlotOptionsWidget(PYAFWidget):
         # Set focus on widget to validate the inputs
         self.setFocus()
 
-        # Get and store the values
-        if what == "input_max" or what == "all":
-            value = self.input_max.get_str_value()
-            if value != "":
-                value = value.replace(',', '.')
-                if float(value) <= data.colortable_min_value:
-                    display_bad_value_message()
-                    self.update_widget()
-                    return False
+        # Get the fields to update: a single input, or all of them when the
+        # apply button is clicked. The middle value is only used by the
+        # Rainbow 1 colortable.
+        inputs = {"max": self.input_max,
+                  "middle": self.input_middle,
+                  "min": self.input_min}
+        if what == "all":
+            fields = ["max", "min"]
+            if data.colortableid == 1:
+                fields.append("middle")
+        elif what in ("input_max", "input_middle", "input_min"):
+            fields = [what[len("input_"):]]
+        else:
+            return True
 
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    if data.used_stiffness_model_selected == 3:
-                        data.colortable_max_value = float(value)
-                    else:
-                        data.colortable_max_value = float(value) * 1e3
-                elif mt == "work":
-                    data.colortable_max_value = float(value) * 1e-9
-                elif mt == "rupture_force":
-                    data.colortable_max_value = float(value) * 1e-12
-                elif mt == "events_rupture_force":
-                    data.colortable_max_value = float(value) * 1e-12
-                elif mt == "events_per_curve":
-                    if float(value) < 2:
-                        text = "The maximum color value can not be set to a \
-                                value smaller than 2 !"
+        # Start from the stored values, converted to the displayed units, so
+        # that the new and old values are compared in the same units
+        values = {}
+        for field in inputs:
+            stored = getattr(data, "colortable_" + field + "_value")
+            factor, offset = color_value_conversion(data, field)
+            values[field] = (stored - offset) / factor
 
-                        # Create a message box
-                        msg = QtWidgets.QMessageBox()
-                        msg.setText("Error")
-                        msg.setInformativeText(text)
-                        msg.setIcon(QtWidgets.QMessageBox.Critical)
-                        msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
-                        msg.exec_()
+        # Only the values modified by the user are stored. The others keep
+        # their exact value (the inputs display rounded values: re-reading
+        # them would for example lower the max set by autoscale)
+        new_fields = []
+        for field in fields:
+            value = inputs[field].get_str_value(use_replace=True)
+            if value != "" and \
+                    float(value) != displayed_color_value(data, field):
+                values[field] = float(value)
+                new_fields.append(field)
 
-                        val = data.colortable_max_value - 1
-                        self.input_max.changeValue(val)
-                        return False
-                    else:
-                        data.colortable_max_value = float(value) + 1
-                else:
-                    data.colortable_max_value = float(value)
+        if mt == "events_per_curve":
+            if "max" in new_fields and values["max"] < 2:
+                display_events_limit_message(
+                    "The maximum color value can not be set to a value "
+                    "smaller than 2 !")
+                self.update_widget()
+                return False
+            if "min" in new_fields and values["min"] < 1:
+                display_events_limit_message(
+                    "The minimum color value can not be set to a value "
+                    "smaller than 1 !")
+                self.update_widget()
+                return False
 
-        elif what == "input_middle" or what == "all":
-            value = self.input_middle.get_str_value()
-            if value != "":
-                if float(value) <= data.colortable_min_value or \
-                        float(value) >= data.colortable_max_value:
-                    display_bad_value_message(mode="middle")
-                    self.update_widget()
-                    return False
+        if ("max" in new_fields or "min" in new_fields) and \
+                values["max"] <= values["min"]:
+            display_bad_value_message()
+            self.update_widget()
+            return False
 
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    if data.used_stiffness_model_selected == 3:
-                        data.colortable_middle_value = float(value)
-                    else:
-                        data.colortable_middle_value = float(value) * 1e3
-                elif mt == "work":
-                    data.colortable_middle_value = float(value) * 1e-9
-                elif mt == "rupture_force":
-                    data.colortable_middle_value = float(value) * 1e-12
-                elif mt == "events_rupture_force":
-                    data.colortable_middle_value = float(value) * 1e-12
-                elif mt == "events_per_curve":
-                    data.colortable_middle_value = float(value) + 1
-                else:
-                    data.colortable_middle_value = float(value)
+        if "middle" in new_fields and \
+                not values["min"] < values["middle"] < values["max"]:
+            display_bad_value_message(mode="middle")
+            self.update_widget()
+            return False
 
-        elif what == "input_min" or what == "all":
-            value = self.input_min.get_str_value()
-            if value != "":
-                if float(value) >= data.colortable_max_value:
-                    display_bad_value_message()
-                    self.update_widget()
-                    return False
-
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    if data.used_stiffness_model_selected == 3:
-                        data.colortable_min_value = float(value)
-                    else:
-                        data.colortable_min_value = float(value) * 1e3
-                elif mt == "work":
-                    data.colortable_min_value = float(value) * 1e-9
-                elif mt == "rupture_force":
-                    data.colortable_min_value = float(value) * 1e-12
-                elif mt == "events_rupture_force":
-                    data.colortable_min_value = float(value) * 1e-12
-                elif mt == "events_per_curve":
-                    if float(value) < 1:
-                        text = "The minimum color value can not be set to a \
-                                value smaller than 1 !"
-
-                        # Create a message box
-                        msg = QtWidgets.QMessageBox()
-                        msg.setText("Error")
-                        msg.setInformativeText(text)
-                        msg.setIcon(QtWidgets.QMessageBox.Critical)
-                        msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
-                        msg.exec_()
-
-                        val = data.colortable_min_value + 1
-                        self.input_min.changeValue(val)
-                        return False
-                    else:
-                        data.colortable_min_value = float(value) - 1
-                else:
-                    data.colortable_min_value = float(value)
+        # Store the values, converted back to the internal units
+        for field in new_fields:
+            factor, offset = color_value_conversion(data, field)
+            setattr(data, "colortable_" + field + "_value",
+                    values[field] * factor + offset)
 
         return True
 
@@ -286,12 +260,15 @@ class PlotOptionsWidget(PYAFWidget):
                 # Check for the middle value, if its misconfigured
                 # replace it by the half of the max value
                 if val_middle <= val_min or val_middle >= val_max:
-                    data.colortable_middle_value = val_max / 2.0
+                    factor, offset = color_value_conversion(data, "middle")
+                    data.colortable_middle_value = \
+                        val_max / 2.0 * factor + offset
 
             data.colortableid = colortable_id
 
             # Apply to all if needed
-            apply_to_all.apply_to_all("display_options", oldid=self.data_id)
+            apply_to_all.apply_to_all("display_options", oldid=self.data_id,
+                                      piezo_colors=True)
 
             # Update
             self.update_widget()
@@ -305,67 +282,61 @@ class PlotOptionsWidget(PYAFWidget):
             data = shared.exp.list[self.data_id]
 
         mt = data.meshgrid_type
-        exp = shared.exp
-        dt = data
 
         if button == "autoscale":
-            if shared.exp.apply_to_all_data:
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    dt.colortable_max_value = exp.global_max_stiffness
-                    dt.colortable_middle_value = exp.global_max_stiffness / 2.0
-                elif mt == "work":
-                    dt.colortable_max_value = exp.global_max_work
-                    dt.colortable_middle_value = exp.global_max_work / 2.0
-                elif mt == "rupture_force":
-                    dt.colortable_max_value = exp.global_max_rupture_force1
-                    dt.colortable_middle_value = \
-                        exp.global_max_rupture_force1 / 2.0
-                elif mt == "events_rupture_force":
-                    dt.colortable_max_value = exp.global_max_rupture_force2
-                    dt.colortable_middle_value = \
-                        exp.global_max_rupture_force2 / 2.0
-                elif mt == "events_per_curve":
-                    dt.colortable_max_value = exp.global_max_nbr_events
-                    dt.colortable_middle_value = exp.global_max_nbr_events / \
-                        2.0
-                elif mt == "piezo":
-                    dt.colortable_max_value = exp.global_max_piezo
-                    dt.colortable_middle_value = exp.global_max_piezo / 2.0
-                elif mt == "topo":
-                    dt.colortable_max_value = exp.global_max_topo
-                    dt.colortable_middle_value = exp.global_max_topo / 2.0
-
-            else:
-                if mt == "stiffness" or mt == "stiffness_slice" or \
-                        mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                    data.colortable_max_value = data.max_stiffness
-                    data.colortable_middle_value = data.max_stiffness / 2.0
-                elif mt == "work":
-                    data.colortable_max_value = data.max_work
-                    data.colortable_middle_value = data.max_work / 2.0
-                elif mt == "rupture_force":
-                    data.colortable_max_value = data.max_rupture_force1
-                    data.colortable_middle_value = data.max_rupture_force1 / \
-                        2.0
-                elif mt == "events_rupture_force":
-                    data.colortable_max_value = data.max_rupture_force2
-                    data.colortable_middle_value = data.max_rupture_force2 / \
-                        2.0
-                elif mt == "events_per_curve":
-                    data.colortable_max_value = data.max_nbr_events
-                    data.colortable_middle_value = data.max_nbr_events / 2.0
-                elif mt == "piezo":
-                    data.colortable_max_value = data.max_piezo
-                    data.colortable_middle_value = data.max_piezo / 2.0
-                elif mt == "topo":
-                    data.colortable_max_value = data.max_topo
-                    data.colortable_middle_value = data.max_topo / 2.0
+            # Autoscale on the selected file. With apply to all, its scale
+            # is then copied to all the files (same scale in the multi
+            # meshgrids)
+            if mt == "stiffness" or mt == "stiffness_slice" or \
+                    mt == "stiffness_corr" or mt == "stiffness_corr_slice":
+                # Up to the 95th percentile of the values of the map (the
+                # outliers above are drawn with the saturation color)
+                high = robust_max(stiffness_values(data, mt))
+                if high is not None:
+                    data.colortable_max_value = high
+                    data.colortable_middle_value = high / 2.0
+            elif mt == "work":
+                data.colortable_max_value = data.max_work
+                data.colortable_middle_value = data.max_work / 2.0
+            elif mt == "rupture_force":
+                data.colortable_max_value = data.max_rupture_force1
+                data.colortable_middle_value = data.max_rupture_force1 / \
+                    2.0
+            elif mt == "events_rupture_force":
+                data.colortable_max_value = data.max_rupture_force2
+                data.colortable_middle_value = data.max_rupture_force2 / \
+                    2.0
+            elif mt == "events_per_curve":
+                data.colortable_max_value = data.max_nbr_events
+                data.colortable_middle_value = data.max_nbr_events / 2.0
+            elif mt == "visco_tan_delta":
+                # Diverging scale centered on tan delta = 1
+                data.colortable_min_value = 0.0
+                data.colortable_max_value = 2.0
+                data.colortable_middle_value = 1.0
+            elif mt.startswith("visco_"):
+                high = robust_max(getattr(data, mt))
+                if high is not None:
+                    data.colortable_max_value = high
+                    data.colortable_middle_value = high / 2.0
+            elif mt == "piezo":
+                data.colortable_max_value = data.max_piezo
+                data.colortable_middle_value = data.max_piezo / 2.0
+            elif mt == "topo":
+                data.colortable_max_value = data.max_topo
+                data.colortable_middle_value = data.max_topo / 2.0
 
             data.colortable_min_value = 0
 
+            if mt in ("piezo", "topo") and \
+                    planefit.get_planefit_roi(data) is not None:
+                # Planefitted heights: their whole range (negative values
+                # around the substrate)
+                planefit.reset_color_scales(data)
+
             # Apply to all if needed
-            apply_to_all.apply_to_all("display_options", oldid=self.data_id)
+            apply_to_all.apply_to_all("display_options", oldid=self.data_id,
+                                      piezo_colors=True)
 
             self.update_widget()
 
@@ -393,7 +364,8 @@ class PlotOptionsWidget(PYAFWidget):
             if result:
                 # Apply to all if needed
                 apply_to_all.apply_to_all("display_options",
-                                          oldid=self.data_id)
+                                          oldid=self.data_id,
+                                          piezo_colors=True)
 
                 # Update the plots
                 self.update_parent_elements()
@@ -416,60 +388,56 @@ class PlotOptionsWidget(PYAFWidget):
 
         mt = data.meshgrid_type
 
-        # Define max label
-        if shared.exp.apply_to_all_data:
-            if mt == "piezo":
-                text = "Max. piezo height (All) : " + \
-                    str(shared.exp.global_max_piezo) + " nm"
-            if mt == "topo":
-                text = "Max. topography height (All) : " + \
-                    str(shared.exp.global_max_topo) + " nm"
-            if mt == "stiffness" or mt == "stiffness_slice" or \
-                    mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                if data.used_stiffness_model_selected == 3:
-                    text = "Max. slope (All) : " + \
-                        str(shared.exp.global_max_stiffness) + " N/m"
-                else:
-                    val = round(shared.exp.global_max_stiffness * 1e-3, 2)
-                    text = "Max. stiffness (All) : " + str(val) + " kPa"
-            if mt == "work":
-                val = round(shared.exp.global_max_work * 1e15, 2)
-                text = "Max. work (All) : " + str(val) + " fJ"
-            if mt == "rupture_force":
-                val = round(shared.exp.global_max_rupture_force1 * 1e12, 2)
-                text = "Max. rupture force (All) : " + str(val) + " pN"
-            if mt == "events_rupture_force":
-                val = round(shared.exp.global_max_rupture_force2 * 1e12, 2)
-                text = "Max. rupture force (All) : " + str(val) + " pN"
+        # Define max label: maximum of the selected file (used by autoscale)
+        # and, when the scale is applied to all the files, of all the files
+        exp = shared.exp
+        if mt in ("stiffness", "stiffness_slice",
+                  "stiffness_corr", "stiffness_corr_slice"):
+            if data.used_stiffness_model_selected == 3:
+                name, unit, factor = "Max. slope", "N/m", 1
+            else:
+                name, unit, factor = "Max. stiffness", "kPa", 1e-3
+            val, val_all = data.max_stiffness, exp.global_max_stiffness
+        elif mt == "piezo":
+            name, unit, factor = "Max. piezo height", "nm", 1
+            val, val_all = data.max_piezo, exp.global_max_piezo
+        elif mt == "topo":
+            name, unit, factor = "Max. topography height", "nm", 1
+            val, val_all = data.max_topo, exp.global_max_topo
+        elif mt == "work":
+            name, unit, factor = "Max. work", "fJ", 1e15
+            val, val_all = data.max_work, exp.global_max_work
+        elif mt == "rupture_force":
+            name, unit, factor = "Max. rupture force", "pN", 1e12
+            val, val_all = data.max_rupture_force1, \
+                exp.global_max_rupture_force1
+        elif mt == "events_rupture_force":
+            name, unit, factor = "Max. rupture force", "pN", 1e12
+            val, val_all = data.max_rupture_force2, \
+                exp.global_max_rupture_force2
+        elif mt == "events_per_curve":
+            name, unit, factor = "Max. number of events", "events", 1
+            val, val_all = data.max_nbr_events, exp.global_max_nbr_events
+        elif mt.startswith("visco_"):
+            name, unit, factor = {
+                "visco_e0": ("Max. E0", "kPa", 1e-3),
+                "visco_fluidity": ("Max. fluidity", "", 1),
+                "visco_tan_delta": ("Max. tan \u03b4", "", 1)}[mt]
+            values = numpy.asarray(getattr(data, mt), dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(values.max()) if values.size else 0.0
+            val_all = None
+
+        def fmt(value):
             if mt == "events_per_curve":
-                val = int(shared.exp.global_max_nbr_events - 1)
-                text = "Max. number of events (All) : " + str(val) + " events"
-        else:
-            if mt == "piezo":
-                text = "Max. piezo height : " + str(data.max_piezo) + " nm"
-            if mt == "topo":
-                text = "Max. topography height : " + str(data.max_topo) + " nm"
-            if mt == "stiffness" or mt == "stiffness_slice" or \
-                    mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                if data.used_stiffness_model_selected == 3:
-                    text = "Max. slope : " + \
-                        str(data.max_stiffness) + " N/m"
-                else:
-                    text = "Max. stiffness : " + \
-                        str(round(data.max_stiffness * 1e-3, 2)) + \
-                        " kPa"
-            if mt == "work":
-                text = "Max. work : " + \
-                    str(round(data.max_work * 1e15, 2)) + " fJ"
-            if mt == "rupture_force":
-                text = "Max. rupture force : " + \
-                    str(round(data.max_rupture_force1 * 1e12)) + " pN"
-            if mt == "events_rupture_force":
-                text = "Max. rupture force : " + \
-                    str(round(data.max_rupture_force2 * 1e12)) + " pN"
-            if mt == "events_per_curve":
-                text = "Max. number of events : " + \
-                    str(int(data.max_nbr_events + 1)) + " events"
+                return str(int(value))
+            if mt in ("visco_fluidity", "visco_tan_delta"):
+                return str(round(float(value) * factor, 3))
+            return str(round(float(value) * factor, 2))
+
+        text = (name + " : " + fmt(val) + " " + unit).rstrip()
+        if exp.apply_to_all_data and val_all is not None:
+            text += " (all files : " + fmt(val_all) + " " + unit + ")"
 
         self.label_max.setText(text)
 
@@ -477,68 +445,9 @@ class PlotOptionsWidget(PYAFWidget):
         self.LS_colortable.setCurrentIndex(data.colortableid)
 
         # Define input values
-        if mt == "stiffness" or mt == "stiffness_slice" or \
-                mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-            if data.used_stiffness_model_selected == 3:
-                val = data.colortable_max_value
-            else:
-                val = round(data.colortable_max_value * 1e-3, 2)
-            self.input_max.changeValue(val)
-        elif mt == "work":
-            val = round(data.colortable_max_value * 1e9, 2)
-            self.input_max.changeValue(val)
-        elif mt == "rupture_force":
-            val = round(data.colortable_max_value * 1e12, 2)
-            self.input_max.changeValue(val)
-        elif mt == "events_rupture_force":
-            val = round(data.colortable_max_value * 1e12, 2)
-            self.input_max.changeValue(val)
-        elif mt == "events_per_curve":
-            self.input_max.changeValue(data.colortable_max_value - 1)
-        else:
-            self.input_max.changeValue(data.colortable_max_value)
-
-        if mt == "stiffness" or mt == "stiffness_slice" or \
-                mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-            if data.used_stiffness_model_selected == 3:
-                val = data.colortable_middle_value
-            else:
-                val = round(data.colortable_middle_value * 1e-3, 2)
-            self.input_middle.changeValue(val)
-        elif mt == "work":
-            val = round(data.colortable_middle_value * 1e9, 2)
-            self.input_middle.changeValue(val)
-        elif mt == "rupture_force":
-            val = round(data.colortable_middle_value * 1e12, 2)
-            self.input_middle.changeValue(val)
-        elif mt == "events_rupture_force":
-            val = round(data.colortable_middle_value * 1e12, 2)
-            self.input_middle.changeValue(val)
-        elif mt == "events_per_curve":
-            self.input_middle.changeValue(data.colortable_middle_value - 1)
-        else:
-            self.input_middle.changeValue(data.colortable_middle_value)
-
-        if mt == "stiffness" or mt == "stiffness_slice" or \
-                mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-            if data.used_stiffness_model_selected == 3:
-                val = data.colortable_min_value
-            else:
-                val = round(data.colortable_min_value * 1e-3, 2)
-            self.input_min.changeValue(val)
-        elif mt == "work":
-            val = round(data.colortable_min_value * 1e9, 2)
-            self.input_min.changeValue(val)
-        elif mt == "rupture_force":
-            val = round(data.colortable_min_value * 1e12, 2)
-            self.input_min.changeValue(val)
-        elif mt == "events_rupture_force":
-            val = round(data.colortable_min_value * 1e12, 2)
-            self.input_min.changeValue(val)
-        elif mt == "events_per_curve":
-            self.input_min.changeValue(data.colortable_min_value + 1)
-        else:
-            self.input_min.changeValue(data.colortable_min_value)
+        self.input_max.changeValue(displayed_color_value(data, "max"))
+        self.input_middle.changeValue(displayed_color_value(data, "middle"))
+        self.input_min.changeValue(displayed_color_value(data, "min"))
 
         # Check checkbox if needed
         self.CB_apply_to_all.setChecked(shared.exp.apply_to_all_data)
@@ -550,6 +459,12 @@ class PlotOptionsWidget(PYAFWidget):
             self.input_middle.setParent(None)
 
         self.CB_nan_transp.setChecked(data.nan_color_transparent)
+
+        # Log scale only for the elasticity and E0 maps
+        self.CB_log.setChecked(getattr(data, "stiffness_color_log", False))
+        self.CB_log.setEnabled(mt in ("stiffness", "stiffness_slice",
+                                      "stiffness_corr",
+                                      "stiffness_corr_slice", "visco_e0"))
 
     def update_parent_elements(self):
         """This method is called to update some elements from the parents widget.
@@ -583,6 +498,69 @@ class PlotOptionsWidget(PYAFWidget):
             widgets_list.widget_multimeshgrids.update_widget()
 
 
+def color_value_conversion(data, field):
+    """Returns the (factor, offset) used to convert a color value displayed in
+    the inputs to the value stored in data:
+    stored = displayed * factor + offset.
+
+    field is "max", "middle" or "min".
+    """
+    mt = data.meshgrid_type
+    if mt in ("stiffness", "stiffness_slice",
+              "stiffness_corr", "stiffness_corr_slice"):
+        if data.used_stiffness_model_selected == 3:
+            # Slope in N/m
+            return 1.0, 0.0
+        # kPa to Pa
+        return 1e3, 0.0
+    elif mt == "visco_e0":
+        # kPa to Pa
+        return 1e3, 0.0
+    elif mt == "work":
+        # fJ to J
+        return 1e-15, 0.0
+    elif mt in ("rupture_force", "events_rupture_force"):
+        # pN to N
+        return 1e-12, 0.0
+    elif mt == "events_per_curve":
+        # The events colortable is shifted by one
+        if field == "min":
+            return 1.0, -1.0
+        return 1.0, 1.0
+    return 1.0, 0.0
+
+
+def displayed_color_value(data, field):
+    """Returns the color value of field ("max", "middle" or "min") as
+    displayed in the inputs (displayed units, rounded)."""
+    stored = getattr(data, "colortable_" + field + "_value")
+    factor, offset = color_value_conversion(data, field)
+    value = float((stored - offset) / factor)
+    mt = data.meshgrid_type
+    if mt in ("stiffness", "stiffness_slice",
+              "stiffness_corr", "stiffness_corr_slice") and \
+            data.used_stiffness_model_selected != 3:
+        return round(value, 2)
+    elif mt == "work":
+        # Work values can be small, keep significant digits
+        return float(f"{value:.4g}")
+    elif mt in ("rupture_force", "events_rupture_force", "visco_e0"):
+        return round(value, 2)
+    elif mt in ("visco_fluidity", "visco_tan_delta"):
+        return round(value, 3)
+    return float(f"{value:.7g}")
+
+
+def display_events_limit_message(text):
+    """Tells the user the events colortable limits are not respected."""
+    msg = QtWidgets.QMessageBox()
+    msg.setText("Error")
+    msg.setInformativeText(text)
+    msg.setIcon(QtWidgets.QMessageBox.Critical)
+    msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
+    msg.exec_()
+
+
 def display_bad_value_message(mode=None):
     """Tells the user the inputed values are not well defined."""
     if mode == "middle":
@@ -595,3 +573,14 @@ def display_bad_value_message(mode=None):
     msg.setIcon(QtWidgets.QMessageBox.Critical)
     msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
     msg.exec_()
+
+
+def stiffness_values(data, meshgrid_type):
+    """Values of the displayed elasticity map (corrected for the B.E.C.
+    maps), for the automatic color scale."""
+    corrected = meshgrid_type.startswith("stiffness_corr") and \
+        data.stiffness_corrected
+    array = data.stiffness_corrected_array if corrected \
+        else data.stiffness_array
+    return [v for i in range(data.nbr_pixels_x)
+            for j in range(data.nbr_pixels_y) for v in array[i][j]]

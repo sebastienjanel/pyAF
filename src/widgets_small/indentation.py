@@ -31,7 +31,7 @@
 
 """Small widget with a list used to change the indentation depth."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools.gui_tools import PYAFComboBox
 from .. import widgets_list
 from ..tools import apply_to_all

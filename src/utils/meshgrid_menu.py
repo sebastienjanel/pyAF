@@ -32,7 +32,7 @@
 """Menu displayed when right-clicking on the meshgrids."""
 
 import os
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from .. import shared
 from .. import widgets_list
@@ -163,7 +163,7 @@ def create_meshgrid_menu(parent, widget, pos):
             action = QtWidgets.QAction("Change slope filter", parent)
             action.triggered.connect(lambda: parent.change_filter("slope"))
             menu.addAction(action)
-            action = QtWidgets.QAction("Change dist filter", parent)
+            action = QtWidgets.QAction("Change distance filter", parent)
             action.triggered.connect(lambda: parent.change_filter("dist"))
             menu.addAction(action)
 

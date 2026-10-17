@@ -31,7 +31,7 @@
 
 """Widget used to go through the curves."""
 
-from PyQt5 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 
 from ... import shared
 from ... import widgets_list
@@ -50,21 +50,25 @@ class ResultsSelectorWidget(PYAFWidget):
     def __init__(self, parent, name):
         super().__init__(parent, name)
         self.IN_curve_x = PYAFInput(
-            self, "input_chose_curve_x", ",")
-        self.IN_curve_y = PYAFInput(self, "input_chose_curve_y", "")
+            self, "input_chose_curve_x", ",", 40)
+        self.IN_curve_y = PYAFInput(self, "input_chose_curve_y", "", 40)
         self.IN_curve_x.input.setValidator(validator("x"))
         self.IN_curve_y.input.setValidator(validator("y"))
         self.IN_curve_x.changeValue(shared.exp.meshgrid_click_xpos + 1)
         self.IN_curve_y.changeValue(shared.exp.meshgrid_click_ypos + 1)
 
-        self.button_rand = PYAFButton(self, "button_rand", "Random curve")
+        self.button_rand = PYAFButton(
+            self, "button_rand", "Random curve", size=115)
 
-        self.BT_back = PYAFButton(self, "back", "<", size=60)
-        self.BT_forward = PYAFButton(self, "forward", ">", size=60)
+        self.BT_back = PYAFButton(self, "back", "<", size=40)
+        self.BT_forward = PYAFButton(self, "forward", ">", size=40)
 
         self.label_info = QtWidgets.QLabel()
 
         self.HL_select_curve = QtWidgets.QHBoxLayout()
+        # Compact: no margins, small gaps between the inputs and buttons
+        self.HL_select_curve.setContentsMargins(0, 0, 0, 0)
+        self.HL_select_curve.setSpacing(4)
         self.HL_select_curve.addStretch(1)
         self.HL_select_curve.addWidget(self.IN_curve_x)
         self.HL_select_curve.addWidget(self.IN_curve_y)
@@ -85,9 +89,12 @@ class ResultsSelectorWidget(PYAFWidget):
         xpos = shared.exp.meshgrid_click_xpos + 1
         ypos = shared.exp.meshgrid_click_ypos + 1
 
+        # Allowed positions for the selected file (the files can have
+        # different sizes)
+        self.IN_curve_x.input.setValidator(validator("x"))
+        self.IN_curve_y.input.setValidator(validator("y"))
+
         # Update the inputs
-        self.IN_curve_x.changeValue(xpos)
-        self.IN_curve_y.changeValue(ypos)
         self.IN_curve_x.changeValue(xpos)
         self.IN_curve_y.changeValue(ypos)
 

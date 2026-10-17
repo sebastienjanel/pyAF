@@ -35,7 +35,7 @@ import os
 import psutil
 import sys
 import logging
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from .. import consts
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFButton
@@ -146,6 +146,8 @@ class EntryWidget(QtWidgets.QDialog):
         #path = os.path.normpath(self.im_path + "/fix.png")
         im = numpy.array(Image.open(get_resource_path("fix.png")).convert("RGBA"))
         self.labelfixed.setPixmap(misc_tools.get_pixmap(im))
+        # Width of the image (fixed and changing parts)
+        self.image_width = im.shape[1] + self.image_list[0].shape[1]
 
         self.VL_entry.addLayout(self.HL_image)
 
@@ -162,23 +164,6 @@ class EntryWidget(QtWidgets.QDialog):
         self.label_mode.setText("Advanced")
         self.label_triangle.mousePressEvent = lambda event: self.change_mode()
         self.label_mode.mousePressEvent = lambda event: self.change_mode()
-
-        # Define checkbox for advanced mode
-        label = "Refresh histograms at load (slower)"
-        self.checkbox = PYAFCheckBox(self, "refresh", label)
-        if self.settings.contains("refreshHistsAtLoad"):
-            # Get the value
-            if self.settings.value("refreshHistsAtLoad") == "true":
-                self.refresh = True
-            elif self.settings.value("refreshHistsAtLoad") == "false":
-                self.refresh = False
-            else:
-                self.refresh = self.settings.value("refreshHistsAtLoad")
-
-        else:
-            # Default value
-            self.refresh = True
-        self.checkbox.setChecked(self.refresh)
 
         # Path and buttons for advanced modes
         self.label_path = QtWidgets.QLabel()
@@ -232,6 +217,18 @@ class EntryWidget(QtWidgets.QDialog):
         """
         self.logger.debug("EntryWidget init first UI")
 
+        # Article to cite, below the image
+        doi = "https://doi.org/10.1039/C8NR08955H"
+        label_cite = QtWidgets.QLabel(
+            "When using the program, cite the original article: "
+            "<i>Stiffness tomography of eukaryotic intracellular "
+            "compartments by atomic force microscopy</i> (Nanoscale, 2019, "
+            "11, 10320-10328).<br>DOI <a href=\"" + doi + "\">" + doi + "</a>")
+        label_cite.setWordWrap(True)
+        label_cite.setOpenExternalLinks(True)
+        label_cite.setFixedWidth(self.image_width)
+        self.VL_entry.addWidget(label_cite)
+
         # Define loading button and mode
         HL_mode = QtWidgets.QHBoxLayout()
 
@@ -268,14 +265,16 @@ class EntryWidget(QtWidgets.QDialog):
 
         # Set the width of the columns
         self.tableWidget.setColumnWidth(0, 40)
-        self.tableWidget.setColumnWidth(1, 240)
-        self.tableWidget.setColumnWidth(2, 100)
-        self.tableWidget.setColumnWidth(3, 203)
+        self.tableWidget.setColumnWidth(1, 220)
+        self.tableWidget.setColumnWidth(2, 150)
+        # The last column fills the width of the table
+        self.tableWidget.horizontalHeader().setStretchLastSection(True)
 
         # Define check all checkbox
-        checkbox = QtWidgets.QCheckBox("Select all")
-        checkbox.setChecked(True)
-        checkbox.clicked.connect(lambda: self.checkbox_clicked("check_all"))
+        self.checkbox = QtWidgets.QCheckBox("Select all")
+        self.checkbox.setChecked(True)
+        self.checkbox.clicked.connect(
+            lambda: self.checkbox_clicked("check_all"))
 
         HL = QtWidgets.QHBoxLayout()
         # Add the button to load the selected data
@@ -297,7 +296,7 @@ class EntryWidget(QtWidgets.QDialog):
         HL.addWidget(self.BT_load)
 
         self.VL_entry.addWidget(self.tableWidget)
-        self.VL_entry.addWidget(checkbox)
+        self.VL_entry.addWidget(self.checkbox)
         self.VL_entry.addLayout(HL)
         self.VL_entry.addLayout(self.GL_advanced)
 
@@ -308,7 +307,6 @@ class EntryWidget(QtWidgets.QDialog):
 
         if self.display_advanced:
             self.display_advanced = False
-            self.checkbox.setParent(None)
             self.BT_reset_path.setParent(None)
             self.BT_change_path.setParent(None)
             self.label_path.setParent(None)
@@ -317,10 +315,9 @@ class EntryWidget(QtWidgets.QDialog):
             self.label_triangle.setPixmap(pixmap)
         else:
             self.display_advanced = True
-            self.GL_advanced.addWidget(self.checkbox, 0, 0, 1, 1)
-            self.GL_advanced.addWidget(self.BT_reset_path, 1, 0)
-            self.GL_advanced.addWidget(self.BT_change_path, 1, 1)
-            self.GL_advanced.addWidget(self.label_path, 1, 2)
+            self.GL_advanced.addWidget(self.BT_reset_path, 0, 0)
+            self.GL_advanced.addWidget(self.BT_change_path, 0, 1)
+            self.GL_advanced.addWidget(self.label_path, 0, 2)
             self.label_mode.setText("Hide")
             pixmap = misc_tools.get_pixmap(self.triangle_down)
             self.label_triangle.setPixmap(pixmap)
@@ -390,12 +387,13 @@ class EntryWidget(QtWidgets.QDialog):
             lb = gui_tools.CenteredCellwidget(content)
             self.tableWidget.setCellWidget(i, 3, lb)
 
-        # Define the size of the table to hide the white space at the bottom
-        if self.tableWidget.verticalHeader().length() >= 200:
-            table_height = 200
-        else:
-            table_height = self.tableWidget.verticalHeader().length()
-        self.tableWidget.setFixedSize(600, table_height + 30)
+        # Define the size of the table to hide the white space at the bottom:
+        # rows (up to 200 px, then the table scrolls) + header + frame, so
+        # that there is no scroll bar when all the rows are displayed
+        table_height = min(self.tableWidget.verticalHeader().length(), 200)
+        header_height = self.tableWidget.horizontalHeader().sizeHint().height()
+        frame = 2 * self.tableWidget.frameWidth()
+        self.tableWidget.setFixedSize(600, table_height + header_height + frame)
 
     def fade(self):
         """Method which changes the alpha value of an image.
@@ -459,7 +457,7 @@ class EntryWidget(QtWidgets.QDialog):
     def center(self):
         """Called by main.py to center the Widget in the middle of the screen."""
         geometry = self.frameGeometry()
-        wcenter = QtWidgets.QDesktopWidget().availableGeometry().center()
+        wcenter = QtGui.QGuiApplication.primaryScreen().availableGeometry().center()
         geometry.moveCenter(wcenter)
         self.move(geometry.topLeft())
 
@@ -585,10 +583,6 @@ class EntryWidget(QtWidgets.QDialog):
                 if self.files_info[i]["enabled"]:
                     self.tableWidget.cellWidget(i, 0).checkbox.setChecked(val)
                     self.files_info[i]["checked"] = val
-
-        elif name == "refresh":
-            val = self.checkbox.isChecked()
-            self.settings.setValue("refreshHistsAtLoad", val)
 
     def list_updated(self, i):
         """Method called when a list is clicked."""

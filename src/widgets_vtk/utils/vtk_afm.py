@@ -36,6 +36,21 @@ import numpy
 from ... import widgets_list
 from ...tools.colortables import ColorTables
 from .common import center_data
+from ...tools import planefit
+
+
+def get_topography_for_geometry(data):
+    """Returns the topography as a numpy array, to build the 3D geometry.
+
+    Pixels where no point of contact was found have a nan topography. VTK
+    needs finite coordinates, so these pixels are drawn at the lowest
+    topography level (they have no stiffness value and are colored as nan).
+    The planefit of the file is applied.
+    """
+    topo = planefit.topo_map(data)
+    finite = numpy.isfinite(topo)
+    topo[~finite] = topo[finite].min() if finite.any() else 0.0
+    return topo
 
 
 def get_surface(parent, data, mode):
@@ -49,9 +64,11 @@ def get_surface(parent, data, mode):
     at the same position when the indentation is maximal, but having the offset
     ensures that those are two separate surfaces (surface and bottom).
     """
+    topo = get_topography_for_geometry(data)
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
+                             data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value)
 
     # Get the array with the stiffness
     if data.stiffness_corrected:
@@ -71,7 +88,7 @@ def get_surface(parent, data, mode):
             for j in range(data.nbr_pixels_y):
                 if tp == "Topo_surf":
                     if len(array[i][j]) > data.stiffness_depth_view:
-                        vals[i][j] = data.topography[i][j]
+                        vals[i][j] = topo[i][j]
                     else:
                         nans[i][j] = True
                 else:
@@ -132,10 +149,10 @@ def get_surface(parent, data, mode):
                 if data.opengl_afm_flat_view:
                     z_array[i][j] = parent.pos_z
                 else:
-                    z_array[i][j] = data.topography[i][j] - dpt
+                    z_array[i][j] = topo[i][j] - dpt
             if mode == "top" or mode == "bottom":
                 val = (len(array[i][j]) - 1) * used_st - z_offset
-                bottom_array[i][j] = data.topography[i][j] - val
+                bottom_array[i][j] = topo[i][j] - val
 
     # The z positions which will be used are the ones from the z_array
     # So in case of the bottom array redefine the z_array
@@ -256,11 +273,13 @@ def get_surface(parent, data, mode):
 
 def get_side(data, side):
     """Method to build the 4 actors for the sides of the tomography."""
+    topo = get_topography_for_geometry(data)
     widgets_list.widget_progressbar.set_label("Prepare data (" + side + ")")
 
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
+                             data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value)
 
     if data.stiffness_corrected:
         array = data.stiffness_corrected_array
@@ -274,7 +293,7 @@ def get_side(data, side):
 
     triangles = vtk.vtkCellArray()
 
-    step = data.indentation_step
+    _, step, _ = data.get_used_indentation()
     depth = data.stiffness_depth_view
 
     # Get the maximum indentation depth for a side, and the number of triangles
@@ -395,12 +414,12 @@ def get_side(data, side):
                 if (finallen > lennext - 2) and z >= (lencurrent - 1):
                     break
 
-                z1 = data.topography[c][b] - z * step
+                z1 = topo[c][b] - z * step
                 if z >= lennext:
-                    z2 = data.topography[c + 1][b] - (lennext - 1) * step
+                    z2 = topo[c + 1][b] - (lennext - 1) * step
                 else:
-                    z2 = data.topography[c + 1][b] - z * step
-                z3 = data.topography[c][b] - z * step - step
+                    z2 = topo[c + 1][b] - z * step
+                z3 = topo[c][b] - z * step - step
 
                 points.InsertNextPoint(c * data.x_size, b * data.y_size, z1)
                 points.InsertNextPoint(c * data.x_size + data.x_size,
@@ -433,14 +452,14 @@ def get_side(data, side):
                 if (finallen > lenbefore - 2) and z >= (lencurrent - 1):
                     break
 
-                z1 = data.topography[c][b] - z * step
+                z1 = topo[c][b] - z * step
                 if z >= lenbefore - 1:
-                    z2 = data.topography[
+                    z2 = topo[
                         c - 1][b] - lenbefore * step + step
                 else:
-                    z2 = data.topography[c - 1][b] - z * step - step
+                    z2 = topo[c - 1][b] - z * step - step
 
-                z3 = data.topography[c][b] - z * step - step
+                z3 = topo[c][b] - z * step - step
 
                 points.InsertNextPoint(c * data.x_size, b * data.y_size, z1)
                 points.InsertNextPoint(c * data.x_size - data.x_size,
@@ -489,12 +508,12 @@ def get_side(data, side):
                 if (finallen > lennext - 2) and z >= (lencurrent - 1):
                     break
 
-                z1 = data.topography[a][c] - z * step
+                z1 = topo[a][c] - z * step
                 if z >= lennext:
-                    z2 = data.topography[a][c + 1] - (lennext - 1) * step
+                    z2 = topo[a][c + 1] - (lennext - 1) * step
                 else:
-                    z2 = data.topography[a][c + 1] - z * step
-                z3 = data.topography[a][c] - z * step - step
+                    z2 = topo[a][c + 1] - z * step
+                z3 = topo[a][c] - z * step - step
 
                 points.InsertNextPoint(a * data.x_size, c * data.y_size, z1)
                 points.InsertNextPoint(a * data.x_size,
@@ -527,14 +546,14 @@ def get_side(data, side):
                 if (finallen > lenbefore - 2) and z >= (lencurrent - 1):
                     break
 
-                z1 = data.topography[a][c] - z * step
+                z1 = topo[a][c] - z * step
                 if z >= lenbefore - 1:
-                    z2 = data.topography[a][
+                    z2 = topo[a][
                         c - 1] - lenbefore * step + step
                 else:
-                    z2 = data.topography[a][c - 1] - z * step - step
+                    z2 = topo[a][c - 1] - z * step - step
 
-                z3 = data.topography[a][c] - z * step - step
+                z3 = topo[a][c] - z * step - step
 
                 points.InsertNextPoint(a * data.x_size, c * data.y_size, z1)
                 points.InsertNextPoint(a * data.x_size,
@@ -579,7 +598,8 @@ def get_surface_as_squares(data, off):
     """
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
+                             data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value)
 
     # Get the array with the stiffness
     if data.stiffness_corrected:
@@ -678,9 +698,11 @@ def get_surface_as_squares(data, off):
 
 def get_actor_surface_as_cubes(self, data, mode):
     """Not working for the moment"""
+    topo = get_topography_for_geometry(data)
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
                              data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value,
                              color_nan=data.color_nan)
 
     if data.stiffness_corrected:
@@ -698,11 +720,11 @@ def get_actor_surface_as_cubes(self, data, mode):
                 if data.opengl_afm_flat_view:
                     z = self.pos_z
                 else:
-                    z = data.topography[i][j] - \
-                        data.stiffness_depth_view * data.indentation_step
+                    z = topo[i][j] - \
+                        data.stiffness_depth_view * data.get_used_indentation()[1]
             elif mode == "bottom":
-                z = data.topography[i][j] - \
-                    (len(array[i][j]) - 1) * data.indentation_step
+                z = topo[i][j] - \
+                    (len(array[i][j]) - 1) * data.get_used_indentation()[1]
 
             points.InsertNextPoint(i * data.x_size, j * data.y_size, z)
 
@@ -730,7 +752,7 @@ def get_actor_surface_as_cubes(self, data, mode):
     cubeSource = vtk.vtkCubeSource()
     cubeSource.SetXLength(data.x_size)
     cubeSource.SetYLength(data.y_size)
-    cubeSource.SetZLength(data.indentation_step)
+    cubeSource.SetZLength(data.get_used_indentation()[1])
 
     glyph3D = vtk.vtkGlyph3D()
     glyph3D.SetColorModeToColorByScalar()
@@ -751,9 +773,11 @@ def get_actor_surface_as_cubes(self, data, mode):
 
 def get_surface_as_points(self, data, mode):
     """Topography as single dots."""
+    topo = get_topography_for_geometry(data)
     colortable = ColorTables(data.colortableid, data.color_saturation,
                              data.color_negative, data.colortable_max_value,
                              data.colortable_middle_value, mode="scalarMap",
+                             min_value=data.colortable_min_value,
                              color_nan=data.color_nan)
 
     points = vtk.vtkPoints()
@@ -766,12 +790,12 @@ def get_surface_as_points(self, data, mode):
                 if data.opengl_afm_flat_view:
                     z = self.pos_z
                 else:
-                    z = data.topography[i][j]
+                    z = topo[i][j]
 
             points.InsertNextPoint(i * data.x_size, j * data.y_size, z)
 
             if len(data.stiffness_array[i][j]) > data.stiffness_depth_view:
-                val_E = data.topography[i][j]
+                val_E = topo[i][j]
             else:
                 val_E = numpy.nan
 
@@ -802,7 +826,10 @@ def get_surface_as_points(self, data, mode):
     glyph3D.SetInputData(polydata)
     glyph3D.Update()
 
-    return glyph3D
+    # Highest point, for the z scale (as for the surface)
+    z_max = 0 if data.opengl_afm_flat_view else float(numpy.max(topo))
+
+    return glyph3D.GetOutput(), z_max
 
 
 def get_actor_profile(sizes, trans, z_scale, profile, polydata_tomo):

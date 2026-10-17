@@ -45,7 +45,7 @@ import os
 import sys
 import time
 import tables
-from PyQt5 import QtCore
+from qtpy import QtCore
 import tempfile
 from .. import widgets_list
 from .. import shared

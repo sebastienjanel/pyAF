@@ -40,6 +40,7 @@ from matplotlib.collections import PolyCollection, LineCollection
 from ...tools.colortables import ColorTables
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from ... import shared
+from ...tools import planefit
 from ..plot_main import MainPlot
 
 
@@ -111,8 +112,12 @@ class PlotSlices(MainPlot):
         old_pos_x = 0
         old_pos_y = 0
 
-        z_size = self.data.indentation_step
+        # Step used for the computation of the displayed segments
+        _, z_size, _ = self.data.get_used_indentation()
         self.custom_max_x = 0  # For custom profile
+
+        # Heights with the planefit of the file (from the substrate plane)
+        topo = planefit.topo_map(self.data)
 
         # Prepare the arrays with the data, depending on the direction
 
@@ -124,7 +129,7 @@ class PlotSlices(MainPlot):
 
             for i in range(nbr_pixels_x):
                 if self.data.display_slice_with_topo:
-                    ztop = self.data.topography[i][pos_top]
+                    ztop = topo[i][pos_top]
                 else:
                     ztop = 0
 
@@ -149,7 +154,7 @@ class PlotSlices(MainPlot):
 
             for i in range(nbr_pixels_x):
                 if self.data.display_slice_with_topo:
-                    ztop = self.data.topography[i][pos_bot]
+                    ztop = topo[i][pos_bot]
                 else:
                     ztop = 0
 
@@ -174,7 +179,7 @@ class PlotSlices(MainPlot):
 
             for i in range(nbr_pixels_y):
                 if self.data.display_slice_with_topo:
-                    ztop = self.data.topography[pos_left][i]
+                    ztop = topo[pos_left][i]
                 else:
                     ztop = 0
 
@@ -199,7 +204,7 @@ class PlotSlices(MainPlot):
 
             for i in range(nbr_pixels_y):
                 if self.data.display_slice_with_topo:
-                    ztop = self.data.topography[pos_right][i]
+                    ztop = topo[pos_right][i]
                 else:
                     ztop = 0
 
@@ -236,7 +241,7 @@ class PlotSlices(MainPlot):
                 old_pos_y = pos_y
 
                 if self.data.display_slice_with_topo:
-                    ztop = self.data.topography[pos_x][pos_y]
+                    ztop = topo[pos_x][pos_y]
                 else:
                     ztop = 0
                 values = self.data.stiffness_array[pos_x][pos_y]
@@ -272,7 +277,7 @@ class PlotSlices(MainPlot):
                 old_pos_y = pos_y
 
                 if self.data.display_slice_with_topo:
-                    ztop = self.data.topography[pos_x][pos_y]
+                    ztop = topo[pos_x][pos_y]
                 else:
                     ztop = 0
                 values = self.data.stiffness_array[pos_x][pos_y]
@@ -301,7 +306,7 @@ class PlotSlices(MainPlot):
         self.z_size = z_size
         self.nbr_pixels_x = nbr_pixels_x
         self.nbr_pixels_y = nbr_pixels_y
-        self.y_height = numpy.amax(self.data.topography)
+        self.y_height = numpy.nanmax(topo)
         self.data_stiffness_slices = [numpy.array(E_array),
                                       numpy.array(X_array),
                                       numpy.array(Z_array)]

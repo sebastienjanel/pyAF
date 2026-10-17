@@ -34,15 +34,15 @@ Custom table header class allowing to embed a checkbox on the header first colum
 This checkbox is used to allow the user to select all the rows at once.
 """
 
-from PyQt5.QtCore import Qt, QRect, pyqtSignal
-from PyQt5.QtWidgets import QTableWidget, QApplication, QHeaderView, QStyleOptionButton, QStyle
+from qtpy.QtCore import Qt, QRect, Signal
+from qtpy.QtWidgets import QTableWidget, QApplication, QHeaderView, QStyleOptionButton, QStyle
 
 
 class QCheckableHeader(QHeaderView):
 
     # Used to handle row selection
     select_all = False
-    all_selected = pyqtSignal()
+    all_selected = Signal()
 
     def __init__(self, orientation, parent=None):
         QHeaderView.__init__(self, orientation, parent)

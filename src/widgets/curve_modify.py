@@ -34,7 +34,7 @@
 import os
 import logging
 import platform
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools import math_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFInput
@@ -59,16 +59,16 @@ class CurveModWidget(PYAFWidget):
 
         self.logger = logging.getLogger()
 
-        self.sel_st1 = "QWidget#widget_tilt { background-color: #3daee9; }"
-        self.sel_st2 = "QWidget#widget_stretch { background-color: #3daee9; }"
+        self.sel_st1 = "QWidget#widget_tilt { background-color: #3b8eea; }"
+        self.sel_st2 = "QWidget#widget_stretch { background-color: #3b8eea; }"
 
         if shared.exp.current_theme == "Dark":
             self.un_st1 = "QWidget#widget_tilt { background-color: #31363b; }"
             self.un_st2 = "QWidget#widget_stretch { background-color: #31363b; }"
 
         elif shared.exp.current_theme == "Light":
-            self.un_st1 = "QWidget#widget_tilt { background-color: #EFF0F1; }"
-            self.un_st2 = "QWidget#widget_stretch { background-color: #EFF0F1; }"
+            self.un_st1 = "QWidget#widget_tilt { background-color: #D0D3D7; }"
+            self.un_st2 = "QWidget#widget_stretch { background-color: #D0D3D7; }"
 
         self.gridLayout = QtWidgets.QGridLayout()
 
@@ -157,7 +157,7 @@ class CurveModWidget(PYAFWidget):
         self.input_stretch_len = PYAFInput(self, "in_stretch_len", "Length")
         self.BTGRP_stretch_mode = PYAFButtonGroup(self, "grp_stretch_mode")
         self.RB_stretch_app = QtWidgets.QRadioButton("Approach")
-        self.RB_stretch_ret = QtWidgets.QRadioButton("Retraction")
+        self.RB_stretch_ret = QtWidgets.QRadioButton("Retract")
         self.BTGRP_stretch_mode.addButton(self.RB_stretch_app, 0)
         self.BTGRP_stretch_mode.addButton(self.RB_stretch_ret, 1)
         self.HL_stretch1.addWidget(self.input_stretch1)

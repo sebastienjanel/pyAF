@@ -31,7 +31,7 @@
 
 """Main VTK widget."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from .menu_options import MenuOptionsWidget
 from .menu_layer_list import MenuLayerListWidget
 from .opengl_vtk import VTKWidget
@@ -97,7 +97,7 @@ class OpenglWidget(PYAFWidget):
 
         # Add colorbar to the renderer
         self.scalar_bar = get_color_bar()
-        self.canvas.renderer.AddActor2D(self.scalar_bar)
+        self.canvas.renderer.AddViewProp(self.scalar_bar)
 
         # Automatically load saved layers, is used for debugging
         if consts.AUTO_LOAD_LAYER_IN_3D:
@@ -169,41 +169,59 @@ class OpenglWidget(PYAFWidget):
 
         # Get a new scalar bar and add it to the renderer
         self.scalar_bar = get_color_bar()
-        self.canvas.renderer.AddActor2D(self.scalar_bar)
+        self.canvas.renderer.AddViewProp(self.scalar_bar)
 
         # Render
         if shared.VTK_first is False:
             self.canvas.interactor.GetRenderWindow().Render()
 
 
+def colorbar_data():
+    """File whose color scale is displayed: the selected AFM layer, else the
+    first AFM layer of the window."""
+    afm_layers = [layer for layer in shared.layer_list if layer.type == "afm"]
+    widget = widgets_list.widget_vtk
+    if widget is not None:
+        index = widget.get_current_layer()
+        if index is not None and shared.layer_list[index].type == "afm":
+            return shared.exp.list[shared.layer_list[index].afm_id]
+    if afm_layers:
+        return shared.exp.list[afm_layers[0].afm_id]
+    return shared.exp.list[0]
+
+
 def get_color_bar():
     """Create a lookup table for the colorbar
 
-    (Defined with the values of the first layer)
+    (Defined with the values of the selected AFM layer, or of the first AFM
+    layer of the window)
     """
-    data = shared.exp.list[0]
+    data = colorbar_data()
 
     lut = vtk.vtkLookupTable()
     lut.SetNumberOfColors(4)
     lut.SetNumberOfTableValues(512)
     tp = data.opengl_surf_type
+    # Same range as the colors of the tomography: from the min value, except
+    # for Rainbow 1 and Cool-Warm which start at 0 (as in the 2D meshgrids)
+    themin = 0 if data.colortableid in (1, 6) else data.colortable_min_value
+    themax = data.colortable_max_value
     if tp == "Stiffness" or tp == "Stiffness_squares":
-        themax = data.colortable_max_value
-        lut.SetTableRange(0, themax / 1000.0)
+        lut.SetTableRange(themin / 1000.0, themax / 1000.0)
     elif tp == "Topo_dots" or tp == "Topo_surf":
-        themax = data.colortable_max_value
-        lut.SetTableRange(0, themax)
+        lut.SetTableRange(themin, themax)
     colortable = ColorTables(data.colortableid,
                              data.color_saturation,
                              data.color_negative,
                              data.colortable_max_value,
                              data.colortable_middle_value,
                              mode="scalarMap",
-                             color_nan=data.color_nan)
-    step = themax / 512.0
+                             color_nan=data.color_nan,
+                             min_value=themin)
+    step = (themax - themin) / 512.0
 
     for i in range(512):
-        color_st = colortable.get_color_as_list(i * step)
+        color_st = colortable.get_color_as_list(themin + i * step)
         lut.SetTableValue(i, [color_st[0], color_st[1], color_st[2], 1.0])
     lut.Build()
 

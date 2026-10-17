@@ -31,11 +31,12 @@
 
 """Plots profiles."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools import math_tools
 from ..tools.gui_tools import PYAFInput
 import numpy
+from ..tools import planefit
 from ..tools.PYAFWidget import PYAFWidget
 from .. import shared
 
@@ -64,6 +65,8 @@ class ProfileWidget(PYAFWidget):
         d_x = (dt.scan_size_x / float(dt.topography.shape[0])) / 1000.0
         d_y = (dt.scan_size_y / float(dt.topography.shape[1])) / 1000.0
         d_xy = numpy.sqrt((d_x ** 2 + d_y ** 2))
+        # Heights with the planefit of the file
+        topo = planefit.topo_map(dt)
 
         self.profiles_x = []
         self.profiles_z = []
@@ -86,7 +89,7 @@ class ProfileWidget(PYAFWidget):
                     self.profiles_x[profile].append(count)
                 i = pl[profile][0][count]
                 j = pl[profile][1][count]
-                val = dt.topography[i][j] / 1000.0
+                val = topo[i][j] / 1000.0
                 self.profiles_z[profile].append(val)
 
         self.VL = QtWidgets.QVBoxLayout()
@@ -213,7 +216,11 @@ class ProfileWidget(PYAFWidget):
                         break
 
                 value = abs(z1 - z2)
-                self.delta_z_labels[profile].setText(str(round(value)))
+                if numpy.isnan(value):
+                    # No topography at one of the bars (no POC found)
+                    self.delta_z_labels[profile].setText("NaN")
+                else:
+                    self.delta_z_labels[profile].setText(str(round(value)))
 
     def open_single_figure(self):
         """Open the figure in a separate window."""
@@ -253,13 +260,9 @@ class ProfileWidget(PYAFWidget):
         canv = self.canvas
 
         if event.button == 3 and event.inaxes == canv.canvas.axes:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = canv.mapToGlobal(QtCore.QPoint(0, 0))
-
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
 
             self.popUpMenu(pos)
 

@@ -31,6 +31,7 @@
 
 """Miscellaneous tools for pyAF."""
 
+import re
 import os
 import sys
 import copy
@@ -42,11 +43,10 @@ import logging
 import logging.handlers
 from PIL import Image
 #from PIL.ImageQt import ImageQt
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 import matplotlib
 import multiprocessing
 from .. import shared
-from .. import consts
 import psutil
 from . import git_tools
 from . import events_tools
@@ -59,12 +59,9 @@ def get_app_path():
 
     Split the current's file path and go back 2 levels, to be in main folder.
     """
-    splitted_path = os.path.realpath(__file__).split(os.sep)
-    path = ""
-    for i in range(1, len(splitted_path) - 2):
-        path += os.sep + splitted_path[i]
-
-    return path
+    # (keeps the drive letter on Windows)
+    tools_folder = os.path.dirname(os.path.realpath(__file__))
+    return os.path.dirname(tools_folder)
 
 
 def get_base_window_title():
@@ -223,6 +220,8 @@ def save_used_params(data, mode):
     """Saved current parameters to shared.exp."""
     if mode == "stiffness" or mode == "all":
         data.used_stiffness_model_selected = data.stiffness_model_selected
+        data.used_stiffness_mode = data.stiffness_mode
+        data.used_fit_range_type = data.fit_range_type
         data.used_tip_radius = data.tip_radius
         data.used_tip_angle = data.tip_angle
         data.used_poisson_ratio = data.poisson_ratio
@@ -231,7 +230,8 @@ def save_used_params(data, mode):
         data.used_indentation_step = data.indentation_step
         data.used_force_start = data.force_start
         data.used_force_stop = data.force_stop
-        data.used_strict_stop = data.strict_stop
+        data.used_fit_min_indentation = data.fit_min_indentation
+        data.used_fit_poc_window = data.fit_poc_window
         data.used_tomography = data.tomography
         data.used_fitparam_poc_skip_start = data.fitparam_poc_skip_start
         data.used_fitparam_poc_fit_length = data.fitparam_poc_fit_length
@@ -306,13 +306,10 @@ def get_hist_refresh_range(exp, loading=False):
     The grouped results preparation is very fast so no need to display a
     progressbar for it.
     """
-    # At load, if the results are not refreshed, no need to display a
-    # progressbar
+    # At load, the results are not computed (they are when the plots tabs
+    # are opened)
     if loading:
-        settings = QtCore.QSettings()
-        refresh_hist_at_load = settings.value("refreshHistsAtLoad")
-        if not refresh_hist_at_load:
-            return 0
+        return 0
 
     # Progressbar for single results
     progressbar_range = 0
@@ -377,77 +374,42 @@ def set_user_path(settings, path):
     matplotlib.rcParams["savefig.directory"] = path
 
 
+def elasticity_name(datas=None):
+    """Name of the elasticity results of the files (all the files by
+    default): Stiffness when computed by Tomography (slope model, N/m),
+    Elasticity / Stiffness when the files are mixed."""
+    if datas is None:
+        datas = shared.exp.list
+    models = {data.used_stiffness_model_selected for data in datas
+              if data.stiffness_calculated}
+    if models == {3}:
+        return "Stiffness"
+    if 3 in models:
+        return "Elasticity / Stiffness"
+    return "Elasticity"
+
+
+# Meshgrid types, by id (id of the radio button in the results tab)
+MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
+                  "stiffness_corr", "stiffness_corr_slice", "work",
+                  "rupture_force", "events_per_curve",
+                  "events_rupture_force", "visco_e0", "visco_fluidity",
+                  "visco_tan_delta")
+
+
 def get_meshgrid_type_as_string(mesh_id):
     """Given a meshgrid id, return the type as a string."""
-    if mesh_id == 0:
-        return "piezo"
-    elif mesh_id == 1:
-        return "topo"
-    elif mesh_id == 2:
-        return "stiffness"
-    elif mesh_id == 3:
-        return "stiffness_slice"
-    elif mesh_id == 4:
-        return "stiffness_corr"
-    elif mesh_id == 5:
-        return "stiffness_corr_slice"
-    elif mesh_id == 6:
-        return "work"
-    elif mesh_id == 7:
-        return "rupture_force"
-    elif mesh_id == 8:
-        return "events_per_curve"
-    elif mesh_id == 9:
-        return "events_rupture_force"
+    return MESHGRID_TYPES[mesh_id]
 
 
 def get_meshgrid_type_by_id(meshgrid_type):
     """Given a meshgrid type, return the type as an id."""
-    if meshgrid_type == "piezo":
-        mesh_id = 0
-    elif meshgrid_type == "topo":
-        mesh_id = 1
-    elif meshgrid_type == "stiffness":
-        mesh_id = 2
-    elif meshgrid_type == "stiffness_slice":
-        mesh_id = 3
-    elif meshgrid_type == "stiffness_corr":
-        mesh_id = 4
-    elif meshgrid_type == "stiffness_corr_slice":
-        mesh_id = 5
-    elif meshgrid_type == "work":
-        mesh_id = 6
-    elif meshgrid_type == "rupture_force":
-        mesh_id = 7
-    elif meshgrid_type == "events_per_curve":
-        mesh_id = 8
-    elif meshgrid_type == "events_rupture_force":
-        mesh_id = 9
-    return mesh_id
+    return MESHGRID_TYPES.index(meshgrid_type)
 
 
 def get_color_opts_by_meshgrid_type(data, meshgrid_type):
     """Return the colorscale depending on the meshgrid type."""
-    if meshgrid_type == "piezo":
-        return data.color_opts_piezo
-    elif meshgrid_type == "topo":
-        return data.color_opts_topo
-    elif meshgrid_type == "stiffness":
-        return data.color_opts_stiffness
-    elif meshgrid_type == "work":
-        return data.color_opts_work
-    elif meshgrid_type == "rupture_force":
-        return data.color_opts_rupture_force1
-    elif meshgrid_type == "events_per_curve":
-        return data.color_opts_events_per_curve
-    elif meshgrid_type == "events_rupture_force":
-        return data.color_opts_rupture_force2
-    elif meshgrid_type == "stiffness_slice":
-        return data.color_opts_stiffness
-    elif meshgrid_type == "stiffness_corr":
-        return data.color_opts_stiffness
-    elif meshgrid_type == "stiffness_corr_slice":
-        return data.color_opts_stiffness
+    return data.get_color_opts(meshgrid_type)
 
 
 def get_results_type_from_id(results_type):
@@ -468,57 +430,19 @@ def get_results_type_from_id(results_type):
         result_id = "loading_rates"
     elif results_type == 7:
         result_id = "events_distance"
+    elif results_type == 8:
+        result_id = "visco_e0"
+    elif results_type == 9:
+        result_id = "visco_fluidity"
+    elif results_type == 10:
+        result_id = "visco_tan_delta"
 
     return result_id
 
 
 def get_cores():
-    """Function used to determine the number of cores aviable,"""
-    cores = multiprocessing.cpu_count()
-
-    if consts.UNIT_TESTING is False:
-        return int(cores)
-    else:
-        # The unit tests segfault often due to problems
-        # with process forks on OS X. Remove the segfaults
-        # by setting the cores to 1.
-        return 1
-
-
-def get_processes(nbr_pixels):
-    """Get the number of processes the software can spawn for the multiprocessing.
-
-    The data has to be evenly shared through the processes, so the number of
-    processes will depend on the number of curves and the numbers of cores.
-
-    On windows the maximum processes is set to 4 for performance reasons.
-    (See documentation).
-    """
-    cores = shared.exp.cores
-
-    # Define the number of processes to spawn.
-    if nbr_pixels < cores:
-        nbr_processes = nbr_pixels
-    else:
-        nbr_processes = cores
-
-    # Reduce number of processes if needed
-    # (for example using 24 cores on 4096 curves will not work).
-    # The data has to be evenly distributed to every process.
-    while nbr_pixels % nbr_processes != 0:
-        nbr_processes -= 1
-        if nbr_processes == 1:
-            break
-
-    # On windows allow only the creation of maximum 4 processes, spawning
-    # more processes is slow.
-    if platform.uname()[0] == "Windows":
-        if nbr_processes != 1:
-            nbr_processes = 4
-            while nbr_processes > cores:
-                nbr_processes = nbr_processes / 2
-
-    return int(nbr_processes)
+    """Number of cores available for the computations."""
+    return int(multiprocessing.cpu_count())
 
 
 def get_nbr_blocks(cols, rows):
@@ -615,17 +539,18 @@ def get_tiff_calibration(path):
                 string += char.decode("latin-1")
             string = repr(string)
 
-            # \xb5m == um
-            string1 = string.split("Voxel_size_X: ")[1]
-            xcal = float(string1.split(" \\xb5m")[0]) * 1e-6
-            string2 = string.split("Voxel_size_Y: ")[1]
-            ycal = float(string2.split(" \\xb5m")[0]) * 1e-6
-            string3 = string.split("Voxel_size_Z: ")[1]
-            zcal = float(string3.split(" \\xb5m")[0]) * 1e-6
+            # Sizes in um (written \xb5m or µm)
+            cal = []
+            for axis in ("X", "Y", "Z"):
+                found = re.search("Voxel_size_" + axis + r": ([0-9.eE+-]+) "
+                                  r"(?:\\xb5|\u00b5)m", string)
+                if found is None:
+                    raise IndexError
+                cal.append(float(found.group(1)) * 1e-6)
 
-            return [xcal, ycal, zcal]
+            return cal
 
-        except IndexError:
+        except (IndexError, ValueError):
             pass
 
         try:
@@ -643,7 +568,7 @@ def get_tiff_calibration(path):
 
             return [xcal, ycal, 0]
 
-        except IndexError:
+        except (IndexError, ValueError):
             pass
 
         # Return nothing
@@ -768,6 +693,10 @@ def reset_computation(data_id, computation_type):
                 str(data_id),
                 "loading_rates")
 
+    if computation_type in ("viscoelasticity", "all"):
+        data.visco_calculated = False
+        data.visco_results = None
+
     data.display_curve_type = "defl_ext"
     data.update()
 
@@ -799,6 +728,63 @@ def get_position_on_meshgrid(event):
     return int(event.xdata / xsize) + 1, int(event.ydata / ysize) + 1
 
 
+class DoubleValidator(QtGui.QDoubleValidator):
+    """Validator for the floats, accepting "." and "," as decimal point.
+
+    The values are displayed with a ".", and get_float_value accepts both,
+    whatever the language of the computer (QDoubleValidator alone only
+    accepts the decimal point of the language, "," in French).
+    """
+
+    def __init__(self, allow_empty=False):
+        super().__init__()
+        self.setLocale(QtCore.QLocale.c())
+        self.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        # An empty input is accepted (to remove an optional value)
+        self.allow_empty = allow_empty
+
+    def validate(self, text, pos):
+        result = super().validate(text.replace(",", "."), pos)
+        state = result[0] if isinstance(result, tuple) else result
+        state = self.check(text, state)
+        if self.allow_empty and text.strip() == "":
+            state = QtGui.QValidator.Acceptable
+        # Keep the text typed by the user (with its "," if any)
+        if isinstance(result, tuple):
+            return state, text, pos
+        return state
+
+    def check(self, text, state):
+        """Additional check of an acceptable value."""
+        return state
+
+
+class StrictlyPositiveDoubleValidator(DoubleValidator):
+    """Validator for the floats > 0 (0 stays an intermediate input)."""
+
+    def __init__(self):
+        super().__init__()
+        self.setBottom(0)
+
+    def check(self, text, state):
+        if state == QtGui.QValidator.Acceptable:
+            try:
+                if float(text.replace(",", ".")) == 0:
+                    return QtGui.QValidator.Intermediate
+            except ValueError:
+                pass
+        return state
+
+
+def format_number(value):
+    """Text of a value with 6 significant digits.
+
+    Removes the floating point noise of the conversions (e.g. 21.5 degC
+    stored as 294.65 K, displayed as 21.499999999999996).
+    """
+    return "{:.6g}".format(value)
+
+
 def validator(name, reg=None, bottom=None, top=None, decimal=None):
     """Validate the inputs.
 
@@ -821,21 +807,35 @@ def validator(name, reg=None, bottom=None, top=None, decimal=None):
 
     # Positive float
     elif name == "UF":
-        val = QtGui.QDoubleValidator()
+        val = DoubleValidator()
         val.setBottom(0)
+
+    # Positive float, or no value
+    elif name == "UF_or_empty":
+        val = DoubleValidator(allow_empty=True)
+        val.setBottom(0)
+
+    # Strictly positive float (0 is refused)
+    elif name == "PF":
+        val = StrictlyPositiveDoubleValidator()
+
+    # Integer greater or equal to 'bottom'
+    elif name == "MI":
+        val = QtGui.QIntValidator()
+        val.setBottom(bottom)
 
     # Float between 'bottom' and 'top' and max decimal of 'decimal'
     elif name == "RF":
-        val = QtGui.QDoubleValidator()
+        val = DoubleValidator()
         val.setRange(bottom, top, decimal)
 
     # All floats
     elif name == "F":
-        val = QtGui.QDoubleValidator()
+        val = DoubleValidator()
 
     # Specific regular expression
     elif name == "R":
-        val = QtGui.QRegExpValidator(reg)
+        val = QtGui.QRegularExpressionValidator(reg)
 
     return val
 
@@ -848,7 +848,7 @@ def ask_user_for_color(current_color):
     color = QtWidgets.QColorDialog.getColor(current_color)
     if color.isValid():
         color = color.getRgb()[:-1]
-        return [color[0] / 256.0, color[1] / 256.0, color[2] / 256.0, 1.0]
+        return [color[0] / 255.0, color[1] / 255.0, color[2] / 255.0, 1.0]
     else:
         return False
 
@@ -860,10 +860,9 @@ def update_indentation_list(unique_id):
     # Create an array with text, defining slices of indent
     # for the list in the results tab
     data.indentation_list = []
-    step = data.indentation_step
-    start = data.indentation_start
+    start, step, tomography = data.get_used_indentation()
     for indentation in range(data.max_indentation_index):
-        if data.tomography:
+        if tomography:
             start_z = str(indentation * step + start)
         else:
             start_z = str(0 + start)
@@ -892,6 +891,31 @@ def update_slice_position(unique_id):
                 res.slice = 0
             if len(data.indentation_list) == 1:
                 res.slice = 0
+
+
+# Font of the plots, shipped with pyAF (SIL Open Font License, see the
+# OFL.txt file next to it)
+PLOT_FONT_FILE = "Inter-Regular.ttf"
+
+
+def z_label(data, unit="nm"):
+    """Label of the z axis of the curves (position of the z axis, from the
+    start of the retraction curve), with the source of the values."""
+    if data.zsensor_used is True:
+        source = " (height sensor)"
+    elif data.zsensor_used is False:
+        source = " (piezo, calculated)"
+    else:
+        source = ""
+    return "Z position" + source + " [" + unit + "]"
+
+
+def get_font_path():
+    """Path of the font of the plots (in the application bundle if
+    frozen, see main_macOS.spec)."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, "fonts", PLOT_FONT_FILE)
+    return os.path.join(get_app_path(), "fonts", PLOT_FONT_FILE)
 
 
 def get_resource_path(relative_path):

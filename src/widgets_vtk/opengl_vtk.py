@@ -35,11 +35,14 @@ import vtk
 import math
 from .. import shared
 from .. import consts
-from PyQt5 import QtCore, QtWidgets
-from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+import qtpy
+from qtpy import QtCore, QtWidgets
+import vtkmodules.qt
+# Use the same Qt binding as the rest of the application
+vtkmodules.qt.PyQtImpl = qtpy.API_NAME
+from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 from .layers.layer_afm import LayerAFM
 from .layers.layer_single_image import LayerSingleImage
-from .layers.layer_optics_HR import LayerOpticsHR
 from .layers.layer_glass import LayerGlass
 from .. import widgets_list
 
@@ -174,13 +177,6 @@ class VTKWidget(QtWidgets.QWidget):
             return True
         else:
             return False
-
-    def addOpticsHRLayer(self, path):
-        """Adds an high resolution optics layer"""
-        shared.layer_list.append(LayerOpticsHR(self, path))
-        if shared.VTK_first is False:
-            self.renderer.Render()
-        return True
 
     def addGlassLayer(self, layer_id, afm_id, roi_id):
         """Adds glass layers."""
@@ -411,6 +407,24 @@ class PYAFInteractor(QVTKRenderWindowInteractor):
         super().__init__(frame)
 
         self.started_drawing_square = False
+        self.render_pending = False
+
+    def paintEvent(self, event):
+        """Render outside of the paint event.
+
+        With Qt >= 6.10 on macOS, calling Render() inside the paint event
+        (as QVTKRenderWindowInteractor does) freezes the application. The
+        render is deferred to the event loop instead.
+        """
+        if not self.render_pending:
+            self.render_pending = True
+            QtCore.QTimer.singleShot(0, self.deferred_render)
+
+    def deferred_render(self):
+        """Render the window (called from paintEvent)."""
+        self.render_pending = False
+        # Same call as QVTKRenderWindowInteractor.paintEvent
+        self._Iren.Render()
 
     def mousePressEvent(self, event):
         """Fetch mouse press events."""

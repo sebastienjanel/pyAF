@@ -32,7 +32,7 @@
 """Import saved layers in VTK."""
 
 import pickle
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 from ... import shared
 from ... import widgets_list
@@ -57,7 +57,7 @@ def load_layers(parent, path=None):
         misc_tools.set_user_path(settings, str(path))
 
         # Get number of layers to load
-        global_file = open(str(path) + "/global.txt", "rb")
+        global_file = open(str(path) + "/global.txt", "r")
         nbr_layers = int(global_file.read().split("=")[1])
         global_file.close()
 
@@ -70,84 +70,81 @@ def load_layers(parent, path=None):
         widgets_list.widget_vtk.canvas.renderer.ResetCameraClippingRange()
         widgets_list.widget_vtk.scales_color = global_params["scales_color"]
 
+        # The saved AFM layers are applied to the AFM layers of the window,
+        # in the same order; the other layers are created
+        afm_layers = [layer for layer in shared.layer_list
+                      if layer.type == "afm"]
+        nbr_afm = 0
+        # Index of each saved layer in the window
+        new_index = {}
+
         # Read each layer file
         for i in range(nbr_layers):
-            layer_file = open(
-                str(path) +
-                "/layer_" +
-                str(i) +
-                ".txt",
-                "rb")
-
-            layer_prefs = pickle.loads(layer_file.read())
+            with open(str(path) + "/layer_" + str(i) + ".txt", "rb") as fi:
+                layer_prefs = pickle.loads(fi.read())
 
             layer_type = layer_prefs["type"]
+            nbr_before = len(shared.layer_list)
 
-            if layer_type == "single_image":
-                new_path = str(path) + "/layer_" + str(i) + ".tiff"
-
-                create_layer(layer_type, new_path)
-
-                # Update the values in the layer
-                layer = shared.layer_list[i]
-                for key in layer_prefs:
-                    misc_tools.setattr_special(layer, key, layer_prefs[key])
-
-                # Use the new path of the file as image path
-                layer.filepath = new_path
-
-                layer.update_actor()
-
-            elif layer_type == "afm":
-                # For AFM layers, just update
-                layer = shared.layer_list[i]
+            if layer_type == "afm":
+                if nbr_afm >= len(afm_layers):
+                    # No AFM layer left in the window for this one
+                    continue
+                layer = afm_layers[nbr_afm]
+                nbr_afm += 1
 
                 for key in layer_prefs:
                     # Do not update the pixel sizes for AFM
-                    if key != "nbr_pixels_x" and key != "nbr_pixels_y" and \
-                            key != "nbr_pixels_z":
+                    if key not in ("nbr_pixels_x", "nbr_pixels_y",
+                                   "nbr_pixels_z"):
                         misc_tools.setattr_special(
                             layer, key, layer_prefs[key])
 
                 layer.draw_at_position()
+                new_index[i] = shared.layer_list.index(layer)
+                continue
 
-            elif layer_type == "stack":
+            if layer_type in ("single_image", "stack"):
                 new_path = str(path) + "/layer_" + str(i) + ".tiff"
-
                 create_layer(layer_type, new_path)
-
-                # Update the values in the layer
-                layer = shared.layer_list[i]
-                for key in layer_prefs:
-                    misc_tools.setattr_special(layer, key, layer_prefs[key])
-
-                # Use the new path of the file as image path
-                layer.filepath = new_path
-
-                layer.update_actor()
 
             elif layer_type == "isosurface":
                 stack_id = layer_prefs["isosurf_orig_layer_id"]
-                new_path = str(path) + "/layer_" + str(i-1) + ".tiff"
+                if stack_id not in new_index:
+                    # The stack was not loaded
+                    continue
+                new_path = str(path) + "/layer_" + str(stack_id) + ".tiff"
                 create_layer(
                     layer_type,
-                    isosurf_stack_id=stack_id,
+                    isosurf_stack_id=new_index[stack_id],
                     iso_file=new_path)
 
-                # Update the values in the layer
-                layer = shared.layer_list[i]
-                for key in layer_prefs:
+            elif layer_type == "glass" and "afm_id" in layer_prefs:
+                widgets_list.widget_vtk.canvas.addGlassLayer(
+                    len(shared.layer_list), layer_prefs["afm_id"],
+                    layer_prefs["roi_id"])
+                newid = len(shared.layer_list) - 1
+                shared.layer_list[-1].layer_id = newid
+                menu = widgets_list.widget_vtk.menu_layer_list
+                menu.tableWidget.insertRow(newid)
+                menu.add_line_in_tablewidget(newid, "glass")
+
+            if len(shared.layer_list) == nbr_before:
+                # The layer could not be created
+                continue
+
+            # Update the values in the new layer
+            layer = shared.layer_list[-1]
+            new_index[i] = len(shared.layer_list) - 1
+            for key in layer_prefs:
+                if key not in ("afm_id", "roi_id", "isosurf_orig_layer_id"):
                     misc_tools.setattr_special(layer, key, layer_prefs[key])
 
+            if layer_type != "glass":
                 # Use the new path of the file as image path
                 layer.filepath = new_path
 
-                layer.update_actor()
-
-            elif layer_type == "glass":
-                print("No substrate loading")
-
-            layer = shared.layer_list[i]
+            layer.update_actor()
 
         # Update the GUI
         widgets_list.widget_vtk.menu_layer_list.reset_table()

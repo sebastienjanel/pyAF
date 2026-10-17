@@ -27,22 +27,39 @@
 # same conditions as regards security.
 #
 # The fact that you are presently reading this means that you have had
-# knowledge of the CeCILL license and that you accept its terms.
 
-from base_test import pyAFTestCase
-from base_test_files import JPK_CORRUPTED
+"""Plots the results of the viscoelasticity fit (Ting model)."""
+
+import numpy
+from .plot_meshgrid import PlotMeshGrid
 
 
-class JPKCorruptedPixelsTest(pyAFTestCase):
-    """Test the opening of a JPK file with corrupted pixels.
+class PlotViscoMeshGrid(PlotMeshGrid):
+    """Plots a map of the viscoelasticity: E0, fluidity or loss tangent.
 
-    In this particular case, the test is the opening.
-    Given the current implementation, the content usually in setUpClass
-    is moved in the test. Only one test is possible.
+    The viscoelasticity is computed in the Viscoelasticity tab of the
+    compute tab.
     """
 
-    def test_open_file(self):
-        """Start the system with the JPK file with corrupted pixels."""
-        cls = type(self)
-        cls.use_files([JPK_CORRUPTED])
-        cls.base_setUpClass()
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        mt = self.mesh_type
+        if mt == "visco_e0":
+            values = self.data.visco_e0
+            self.factor = 1e-3
+            self.colorbarlabel = "E0 [kPa]"
+        elif mt == "visco_fluidity":
+            values = self.data.visco_fluidity
+            self.factor = 1.0
+            self.colorbarlabel = "Fluidity"
+        else:
+            values = self.data.visco_tan_delta
+            self.factor = 1.0
+            self.colorbarlabel = "tan δ"
+
+        # The nans (curves not fitted) have a different color
+        self.temp_array = numpy.ma.masked_invalid(
+            numpy.asarray(values, dtype=float))
+
+        self.plot_fig()
