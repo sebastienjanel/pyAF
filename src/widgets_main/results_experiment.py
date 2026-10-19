@@ -30,8 +30,9 @@
 # knowledge of the CeCILL license and that you accept its terms.
 
 """Widget displaying histograms and results (Grouped)."""
-"""SuperPlots tab: the conditions, with one dot per map, the replicate
-means and the tests on the replicates (Lord et al., J Cell Biol 2020)."""
+"""SuperPlots tab: the conditions, with one dot per file (force map, QI
+image or single curve), the replicate means and the tests on the replicates
+(Lord et al., J Cell Biol 2020)."""
 
 import csv
 import logging
@@ -54,9 +55,10 @@ from ..widgets_main.results_single import PLOT_MIN_HEIGHT
 from ..widgets_main.subwidgets.result_chooser import ResultsChooserWidget
 from ..widgets_small.rename_conditions import RenameConditionsWidget
 
-CONDITION_COLUMNS = ("", "Condition", "Replicates", "Maps", "Curves",
+CONDITION_COLUMNS = ("", "Condition", "Replicates", "Files", "Curves",
                      "Mean", "S.D.", "95% CI")
-TEST_COLUMNS = ("Comparison", "Test", "N", "p-value", "")
+TEST_COLUMNS = ("Comparison", "Test", "N", "p-value", "",
+                "Fold change [95% CI]")
 
 
 def number(value):
@@ -66,12 +68,23 @@ def number(value):
     return "%.4g" % value
 
 
+def fold_change_text(test):
+    """Fold change and its 95 % confidence interval as text."""
+    if not numpy.isfinite(test["fc"]):
+        return "–"
+    if not numpy.isfinite(test["fc_low"]):
+        return "%.3g [unbounded]" % test["fc"]
+    return "%.3g [%.3g, %.3g]" % (test["fc"], test["fc_low"],
+                                  test["fc_high"])
+
+
 class ResultsExperimentWidget(PYAFWidget):
     """SuperPlots tab.
 
-    Hierarchy: condition > replicate (the groups of the plots tab) > map
-    (file) > curves. Each map gives one value (median of its curves), each
-    replicate the mean of its maps, and the tests compare the replicates of
+    Hierarchy: condition > replicate (the groups of the plots tab) > file
+    (force map, QI image or single curve) > curves. Each file gives one value
+    (median of its curves), each replicate the mean of its files, and the
+    tests compare the replicates of
     each condition with the ones of the control (n = number of replicates).
     """
 
@@ -110,15 +123,18 @@ class ResultsExperimentWidget(PYAFWidget):
         form = QtWidgets.QFormLayout()
         self.list_control = PYAFComboBox(self, "control")
         self.list_control.setToolTip(
-            "The other conditions are compared to this one")
+            "The other conditions are compared to this one.\nNone: all the "
+            "pairs of conditions are compared (Tukey's test, or paired "
+            "t-tests with the Holm correction)")
         self.list_paired = PYAFComboBox(self, "paired")
         self.list_paired.addItem("Unpaired")
         self.list_paired.addItem("Paired (same exp.)")
         self.list_paired.setToolTip(
-            "Unpaired: Welch t-test (one comparison) or Dunnett's test "
-            "(several).\nPaired: the replicates with the same Experiment "
-            "number (Replicates tab)\nare compared with paired t-tests "
-            "(Holm correction for several).")
+            "Unpaired: Welch t-test (one comparison), Dunnett's test "
+            "(several) or Tukey's test (all pairs).\nPaired: the "
+            "replicates with the same Experiment number (Replicates tab)\n"
+            "are compared with paired t-tests (Holm correction for "
+            "several).")
         self.list_error = PYAFComboBox(self, "error")
         self.list_error.addItem("SD")
         self.list_error.addItem("95% CI")
@@ -146,29 +162,46 @@ class ResultsExperimentWidget(PYAFWidget):
         self.widget_result_chooser = ResultsChooserWidget(self, name)
         self.BT_export = PYAFButton(self, "export", "Export CSV")
         self.BT_export.setToolTip(
-            "One row per map: condition, replicate, experiment, map value, "
-            "number of curves, replicate mean")
+            "One row per file: condition, replicate, experiment, file value, "
+            "number of curves, replicate mean.\nAnd the tests: p-values and "
+            "fold changes with their 95 % CI (_tests.csv).")
         self.HL_buttons.addWidget(self.widget_result_chooser)
         self.HL_buttons.addStretch(1)
         self.HL_buttons.addWidget(self.BT_export)
 
         # Conditions and tests
         self.TW_conditions = self.make_table(CONDITION_COLUMNS)
+        superplot_tools.set_header_tooltips(self.TW_conditions, "superplots")
         self.TW_conditions.setColumnWidth(0, 35)
         header = self.TW_conditions.horizontalHeader()
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        # Widths of the columns after Condition (it takes the remaining
+        # space, at least 150 px: minimum width of the table)
+        widths = (80, 50, 70, 80, 80, 80)
+        for column, width in enumerate(widths, start=2):
+            self.TW_conditions.setColumnWidth(column, width)
+        self.TW_conditions.setMinimumWidth(35 + sum(widths) + 150 + 20)
         header.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self.popUpMenuTableHeader)
         self.TW_tests = self.make_table(TEST_COLUMNS)
         self.TW_tests.horizontalHeader().setSectionResizeMode(
             0, QtWidgets.QHeaderView.Stretch)
-        self.TW_tests.setColumnWidth(1, 170)
-        self.TW_tests.setColumnWidth(2, 45)
-        self.TW_tests.setColumnWidth(3, 90)
-        self.TW_tests.setColumnWidth(4, 50)
+        # Widths of the columns after Comparison (it takes the remaining
+        # space, at least 120 px: minimum width of the table)
+        widths = (130, 40, 80, 40, 145)
+        for column, width in enumerate(widths, start=1):
+            self.TW_tests.setColumnWidth(column, width)
+        self.TW_tests.setMinimumWidth(sum(widths) + 120 + 20)
+        self.TW_tests.horizontalHeaderItem(5).setToolTip(
+            "Ratio of the means of the replicates vs the control (geometric "
+            "means with the log scale), with its 95 % confidence interval\n"
+            "from the same test as the p-value: the interval excludes 1 when "
+            "the difference is significant.\nWith few replicates, the "
+            "interval shows how large the effect can be, which the p-value "
+            "alone does not.")
         self.HL_tables = QtWidgets.QHBoxLayout()
-        self.HL_tables.addWidget(self.TW_conditions, 3)
-        self.HL_tables.addWidget(self.TW_tests, 2)
+        self.HL_tables.addWidget(self.TW_conditions, 1)
+        self.HL_tables.addWidget(self.TW_tests, 1)
 
         layout = QtWidgets.QGridLayout()
         layout.addWidget(self.SA_plot, 0, 0)
@@ -217,9 +250,12 @@ class ResultsExperimentWidget(PYAFWidget):
         widgets_list.widget_results_chooser_experiment.update_widget()
         options = superplot_tools.get_options()
 
-        # Control: one of the conditions
+        # Control: one of the conditions, or none (all the pairs)
         names = [c.name for c in shared.exp.conditions_list[1:]]
         ids = [c.condition_id for c in shared.exp.conditions_list[1:]]
+        if ids:
+            names.append("None: all pairs")
+            ids.append(superplot_tools.ALL_PAIRS)
         if options["control"] not in ids and ids:
             options["control"] = ids[0]
         self.list_control.blockSignals(True)
@@ -273,12 +309,14 @@ class ResultsExperimentWidget(PYAFWidget):
             table.insertRow(row)
             table.setRowHeight(row, 30)
             texts = [test["name"], test["test"], str(test["n"]),
-                     number(test["p"]), superplot_tools.stars(test["p"])]
+                     number(test["p"]), superplot_tools.stars(test["p"]),
+                     fold_change_text(test)]
             for col, text in enumerate(texts):
                 label = QtWidgets.QLabel(text)
                 label.setFont(self.parent.smallfont)
-                if test["note"]:
-                    label.setToolTip(test["note"])
+                note = test["fc_note"] if col == 5 else test["note"]
+                if note:
+                    label.setToolTip(note)
                 table.setCellWidget(row, col,
                                     gui_tools.CenteredCellwidget(label))
 
@@ -287,9 +325,11 @@ class ResultsExperimentWidget(PYAFWidget):
         options = superplot_tools.get_options()
         if name == "control":
             index = self.list_control.currentIndex()
-            if index >= 0:
-                options["control"] = \
-                    shared.exp.conditions_list[index + 1].condition_id
+            conditions = shared.exp.conditions_list[1:]
+            if 0 <= index < len(conditions):
+                options["control"] = conditions[index].condition_id
+            elif index == len(conditions):
+                options["control"] = superplot_tools.ALL_PAIRS
         elif name == "paired":
             options["paired"] = self.list_paired.currentIndex() == 1
         elif name == "error":
@@ -320,7 +360,7 @@ class ResultsExperimentWidget(PYAFWidget):
             self.export_csv()
 
     def export_csv(self):
-        """Saves the values of the maps and of the replicates."""
+        """Saves the values of the files and of the replicates."""
         rows = superplot_tools.export_rows(superplot_tools.get_data())
         if not rows:
             return
@@ -338,8 +378,18 @@ class ResultsExperimentWidget(PYAFWidget):
             writer = csv.DictWriter(f, fieldnames=list(rows[0]))
             writer.writeheader()
             writer.writerows(rows)
-        gui_tools.show_success(self, "Export complete",
-                               "Values exported to " + filename)
+        text = "Values exported to " + filename
+        # Tests: p-values and fold changes with their confidence intervals
+        tests = superplot_tools.test_rows(superplot_tools.get_data(),
+                                          superplot_tools.get_options())
+        if tests:
+            tests_name = filename[:-4] + "_tests.csv"
+            with open(tests_name, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=list(tests[0]))
+                writer.writeheader()
+                writer.writerows(tests)
+            text += "\nTests exported to " + tests_name
+        gui_tools.show_success(self, "Export complete", text)
 
     def add_condition(self):
         """Add a new condition."""

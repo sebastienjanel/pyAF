@@ -40,6 +40,7 @@ from .. import experiment
 from qtpy import QtCore, QtWidgets
 from ..tools import stat_tools
 from ..tools import gui_tools
+from ..tools import superplot_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..widgets_main.subwidgets.result_chooser import ResultsChooserWidget
@@ -350,6 +351,7 @@ class ResultsSingleWidget(PYAFWidget):
         # Create the headers
         self.tableWidget.setColumnCount(self.columns.len_visible)
         self.tableWidget.setHorizontalHeaderLabels(self.columns.names)
+        superplot_tools.set_header_tooltips(self.tableWidget, "plots")
 
         # Set specific column widths
         headers = self.tableWidget.horizontalHeader()

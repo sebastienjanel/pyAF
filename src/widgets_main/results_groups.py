@@ -39,6 +39,7 @@ from .. import experiment
 from qtpy import QtCore, QtGui, QtWidgets
 from ..tools import stat_tools
 from ..tools import gui_tools
+from ..tools import superplot_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..widgets_main.subwidgets.result_chooser import ResultsChooserWidget
@@ -145,11 +146,7 @@ class ResultsGroupsWidget(PYAFWidget):
         self.tableWidget.setHorizontalScrollBarPolicy(policy)
         self.tableWidget.setHorizontalHeaderLabels(
             [LABELS.get(name, name) for name in COLUMNS])
-        self.tableWidget.horizontalHeaderItem(col("Experiment")).setToolTip(
-            "Replicates of different conditions done in the same experiment "
-            "(same day)\nhave the same number: colors of the SuperPlots and "
-            "pairing of the paired tests.\nEmpty: order of the replicate in "
-            "its condition.")
+        superplot_tools.set_header_tooltips(self.tableWidget, "replicates")
         headers = self.tableWidget.horizontalHeader()
         headers.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         headers.customContextMenuRequested.connect(self.popUpMenuTableHeader)
@@ -475,6 +472,17 @@ class ResultsGroupsWidget(PYAFWidget):
             cell.widget.setCurrentIndex(index)
         self.conditions_changed()
 
+    def batch_experiments_change(self, action):
+        """Change the experiment number of the selected groups (None: empty,
+        order of the replicate in its condition)."""
+        number = action.data()
+        for item in self.tableWidget.selectionModel().selectedRows():
+            group = shared.exp.groups_list[item.row() + 1]
+            group.experiment = number
+            cell = self.tableWidget.cellWidget(item.row(), col("Experiment"))
+            cell.widget.setText(str(number) if number else "")
+        widgets_list.widget_results_experiment.update_widget()
+
     def popUpMenuTableHeader(self, pos):
         """Pop up menu displayed on the headers of the groups table."""
         # Get the global pos for the menu
@@ -494,6 +502,12 @@ class ResultsGroupsWidget(PYAFWidget):
         # Add group
         action = QtWidgets.QAction("Add replicate", self)
         action.triggered.connect(self.add_group)
+        menu.addAction(action)
+
+        # Add condition (as in the experiment plots tab)
+        action = QtWidgets.QAction("Add condition", self)
+        action.triggered.connect(
+            widgets_list.widget_results_experiment.add_condition)
         menu.addAction(action)
 
         # Rename groups
@@ -518,6 +532,26 @@ class ResultsGroupsWidget(PYAFWidget):
         self.submenu_conditions.triggered.connect(
             self.batch_conditions_change)
         action.setMenu(self.submenu_conditions)
+
+        # Batch change experiments: the numbers used, one more, or empty
+        action = QtWidgets.QAction("Change selected experiments", self)
+        menu.addAction(action)
+        self.submenu_experiments = QtWidgets.QMenu()
+        groups = shared.exp.groups_list[1:]
+        used = [g.experiment for g in groups if getattr(g, "experiment", None)]
+        # Largest number of replicates of a condition (not "no condition")
+        per_condition = max([sum(g.condition == c.condition_id for g in groups)
+                             for c in shared.exp.conditions_list[1:]] + [0])
+        for number in range(1, max(used + [per_condition]) + 2):
+            subaction = QtWidgets.QAction(str(number), self)
+            subaction.setData(number)
+            self.submenu_experiments.addAction(subaction)
+        subaction = QtWidgets.QAction("Empty (order in its condition)", self)
+        subaction.setData(None)
+        self.submenu_experiments.addAction(subaction)
+        self.submenu_experiments.triggered.connect(
+            self.batch_experiments_change)
+        action.setMenu(self.submenu_experiments)
 
         # Display menu
         menu.popup(pos, menu.menuAction())

@@ -55,7 +55,7 @@ def experiment_colors(conditions):
 
 
 class PlotSuperPlot(PlotResults):
-    """SuperPlot: the maps (small dots, one value per map) colored by
+    """SuperPlot: the files (small dots, one value per file) colored by
     experiment, the replicate means (large dots), the mean of the replicates
     of each condition with its SD or 95% CI, and the tests against the
     control (on the replicates)."""
@@ -165,13 +165,37 @@ class PlotSuperPlot(PlotResults):
                             ecolor=ink, elinewidth=1.5, capsize=8, zorder=6)
 
         # Tests against the control
-        tests = {t["name"]: t for t in
-                 superplot_tools.compare(conditions, opts)}
+        results = superplot_tools.compare(conditions, opts)
+        tests = {t["name"]: t for t in results}
         control = next((c["name"] for c in conditions
                         if c["id"] == opts["control"]), None)
         if log:
             ax.set_yscale("log")
-        top = ax.get_ylim()[1]
+        bottom, top = ax.get_ylim()
+        if opts["control"] == superplot_tools.ALL_PAIRS:
+            # All pairs: brackets above the significant pairs, the shortest
+            # ones first
+            significant = sorted(
+                (t for t in results if numpy.isfinite(t["p"]) and
+                 t["p"] < 0.05),
+                key=lambda t: (t["pair"][1] - t["pair"][0], t["pair"][0]))
+            level = top
+            for test in significant:
+                i, j = test["pair"]
+                if log:
+                    y, tick = level * 1.12, level * 1.04
+                else:
+                    step = 0.07 * (top - bottom)
+                    y, tick = level + step, level + 0.35 * step
+                ax.plot([i, i, j, j], [tick, y, y, tick], "-", color=ink,
+                        linewidth=1, zorder=6)
+                ax.text((i + j) / 2, y, superplot_tools.stars(test["p"]),
+                        ha="center", va="bottom", color=ink,
+                        fontproperties=self.font)
+                level = y * 1.06 if log else y + 0.04 * (top - bottom)
+            if significant:
+                ax.set_ylim(bottom, level * 1.1 if log else
+                            level + 0.06 * (top - bottom))
         for i, c in enumerate(conditions):
             test = tests.get(c["name"] + " vs " + str(control))
             if test is not None:
