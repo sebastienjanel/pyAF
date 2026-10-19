@@ -48,11 +48,17 @@ class PlotViscoMeshGrid(PlotMeshGrid):
         if mt == "visco_e0":
             values = self.data.visco_e0
             self.factor = 1e-3
-            self.colorbarlabel = "E0 [kPa]"
+            self.colorbarlabel = "E\u2080 [kPa]"
         elif mt == "visco_fluidity":
             values = self.data.visco_fluidity
             self.factor = 1.0
             self.colorbarlabel = "Fluidity"
+        elif mt in ("visco_storage", "visco_loss"):
+            values = getattr(self.data, mt)
+            self.factor = 1e-3
+            self.colorbarlabel = ("E\u2032" if mt == "visco_storage" else
+                                  "E\u2033") + " at %g Hz [kPa]" % \
+                self.data.visco_frequency
         else:
             values = self.data.visco_tan_delta
             self.factor = 1.0

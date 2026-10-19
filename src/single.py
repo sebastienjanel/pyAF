@@ -55,6 +55,7 @@ current temporary hdf5 file. See the src/tools/temp_file.py for more details.
 """
 
 import numpy
+from scipy import special
 from . import widgets_list
 from .tools import results_sorting
 
@@ -242,6 +243,9 @@ class SingleFile:
         self.color_opts_visco_e0 = [2, 0, 0, 0, 0]
         self.color_opts_visco_fluidity = [3, 0, 1, 0.5, 0]
         self.color_opts_visco_tan_delta = [6, 0, 2, 1, 0]
+        # Storage (Viridis, as E0) and loss (Magma) moduli
+        self.color_opts_visco_storage = [2, 0, 0, 0, 0]
+        self.color_opts_visco_loss = [4, 0, 0, 0, 0]
         # Quality of the elasticity fit: R^2 from 0.9 (white to red: the
         # bad fits in red, the good ones light), and the pixels with the
         # point of contact fixed (Reds: fixed in red)
@@ -442,6 +446,9 @@ class SingleFile:
         self.visco_beta_init = 0.2
         # Offset of the retraction baseline (viscous drag) corrected
         self.visco_drag_correction = True
+        # Frequency of the storage and loss moduli maps [Hz] (computed from
+        # E0 and the fluidity, no new fit)
+        self.visco_frequency = 1.0
         # Results [i, j, k], k: VISCO_RESULTS
         self.visco_results = None
         self.used_visco_solver = None
@@ -1121,11 +1128,14 @@ class SingleFile:
 
         # Viscoelasticity
         if self.visco_calculated and color:
-            values = self.visco_e0[numpy.isfinite(self.visco_e0)]
-            high = robust_max(values) if len(values) else None
-            if high is not None:
-                self.color_opts_visco_e0[2] = high
-                self.color_opts_visco_e0[3] = high / 2.0
+            # Moduli: same automatic scale as the elasticity
+            for name in ("visco_e0", "visco_storage", "visco_loss"):
+                limits = robust_range(getattr(self, name),
+                                      self.stiffness_color_log)
+                if limits is not None:
+                    opts = getattr(self, "color_opts_" + name)
+                    opts[1], opts[2] = limits
+                    opts[3] = sum(limits) / 2.0
 
         # Events
         if self.events_calculated:
@@ -1383,6 +1393,26 @@ class SingleFile:
         """Loss tangent of the power law: tan(pi * fluidity / 2)."""
         return numpy.tan(numpy.pi * self.visco_fluidity / 2)
 
+    def visco_modulus(self):
+        """Complex modulus of the power law at visco_frequency [Pa]:
+        E*(w) = E0 Gamma(1 - b) (i w t0) ** b (t0 = 1 s), derived from E0
+        and the fluidity b (no measure at this frequency)."""
+        beta = self.visco_fluidity
+        omega = 2 * numpy.pi * getattr(self, "visco_frequency", 1.0)
+        return self.visco_e0 * special.gamma(1 - beta) * omega ** beta
+
+    @property
+    def visco_storage(self):
+        """Storage modulus E' at visco_frequency [Pa]."""
+        return self.visco_modulus() * \
+            numpy.cos(numpy.pi * self.visco_fluidity / 2)
+
+    @property
+    def visco_loss(self):
+        """Loss modulus E'' at visco_frequency [Pa]."""
+        return self.visco_modulus() * \
+            numpy.sin(numpy.pi * self.visco_fluidity / 2)
+
     def sample_elasticity_values(self, corrected=False):
         """Elasticity values of the sample, for the automatic color scale:
         without the substrate, i.e. the pixels where the point of contact
@@ -1452,6 +1482,8 @@ class SingleFile:
                  "visco_e0": "color_opts_visco_e0",
                  "visco_fluidity": "color_opts_visco_fluidity",
                  "visco_tan_delta": "color_opts_visco_tan_delta",
+                 "visco_storage": "color_opts_visco_storage",
+                 "visco_loss": "color_opts_visco_loss",
                  "fit_r2": "color_opts_fit_r2",
                  "fit_poc_fixed": "color_opts_fit_poc_fixed"}
         return getattr(self, names[mt])

@@ -63,6 +63,7 @@ from ..compute_tools.stiffness_correction import StiffnessCorrection
 from ..compute_tools.viscoelasticity import main as visco_main
 from ..compute_tools.stiffness import contact_models
 from ..compute_tools.stiffness import bec
+from ..widgets import plot_options
 from ..compute_tools.loading_rates import GetLoadingRate
 from ..compute_tools.events import GetEvents
 from ..tools.PYAFWidget import PYAFWidget
@@ -606,6 +607,16 @@ class ComputeWidget(PYAFWidget):
             self, "visco_beta_init", "Initial fluidity", 60)
         self.IN_visco_beta.input.setValidator(
             misc_tools.validator("RF", bottom=0.01, top=0.99, decimal=3))
+        self.IN_visco_frequency = PYAFInput(
+            self, "visco_frequency", "Frequency of E\u2032, E\u2033 [Hz]",
+            60)
+        self.IN_visco_frequency.setToolTip(
+            "Frequency of the storage and loss moduli maps (Results tab), "
+            "computed from E\u2080 and the fluidity\n(power law, no new fit). "
+            "Choose it within the time scales of the curves, between about "
+            "1 / (contact time)\nand 1 / (time between two points): outside, "
+            "the values are an extrapolation of the model.")
+        self.IN_visco_frequency.input.setValidator(misc_tools.validator("PF"))
 
         GL_visco.addLayout(HL_solver, 0, 0)
         GL_visco.addWidget(self.CB_visco_bec, 1, 0)
@@ -614,6 +625,7 @@ class ComputeWidget(PYAFWidget):
         GL_visco.addWidget(self.IN_visco_points, 1, 1)
         GL_visco.addWidget(self.CB_visco_beta_auto, 2, 1)
         GL_visco.addWidget(self.IN_visco_beta, 3, 1)
+        GL_visco.addWidget(self.IN_visco_frequency, 4, 1)
         GL_visco.setColumnStretch(2, 1)
         self.Box_visco.setLayout(GL_visco)
 
@@ -814,6 +826,8 @@ class ComputeWidget(PYAFWidget):
             self.IN_visco_points.changeValue(data.visco_nbr_points)
             self.CB_visco_beta_auto.setChecked(data.visco_beta_auto)
             self.IN_visco_beta.changeValue(data.visco_beta_init)
+            self.IN_visco_frequency.changeValue(
+                getattr(data, "visco_frequency", 1.0))
             self.IN_visco_beta.setEnabled(not data.visco_beta_auto)
             # The elasticity fit is needed (and a height for the B.E.C.)
             reason = visco_main.check_file(data)
@@ -1032,6 +1046,22 @@ class ComputeWidget(PYAFWidget):
 
         elif field == "visco_beta_init":
             data.visco_beta_init = self.IN_visco_beta.get_float_value()
+
+        elif field == "visco_frequency":
+            if self.IN_visco_frequency.input.text() != "":
+                data.visco_frequency = \
+                    self.IN_visco_frequency.get_float_value()
+                files = shared.exp.list if shared.exp.apply_to_all_compute \
+                    else [data]
+                for dt in files:
+                    dt.visco_frequency = data.visco_frequency
+                    # New values: automatic scales of the moduli maps
+                    if dt.visco_calculated:
+                        for mt in ("visco_storage", "visco_loss"):
+                            plot_options.autoscale_elasticity(dt, mt)
+                # Maps of the moduli at this frequency (no new fit)
+                if data.meshgrid_type in ("visco_storage", "visco_loss"):
+                    widgets_list.widget_results.update_MPL("MPL_canvas1")
 
         self.update_MPL("MPL_canvas")
         self.update_GUI("BT_height_correction")

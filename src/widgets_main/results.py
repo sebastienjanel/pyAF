@@ -176,10 +176,10 @@ class ResultsWidget(PYAFWidget):
         self.GRP_mesh_type.addButton(self.RBT_mesh_events_per_curve, 8)
         self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force2, 9)
         # Viscoelasticity (Ting fit)
-        self.RBT_mesh_visco_e0 = QtWidgets.QRadioButton("E0 (visco.)")
+        self.RBT_mesh_visco_e0 = QtWidgets.QRadioButton("E\u2080")
         self.RBT_mesh_visco_fluidity = QtWidgets.QRadioButton("Fluidity")
         self.RBT_mesh_visco_tan_delta = QtWidgets.QRadioButton(
-            "Loss tangent (tan \u03b4)")
+            "Loss tangent")
         self.GRP_mesh_type.addButton(self.RBT_mesh_visco_e0, 10)
         self.GRP_mesh_type.addButton(self.RBT_mesh_visco_fluidity, 11)
         self.GRP_mesh_type.addButton(self.RBT_mesh_visco_tan_delta, 12)
@@ -196,6 +196,62 @@ class ResultsWidget(PYAFWidget):
             "elasticity fitted with the detected point of contact (1)")
         self.GRP_mesh_type.addButton(self.RBT_mesh_fit_r2, 13)
         self.GRP_mesh_type.addButton(self.RBT_mesh_fit_poc_fixed, 14)
+        # Storage and loss moduli, derived from E0 and the fluidity
+        self.RBT_mesh_visco_storage = QtWidgets.QRadioButton(
+            "Storage modulus E\u2032")
+        self.RBT_mesh_visco_loss = QtWidgets.QRadioButton(
+            "Loss modulus E\u2033")
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_storage, 15)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_loss, 16)
+
+        # Nature of each map (elastic, viscoelastic, adhesion) and limits
+        derived = (
+            "\nDerived from E\u2080 and the fluidity (power-law model), not "
+            "measured at this frequency: valid only if the sample follows a "
+            "single power law,\nand within the time scales of the curves "
+            "(about 1 / contact time to 1 / time between two points); "
+            "outside, it is an extrapolation.")
+        tips = {
+            self.RBT_mesh_piezo: "Height of the piezo at the end of the "
+            "approach (includes the indentation).",
+            self.RBT_mesh_topography: "Height of the sample at the point of "
+            "contact (zero force): topography without the indentation.",
+            self.RBT_mesh_stiffness: "Elastic: Young's modulus fitted on the "
+            "approach (contact model of the Compute tab).\nOn a "
+            "viscoelastic sample it depends on the indentation speed.",
+            self.RBT_mesh_stiffness_slice: "Elastic: elasticity of one "
+            "indentation segment (depth).",
+            self.RBT_mesh_stiffness_corr: "Elastic: elasticity corrected for "
+            "the stiff substrate under thin samples (bottom effect, Garcia "
+            "& Garcia).",
+            self.RBT_mesh_stiffness_slice_corr: "Elastic: elasticity of one "
+            "indentation segment, corrected for the substrate.",
+            self.RBT_mesh_visco_e0: "Viscoelastic: modulus at 1 s of the "
+            "power-law relaxation E(t) = E\u2080 (t / 1 s)^-\u03b2\n(Ting fit "
+            "of the approach and the retraction).",
+            self.RBT_mesh_visco_fluidity: "Viscoelastic: exponent \u03b2 of "
+            "the power law, 0 elastic solid, 1 viscous liquid (cells: about "
+            "0.1-0.3).",
+            self.RBT_mesh_visco_tan_delta: "Viscoelastic: loss tangent "
+            "E\u2033 / E\u2032 = tan(\u03c0 \u03b2 / 2), the fluidity "
+            "in rheology terms:\nbelow 1 solid-like, above 1 liquid-like; "
+            "the same at all frequencies for a power law.",
+            self.RBT_mesh_visco_storage: "Viscoelastic: storage (elastic) "
+            "modulus E\u2032 at the frequency of the Viscoelasticity tab."
+            + derived,
+            self.RBT_mesh_visco_loss: "Viscoelastic: loss (dissipative) "
+            "modulus E\u2033 at the frequency of the Viscoelasticity tab."
+            + derived,
+            self.RBT_mesh_work: "Adhesion: work to detach the tip (area "
+            "of the retraction curve below zero force).",
+            self.RBT_mesh_rupture_force1: "Adhesion: maximum force of "
+            "detachment.",
+            self.RBT_mesh_events_per_curve: "Adhesion: number of unbinding "
+            "events of each curve.",
+            self.RBT_mesh_rupture_force2: "Adhesion: largest force of the "
+            "unbinding events of each curve."}
+        for button, tip in tips.items():
+            button.setToolTip(tip)
 
         self.GL_mesh_options = QtWidgets.QGridLayout()
         # Same spacing between all the rows (the style's default spacing
@@ -219,12 +275,16 @@ class ResultsWidget(PYAFWidget):
         self.GL_mesh_options.addWidget(self.RBT_mesh_events_per_curve, 2, 2)
         self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force2, 3, 2)
 
-        # Viscoelasticity, and the quality of the elasticity fit
+        # Quality of the elasticity fit, below the adhesion
+        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_r2, 4, 2)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_poc_fixed, 5, 2)
+
+        # Viscoelasticity
         self.GL_mesh_options.addWidget(self.RBT_mesh_visco_e0, 0, 1)
         self.GL_mesh_options.addWidget(self.RBT_mesh_visco_fluidity, 1, 1)
         self.GL_mesh_options.addWidget(self.RBT_mesh_visco_tan_delta, 2, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_r2, 3, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_poc_fixed, 4, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_storage, 3, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_loss, 4, 1)
 
         self.VL_meshgrid_options.addLayout(self.GL_mesh_options)
         self.VL_meshgrid_options.addStretch(1)
@@ -504,6 +564,8 @@ class ResultsWidget(PYAFWidget):
             self.RBT_mesh_visco_e0.setEnabled(val)
             self.RBT_mesh_visco_fluidity.setEnabled(val)
             self.RBT_mesh_visco_tan_delta.setEnabled(val)
+            self.RBT_mesh_visco_storage.setEnabled(val)
+            self.RBT_mesh_visco_loss.setEnabled(val)
             val = data.has_fit_quality()
             self.RBT_mesh_fit_r2.setEnabled(val)
             self.RBT_mesh_fit_poc_fixed.setEnabled(val)

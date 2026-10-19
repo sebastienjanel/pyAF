@@ -394,7 +394,8 @@ MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
                   "stiffness_corr", "stiffness_corr_slice", "work",
                   "rupture_force", "events_per_curve",
                   "events_rupture_force", "visco_e0", "visco_fluidity",
-                  "visco_tan_delta", "fit_r2", "fit_poc_fixed")
+                  "visco_tan_delta", "fit_r2", "fit_poc_fixed",
+                  "visco_storage", "visco_loss")
 
 
 def get_meshgrid_type_as_string(mesh_id):

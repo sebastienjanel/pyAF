@@ -177,7 +177,13 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 copy.deepcopy(cur.color_opts_rupture_force1)
             dt.color_opts_events_per_curve = \
                 copy.deepcopy(cur.color_opts_events_per_curve)
-            for name in ("color_opts_visco_e0", "color_opts_visco_fluidity",
+            if from_color_options:
+                # Moduli: each file keeps its automatic scale, as the
+                # elasticity
+                for name in ("color_opts_visco_e0", "color_opts_visco_storage",
+                             "color_opts_visco_loss"):
+                    setattr(dt, name, copy.deepcopy(getattr(cur, name)))
+            for name in ("color_opts_visco_fluidity",
                          "color_opts_visco_tan_delta", "color_opts_fit_r2",
                          "color_opts_fit_poc_fixed"):
                 setattr(dt, name, copy.deepcopy(getattr(cur, name)))
@@ -251,7 +257,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
             cur = exp.list[oldid]
             for dt in exp.list:
                 for name in ("solver", "bec", "contact_offset", "nbr_points",
-                             "beta_auto", "beta_init", "drag_correction"):
+                             "beta_auto", "beta_init", "drag_correction",
+                             "frequency"):
                     setattr(dt, "visco_" + name,
                             getattr(cur, "visco_" + name))
 

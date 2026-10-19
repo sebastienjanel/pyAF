@@ -43,6 +43,10 @@ from matplotlib.collections import PolyCollection, LineCollection
 from ...tools.colortables import ColorTables
 from ...tools import misc_tools
 from ...single import ELASTICITY_PERCENTILES
+
+# Viscoelastic moduli maps (log scale and first color below the scale, as
+# the elasticity)
+MODULUS_MAPS = ("visco_e0", "visco_storage", "visco_loss")
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from ..plot_main import MainPlot
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
@@ -180,7 +184,7 @@ class PlotMeshGrid(MainPlot):
         low = log_norm.vmin if log_norm is not None else \
             self.colortable_min_value * self.factor
         if self.data_meshgrid is not None and low > 0 and \
-                (mesh.startswith("stiffness") or mesh == "visco_e0"):
+                (mesh.startswith("stiffness") or mesh in MODULUS_MAPS):
             values = numpy.ma.asarray(self.data_meshgrid, dtype=float)
             self.data_meshgrid = numpy.ma.where(
                 (values >= 0) & (values < low), low, values)
@@ -333,7 +337,7 @@ class PlotMeshGrid(MainPlot):
         pixel squeeze the colors)."""
         mesh = self.mesh_type
         if mesh is None or not (str(mesh).startswith("stiffness") or
-                                mesh == "visco_e0") or \
+                                mesh in MODULUS_MAPS) or \
                 not getattr(self.data, "stiffness_color_log", False) or \
                 self.data_meshgrid is None:
             return None

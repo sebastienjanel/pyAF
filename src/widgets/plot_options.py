@@ -34,6 +34,7 @@
 import numpy
 from qtpy import QtCore, QtWidgets
 from ..single import robust_max, robust_range
+from ..plots.meshgrids.plot_meshgrid import MODULUS_MAPS
 from ..tools import apply_to_all
 from ..tools import misc_tools
 from ..tools import planefit
@@ -292,9 +293,12 @@ class PlotOptionsWidget(PYAFWidget):
             data.colortable_min_value = 0
             elasticity = mt in ("stiffness", "stiffness_slice",
                                 "stiffness_corr", "stiffness_corr_slice")
-            if elasticity:
+            modulus = mt in MODULUS_MAPS
+            if elasticity or modulus:
+                calculated = "stiffness_calculated" if elasticity \
+                    else "visco_calculated"
                 files = [dt for dt in shared.exp.list
-                         if dt.stiffness_calculated] \
+                         if getattr(dt, calculated)] \
                     if shared.exp.apply_to_all_data else [data]
                 for dt in files:
                     autoscale_elasticity(dt, mt)
@@ -317,7 +321,7 @@ class PlotOptionsWidget(PYAFWidget):
                 data.colortable_min_value = 0.0
                 data.colortable_max_value = 2.0
                 data.colortable_middle_value = 1.0
-            elif mt.startswith("visco_"):
+            elif mt.startswith("visco_") and not modulus:
                 high = robust_max(getattr(data, mt))
                 if high is not None:
                     data.colortable_max_value = high
@@ -351,11 +355,12 @@ class PlotOptionsWidget(PYAFWidget):
             # Apply to all if needed (each file keeps its own elasticity
             # scale)
             apply_to_all.apply_to_all("display_options", oldid=self.data_id,
-                                      from_color_options=not elasticity)
+                                      from_color_options=not (elasticity or
+                                                              modulus))
 
             self.update_widget()
 
-            if elasticity:
+            if elasticity or modulus:
                 # As button_apply, without copying the scale to the files
                 if self.input_updated("all"):
                     self.update_parent_elements()
@@ -441,7 +446,9 @@ class PlotOptionsWidget(PYAFWidget):
             val, val_all = data.max_nbr_events, exp.global_max_nbr_events
         elif mt.startswith("visco_"):
             name, unit, factor = {
-                "visco_e0": ("Max. E0", "kPa", 1e-3),
+                "visco_e0": ("Max. E\u2080", "kPa", 1e-3),
+                "visco_storage": ("Max. E\u2032", "kPa", 1e-3),
+                "visco_loss": ("Max. E\u2033", "kPa", 1e-3),
                 "visco_fluidity": ("Max. fluidity", "", 1),
                 "visco_tan_delta": ("Max. tan \u03b4", "", 1)}[mt]
             values = numpy.asarray(getattr(data, mt), dtype=float)
@@ -500,7 +507,8 @@ class PlotOptionsWidget(PYAFWidget):
         self.CB_log.setChecked(getattr(data, "stiffness_color_log", False))
         self.CB_log.setEnabled(mt in ("stiffness", "stiffness_slice",
                                       "stiffness_corr",
-                                      "stiffness_corr_slice", "visco_e0"))
+                                      "stiffness_corr_slice", "visco_e0",
+                                      "visco_storage", "visco_loss"))
 
     def update_parent_elements(self):
         """This method is called to update some elements from the parents widget.
@@ -549,7 +557,7 @@ def color_value_conversion(data, field):
             return 1.0, 0.0
         # kPa to Pa
         return 1e3, 0.0
-    elif mt == "visco_e0":
+    elif mt in ("visco_e0", "visco_storage", "visco_loss"):
         # kPa to Pa
         return 1e3, 0.0
     elif mt == "work":
@@ -580,7 +588,8 @@ def displayed_color_value(data, field):
     elif mt == "work":
         # Work values can be small, keep significant digits
         return float(f"{value:.4g}")
-    elif mt in ("rupture_force", "events_rupture_force", "visco_e0"):
+    elif mt in ("rupture_force", "events_rupture_force", "visco_e0",
+                "visco_storage", "visco_loss"):
         return round(value, 2)
     elif mt in ("visco_fluidity", "visco_tan_delta", "fit_r2",
                 "fit_poc_fixed"):
@@ -613,11 +622,15 @@ def display_bad_value_message(mode=None):
 
 
 def autoscale_elasticity(data, meshgrid_type):
-    """Automatic color scale of an elasticity map of a file: robust limits
-    of the values of the sample (substrate excluded; values outside drawn
-    with the first and saturation colors), see robust_range."""
-    limits = robust_range(stiffness_values(data, meshgrid_type),
-                          data.stiffness_color_log)
+    """Automatic color scale of an elasticity or viscoelastic modulus map
+    of a file: robust limits of the values (of the sample for the
+    elasticity: substrate excluded; values outside drawn with the first and
+    saturation colors), see robust_range."""
+    if meshgrid_type in MODULUS_MAPS:
+        values = getattr(data, meshgrid_type)
+    else:
+        values = stiffness_values(data, meshgrid_type)
+    limits = robust_range(values, data.stiffness_color_log)
     if limits is not None:
         opts = data.get_color_opts(meshgrid_type)
         opts[1], opts[2], opts[3] = limits[0], limits[1], sum(limits) / 2.0

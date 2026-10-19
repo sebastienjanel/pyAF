@@ -208,11 +208,15 @@ def write_unfiltered(pre, data):
     if data.visco_calculated:
         # All the parameters of the Ting fit (nan: not fitted)
         maps = [data.visco_e0, data.visco_fluidity, data.visco_tan_delta,
+                data.visco_storage, data.visco_loss,
                 data.get_visco_result("tc"), data.get_visco_result("f0"),
                 data.get_visco_result("r2"), data.get_visco_result("height")]
+        freq = "%g Hz" % data.visco_frequency
         write_file(pre + "_viscoelasticity.txt",
                    "Index\tXpos\tYpos\tE0 (Pa)\tFluidity\t"
-                   "Loss tangent (tan delta)\tTime of contact (s)\t"
+                   "Loss tangent (tan delta)\tStorage modulus E' at " +
+                   freq + " (Pa)\tLoss modulus E'' at " + freq + " (Pa)\t"
+                   "Time of contact (s)\t"
                    "F0 (N)\tR2\tB.E.C. height (nm)",
                    [start(index, i, j) +
                     "\t".join(str(float(m[i][j])) for m in maps)

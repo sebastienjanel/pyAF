@@ -43,12 +43,12 @@ from .. import widgets_list
 # the plots (displayed values: value * factor), name and unit in the
 # exports (SI), column name in the R export
 VISCO_TYPES = {
-    "visco_e0": {"name": "E0 (visco.)", "label": "E0 [kPa]",
+    "visco_e0": {"name": "E\u2080", "label": "E\u2080 [kPa]",
                  "factor": 1e-3, "export": "E0 (Pa)", "column": "visco_e0"},
     "visco_fluidity": {"name": "Fluidity", "label": "Fluidity",
                        "factor": 1.0, "export": "Fluidity",
                        "column": "fluidity"},
-    "visco_tan_delta": {"name": "Loss tangent (tan \u03b4)",
+    "visco_tan_delta": {"name": "Loss tangent",
                         "label": "tan \u03b4", "factor": 1.0,
                         "export": "Loss tangent (tan delta)",
                         "column": "tan_delta"},

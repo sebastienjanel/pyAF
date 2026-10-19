@@ -46,8 +46,9 @@ from .. import widgets_list
 from .. import shared
 from .. import consts
 
-# Maps of the viscoelasticity (same color scale in all the files at load)
-VISCO_MAPS = ("visco_e0", "visco_fluidity", "visco_tan_delta")
+# Maps of the viscoelasticity with the same color scale in all the files at
+# load (the moduli, as the elasticity, keep the scale of each file)
+VISCO_MAPS = ("visco_fluidity", "visco_tan_delta")
 
 
 class Load:
@@ -370,8 +371,11 @@ def update_colors_at_load():
         dt = shared.exp.list[i]
 
         if found_stiffness:
+            # The elasticity keeps the scale of each file (computed or
+            # saved), see apply_to_all
             dt.color_opts_topo = copy.deepcopy(topo)
-            dt.color_opts_stiffness = copy.deepcopy(stiffness)
+            if not dt.stiffness_calculated:
+                dt.color_opts_stiffness = copy.deepcopy(stiffness)
 
         if found_work_and_rupture_force1_calculated:
             dt.color_opts_work = copy.deepcopy(work)
