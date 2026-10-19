@@ -42,6 +42,7 @@ import matplotlib.font_manager as fm
 from matplotlib.collections import PolyCollection, LineCollection
 from ...tools.colortables import ColorTables
 from ...tools import misc_tools
+from ...single import ELASTICITY_PERCENTILES
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from ..plot_main import MainPlot
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
@@ -171,6 +172,18 @@ class PlotMeshGrid(MainPlot):
 
         # Log color scale (elasticity maps)
         log_norm = self.get_log_norm()
+
+        # Elasticity: the positive values below the bottom of the scale
+        # (2nd percentile by default) have the first color of the scale,
+        # the color of the negative values is kept for the negative ones
+        mesh = str(self.mesh_type)
+        low = log_norm.vmin if log_norm is not None else \
+            self.colortable_min_value * self.factor
+        if self.data_meshgrid is not None and low > 0 and \
+                (mesh.startswith("stiffness") or mesh == "visco_e0"):
+            values = numpy.ma.asarray(self.data_meshgrid, dtype=float)
+            self.data_meshgrid = numpy.ma.where(
+                (values >= 0) & (values < low), low, values)
 
         # Plot the meshgrid
         if self.colormap != "Rainbow 1" and self.colormap != "Cool-Warm" and \
@@ -315,8 +328,9 @@ class PlotMeshGrid(MainPlot):
 
     def get_log_norm(self):
         """Log color scale of the elasticity maps (None if not asked). A log
-        scale can not start at 0: the minimum is then the lowest positive
-        value of the map."""
+        scale can not start at 0: the minimum is then the 2nd percentile of
+        the positive values of the map (the lowest value would let a noisy
+        pixel squeeze the colors)."""
         mesh = self.mesh_type
         if mesh is None or not (str(mesh).startswith("stiffness") or
                                 mesh == "visco_e0") or \
@@ -330,7 +344,8 @@ class PlotMeshGrid(MainPlot):
             values = values[numpy.isfinite(values) & (values > 0)]
             if values.size == 0:
                 return None
-            vmin = float(values.min())
+            vmin = float(numpy.percentile(values,
+                                          ELASTICITY_PERCENTILES[0]))
         if vmax <= vmin:
             return None
         return LogNorm(vmin=vmin, vmax=vmax)

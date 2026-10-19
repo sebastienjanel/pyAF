@@ -60,10 +60,20 @@ from .tools import results_sorting
 
 
 
-# Upper limit of the automatic color scale of the elasticity: percentile of
-# the values (the maximum would let a few outliers squeeze the colors of the
-# other pixels, the values above are drawn with the saturation color)
+# Upper limit of the automatic color scales: percentile of the values (the
+# maximum would let a few outliers squeeze the colors of the other pixels,
+# the values above are drawn with the saturation color)
 SCALE_PERCENTILE = 95
+# Automatic color scale of the elasticity: median of the values of the
+# sample (substrate excluded) multiplied and divided by 10 ** (n sigma),
+# sigma being the robust standard deviation of log10(E) (e.g. 0-240 kPa for
+# a cell of 15-40 kPa next to glass, cone model); bottom at 0 if below this
+# fraction of the top
+ELASTICITY_SIGMAS = 4
+ELASTICITY_ZERO_FRACTION = 0.1
+# Bottom of a log scale starting at 0: this percentile of the positive
+# values
+ELASTICITY_PERCENTILES = (2, 98)
 
 # Results of the viscoelasticity fit (index in data.visco_results)
 VISCO_RESULTS = ("e0", "fluidity", "tc", "f0", "r2", "height")
@@ -80,6 +90,31 @@ def robust_max(values):
     if high <= 0:
         high = float(values.max())
     return high
+
+def robust_range(values, log=False):
+    """Limits (low, high) of the automatic color scale of the elasticity,
+    None without positive values: median of log10(E) +- ELASTICITY_SIGMAS
+    robust standard deviations (1.4826 x median absolute deviation), not
+    moved by the tail of the distribution and by a minority of other pixels
+    (e.g. a substrate not excluded). On a linear scale, the bottom is 0 if
+    it is below ELASTICITY_ZERO_FRACTION of the top.
+    """
+    values = numpy.asarray(values, dtype=float).ravel()
+    values = values[numpy.isfinite(values) & (values > 0)]
+    if values.size == 0:
+        return None
+    logs = numpy.log10(values)
+    median = float(numpy.median(logs))
+    sigma = 1.4826 * float(numpy.median(numpy.abs(logs - median)))
+    if sigma == 0:
+        # Uniform values: +- 10 %
+        sigma = numpy.log10(1.1) / ELASTICITY_SIGMAS
+    low = 10.0 ** (median - ELASTICITY_SIGMAS * sigma)
+    high = 10.0 ** (median + ELASTICITY_SIGMAS * sigma)
+    if not log and low < ELASTICITY_ZERO_FRACTION * high:
+        low = 0.0
+    return low, high
+
 
 class SingleFile:
     """Objet containing the data and options for a single file."""
@@ -1065,10 +1100,12 @@ class SingleFile:
             if color:
                 self.color_opts_topo[2] = self.max_topo
                 self.color_opts_topo[3] = self.max_topo / 2.0
-                high = robust_max(array_stiffness)
-                if high is not None:
-                    self.color_opts_stiffness[2] = high
-                    self.color_opts_stiffness[3] = high / 2.0
+                limits = robust_range(self.sample_elasticity_values(),
+                                      self.stiffness_color_log)
+                if limits is not None:
+                    self.color_opts_stiffness[1] = limits[0]
+                    self.color_opts_stiffness[2] = limits[1]
+                    self.color_opts_stiffness[3] = sum(limits) / 2.0
 
         # Jump of contact and work
         if self.work_and_rupture_force1_calculated:
@@ -1345,6 +1382,29 @@ class SingleFile:
     def visco_tan_delta(self):
         """Loss tangent of the power law: tan(pi * fluidity / 2)."""
         return numpy.tan(numpy.pi * self.visco_fluidity / 2)
+
+    def sample_elasticity_values(self, corrected=False):
+        """Elasticity values of the sample, for the automatic color scale:
+        without the substrate, i.e. the pixels where the point of contact
+        of the fit was fixed (sample too stiff for the cantilever, failed
+        fit) and the pixels of the substrate ROIs. All the values if no
+        pixel is left."""
+        array = self.stiffness_corrected_array if corrected \
+            else self.stiffness_array
+        exclude = numpy.zeros((self.nbr_pixels_x, self.nbr_pixels_y), bool)
+        if self.has_fit_quality():
+            exclude |= self.fit_poc_fixed == 1
+        for roi in self.roi_list:
+            if roi.glass_coeffs is not None:
+                for i, j in roi.values:
+                    exclude[i, j] = True
+        values = [v for i in range(self.nbr_pixels_x)
+                  for j in range(self.nbr_pixels_y) if not exclude[i, j]
+                  for v in array[i][j]]
+        if not numpy.any(numpy.isfinite(values)):
+            values = [v for i in range(self.nbr_pixels_x)
+                      for j in range(self.nbr_pixels_y) for v in array[i][j]]
+        return values
 
     def get_fit_quality(self, index):
         """Map of the quality of the elasticity fit: R^2 (index 0), or 1 if

@@ -36,7 +36,7 @@ from .. import shared
 from .. import widgets_list
 
 
-def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
+def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
     """Used to apply preferences to all files in the experiment.
 
     Lets says you want to change the values of a colorscale for a meshgrid in
@@ -157,7 +157,7 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
             # Colortable colors
             # (important to have deepcopy here because these are lists)
 
-            if cur.is_single is False and piezo_colors:
+            if cur.is_single is False and from_color_options:
                 # Only when the scale is changed in the color options: the
                 # piezo heights of the files are not comparable, each file
                 # keeps its own scale otherwise. (Only in case of a meshgrid,
@@ -165,7 +165,13 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
                 dt.color_opts_piezo = copy.deepcopy(cur.color_opts_piezo)
 
             dt.color_opts_topo = copy.deepcopy(cur.color_opts_topo)
-            dt.color_opts_stiffness = copy.deepcopy(cur.color_opts_stiffness)
+            if from_color_options:
+                # Same for the elasticity: each file keeps its automatic
+                # scale (cells, gels and substrates differ by orders of
+                # magnitude), unless the scale is changed in the color
+                # options
+                dt.color_opts_stiffness = \
+                    copy.deepcopy(cur.color_opts_stiffness)
             dt.color_opts_work = copy.deepcopy(cur.color_opts_work)
             dt.color_opts_rupture_force1 = \
                 copy.deepcopy(cur.color_opts_rupture_force1)

@@ -33,7 +33,7 @@
 
 import numpy
 from qtpy import QtCore, QtWidgets
-from ..single import robust_max
+from ..single import robust_max, robust_range
 from ..tools import apply_to_all
 from ..tools import misc_tools
 from ..tools import planefit
@@ -146,7 +146,7 @@ class PlotOptionsWidget(PYAFWidget):
 
             # Apply on all
             apply_to_all.apply_to_all("display_options", oldid=self.data_id,
-                                      piezo_colors=True)
+                                      from_color_options=True)
 
             # Update the plots only if asked
             self.update_parent_elements()
@@ -156,7 +156,7 @@ class PlotOptionsWidget(PYAFWidget):
         elif what == "log_scale":
             data.stiffness_color_log = self.CB_log.isChecked()
             apply_to_all.apply_to_all("display_options", oldid=self.data_id,
-                                      piezo_colors=True)
+                                      from_color_options=True)
             self.update_parent_elements()
 
         elif what == "nan_transp":
@@ -268,7 +268,7 @@ class PlotOptionsWidget(PYAFWidget):
 
             # Apply to all if needed
             apply_to_all.apply_to_all("display_options", oldid=self.data_id,
-                                      piezo_colors=True)
+                                      from_color_options=True)
 
             # Update
             self.update_widget()
@@ -286,15 +286,18 @@ class PlotOptionsWidget(PYAFWidget):
         if button == "autoscale":
             # Autoscale on the selected file. With apply to all, its scale
             # is then copied to all the files (same scale in the multi
-            # meshgrids)
-            if mt == "stiffness" or mt == "stiffness_slice" or \
-                    mt == "stiffness_corr" or mt == "stiffness_corr_slice":
-                # Up to the 95th percentile of the values of the map (the
-                # outliers above are drawn with the saturation color)
-                high = robust_max(stiffness_values(data, mt))
-                if high is not None:
-                    data.colortable_max_value = high
-                    data.colortable_middle_value = high / 2.0
+            # meshgrids), except for the elasticity: autoscale of each file
+            # (cells, gels and substrates differ by orders of magnitude)
+            # Bottom of the scale: 0, unless set below
+            data.colortable_min_value = 0
+            elasticity = mt in ("stiffness", "stiffness_slice",
+                                "stiffness_corr", "stiffness_corr_slice")
+            if elasticity:
+                files = [dt for dt in shared.exp.list
+                         if dt.stiffness_calculated] \
+                    if shared.exp.apply_to_all_data else [data]
+                for dt in files:
+                    autoscale_elasticity(dt, mt)
             elif mt == "work":
                 data.colortable_max_value = data.max_work
                 data.colortable_middle_value = data.max_work / 2.0
@@ -339,21 +342,26 @@ class PlotOptionsWidget(PYAFWidget):
                 data.colortable_max_value = data.max_topo
                 data.colortable_middle_value = data.max_topo / 2.0
 
-            data.colortable_min_value = 0
-
             if mt in ("piezo", "topo") and \
                     planefit.get_planefit_roi(data) is not None:
                 # Planefitted heights: their whole range (negative values
                 # around the substrate)
                 planefit.reset_color_scales(data)
 
-            # Apply to all if needed
+            # Apply to all if needed (each file keeps its own elasticity
+            # scale)
             apply_to_all.apply_to_all("display_options", oldid=self.data_id,
-                                      piezo_colors=True)
+                                      from_color_options=not elasticity)
 
             self.update_widget()
 
-            self.button_clicked("button_apply")
+            if elasticity:
+                # As button_apply, without copying the scale to the files
+                if self.input_updated("all"):
+                    self.update_parent_elements()
+                widgets_list.widget_results.update_GUI("apply_to_all")
+            else:
+                self.button_clicked("button_apply")
 
         if button == "sat_color":
             color = misc_tools.ask_user_for_color(data.color_saturation)
@@ -378,7 +386,7 @@ class PlotOptionsWidget(PYAFWidget):
                 # Apply to all if needed
                 apply_to_all.apply_to_all("display_options",
                                           oldid=self.data_id,
-                                          piezo_colors=True)
+                                          from_color_options=True)
 
                 # Update the plots
                 self.update_parent_elements()
@@ -604,12 +612,20 @@ def display_bad_value_message(mode=None):
     msg.exec_()
 
 
+def autoscale_elasticity(data, meshgrid_type):
+    """Automatic color scale of an elasticity map of a file: robust limits
+    of the values of the sample (substrate excluded; values outside drawn
+    with the first and saturation colors), see robust_range."""
+    limits = robust_range(stiffness_values(data, meshgrid_type),
+                          data.stiffness_color_log)
+    if limits is not None:
+        opts = data.get_color_opts(meshgrid_type)
+        opts[1], opts[2], opts[3] = limits[0], limits[1], sum(limits) / 2.0
+
+
 def stiffness_values(data, meshgrid_type):
-    """Values of the displayed elasticity map (corrected for the B.E.C.
-    maps), for the automatic color scale."""
+    """Values of the sample in the displayed elasticity map of the file
+    (corrected for the B.E.C. maps), for the automatic color scale."""
     corrected = meshgrid_type.startswith("stiffness_corr") and \
         data.stiffness_corrected
-    array = data.stiffness_corrected_array if corrected \
-        else data.stiffness_array
-    return [v for i in range(data.nbr_pixels_x)
-            for j in range(data.nbr_pixels_y) for v in array[i][j]]
+    return data.sample_elasticity_values(corrected=corrected)
