@@ -449,6 +449,12 @@ class SingleFile:
         # Frequency of the storage and loss moduli maps [Hz] (computed from
         # E0 and the fluidity, no new fit)
         self.visco_frequency = 1.0
+        # Frequencies supported by the curves [Hz] (low, high), set by the
+        # computation (see viscoelasticity.main.set_frequency_window)
+        self.visco_frequency_window = None
+        # The frequency was entered by the user (kept by the computations
+        # if the curves support it)
+        self.visco_frequency_user = False
         # Results [i, j, k], k: VISCO_RESULTS
         self.visco_results = None
         self.used_visco_solver = None

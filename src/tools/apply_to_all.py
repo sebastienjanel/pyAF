@@ -256,9 +256,10 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
         if exp.compute_type == "viscoelasticity" or mode == "all":
             cur = exp.list[oldid]
             for dt in exp.list:
+                # Not the frequency of E' and E'': each file has its own,
+                # within the time scales of its curves (see the input)
                 for name in ("solver", "bec", "contact_offset", "nbr_points",
-                             "beta_auto", "beta_init", "drag_correction",
-                             "frequency"):
+                             "beta_auto", "beta_init", "drag_correction"):
                     setattr(dt, "visco_" + name,
                             getattr(cur, "visco_" + name))
 

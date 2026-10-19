@@ -13,6 +13,7 @@ the HDF5 file) and fitted in the processes of the pool.
 
 import concurrent.futures
 import logging
+import math
 import os
 import sys
 
@@ -261,6 +262,43 @@ def get_model(data, settings):
             "poisson": data.used_poisson_ratio}
 
 
+def set_frequency_window(data, contact_times, steps):
+    """Frequencies of E' and E'' supported by the curves [Hz]: from
+    1 / contact time to 1 / (2 x time between two fitted points) (Nyquist),
+    medians of the curves. The frequency of the maps is set to
+    1 / contact time (time scale of the measurement), unless the user
+    entered a frequency supported by the curves."""
+    contact = numpy.asarray(contact_times, dtype=float)
+    step = numpy.asarray(steps, dtype=float)
+    contact = contact[numpy.isfinite(contact) & (contact > 0)]
+    step = step[numpy.isfinite(step) & (step > 0)]
+    if contact.size == 0 or step.size == 0:
+        data.visco_frequency_window = None
+        return
+    low = 1.0 / float(numpy.median(contact))
+    high = 1.0 / (2.0 * float(numpy.median(step)))
+    if high <= low:
+        data.visco_frequency_window = None
+        return
+    data.visco_frequency_window = [low, high]
+    if getattr(data, "visco_frequency_user", False) and \
+            low <= data.visco_frequency <= high:
+        return
+    # 1 / contact time rounded up to 2 significant digits (in the window)
+    unit = 10.0 ** (math.floor(math.log10(low)) - 1)
+    data.visco_frequency = min(math.ceil(low / unit - 1e-9) * unit, high)
+    data.visco_frequency_user = False
+
+
+def clamp_frequency(data, frequency):
+    """Frequency of E' and E'' within the window of the file (no limit
+    without window: files computed before)."""
+    window = getattr(data, "visco_frequency_window", None)
+    if window is None:
+        return frequency
+    return min(max(frequency, window[0]), window[1])
+
+
 def get_fit_inputs(data, i, j, settings, heights=None):
     """Inputs of the fit of a curve (see fit_curves), or None if the curve
     is not fitted."""
@@ -350,6 +388,10 @@ class ViscoCompute:
             else:
                 futures.append(executor.submit(fit_curves, task))
 
+        # Time scales probed by the curves: contact time (from the contact
+        # to the end of the fitted part) and time between two fitted points
+        contact_times = []
+        steps = []
         try:
             curves = []
             for i in range(nx):
@@ -358,6 +400,9 @@ class ViscoCompute:
                     if inputs is None:
                         widgets_list.widget_progressbar.update()
                         continue
+                    time, tc_init = inputs[2], inputs[6]
+                    contact_times.append(time[-1] - tc_init)
+                    steps.append(numpy.median(numpy.diff(time)))
                     curves.append(inputs)
                     if len(curves) == CURVES_PER_TASK:
                         submit(curves)
@@ -381,6 +426,7 @@ class ViscoCompute:
         data.visco_results = results.astype(numpy.float32)
         for name, value in settings.items():
             setattr(data, "used_visco_" + name, value)
+        set_frequency_window(data, contact_times, steps)
         data.visco_calculated = True
         data.update()
 

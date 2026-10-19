@@ -613,9 +613,15 @@ class ComputeWidget(PYAFWidget):
         self.IN_visco_frequency.setToolTip(
             "Frequency of the storage and loss moduli maps (Results tab), "
             "computed from E\u2080 and the fluidity\n(power law, no new fit). "
-            "Choose it within the time scales of the curves, between about "
-            "1 / (contact time)\nand 1 / (time between two points): outside, "
-            "the values are an extrapolation of the model.")
+            "Limited to the time scales of the curves, measured by the "
+            "computation (medians of the curves):\nfrom 1 / contact time "
+            "to 1 / (2 x time between two fitted points); outside, the "
+            "values would be an\nextrapolation of the model. Set to 1 / "
+            "contact time (time scale of the measurement) by the "
+            "computation, unless a frequency\nsupported by the curves was "
+            "entered. Each file has its own frequency; with apply to "
+            "all, a new value is also given to the files whose curves "
+            "support it.")
         self.IN_visco_frequency.input.setValidator(misc_tools.validator("PF"))
 
         GL_visco.addLayout(HL_solver, 0, 0)
@@ -826,8 +832,23 @@ class ComputeWidget(PYAFWidget):
             self.IN_visco_points.changeValue(data.visco_nbr_points)
             self.CB_visco_beta_auto.setChecked(data.visco_beta_auto)
             self.IN_visco_beta.changeValue(data.visco_beta_init)
+            # Frequency of E' and E'': within the time scales of the curves
+            # (window measured by the computation)
+            window = getattr(data, "visco_frequency_window", None)
+            label = "Frequency of E\u2032, E\u2033 [Hz]"
+            if window is not None:
+                label += " (" + "\u2013".join(
+                    "%.3g" % f if f < 1000 else "%.0f" % f
+                    for f in window) + ")"
+                self.IN_visco_frequency.input.setValidator(
+                    misc_tools.validator("RF", bottom=window[0],
+                                         top=window[1], decimal=3))
+            else:
+                self.IN_visco_frequency.input.setValidator(
+                    misc_tools.validator("PF"))
+            self.IN_visco_frequency.label.setText("  " + label)
             self.IN_visco_frequency.changeValue(
-                getattr(data, "visco_frequency", 1.0))
+                float("%.3g" % getattr(data, "visco_frequency", 1.0)))
             self.IN_visco_beta.setEnabled(not data.visco_beta_auto)
             # The elasticity fit is needed (and a height for the B.E.C.)
             reason = visco_main.check_file(data)
@@ -1049,12 +1070,19 @@ class ComputeWidget(PYAFWidget):
 
         elif field == "visco_frequency":
             if self.IN_visco_frequency.input.text() != "":
-                data.visco_frequency = \
-                    self.IN_visco_frequency.get_float_value()
-                files = shared.exp.list if shared.exp.apply_to_all_compute \
-                    else [data]
+                value = self.IN_visco_frequency.get_float_value()
+                data.visco_frequency = visco_main.clamp_frequency(data, value)
+                # With apply to all: also the files whose curves support this
+                # frequency (the others keep theirs)
+                files = [data]
+                if shared.exp.apply_to_all_compute:
+                    files += [dt for dt in shared.exp.list if dt is not data
+                              and visco_main.clamp_frequency(dt, value) ==
+                              value]
                 for dt in files:
                     dt.visco_frequency = data.visco_frequency
+                    # Kept by the next computations (if supported)
+                    dt.visco_frequency_user = True
                     # New values: automatic scales of the moduli maps
                     if dt.visco_calculated:
                         for mt in ("visco_storage", "visco_loss"):
