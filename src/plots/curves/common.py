@@ -39,6 +39,7 @@ from ...tools import math_tools
 from ...tools import events_tools
 from ...tools import curve_tools
 from ...compute_tools.stiffness import stiffness_compute
+from ...compute_tools.stiffness import contact_models
 
 
 class CommonCurveTools:
@@ -413,7 +414,7 @@ class CommonCurveTools:
                     a = 2.0 * math.tan(math.radians(dt.used_tip_angle))
                     coeff = (math.pi * (1.0 - dt.used_poisson_ratio ** 2)) / a
                 elif dt.used_stiffness_model_selected == 2:
-                    # Bilodeau (pyramid)
+                    # Barber & Billings (4-sided pyramid)
                     a = math.sqrt(2) * (1.0 - dt.used_poisson_ratio ** 2)
                     coeff = a / math.tan(math.radians(dt.used_tip_angle))
                 elif dt.used_stiffness_model_selected == 3:
@@ -474,97 +475,56 @@ class CommonCurveTools:
             fcapp[0] = fcapp[0] * 1e-09  # scaling force data
             fcapp[1] = fcapp[1] * 1e-09  # scaling indentation
 
-            if dt.used_stiffness_model_selected == 0:
-                # Hertz (sphere)
-                fitforce = self.hertz_sphere
-                div = numpy.sqrt(dt.used_tip_radius * 1e-9)
-                coeff = (4.0 / 3.0) * div / (1.0 - dt.used_poisson_ratio ** 2)
-            elif dt.used_stiffness_model_selected == 1:
-                # Sneddon (cone)
-                fitforce = self.sneddon_cone
-                div = numpy.tan(dt.used_tip_angle * numpy.pi / 180)
-                coeff = (2.0 / numpy.pi) * div / (1.0 - dt.used_poisson_ratio ** 2)
-            elif dt.used_stiffness_model_selected == 2:
-                # Bilodeau (pyramid)
-                fitforce = self.bilodeau_pyramid
-                div = numpy.tan(dt.used_tip_angle * numpy.pi / 180)
-                coeff = (1.0 / numpy.sqrt(2)) * div / (1.0 - dt.used_poisson_ratio ** 2)
-            if dt.used_stiffness_model_selected == 4:
-                # Flat punch
-                fitforce = self.flat_punch
-                div = dt.used_tip_radius * 1e-9
-                coeff = 2 * div / (1.0 - dt.used_poisson_ratio ** 2)
-
+            model = dt.used_stiffness_model_selected
+            radius = dt.used_tip_radius * 1e-9
+            angle = dt.used_tip_angle
+            nu = dt.used_poisson_ratio
             E = dt.stiffness_array[self.xpos][self.ypos][0]
+
+            def fit_force(d):
+                """Force of the fitted model at the indentations d [m]."""
+                return E * contact_models.unit_force(model, radius, angle,
+                                                     nu, d)
 
             delta = fcapp[0][ind::]
             data_to_fit = fcapp[1][ind::]
 
-            # Display elasticity fit within the indentation range selected by user.
-            if dt.used_indentation_stop != 0 and dt.get_used_fit_range_type() == 1:
-                start_f = dt.used_indentation_start * 1e-09  # 0 is the default value.
+            # Points of the fit range (same selection as stiffness_fit)
+            in_range = numpy.ones(len(delta), dtype=bool)
+            if dt.get_used_fit_range_type() == 0:
+                force_start = dt.used_force_start \
+                    if dt.used_force_start is not None else dt.force_start
+                force_stop = dt.used_force_stop \
+                    if dt.used_force_stop is not None else dt.force_stop
+                setpoint = dt.trig_threshold * dt.deflection_sensitivity * \
+                    dt.spring_constant
+                in_range = (data_to_fit >= force_start / 100 * setpoint) & \
+                    (data_to_fit <= force_stop / 100 * setpoint)
+            elif dt.get_used_fit_range_type() == 1:
+                start_f = dt.used_indentation_start * 1e-09
                 stop_f = dt.used_indentation_stop * 1e-09
+                in_range = delta >= start_f
+                if stop_f != 0:
+                    in_range &= delta <= stop_f
+            if not numpy.any(in_range):
+                in_range = numpy.ones(len(delta), dtype=bool)
 
-                delta = numpy.clip(delta, a_min=start_f, a_max=stop_f)
+            # Residuals on the fitted points
+            res_delta = delta[in_range]
+            residuals = data_to_fit[in_range] - fit_force(res_delta)
+            self.chisqr = self.get_chisqr(residuals)
+            self.residuals.append([res_delta * 1e09 * self.x_factor,
+                                   residuals * 1e09 * self.force_factor])
 
-            ytemp = fitforce(E, coeff, delta, data_to_fit)
-
-            self.chisqr = self.get_chisqr(ytemp)
-
-            self.residuals.append([delta * 1e09 * self.x_factor, ytemp * 1e09 * self.force_factor])
-
-            y_offset = ytemp[0]
-            ytemp = ytemp - y_offset
-
-            yf = data_to_fit - ytemp
-
-            if dt.used_indentation_start == 0:
-                x_offset = delta[0]
-                delta = delta - x_offset
-
-            self.segments_fits.append(
-                [delta * 1e09 * self.x_factor, yf * 1e09 * self.force_factor])
-
-
-    def hertz_sphere(self, e0, coeff, delta, data):
-
-        y = numpy.zeros(delta.shape)
-        for i in range(len(y)):
-            # No force without indentation (same as the fit models)
-            if delta[i] > 0:
-                y[i] = coeff * e0 * numpy.power((delta[i]), 1.5)
-
-        return data - y
-
-    def sneddon_cone(self, e0, coeff, delta, data):
-
-        y = numpy.zeros(delta.shape)
-        for i in range(len(y)):
-            # No force without indentation (same as the fit models)
-            if delta[i] > 0:
-                y[i] = coeff * e0 * numpy.power((delta[i]), 2)
-
-        return data - y
-
-    def bilodeau_pyramid(self, e0, coeff, delta, data):
-
-        y = numpy.zeros(delta.shape)
-        for i in range(len(y)):
-            # No force without indentation (same as the fit models)
-            if delta[i] > 0:
-                y[i] = coeff * e0 * numpy.power((delta[i]), 2)
-
-        return data - y
-
-    def flat_punch(self, e0, coeff, delta, data):
-
-        y = numpy.zeros(delta.shape)
-        for i in range(len(y)):
-            # No force without indentation (same as the fit models)
-            if delta[i] > 0:
-                y[i] = coeff * e0 * numpy.power((delta[i]), 1)
-
-        return data - y
+            # Fit drawn on a regular grid from the point of contact (0, 0)
+            # to the end of the fit range: the measured indentation is noisy
+            # and not monotonic, a line through it zigzags
+            x_max = numpy.max(res_delta)
+            if x_max > 0:
+                fit_x = numpy.linspace(0.0, x_max, 500)
+                self.segments_fits.append(
+                    [fit_x * 1e09 * self.x_factor,
+                     fit_force(fit_x) * 1e09 * self.force_factor])
 
     def get_chisqr(self, r):
         r"""

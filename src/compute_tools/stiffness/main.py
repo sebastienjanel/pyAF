@@ -134,7 +134,7 @@ class Stiffness:
             div = 2.0 * math.tan(math.radians(data.tip_angle))
             coeff = math.pi / div * (1.0 - data.poisson_ratio ** 2)
         elif data.stiffness_model_selected == 2:
-            # Bilodeau (Pyramid)
+            # Barber & Billings (4-sided pyramid)
             div = math.tan(math.radians(data.tip_angle))
             coeff = math.sqrt(2) * ((1.0 - data.poisson_ratio ** 2) / div)
         elif data.stiffness_model_selected == 3:
@@ -144,6 +144,9 @@ class Stiffness:
             # Flat punch
             div = 2 * data.tip_radius * pow(10, -9)
             coeff = (1.0 - data.poisson_ratio ** 2) / div
+        else:
+            # Tabulated models (sphere, blunted tips): no single coefficient
+            coeff = 1.0
 
         # Piezo image (last position of the extended piezo)
         piezo_image = \

@@ -201,7 +201,9 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
                 dt.stiffness_model_selected = cur.stiffness_model_selected
                 dt.tomography = cur.tomography
                 dt.tip_radius = cur.tip_radius
+                dt.tip_radii = dict(cur.tip_radii)
                 dt.tip_angle = cur.tip_angle
+                dt.tip_angles = dict(cur.tip_angles)
                 dt.poisson_ratio = cur.poisson_ratio
                 # Tomography or Fitting (perform_fit follows)
                 dt.stiffness_mode = cur.stiffness_mode

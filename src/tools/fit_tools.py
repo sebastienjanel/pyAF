@@ -110,6 +110,17 @@ def fit_e_fixed_poc(delta, force, coeff, exponent):
     return float(np.sum(np.asarray(force, float) * g) / norm)
 
 
+def fit_e_fixed_poc_unit(force, unit):
+    """Elasticity fitted with the point of contact fixed, for a model
+    F = E * unit (unit: force per unit modulus at each indentation, see
+    contact_models.unit_force). Returns nan without indentation."""
+    g = np.asarray(unit, float)
+    norm = np.sum(g * g)
+    if not np.isfinite(norm) or norm <= 0:
+        return np.nan
+    return float(np.sum(np.asarray(force, float) * g) / norm)
+
+
 def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):
     """
     Function to obtain delta0 (POC) and E0 by goodness of fit.

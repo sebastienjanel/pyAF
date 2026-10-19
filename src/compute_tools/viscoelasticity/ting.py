@@ -38,6 +38,8 @@ from scipy.optimize import least_squares
 from scipy.special import beta as beta_function
 from scipy.special import hyp2f1
 
+from ..stiffness import contact_models
+
 T0 = 1.0
 
 # Models of the elasticity fit (index of the model in pyAF)
@@ -45,7 +47,9 @@ PARABOLOID = 0
 CONE = 1
 PYRAMID = 2
 FLAT_PUNCH = 4
-SUPPORTED_MODELS = (PARABOLOID, CONE, PYRAMID, FLAT_PUNCH)
+SUPPORTED_MODELS = (PARABOLOID, CONE, PYRAMID, FLAT_PUNCH,
+                    contact_models.SPHERE, contact_models.BLUNTED_CONE,
+                    contact_models.BLUNTED_PYRAMID)
 
 BETA_MIN = 0.01
 BETA_MAX = 0.99
@@ -56,16 +60,15 @@ def get_geometry(model, tip_radius, tip_angle, poisson_ratio):
     (F = C * E * delta ** n for an elastic material).
 
     tip_radius in m, tip_angle (half angle) in degrees.
+    Tabulated models (sphere, blunted tips): (1, None), the force per unit
+    modulus is given by contact_models.unit_force.
     """
-    nu = 1.0 - poisson_ratio ** 2
-    if model == PARABOLOID:
-        return 4.0 / 3.0 * math.sqrt(tip_radius) / nu, 1.5
-    if model == CONE:
-        return 2.0 / math.pi * math.tan(math.radians(tip_angle)) / nu, 2.0
-    if model == PYRAMID:
-        return 1.0 / math.sqrt(2) * math.tan(math.radians(tip_angle)) / nu, 2.0
-    if model == FLAT_PUNCH:
-        return 2.0 * tip_radius / nu, 1.0
+    law = contact_models.power_law(model, tip_radius, tip_angle,
+                                   poisson_ratio)
+    if law is not None:
+        return law
+    if model in SUPPORTED_MODELS:
+        return 1.0, None
     raise ValueError("Model not supported by the Ting fit: " + str(model))
 
 
@@ -114,23 +117,38 @@ class TingModel:
     model: index of the elasticity model in pyAF, coeff and exponent: from
     get_geometry. With a height (bottom effect correction), the numerical
     solver is used. tip_radius in m, height in m.
+
+    Tabulated models (sphere, blunted tips, exponent None): the force per
+    unit modulus of the tip (contact_models.unit_force) replaces
+    coeff * delta ** n (numerical solver, no bottom effect correction).
     """
 
     def __init__(self, model, coeff, exponent, solver="analytical",
-                 tip_radius=None, tip_angle=None, height=None):
+                 tip_radius=None, tip_angle=None, height=None,
+                 poisson_ratio=0.5):
         self.model = model
         self.coeff = coeff
         self.exponent = exponent
         self.tip_radius = tip_radius
         self.tip_angle = tip_angle
+        self.poisson_ratio = poisson_ratio
         self.height = height
-        if height is not None and height > 0:
+        if exponent is None:
+            # No closed form: numerical solver, no B.E.C. factors
+            self.height = None
+            solver = "numerical"
+        if self.height is not None and self.height > 0:
             solver = "numerical"
         self.solver = solver
 
     def u_function(self, delta):
-        """U(delta) = delta ** n, with the bottom effect correction."""
+        """U(delta) = delta ** n, with the bottom effect correction (force
+        per unit modulus for the tabulated models)."""
         delta = numpy.clip(delta, 0, None)
+        if self.exponent is None:
+            return contact_models.unit_force(
+                self.model, self.tip_radius, self.tip_angle,
+                self.poisson_ratio, delta)
         u = delta ** self.exponent
         if self.height is not None and self.height > 0:
             u = u * bec_factor(delta, self.model, self.tip_radius,

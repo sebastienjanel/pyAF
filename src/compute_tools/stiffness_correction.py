@@ -190,7 +190,21 @@ class StiffnessCorrection:
                             # Don't correct if we are "under" the glass
                             coeff = 1.0
 
-                    # print(f"Pos: ({i},{j}), Ind:{indentation}, tanangle{tan_angle}, h{h}")
+                    elif model == 4:
+                        # Flat punch (cylinder, Garcia & Garcia 2018, as in
+                        # PyFMRheo): independent of the indentation
+                        if h >= nf:
+                            x = tip_radius / h
+                            coeff = 1.0 / (1 + 1.133 * x + 1.283 * x ** 2 +
+                                           0.598 * x ** 3 - 0.291 * x ** 4)
+                        else:
+                            coeff = 1.0
+
+                    else:
+                        # No bottom effect correction for this model (the
+                        # computation is not available, see the compute tab)
+                        coeff = numpy.nan
+
 
                     # Correct the stiffness
                     E_new.append(E_original * coeff)

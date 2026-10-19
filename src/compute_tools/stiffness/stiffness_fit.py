@@ -38,6 +38,7 @@ from ...tools import search_poc
 from ...tools import curve_tools
 from ...tools import fit_tools
 from . import stiffness_models as sm
+from . import contact_models
 
 
 def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
@@ -64,10 +65,9 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         sm.coeff = (2.0 / numpy.pi) * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
     elif model_selected == 2:
-        # Bilodeau (Pyramid)
-        #print("fit_params:", fit_params)
-        fit_model = sm.bilodeau_pyramid
-        fit_model_lmfit = sm.bilodeau_pyramid_lmfit
+        # Barber & Billings (4-sided pyramid)
+        fit_model = sm.barber_billings_pyramid
+        fit_model_lmfit = sm.barber_billings_pyramid_lmfit
         div = numpy.tan(fit_params["tip_angle"] * numpy.pi / 180)
         sm.coeff = (1.0 / numpy.sqrt(2)) * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
@@ -77,6 +77,17 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         fit_model_lmfit = sm.flat_punch_lmfit
         div = fit_params["tip_radius"] * 1e-9
         sm.coeff = 2 * div / (1.0 - fit_params["poisson_ratio"] ** 2)
+
+    else:
+        # Sphere (exact), blunted cone and pyramid, needle and nanowire:
+        # force per unit modulus of contact_models
+        fit_model = sm.tabulated
+        fit_model_lmfit = sm.tabulated_lmfit
+        radius = fit_params["tip_radius"] * 1e-9
+        angle = fit_params["tip_angle"]
+        nu = fit_params["poisson_ratio"]
+        sm.unit = lambda d: contact_models.unit_force(
+            model_selected, radius, angle, nu, d)
 
     # Get approach curve.
     app, _, _, _, _, smoothing_error = curve_tools.get_curve(None, [i, j], app, ret,
@@ -161,8 +172,12 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
             # contact
             poc_index_fit = poc_index_i
             real_poc = poc_pos_i
-            e_fixed = fit_tools.fit_e_fixed_poc(
-                masked_delta, masked_data_to_fit, sm.coeff, exponent)
+            if exponent is None:
+                e_fixed = fit_tools.fit_e_fixed_poc_unit(
+                    masked_data_to_fit, sm.unit(masked_delta))
+            else:
+                e_fixed = fit_tools.fit_e_fixed_poc(
+                    masked_delta, masked_data_to_fit, sm.coeff, exponent)
             stiffness = [] if numpy.isnan(e_fixed) else [e_fixed]
         else:
             poc_index_fit = (numpy.abs(delta - delta0_fit)).argmin() + first

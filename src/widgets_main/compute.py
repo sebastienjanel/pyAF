@@ -33,6 +33,7 @@
 """Main compute widget, used to compute elasticity, events, forces, ..."""
 
 import os
+import numpy
 from .. import shared
 from .. import widgets_list
 from .. import experiment
@@ -60,6 +61,7 @@ from ..compute_tools.stiffness.main import Stiffness
 from ..compute_tools.work_and_rupture_force.main import WorkAndRuptureForce
 from ..compute_tools.stiffness_correction import StiffnessCorrection
 from ..compute_tools.viscoelasticity import main as visco_main
+from ..compute_tools.stiffness import contact_models
 from ..compute_tools.loading_rates import GetLoadingRate
 from ..compute_tools.events import GetEvents
 from ..tools.PYAFWidget import PYAFWidget
@@ -225,6 +227,13 @@ class ComputeWidget(PYAFWidget):
         # Same width for the three inputs of the model parameters
         self.IN_tip_angle = PYAFInput(self, "tip_angle", label, 60)
         self.IN_poisson = PYAFInput(self, "poisson", "Poisson ratio", 60)
+        self.IN_tip_angle.setToolTip(
+            "Half-angle between the axis of the tip and its face (for a "
+            "pyramid: the face, not the edge).")
+        self.IN_tip_radius.setToolTip(
+            "Radius of the apex of the tip (sphere, paraboloid, blunted "
+            "tips), of the flat punch, or of the cylinder of the needle "
+            "and the nanowire.")
         # 0 is refused (division by zero in the models)
         self.IN_tip_radius.input.setValidator(misc_tools.validator("PF"))
         self.IN_tip_angle.input.setValidator(misc_tools.validator("PF"))
@@ -234,8 +243,7 @@ class ComputeWidget(PYAFWidget):
         self.HL_list_stiff = QtWidgets.QHBoxLayout()
         self.label_models_list = QtWidgets.QLabel("Model : ")
         self.list_models = PYAFComboBox(self, "list_models")
-        self.models = [
-            "Hertz (Paraboloid)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Slope", "Flat punch"]
+        self.models = contact_models.MODEL_NAMES
         for model in self.models:
             self.list_models.addItem(str(model))
         # Wide enough to display the longest model name. Set with a style
@@ -259,7 +267,7 @@ class ComputeWidget(PYAFWidget):
         self.GL_stiffness_params.addLayout(self.HL_list_stiff, 0, 0)
         self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
         # Position 2, defined in update_widget
-        self.GL_stiffness_params.addLayout(VL_empty1, 3, 0)
+        self.GL_stiffness_params.addLayout(VL_empty1, 4, 0)
 
         self.Box_stiff_exp_params.setLayout(self.GL_stiffness_params)
         VL_stiff_exp_params = QtWidgets.QVBoxLayout()
@@ -770,10 +778,10 @@ class ComputeWidget(PYAFWidget):
             # saved with the previous Calculus mode)
             tomography = not data.perform_fit
             if tomography and data.stiffness_model_selected != 3:
-                data.stiffness_model_selected = 3
+                self.set_model(data, 3)
                 data.tomography = 1
             elif not tomography and data.stiffness_model_selected == 3:
-                data.stiffness_model_selected = 0
+                self.set_model(data, 0)
             for index in range(len(self.models)):
                 if (index == 3) == tomography:
                     gui_tools.enable_combobox_item(self.list_models, index)
@@ -791,10 +799,17 @@ class ComputeWidget(PYAFWidget):
             model = data.used_stiffness_model_selected
             roi = data.roi_glass_id
             user_h = data.user_h
-            if data.stiffness_calculated and (roi != 0 or (user_h is not None and user_h != 0)) and model != 3:
+            # Bottom effect correction only for the models of Garcia &
+            # Garcia (paraboloid, cone, pyramid, flat punch)
+            has_bec = model in contact_models.HAS_BEC
+            if data.stiffness_calculated and (roi != 0 or (user_h is not None and user_h != 0)) and has_bec:
                 self.BT_height_corr.setEnabled(True)
             else:
                 self.BT_height_corr.setEnabled(False)
+            self.BT_height_corr.setToolTip(
+                "" if not data.stiffness_calculated or has_bec else
+                "No bottom effect correction for this model (Garcia & "
+                "Garcia 2018: paraboloid, cone, pyramid, flat punch)")
 
         if element == "visco" or element == "all":
             self.list_visco_solver.setCurrentIndex(
@@ -843,30 +858,25 @@ class ComputeWidget(PYAFWidget):
             self.BT_get_lr.setEnabled(data.events_calculated)
 
         if element == "grid_model_options" or element == "all":
-            if data.stiffness_model_selected == 0:
-                self.IN_tip_angle.setParent(None)
+            # Inputs of the tip of the model: radius and/or angle (none for
+            # the slope)
+            model = data.stiffness_model_selected
+            self.IN_tip_radius.setParent(None)
+            self.IN_tip_angle.setParent(None)
+            self.IN_poisson.setParent(None)
+            if model != contact_models.SLOPE:
+                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
+            row = 2
+            if model in contact_models.USES_RADIUS:
+                self.IN_tip_radius.label.setText(
+                    "  " + contact_models.RADIUS_LABELS.get(
+                        model, contact_models.RADIUS_LABEL))
                 self.IN_tip_radius.input.setText(str(data.tip_radius))
-                self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
-                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-            elif data.stiffness_model_selected == 1:
-                self.IN_tip_radius.setParent(None)
+                self.GL_stiffness_params.addWidget(self.IN_tip_radius, row, 0)
+                row += 1
+            if model in contact_models.USES_ANGLE:
                 self.IN_tip_angle.input.setText(str(data.tip_angle))
-                self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
-                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-            elif data.stiffness_model_selected == 2:
-                self.IN_tip_radius.setParent(None)
-                self.IN_tip_angle.input.setText(str(data.tip_angle))
-                self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
-                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-            elif data.stiffness_model_selected == 3:
-                self.IN_tip_radius.setParent(None)
-                self.IN_tip_angle.setParent(None)
-                self.IN_poisson.setParent(None)
-            if data.stiffness_model_selected == 4:
-                self.IN_tip_angle.setParent(None)
-                self.IN_tip_radius.input.setText(str(data.tip_radius))
-                self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
-                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
+                self.GL_stiffness_params.addWidget(self.IN_tip_angle, row, 0)
 
             self.IN_poisson.input.setText(str(data.poisson_ratio))
 
@@ -917,13 +927,32 @@ class ComputeWidget(PYAFWidget):
             elif data.events_curve_type == "detection":
                 self.RBT_detection.setChecked(True)
 
+    @staticmethod
+    def set_model(data, model):
+        """Selects the model of the elasticity. Each model keeps its own tip
+        radius and angle (default values of the model until the user changes
+        them)."""
+        old = data.stiffness_model_selected
+        if model != old:
+            if old in contact_models.USES_RADIUS:
+                data.tip_radii[old] = data.tip_radius
+            if old in contact_models.USES_ANGLE:
+                data.tip_angles[old] = data.tip_angle
+            if model in contact_models.USES_RADIUS:
+                data.tip_radius = data.tip_radii.get(
+                    model, contact_models.DEFAULT_RADIUS[model])
+            if model in contact_models.USES_ANGLE:
+                data.tip_angle = data.tip_angles.get(
+                    model, contact_models.DEFAULT_ANGLE[model])
+        data.stiffness_model_selected = model
+
     def list_updated(self, name):
         """Called when a list is updated."""
         data = shared.exp.current_data
 
         if name == "list_models":
             # This list lets you chose the model for the stiffness computation.
-            data.stiffness_model_selected = self.list_models.currentIndex()
+            self.set_model(data, self.list_models.currentIndex())
             # Update the GUI
             self.update_GUI("grid_model_options")
 
@@ -1014,6 +1043,34 @@ class ComputeWidget(PYAFWidget):
         self.update_MPL("MPL_canvas")
         self.update_GUI("BT_height_correction")
         self.update_GUI("visco")
+
+    @staticmethod
+    def radius_notes(calc_list):
+        """Message for the files indented deeper than the radius of the tip
+        with the paraboloid (Hertz is valid for an indentation much smaller
+        than the radius), None if there is none."""
+        lines = ""
+        for calc_id in calc_list:
+            data = shared.exp.list[calc_id]
+            if not data.stiffness_calculated or \
+                    data.used_stiffness_model_selected not in \
+                    contact_models.RADIUS_LIMITED:
+                continue
+            depth = numpy.asarray(data.indentation[:], dtype=float)
+            depth = depth[numpy.isfinite(depth)]
+            nbr = int(numpy.sum(depth > data.used_tip_radius))
+            if nbr:
+                lines += "<li>" + os.path.basename(data.filename) + " : " + \
+                    str(nbr) + " pixels out of " + str(depth.size) + \
+                    " (median indentation " + \
+                    str(int(round(float(numpy.median(depth))))) + " nm, tip " \
+                    "radius " + str(data.used_tip_radius) + " nm)</li>"
+        if not lines:
+            return None
+        return "The indentation is larger than the tip radius: the " \
+            "paraboloid (Hertz) is valid for an indentation much smaller " \
+            "than the radius. Use the Sneddon (Sphere) model for a bead, or " \
+            "a blunted cone or pyramid for a sharp tip.<ul>" + lines + "</ul>"
 
     def finish_computation(self, warnings=None, notes=None):
         """At the end of the computation, display the errors and refresh the GUI.
@@ -1309,7 +1366,8 @@ class ComputeWidget(PYAFWidget):
                         smoothing_warnings,
                         range_warnings]
 
-            self.finish_computation(warnings)
+            self.finish_computation(warnings,
+                                    notes=self.radius_notes(calc_list))
 
         elif button == "get_work_and_rupture_force":
             # Update all the parameters if needed
@@ -1514,10 +1572,10 @@ class ComputeWidget(PYAFWidget):
             data.stiffness_mode = value
             # Tomography: slope of the segments. Fitting: Hertz by default
             if value == 0:
-                data.stiffness_model_selected = 3
+                self.set_model(data, 3)
                 data.tomography = 1
             elif data.stiffness_model_selected == 3:
-                data.stiffness_model_selected = 0
+                self.set_model(data, 0)
             self.update_GUI("grid_model_options")
             self.update_GUI("stiffness_model_selected")
             self.update_widget()

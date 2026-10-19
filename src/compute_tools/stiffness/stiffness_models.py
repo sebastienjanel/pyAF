@@ -1,6 +1,9 @@
 import numpy
 
 coeff = None
+# Force per unit modulus of the tabulated models (sphere, blunted tips),
+# see contact_models.unit_force
+unit = None
 
 # Models for curve_fit #################################################################################################
 
@@ -26,7 +29,7 @@ def sneddon_cone(delta, delta0, e0):
     return y
 
 
-def bilodeau_pyramid(delta, delta0, e0):
+def barber_billings_pyramid(delta, delta0, e0):
     y = numpy.zeros(delta.shape)
     for i in range(len(y)):
         if delta[i] <= delta0:
@@ -75,7 +78,7 @@ def sneddon_cone_lmfit(params, delta, data):
     return data - y
 
 
-def bilodeau_pyramid_lmfit(params, delta, data):
+def barber_billings_pyramid_lmfit(params, delta, data):
     delta0 = params['delta0_fit'].value
     e0 = params['e0_fit'].value
 
@@ -100,3 +103,14 @@ def flat_punch_lmfit(params, delta, data):
             y[i] = coeff * e0 * numpy.power((delta[i] - delta0), 1)
 
     return data - y
+
+
+def tabulated(delta, delta0, e0):
+    """Tabulated contact models (sphere, blunted cone and pyramid)."""
+    return e0 * unit(numpy.asarray(delta) - delta0)
+
+
+def tabulated_lmfit(params, delta, data):
+    delta0 = params['delta0_fit'].value
+    e0 = params['e0_fit'].value
+    return data - tabulated(delta, delta0, e0)

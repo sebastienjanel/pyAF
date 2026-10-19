@@ -25,6 +25,7 @@ from ...tools import curve_tools
 from ...widgets.progressbar import Progressbar
 from .. import multiproc
 from . import ting
+from ..stiffness import contact_models
 
 # Number of curves fitted in a task of the pool
 CURVES_PER_TASK = 32
@@ -48,6 +49,9 @@ def check_file(data):
         return "the elasticity was computed with Tomography (Fitting needed)"
     if data.used_stiffness_model_selected not in ting.SUPPORTED_MODELS:
         return "the model of the elasticity fit is not supported"
+    if data.visco_bec and data.used_stiffness_model_selected not in \
+            contact_models.HAS_BEC:
+        return "no bottom effect correction for this model"
     if data.visco_bec and not has_height(data):
         return "no substrate ROI or sample height for the B.E.C."
     if data.file_type == "Nanoscope (Peak Force)" and not data.pft_freq:
@@ -253,7 +257,8 @@ def fit_curves(task):
         model = ting.TingModel(
             common["model"], common["coeff"], common["exponent"], solver,
             tip_radius=common["tip_radius"], tip_angle=common["tip_angle"],
-            height=height if numpy.isfinite(height) else None)
+            height=height if numpy.isfinite(height) else None,
+            poisson_ratio=common["poisson"])
         curve = ting.TingCurve(time, delta, force, idx_tm)
         beta_init = None if common["beta_auto"] else common["beta_init"]
         result = ting.fit_ting(curve, model, e_init, tc_init, f0_init,
@@ -269,14 +274,16 @@ def get_model(data, settings):
     coeff, exponent = ting.get_geometry(model, tip_radius,
                                         data.used_tip_angle,
                                         data.used_poisson_ratio)
-    # Numerical solver with the B.E.C. and for PeakForce (sinusoidal
-    # modulation: no constant velocities)
-    numerical = settings["bec"] or data.file_type == "Nanoscope (Peak Force)"
+    # Numerical solver with the B.E.C., for PeakForce (sinusoidal
+    # modulation: no constant velocities) and the tabulated tips
+    numerical = settings["bec"] or exponent is None or \
+        data.file_type == "Nanoscope (Peak Force)"
     return {"model": model, "coeff": coeff, "exponent": exponent,
             "tip_radius": tip_radius, "tip_angle": data.used_tip_angle,
             "solver": 1 if numerical else settings["solver"],
             "beta_auto": settings["beta_auto"],
-            "beta_init": settings["beta_init"]}
+            "beta_init": settings["beta_init"],
+            "poisson": data.used_poisson_ratio}
 
 
 def get_fit_inputs(data, i, j, settings, heights=None):

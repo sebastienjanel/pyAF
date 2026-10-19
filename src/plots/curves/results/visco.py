@@ -106,7 +106,8 @@ class ResultsVisco(PlotCurve):
                     common["model"], common["coeff"], common["exponent"],
                     solver, tip_radius=common["tip_radius"],
                     tip_angle=common["tip_angle"],
-                    height=height if numpy.isfinite(height) else None)
+                    height=height if numpy.isfinite(height) else None,
+                    poisson_ratio=common["poisson"])
                 curve = ting.TingCurve(time, delta, force, idx_tm)
                 velocities = ting.get_velocities(curve, tc_init) \
                     if solver == "analytical" else None
