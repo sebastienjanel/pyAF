@@ -31,9 +31,9 @@
 
 """Plots profiles."""
 
-from qtpy import QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
-from ..tools.gui_tools import PYAFInput
+from ..tools.gui_tools import PYAFInput, CenteredCellwidget
 import numpy
 from ..tools import planefit
 from ..tools.PYAFWidget import PYAFWidget
@@ -178,7 +178,9 @@ class ProfileWidget(PYAFWidget):
         self.table_profiles = list(self.profile_list)
         self.tableWidget.setRowCount(len(self.table_profiles))
         for i, profile in enumerate(self.table_profiles):
+            # Centered values
             item = QtWidgets.QTableWidgetItem(str(i + 1))
+            item.setTextAlignment(QtCore.Qt.AlignCenter)
             self.tableWidget.setItem(i, 0, item)
 
             checkbox = QtWidgets.QCheckBox()
@@ -186,12 +188,14 @@ class ProfileWidget(PYAFWidget):
                                            i == 0 if opening else True))
             checkbox.stateChanged.connect(self.list_checkbox_clicked)
             self.checkbox_list.append(checkbox)
-            self.tableWidget.setCellWidget(i, 1, checkbox)
+            self.tableWidget.setCellWidget(i, 1, CenteredCellwidget(checkbox))
 
             label_delta_x = QtWidgets.QLabel()
+            label_delta_x.setAlignment(QtCore.Qt.AlignCenter)
             self.delta_x_labels.append(label_delta_x)
             self.tableWidget.setCellWidget(i, 2, label_delta_x)
             label_delta_z = QtWidgets.QLabel()
+            label_delta_z.setAlignment(QtCore.Qt.AlignCenter)
             self.delta_z_labels.append(label_delta_z)
             self.tableWidget.setCellWidget(i, 3, label_delta_z)
 
