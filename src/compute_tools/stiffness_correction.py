@@ -34,12 +34,12 @@
 
 import os
 import numpy
-import math
 import logging
 from .. import shared
 from .. import widgets_list
-from ..tools import curve_tools
 from ..widgets.progressbar import Progressbar
+from .stiffness import bec
+from .stiffness import contact_models
 
 
 class StiffnessCorrection:
@@ -49,15 +49,10 @@ class StiffnessCorrection:
     between the topography and the substrate. One has to define a ROI in the
     roi manager, and set it as a glass substrate.
 
-    The coefficient chosen depends on the model chosen (Dimitriadis, Chadwick),
-    depending if the stiffness was computed with the Hertz model or the Sneddon
-    model.
-    2024 -> BEC models have been updated to Garcia Garcia 2018.
-
-    Note on the units:
-    indentation, tip_radius, height (h) are all kept in nm as they are divided
-    to compute the X value. No need to convert them to meters, X has no
-    dimension.
+    Garcia & Garcia 2018 corrections (paraboloid, cone and pyramid, flat
+    punch), applied inside the fit model (see stiffness.bec). The height
+    of the sample is the user height, or the topography above the plane of
+    the substrate ROI.
     """
 
     def __init__(self):
@@ -92,122 +87,40 @@ class StiffnessCorrection:
         # Create empty arrays to store intermediate results
         resstiffness_array = numpy.zeros([data.nbr_pixels_y], list)
 
-        tan_angle = math.tan(math.radians(data.used_tip_angle))
+        model = data.used_stiffness_model_selected
         tip_radius = data.used_tip_radius
-
-        # Get the coefficients of the glass surface if there is no user defined sample height
-        if data.user_h is None or data.user_h == 0:
-            d, a, b, _ = data.roi_list[data.roi_glass_id - 1].glass_coeffs
-
-        nf = data.noise_floor
-        if nf is None:
-            nf = 0
-
-        x_size = data.scan_size_x / data.nbr_pixels_x
-        y_size = data.scan_size_y / data.nbr_pixels_y
+        # Height of the sample [nm] (nan below the noise floor: no
+        # correction)
+        heights = bec.get_height_map(data)
 
         for i in range(data.nbr_pixels_x):
             for j in range(data.nbr_pixels_y):
-                if data.user_h is None or data.user_h == 0:
-                    z_glass = a * (j * y_size) + b * (i * x_size) + d
-
+                h = heights[i, j]
+                values = data.stiffness_array[i][j]
                 E_new = []
-                for z in range(len(data.stiffness_array[i][j])):
-                    E_original = data.stiffness_array[i][j][z]
-
-                    if data.user_h is None or data.user_h == 0:
-                        h = data.topography[i][j] - z_glass
-
-                    else:
-                        h = data.user_h
-
-                    # First indentation must be at 1, not at 0
-                    z += 1
-
-                    if not data.used_tomography:
-                        if len(data.stiffness_array[i][j]) == 1:
-                            poc_pos = data.pocs_real[i][j]
-
-                            # Get the deflection - extension curve
-                            app, _, _, _, _, _ = curve_tools.get_curve(
-                                data, [i, j], mode="curve_results")
-                            # Get the force curve
-                            force_curve = curve_tools.get_force_curves(
-                                app[0], app[1], poc_pos, data.spring_constant)
-
-                            # The last value of the force-distance curve is
-                            # the maximal indentation
-                            # (The point of contact is at the position 0, 0)
-                            indentation = force_curve[0][-1]
-                        else:
-                            indentation = z * data.used_indentation_step
-                    else:
-                        # Kasas model, not sure what to do here ...
-                        indentation = data.used_indentation_step
-                        h = h - z * data.used_indentation_step
-
-                    # For very rare cases on glass, where the indentation
-                    # is negative
-                    if indentation < 0:
-                        indentation = 0
-
-                    model = data.used_stiffness_model_selected
-
-                    if model == 0:
-                        # Hertz (paraboloid)
-                        # Don't correct for height < noise floor
-                        if h >= nf:
-                            # Old Chadwick/Dimitriadis correction
-                            # X = math.sqrt(indentation * tip_radius) / h
-                            # o2 = 1.133 * X + 1.283 * X ** 2
-                            # o4 = 0.769 * X ** 3 + 0.0975 * X ** 4
-                            # Updated correction according to Garcia 2018
-                            o1 = (1.133 * math.sqrt(indentation * tip_radius)) / h
-                            o2 = (1.497 * indentation * tip_radius) / h ** 2
-                            o3 = (1.469 * indentation * tip_radius * math.sqrt(indentation * tip_radius)) / h ** 3
-                            o4 = (0.755 * indentation ** 2 * tip_radius ** 2) / h ** 4
-                            coeff = 1.0 / (1 + o1 + o2 + o3 + o4)
-
-                        else:
-                            # Don't correct if we are "under" the glass
-                            coeff = 1.0
-
-                    elif model == 1 or model == 2:
-                        # Sneddon (Cone and Pyramid)
-                        # Don't correct for height < noise floor
-                        if h >= nf:
-                            # Old Chadwick/Dimitriadis correction
-                            # X = (indentation) / h
-                            # o1 = 1.7795 * (2 * tan_angle / math.pi ** 2) * X
-                            # o2 = 16.0 * (1.7795) ** 2 * tan_angle ** 2 * X ** 2
-                            # Updated correction according to Garcia 2018
-                            o1 = (0.721 * indentation * tan_angle) / h
-                            o2 = (0.650 * indentation ** 2 * tan_angle ** 2) / h ** 2
-                            o3 = (0.491 * indentation ** 3 * tan_angle ** 3) / h ** 3
-                            o4 = (0.225 * indentation ** 4 * tan_angle ** 4) / h ** 4
-                            coeff = 1.0 / (1 + o1 + o2 + o3 + o4)
-                        else:
-                            # Don't correct if we are "under" the glass
-                            coeff = 1.0
-
-                    elif model == 4:
-                        # Flat punch (cylinder, Garcia & Garcia 2018, as in
-                        # PyFMRheo): independent of the indentation
-                        if h >= nf:
-                            x = tip_radius / h
-                            coeff = 1.0 / (1 + 1.133 * x + 1.283 * x ** 2 +
-                                           0.598 * x ** 3 - 0.291 * x ** 4)
-                        else:
-                            coeff = 1.0
-
-                    else:
-                        # No bottom effect correction for this model (the
-                        # computation is not available, see the compute tab)
-                        coeff = numpy.nan
-
-
-                    # Correct the stiffness
-                    E_new.append(E_original * coeff)
+                if model not in contact_models.HAS_BEC:
+                    # No bottom effect correction for this model (the
+                    # computation is not available, see the compute tab)
+                    E_new = [numpy.nan] * len(values)
+                elif data.used_perform_fit and len(values) == 1:
+                    # Fitting: the B.E.C. factor is inside the fit model
+                    # (elasticity fitted again with the point of contact of
+                    # the elasticity fit)
+                    E_new = [values[0] *
+                             bec.correction_factor(data, i, j, h)]
+                else:
+                    # Previous Calculus mode: factor at the maximal
+                    # indentation (one value) or at the end of each segment
+                    for z in range(len(values)):
+                        indentation = (z + 1) * data.used_indentation_step
+                        if len(values) == 1:
+                            points = bec.approach_points(data, i, j)
+                            indentation = 0 if points is None else \
+                                max(float(numpy.max(points[0])) * 1e9, 0)
+                        factor = contact_models.bec_factor(
+                            indentation, model, tip_radius,
+                            data.used_tip_angle, h)
+                        E_new.append(values[z] / float(factor))
 
                 # Update the progressbar
                 widgets_list.widget_progressbar.update()

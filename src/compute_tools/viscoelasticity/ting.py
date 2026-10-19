@@ -72,30 +72,6 @@ def get_geometry(model, tip_radius, tip_angle, poisson_ratio):
     raise ValueError("Model not supported by the Ting fit: " + str(model))
 
 
-def bec_factor(delta, model, tip_radius, tip_angle, height):
-    """Bottom effect correction of Garcia & Garcia (Biophys. J. 2018):
-    factor of the force of an elastic material (>= 1).
-
-    delta, tip_radius and height in the same unit. Returns 1 if the height
-    is not positive.
-    """
-    delta = numpy.clip(numpy.asarray(delta, dtype=float), 0, None)
-    if height is None or not height > 0:
-        return numpy.ones_like(delta)
-    if model == PARABOLOID:
-        x = numpy.sqrt(delta * tip_radius) / height
-        coeffs = (1.133, 1.497, 1.469, 0.755)
-    elif model in (CONE, PYRAMID):
-        x = delta * math.tan(math.radians(tip_angle)) / height
-        coeffs = (0.721, 0.650, 0.491, 0.225)
-    elif model == FLAT_PUNCH:
-        x = numpy.full_like(delta, tip_radius / height)
-        coeffs = (1.133, 1.283, 0.598, -0.291)
-    else:
-        raise ValueError("Model not supported by the Ting fit: " + str(model))
-    return 1.0 + sum(c * x ** (k + 1) for k, c in enumerate(coeffs))
-
-
 class TingCurve:
     """Data of a curve for the Ting fit.
 
@@ -151,8 +127,9 @@ class TingModel:
                 self.poisson_ratio, delta)
         u = delta ** self.exponent
         if self.height is not None and self.height > 0:
-            u = u * bec_factor(delta, self.model, self.tip_radius,
-                               self.tip_angle, self.height)
+            u = u * contact_models.bec_factor(
+                delta, self.model, self.tip_radius, self.tip_angle,
+                self.height)
         return u
 
     def evaluate(self, curve, e0, tc, beta, f0, velocities=None):

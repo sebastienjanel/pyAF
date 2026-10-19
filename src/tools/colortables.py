@@ -57,7 +57,8 @@ class ColorTables:
                                  "Red to white",
                                  "Red to blue",
                                  "Gray",
-                                 "Binary"]
+                                 "Binary",
+                                 "White to red"]
         self.colortables_mpl_list = ["copper",
                                      "Rainbow 1",
                                      "viridis",
@@ -71,7 +72,8 @@ class ColorTables:
                                      "Reds",
                                      "RdBu",
                                      "gray",
-                                     "binary"]
+                                     "binary",
+                                     "Reds_r"]
 
         self.colortableid = colortableid
         self.color_saturation = color_saturation

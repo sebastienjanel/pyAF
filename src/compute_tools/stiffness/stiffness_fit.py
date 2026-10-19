@@ -113,6 +113,7 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         real_poc = poc_pos_i
         stiffness = []
         indentation_val = 0
+        fit_quality = [numpy.nan, numpy.nan]
 
     else:
 
@@ -179,10 +180,21 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
                 e_fixed = fit_tools.fit_e_fixed_poc(
                     masked_delta, masked_data_to_fit, sm.coeff, exponent)
             stiffness = [] if numpy.isnan(e_fixed) else [e_fixed]
+            fit_delta0, fit_e, fixed_poc = 0.0, e_fixed, 1.0
         else:
             poc_index_fit = (numpy.abs(delta - delta0_fit)).argmin() + first
             real_poc = [app[0][poc_index_fit] * 1e09, app[1][poc_index_fit] * 1e09]
             stiffness = [e0_fit]
+            fit_delta0, fit_e, fixed_poc = delta0_fit, e0_fit, 0.0
+
+        # Quality of the fit: R^2 on the fitted points after the contact,
+        # and 1 if the point of contact was fixed (fallback), 0 if fitted
+        fit_quality = [numpy.nan, numpy.nan]
+        if stiffness:
+            fit_quality = [r_squared(
+                filtered_df["data_to_fit"].values,
+                fit_model(filtered_df["delta"].values, fit_delta0, fit_e)),
+                fixed_poc]
 
     # Apply corrections to get the POC corrected value
     piez = dt["piezo_image"]
@@ -193,5 +205,18 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         # No POC: no topography value
         poc_corrected = numpy.nan
 
-    return i, j, poc_index_fit, real_poc, final_fit, stiffness, poc_corrected, smoothing_error, indentation_val
+    return i, j, poc_index_fit, real_poc, final_fit, stiffness, poc_corrected, smoothing_error, indentation_val, \
+        fit_quality
+
+
+def r_squared(data, model):
+    """Coefficient of determination of a fit (nan with less than 3 points
+    or without variation of the data)."""
+    data = numpy.asarray(data, dtype=float)
+    if len(data) < 3:
+        return numpy.nan
+    ss_tot = numpy.sum((data - numpy.mean(data)) ** 2)
+    if not ss_tot > 0:
+        return numpy.nan
+    return float(1.0 - numpy.sum((data - numpy.asarray(model)) ** 2) / ss_tot)
 

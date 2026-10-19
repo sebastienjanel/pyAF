@@ -62,6 +62,7 @@ from ..compute_tools.work_and_rupture_force.main import WorkAndRuptureForce
 from ..compute_tools.stiffness_correction import StiffnessCorrection
 from ..compute_tools.viscoelasticity import main as visco_main
 from ..compute_tools.stiffness import contact_models
+from ..compute_tools.stiffness import bec
 from ..compute_tools.loading_rates import GetLoadingRate
 from ..compute_tools.events import GetEvents
 from ..tools.PYAFWidget import PYAFWidget
@@ -473,9 +474,12 @@ class ComputeWidget(PYAFWidget):
                        self.BT_height_corr):
             button.setObjectName("primaryButton")
 
-        # Instruction label
-        self.label_info = QtWidgets.QLabel("Either select the substrate from the ROI manager (results tab) or input"
-                                           " the known height of the sample")
+        # Instruction label (models with a correction of Garcia & Garcia)
+        names = [contact_models.MODEL_NAMES[m] for m in contact_models.HAS_BEC]
+        self.label_info = QtWidgets.QLabel(
+            "Applies to " + ", ".join(names[:-1]) + " and " + names[-1] +
+            " models.\nEither select the substrate from the ROI manager "
+            "(results tab) or input the known height of the sample")
 
         # ROI selection (Label + Dropdown)
         self.label_list_roi = QtWidgets.QLabel("ROI of substrate:")
@@ -793,23 +797,12 @@ class ComputeWidget(PYAFWidget):
             self.update_GUI("buttons_compute")
 
         if element == "BT_height_correction" or element == "all":
-            # In the case of the model with the slope, do not allow the
-            # height correction computation.
-
-            model = data.used_stiffness_model_selected
-            roi = data.roi_glass_id
-            user_h = data.user_h
-            # Bottom effect correction only for the models of Garcia &
-            # Garcia (paraboloid, cone, pyramid, flat punch)
-            has_bec = model in contact_models.HAS_BEC
-            if data.stiffness_calculated and (roi != 0 or (user_h is not None and user_h != 0)) and has_bec:
-                self.BT_height_corr.setEnabled(True)
-            else:
-                self.BT_height_corr.setEnabled(False)
+            # Bottom effect correction: elasticity, model with a correction,
+            # and a height (substrate ROI or sample height)
+            reason = bec.check_file(data)
+            self.BT_height_corr.setEnabled(reason is None)
             self.BT_height_corr.setToolTip(
-                "" if not data.stiffness_calculated or has_bec else
-                "No bottom effect correction for this model (Garcia & "
-                "Garcia 2018: paraboloid, cone, pyramid, flat punch)")
+                "" if reason is None else "Not available: " + reason)
 
         if element == "visco" or element == "all":
             self.list_visco_solver.setCurrentIndex(

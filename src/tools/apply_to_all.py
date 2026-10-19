@@ -93,6 +93,8 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
                 dt.meshgrid_type = mt
             elif mt.startswith("visco_") and dt.visco_calculated:
                 dt.meshgrid_type = mt
+            elif mt.startswith("fit_") and dt.has_fit_quality():
+                dt.meshgrid_type = mt
             elif mt == "piezo":
                 dt.meshgrid_type = mt
 
@@ -170,7 +172,8 @@ def apply_to_all(mode, option=None, oldid=None, piezo_colors=False):
             dt.color_opts_events_per_curve = \
                 copy.deepcopy(cur.color_opts_events_per_curve)
             for name in ("color_opts_visco_e0", "color_opts_visco_fluidity",
-                         "color_opts_visco_tan_delta"):
+                         "color_opts_visco_tan_delta", "color_opts_fit_r2",
+                         "color_opts_fit_poc_fixed"):
                 setattr(dt, name, copy.deepcopy(getattr(cur, name)))
             dt.stiffness_color_log = getattr(cur, "stiffness_color_log",
                                              False)

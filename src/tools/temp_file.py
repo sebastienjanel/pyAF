@@ -44,6 +44,7 @@ the tmp file to a new destination.
 import os
 import sys
 import time
+import numpy
 import tables
 from qtpy import QtCore
 import tempfile
@@ -248,6 +249,9 @@ class TempFile:
             self.cp_node(st2 + "fits_poc", st1)
             self.cp_node(st2 + "indentation", st1)
             self.cp_node(st2 + "stiffness_array", st1)
+            # Not in the files computed before the fit quality
+            if self.file.__contains__(st2 + "fit_quality"):
+                self.cp_node(st2 + "fit_quality", st1)
             # self.cp_node(st2 + "yf", st1)
 
         if data.work_and_rupture_force1_calculated:
@@ -364,6 +368,8 @@ class TempFile:
             self.file.remove_node(st + "/results/fits_poc")
             self.file.remove_node(st + "/results/indentation")
             self.file.remove_node(st + "/results/stiffness_array")
+            if self.file.__contains__(st + "/results/fit_quality"):
+                self.file.remove_node(st + "/results/fit_quality")
         if tabletypes == "all" or tabletypes == "work":
             self.file.remove_node(st + "/results/jocs1_indices")
             self.file.remove_node(st + "/results/jocs2_indices")
@@ -387,6 +393,19 @@ class TempFile:
             self.file.remove_node(st + "/results/stiffness_corrected")
         if tabletypes == "all" or tabletypes == "loading_rates":
             self.file.remove_node(st + "/results/loading_rates")
+
+    def create_fit_quality_table(self, unique_id):
+        """Creates the table of the quality of the elasticity fit (R^2,
+        and 1 if the point of contact was fixed, 0 if fitted), if it does
+        not exist (files saved before it)."""
+        dt = shared.exp.list[int(unique_id)]
+        st = "/data/_" + str(unique_id) + "/results"
+        if self.file.__contains__(st + "/fit_quality"):
+            return
+        self.file.create_carray(
+            st, "fit_quality", tables.Float32Atom(dflt=numpy.nan),
+            shape=(dt.nbr_pixels_x, dt.nbr_pixels_y, 2),
+            filters=tables.Filters(complevel=9, complib="blosc"))
 
     def create_tables_for_results(
             self,
@@ -429,6 +448,7 @@ class TempFile:
                                  ty_fl,
                                  shape=(dt.nbr_pixels_x, dt.nbr_pixels_y),
                                  filters = comp)
+                self.create_fit_quality_table(unique_id)
 
             # Here it is tricky, we need to guess the number of segments that
             # will be stored in the array, to optimize speed.

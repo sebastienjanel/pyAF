@@ -123,6 +123,8 @@ class Stiffness:
         if data.stiffness_calculated:
             self.temp_file.delete_tables_for_results(calc_id, "stiffness")
             self.temp_file.create_tables_for_results(calc_id, "stiffness")
+        # Files saved before the fit quality
+        self.temp_file.create_fit_quality_table(calc_id)
 
         # Calculate the coefficients only once for all curves
         if data.stiffness_model_selected == 0:
@@ -293,6 +295,11 @@ class Stiffness:
         # Flush the file and update the values in the experiment class
         self.temp_file.flush_file()
         data.stiffness_calculated = True
+
+        # No fit quality with the Tomography
+        if data.meshgrid_type.startswith("fit_") and \
+                not data.has_fit_quality():
+            data.meshgrid_type = "stiffness"
 
         # The viscoelasticity uses the points of contact and the moduli of
         # the elasticity fit: to be computed again

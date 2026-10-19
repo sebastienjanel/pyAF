@@ -236,6 +236,34 @@ def _table_force(model, tip_radius, tip_angle, d):
     return values
 
 
+def bec_factor(delta, model, tip_radius, tip_angle, height):
+    """Bottom effect correction of Garcia & Garcia (Biophys. J. 2018, eqs.
+    12, 14 and 16, cell bonded to the substrate): factor (>= 1) of the
+    force of a layer of thickness height, for the models of HAS_BEC (the
+    cone factors are used for the pyramid).
+
+    delta, tip_radius and height in the same unit. Returns 1 if the height
+    is not positive (or nan).
+    """
+    delta = numpy.clip(numpy.asarray(delta, dtype=float), 0, None)
+    if height is None or not height > 0:
+        return numpy.ones_like(delta)
+    if model == PARABOLOID:
+        x = numpy.sqrt(delta * tip_radius) / height
+        coeffs = (1.133, 1.497, 1.469, 0.755)
+    elif model in (CONE, PYRAMID):
+        x = delta * math.tan(math.radians(tip_angle)) / height
+        coeffs = (0.721, 0.650, 0.491, 0.225)
+    elif model == FLAT_PUNCH:
+        # -0.291: sign of eq. 12a (+0.291 in Lekka et al. 2022, table 2.2.2)
+        x = numpy.full_like(delta, tip_radius / height)
+        coeffs = (1.133, 1.283, 0.598, -0.291)
+    else:
+        raise ValueError("No bottom effect correction for the model " +
+                         str(model))
+    return 1.0 + sum(c * x ** (k + 1) for k, c in enumerate(coeffs))
+
+
 def unit_force(model, tip_radius, tip_angle, poisson_ratio, delta):
     """Force per unit modulus g(delta) (F = E g(delta)), 0 for delta <= 0.
 

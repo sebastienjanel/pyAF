@@ -319,6 +319,19 @@ class PlotOptionsWidget(PYAFWidget):
                 if high is not None:
                     data.colortable_max_value = high
                     data.colortable_middle_value = high / 2.0
+            elif mt == "fit_r2":
+                # From the 5th percentile of the R^2 to 1
+                values = numpy.asarray(data.fit_r2, dtype=float)
+                values = values[numpy.isfinite(values)]
+                if values.size:
+                    low = min(float(numpy.percentile(values, 5)), 0.99)
+                    data.colortable_min_value = low
+                    data.colortable_max_value = 1.0
+                    data.colortable_middle_value = (low + 1.0) / 2.0
+            elif mt == "fit_poc_fixed":
+                data.colortable_min_value = 0.0
+                data.colortable_max_value = 1.0
+                data.colortable_middle_value = 0.5
             elif mt == "piezo":
                 data.colortable_max_value = data.max_piezo
                 data.colortable_middle_value = data.max_piezo / 2.0
@@ -427,12 +440,27 @@ class PlotOptionsWidget(PYAFWidget):
             values = values[numpy.isfinite(values)]
             val = float(values.max()) if values.size else 0.0
             val_all = None
+        elif mt == "fit_r2":
+            name, unit, factor = "Median R\u00b2", "", 1
+            values = numpy.asarray(data.fit_r2, dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(numpy.median(values)) if values.size else 0.0
+            val_all = None
+        elif mt == "fit_poc_fixed":
+            name, unit, factor = "Fixed point of contact", "% of the fits", \
+                100
+            values = numpy.asarray(data.fit_poc_fixed, dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(values.mean()) if values.size else 0.0
+            val_all = None
 
         def fmt(value):
             if mt == "events_per_curve":
                 return str(int(value))
-            if mt in ("visco_fluidity", "visco_tan_delta"):
+            if mt in ("visco_fluidity", "visco_tan_delta", "fit_r2"):
                 return str(round(float(value) * factor, 3))
+            if mt == "fit_poc_fixed":
+                return str(round(float(value) * factor, 1))
             return str(round(float(value) * factor, 2))
 
         text = (name + " : " + fmt(val) + " " + unit).rstrip()
@@ -546,7 +574,8 @@ def displayed_color_value(data, field):
         return float(f"{value:.4g}")
     elif mt in ("rupture_force", "events_rupture_force", "visco_e0"):
         return round(value, 2)
-    elif mt in ("visco_fluidity", "visco_tan_delta"):
+    elif mt in ("visco_fluidity", "visco_tan_delta", "fit_r2",
+                "fit_poc_fixed"):
         return round(value, 3)
     return float(f"{value:.7g}")
 

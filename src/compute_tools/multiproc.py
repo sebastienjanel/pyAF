@@ -71,7 +71,7 @@ PARTS_PER_PROCESS = 4
 # Results of the curves, written in the HDF5 file (index in the result of
 # the computation function of a curve)
 STIFFNESS_RESULTS = {"pocs_indices": 2, "pocs_real": 3, "fits_poc": 4,
-                     "topography": 6, "indentation": 8}
+                     "topography": 6, "indentation": 8, "fit_quality": 9}
 WORK_RESULTS = {"jocs1_indices": 2, "jocs2_indices": 3, "jocs1_real": 4,
                 "jocs2_real": 5, "fits_joc": 6, "work": 7,
                 "rupture_force1": 8}

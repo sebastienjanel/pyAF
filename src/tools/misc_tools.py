@@ -394,7 +394,7 @@ MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
                   "stiffness_corr", "stiffness_corr_slice", "work",
                   "rupture_force", "events_per_curve",
                   "events_rupture_force", "visco_e0", "visco_fluidity",
-                  "visco_tan_delta")
+                  "visco_tan_delta", "fit_r2", "fit_poc_fixed")
 
 
 def get_meshgrid_type_as_string(mesh_id):
@@ -640,16 +640,16 @@ def reset_computation(data_id, computation_type):
     """Resets results arrays."""
     data = shared.exp.list[data_id]
 
-    if computation_type == "stiffness" or "all":
+    if computation_type in ("stiffness", "all"):
         if data.stiffness_calculated:
             data.stiffness_calculated = False
 
             shared.exp.temp_file.delete_tables_for_results(str(data_id),
-                                                           "stiffness", True)
+                                                           "stiffness")
             shared.exp.temp_file.create_tables_for_results(str(data_id),
                                                            "stiffness", True)
 
-    if computation_type == "stiffness_corrected" or "all":
+    if computation_type in ("stiffness_corrected", "all"):
         if data.stiffness_corrected:
             data.stiffness_corrected = False
 
@@ -660,7 +660,7 @@ def reset_computation(data_id, computation_type):
                 str(data_id),
                 "stiffness_corrected")
 
-    if computation_type == "work_and_rupture_force1" or "all":
+    if computation_type in ("work_and_rupture_force1", "all"):
         if data.work_and_rupture_force1_calculated:
             data.work_and_rupture_force1_calculated = False
 
@@ -671,7 +671,7 @@ def reset_computation(data_id, computation_type):
                 str(data_id),
                 "work")
 
-    if computation_type == "events" or "all":
+    if computation_type in ("events", "all"):
         if data.events_calculated:
             data.events_calculated = False
 
@@ -682,7 +682,7 @@ def reset_computation(data_id, computation_type):
                 str(data_id),
                 "events")
 
-    if computation_type == "loading_rates" or "all":
+    if computation_type in ("loading_rates", "all"):
         if data.loading_rates_calculated:
             data.loading_rates_calculated = False
 

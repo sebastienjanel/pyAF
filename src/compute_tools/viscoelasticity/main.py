@@ -26,6 +26,7 @@ from ...widgets.progressbar import Progressbar
 from .. import multiproc
 from . import ting
 from ..stiffness import contact_models
+from ..stiffness.bec import has_height, get_height_map
 
 # Number of curves fitted in a task of the pool
 CURVES_PER_TASK = 32
@@ -62,32 +63,6 @@ def check_file(data):
     if not has_time and curve_tools.get_nanoscope_times(data, 2, 2) is None:
         return "no time and no ramp velocities in the file"
     return None
-
-
-def has_height(data):
-    """True if a height is defined for the bottom effect correction (as in
-    the B.E.C. tab)."""
-    if data.user_h is not None and data.user_h != 0:
-        return True
-    return data.roi_glass_id != 0 and \
-        data.roi_list[data.roi_glass_id - 1].glass_coeffs is not None
-
-
-def get_height_map(data):
-    """Height of the sample [nm] for the bottom effect correction (nan if
-    not corrected: below the noise floor), as in the B.E.C. tab."""
-    nx, ny = data.nbr_pixels_x, data.nbr_pixels_y
-    if data.user_h is not None and data.user_h != 0:
-        return numpy.full((nx, ny), float(data.user_h))
-    d, a, b, _ = data.roi_list[data.roi_glass_id - 1].glass_coeffs
-    x_size = data.scan_size_x / nx
-    y_size = data.scan_size_y / ny
-    cols = numpy.arange(nx)[:, None] * x_size
-    rows = numpy.arange(ny)[None, :] * y_size
-    height = numpy.asarray(data.topography, float) - (a * rows + b * cols + d)
-    noise_floor = data.noise_floor if data.noise_floor is not None else 0
-    height[~(height >= noise_floor)] = numpy.nan
-    return height
 
 
 def get_time(data, i, j, nbr_app, nbr_ret):

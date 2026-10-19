@@ -155,7 +155,7 @@ class MainPlot:
                 continue
             curve.fig.tight_layout()
             bottom = max(bottom, curve.fig.subplotpars.bottom)
-            top = min(top, curve.fig.subplotpars.top)
+            top = min(top, curve.fig.subplotpars.top, stable_top(curve))
         if bottom < top:
             self.fig.subplots_adjust(bottom=bottom, top=top)
 
@@ -331,6 +331,21 @@ def _plot_of(widget_name, attribute):
     pyaf_plot = getattr(widget, attribute, None)
     plot = getattr(pyaf_plot, "canvas", None)
     return plot if hasattr(plot, "fig") else None
+
+
+def stable_top(curve):
+    """Top of the axes of a curve leaving room for half a tick label above
+    them, as the tight layout does when the top tick is at the top of the
+    axes. The tight layout only does it in this case: the margin of a map
+    aligned on the curve then changed by some pixels with the y range."""
+    fig = curve.fig
+    labels = [t for t in curve.axes.get_yticklabels() if t.get_text()]
+    if not labels or fig.bbox.height <= 0:
+        return fig.subplotpars.top
+    height = labels[0].get_window_extent(fig.canvas.get_renderer()).height
+    # Padding of the tight layout: 1.08 font size
+    pad = 1.08 * matplotlib.rcParams["font.size"] * fig.dpi / 72.0
+    return 1.0 - (pad + height / 2.0) / fig.bbox.height
 
 
 def get_map_next_to_curve(curve_type):

@@ -183,6 +183,19 @@ class ResultsWidget(PYAFWidget):
         self.GRP_mesh_type.addButton(self.RBT_mesh_visco_e0, 10)
         self.GRP_mesh_type.addButton(self.RBT_mesh_visco_fluidity, 11)
         self.GRP_mesh_type.addButton(self.RBT_mesh_visco_tan_delta, 12)
+        # Quality of the elasticity fit
+        self.RBT_mesh_fit_r2 = QtWidgets.QRadioButton("Fit R\u00b2")
+        self.RBT_mesh_fit_poc_fixed = QtWidgets.QRadioButton(
+            "Fit: fixed point of contact")
+        self.RBT_mesh_fit_r2.setToolTip(
+            "R\u00b2 of the elasticity fit, on the fitted points after the "
+            "point of contact")
+        self.RBT_mesh_fit_poc_fixed.setToolTip(
+            "Pixels where the point of contact could not be fitted (too "
+            "stiff sample, failed fit, or point of contact moved too far): "
+            "elasticity fitted with the detected point of contact (1)")
+        self.GRP_mesh_type.addButton(self.RBT_mesh_fit_r2, 13)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_fit_poc_fixed, 14)
 
         self.GL_mesh_options = QtWidgets.QGridLayout()
         # Same spacing between all the rows (the style's default spacing
@@ -191,14 +204,14 @@ class ResultsWidget(PYAFWidget):
         self.VL_meshgrid_options = QtWidgets.QVBoxLayout()
         self.VL_meshgrid_options.setContentsMargins(0, 0, 0, 0)
 
+        # Heights, and the elasticity below them
         self.GL_mesh_options.addWidget(self.RBT_mesh_piezo, 0, 0)
         self.GL_mesh_options.addWidget(self.RBT_mesh_topography, 1, 0)
-
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness, 0, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_slice, 1, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_corr, 2, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness, 2, 0)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_slice, 3, 0)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_corr, 4, 0)
         self.GL_mesh_options.addWidget(
-            self.RBT_mesh_stiffness_slice_corr, 3, 1)
+            self.RBT_mesh_stiffness_slice_corr, 5, 0)
 
         self.GL_mesh_options.addWidget(self.RBT_mesh_work, 0, 2)
         self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force1, 1, 2)
@@ -206,10 +219,12 @@ class ResultsWidget(PYAFWidget):
         self.GL_mesh_options.addWidget(self.RBT_mesh_events_per_curve, 2, 2)
         self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force2, 3, 2)
 
-        # Viscoelasticity below the elasticity
-        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_e0, 4, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_fluidity, 5, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_tan_delta, 6, 1)
+        # Viscoelasticity, and the quality of the elasticity fit
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_e0, 0, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_fluidity, 1, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_tan_delta, 2, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_r2, 3, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_poc_fixed, 4, 1)
 
         self.VL_meshgrid_options.addLayout(self.GL_mesh_options)
         self.VL_meshgrid_options.addStretch(1)
@@ -407,7 +422,8 @@ class ResultsWidget(PYAFWidget):
         heights. Returns True if the curve changed."""
         mt = data.meshgrid_type
         if mt in ("stiffness", "stiffness_slice", "stiffness_corr",
-                  "stiffness_corr_slice") and data.stiffness_calculated:
+                  "stiffness_corr_slice", "fit_r2", "fit_poc_fixed") and \
+                data.stiffness_calculated:
             data.display_curve_type = "force"
             data.display_trace_retrace = 0
             data.display_poc = True
@@ -488,6 +504,9 @@ class ResultsWidget(PYAFWidget):
             self.RBT_mesh_visco_e0.setEnabled(val)
             self.RBT_mesh_visco_fluidity.setEnabled(val)
             self.RBT_mesh_visco_tan_delta.setEnabled(val)
+            val = data.has_fit_quality()
+            self.RBT_mesh_fit_r2.setEnabled(val)
+            self.RBT_mesh_fit_poc_fixed.setEnabled(val)
 
             # Check the button
             index = misc_tools.get_meshgrid_type_by_id(data.meshgrid_type)

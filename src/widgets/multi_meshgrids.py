@@ -115,6 +115,8 @@ class MultiMeshgridsWidget(PYAFWidget):
         self.list_choser.addItem("E0 (visco.)")
         self.list_choser.addItem("Fluidity")
         self.list_choser.addItem("Loss tangent (tan \u03b4)")
+        self.list_choser.addItem("Fit R\u00b2")
+        self.list_choser.addItem("Fit: fixed point of contact")
         self.list_choser.fit_to_contents()
 
         self.CB_display_roi = PYAFCheckBox(self, "display_roi", "Display ROIs")

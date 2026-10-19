@@ -207,6 +207,11 @@ class SingleFile:
         self.color_opts_visco_e0 = [2, 0, 0, 0, 0]
         self.color_opts_visco_fluidity = [3, 0, 1, 0.5, 0]
         self.color_opts_visco_tan_delta = [6, 0, 2, 1, 0]
+        # Quality of the elasticity fit: R^2 from 0.9 (white to red: the
+        # bad fits in red, the good ones light), and the pixels with the
+        # point of contact fixed (Reds: fixed in red)
+        self.color_opts_fit_r2 = [14, 0.9, 1, 0.95, 0]
+        self.color_opts_fit_poc_fixed = [10, 0, 1, 0.5, 0]
         self.color_saturation = [1, 1, 1, 1]
         self.color_negative = [0, 0, 0, 1]
         self.color_nan = [0.8, 0.8, 0.8, 1]  # grey
@@ -493,7 +498,7 @@ class SingleFile:
 
         # Preview values for the tilt limits
         self.tilt_limit_1 = 200
-        self.tilt_limit_2 = 400
+        self.tilt_limit_2 = 600
         self.tilt_applied = False
         self.check_tilt_option = "nbr_points"  # nbr_points or slopes
         # Values applied
@@ -1341,6 +1346,36 @@ class SingleFile:
         """Loss tangent of the power law: tan(pi * fluidity / 2)."""
         return numpy.tan(numpy.pi * self.visco_fluidity / 2)
 
+    def get_fit_quality(self, index):
+        """Map of the quality of the elasticity fit: R^2 (index 0), or 1 if
+        the point of contact was fixed and 0 if fitted (index 1); nan if
+        not computed (Tomography, files computed before)."""
+        values = numpy.full((self.nbr_pixels_x, self.nbr_pixels_y),
+                            numpy.nan)
+        if self.stiffness_calculated and self.has_fit_quality():
+            values = numpy.asarray(
+                self.get_node("/results/fit_quality")[:, :, index], float)
+        return values
+
+    def has_fit_quality(self):
+        """True if the quality of the elasticity fit is stored (Fitting,
+        computed with this version)."""
+        if not self.stiffness_calculated or not self.used_perform_fit:
+            return False
+        return self.temp_file.file.__contains__(
+            "/data/_" + str(self.unique_id) + "/results/fit_quality")
+
+    @property
+    def fit_r2(self):
+        """R^2 of the elasticity fit (fitted points after the contact)."""
+        return self.get_fit_quality(0)
+
+    @property
+    def fit_poc_fixed(self):
+        """1 where the point of contact of the elasticity fit was fixed
+        (fallback), 0 where it was fitted."""
+        return self.get_fit_quality(1)
+
     def get_color_opts(self, meshgrid_type=None):
         """Color options (list) of a meshgrid type (the current one by
         default)."""
@@ -1356,7 +1391,9 @@ class SingleFile:
                  "events_rupture_force": "color_opts_rupture_force2",
                  "visco_e0": "color_opts_visco_e0",
                  "visco_fluidity": "color_opts_visco_fluidity",
-                 "visco_tan_delta": "color_opts_visco_tan_delta"}
+                 "visco_tan_delta": "color_opts_visco_tan_delta",
+                 "fit_r2": "color_opts_fit_r2",
+                 "fit_poc_fixed": "color_opts_fit_poc_fixed"}
         return getattr(self, names[mt])
 
     @property

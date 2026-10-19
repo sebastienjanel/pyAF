@@ -47,6 +47,7 @@ from .meshgrids.stiffness_slice_corr_meshgrid import \
     PlotStiffnessSliceCorrMeshGrid
 from .meshgrids.work_meshgrid import PlotWorkMeshGrid
 from .meshgrids.visco_meshgrid import PlotViscoMeshGrid
+from .meshgrids.fit_quality_meshgrid import PlotFitQualityMeshGrid
 from .meshgrids.rupture_force1_meshgrid import PlotRuptureForce1MeshGrid
 from .meshgrids.rupture_force2_meshgrid import PlotRuptureForce2MeshGrid
 from .meshgrids.events_per_curve_meshgrid import PlotEventsPerCurveMeshGrid
@@ -252,6 +253,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                 self.canvas = PlotStiffnessSliceCorrMeshGrid(self)
             elif mesh.startswith("visco_") and dt.visco_calculated:
                 self.canvas = PlotViscoMeshGrid(self)
+            elif mesh.startswith("fit_") and dt.has_fit_quality():
+                self.canvas = PlotFitQualityMeshGrid(self)
             else:
                 # Plot an empty meshgrid
                 self.canvas = PlotEmptyMeshGrid(self)

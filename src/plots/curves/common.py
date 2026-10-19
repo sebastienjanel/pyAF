@@ -37,9 +37,8 @@ import numpy
 import copy
 from ...tools import math_tools
 from ...tools import events_tools
-from ...tools import curve_tools
 from ...compute_tools.stiffness import stiffness_compute
-from ...compute_tools.stiffness import contact_models
+from ...compute_tools.stiffness import bec
 
 
 class CommonCurveTools:
@@ -459,55 +458,30 @@ class CommonCurveTools:
                 # The fit failed for this curve: no fit to display
                 return
 
-            app, _, _, _, _, _ = \
-                curve_tools.get_curve(dt, [self.xpos, self.ypos],
-                                      mode="curve_results")  # get approach curve data
+            x, y = self.xpos, self.ypos
+            points = bec.approach_points(dt, x, y)
+            if points is None:
+                return
+            # Indentation and force from the point of contact, baseline
+            # removed (as in the fit)
+            delta, data_to_fit, _ = points
 
-            poc_pos = dt.pocs_real[self.xpos][self.ypos]
-            ind = dt.pocs_indices[self.xpos][self.ypos]
-
-            k = dt.spring_constant * 1e9
-
-            fcapp = curve_tools.get_force_curves(
-                app[0], app[1], poc_pos, k)  # Point of contact position is subtracted to set F = 0 and zheight = 0
-            app[0] = app[0] * 1e-09  # scaling zheight
-            app[1] = app[1] * 1e-09  # scaling deflection
-            fcapp[0] = fcapp[0] * 1e-09  # scaling force data
-            fcapp[1] = fcapp[1] * 1e-09  # scaling indentation
-
-            model = dt.used_stiffness_model_selected
-            radius = dt.used_tip_radius * 1e-9
-            angle = dt.used_tip_angle
-            nu = dt.used_poisson_ratio
-            E = dt.stiffness_array[self.xpos][self.ypos][0]
+            # B.E.C. map displayed: corrected elasticity, with the factor in
+            # the model (see stiffness.bec)
+            E = dt.stiffness_array[x][y][0]
+            height = None
+            if dt.meshgrid_type.startswith("stiffness_corr") and \
+                    dt.stiffness_corrected and \
+                    numpy.isfinite(dt.stiffness_corrected_array[x][y][0]):
+                E = dt.stiffness_corrected_array[x][y][0]
+                height = bec.get_height_map(dt)[x, y] * 1e-9
 
             def fit_force(d):
                 """Force of the fitted model at the indentations d [m]."""
-                return E * contact_models.unit_force(model, radius, angle,
-                                                     nu, d)
-
-            delta = fcapp[0][ind::]
-            data_to_fit = fcapp[1][ind::]
+                return E * bec.unit_force(dt, d, height)
 
             # Points of the fit range (same selection as stiffness_fit)
-            in_range = numpy.ones(len(delta), dtype=bool)
-            if dt.get_used_fit_range_type() == 0:
-                force_start = dt.used_force_start \
-                    if dt.used_force_start is not None else dt.force_start
-                force_stop = dt.used_force_stop \
-                    if dt.used_force_stop is not None else dt.force_stop
-                setpoint = dt.trig_threshold * dt.deflection_sensitivity * \
-                    dt.spring_constant
-                in_range = (data_to_fit >= force_start / 100 * setpoint) & \
-                    (data_to_fit <= force_stop / 100 * setpoint)
-            elif dt.get_used_fit_range_type() == 1:
-                start_f = dt.used_indentation_start * 1e-09
-                stop_f = dt.used_indentation_stop * 1e-09
-                in_range = delta >= start_f
-                if stop_f != 0:
-                    in_range &= delta <= stop_f
-            if not numpy.any(in_range):
-                in_range = numpy.ones(len(delta), dtype=bool)
+            in_range = bec.fit_range_mask(dt, delta, data_to_fit)
 
             # Residuals on the fitted points
             res_delta = delta[in_range]
