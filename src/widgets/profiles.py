@@ -100,28 +100,11 @@ class ProfileWidget(PYAFWidget):
         self.box_profiles_list = QtWidgets.QGroupBox("Profiles list")
         self.box_profiles_list_HL = QtWidgets.QHBoxLayout()
 
-        self.tableWidget = QtWidgets.QTableWidget(len(self.profile_list), 4)
+        self.tableWidget = QtWidgets.QTableWidget(0, 4)
         self.set_headers()
-
-        # Fill every line of the table
-        for i in range(len(self.profile_list)):
-            item = QtWidgets.QTableWidgetItem(str(i + 1))
-            self.tableWidget.setItem(i, 0, item)
-
-            checkbox = QtWidgets.QCheckBox()
-            # We display only the first profile at the beginning
-            if i == 0:
-                checkbox.setChecked(True)
-            checkbox.stateChanged.connect(self.list_checkbox_clicked)
-            self.checkbox_list.append(checkbox)
-            self.tableWidget.setCellWidget(i, 1, checkbox)
-
-            label_delta_x = QtWidgets.QLabel()
-            self.delta_x_labels.append(label_delta_x)
-            self.tableWidget.setCellWidget(i, 2, label_delta_x)
-            label_delta_z = QtWidgets.QLabel()
-            self.delta_z_labels.append(label_delta_z)
-            self.tableWidget.setCellWidget(i, 3, label_delta_z)
+        # Profiles of the rows of the table (display state of each profile)
+        self.table_profiles = []
+        self.fill_table()
 
         # Widths of the columns: the value delta takes the remaining space
         for column, width in enumerate((70, 70, 120)):
@@ -182,6 +165,36 @@ class ProfileWidget(PYAFWidget):
                 j = pl[profile][1][count]
                 self.profiles_z[profile].append(values[i][j])
 
+    def fill_table(self):
+        """One row per profile. The profiles keep their display state; at
+        the opening only the first one is displayed, the new profiles are
+        displayed."""
+        opening = not self.table_profiles
+        states = {id(profile): checkbox.isChecked() for profile, checkbox
+                  in zip(self.table_profiles, self.checkbox_list)}
+        self.checkbox_list = []
+        self.delta_x_labels = []
+        self.delta_z_labels = []
+        self.table_profiles = list(self.profile_list)
+        self.tableWidget.setRowCount(len(self.table_profiles))
+        for i, profile in enumerate(self.table_profiles):
+            item = QtWidgets.QTableWidgetItem(str(i + 1))
+            self.tableWidget.setItem(i, 0, item)
+
+            checkbox = QtWidgets.QCheckBox()
+            checkbox.setChecked(states.get(id(profile),
+                                           i == 0 if opening else True))
+            checkbox.stateChanged.connect(self.list_checkbox_clicked)
+            self.checkbox_list.append(checkbox)
+            self.tableWidget.setCellWidget(i, 1, checkbox)
+
+            label_delta_x = QtWidgets.QLabel()
+            self.delta_x_labels.append(label_delta_x)
+            self.tableWidget.setCellWidget(i, 2, label_delta_x)
+            label_delta_z = QtWidgets.QLabel()
+            self.delta_z_labels.append(label_delta_z)
+            self.tableWidget.setCellWidget(i, 3, label_delta_z)
+
     def set_headers(self):
         """Headers of the table: delta of the values of the map."""
         unit = " [" + self.value_unit + "]" if self.value_unit else ""
@@ -192,8 +205,10 @@ class ProfileWidget(PYAFWidget):
             ") between the two bars")
 
     def update_widget(self):
-        """The map of the results tab changed: profiles of its values."""
+        """The map of the results tab or the profiles changed: profiles of
+        the values of the map."""
         self.compute_profiles()
+        self.fill_table()
         self.set_headers()
         self.update_GUI("labels_delta_x")
         self.update_GUI("labels_delta_z")

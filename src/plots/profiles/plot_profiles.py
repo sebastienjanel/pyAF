@@ -49,10 +49,13 @@ class PlotProfiles(MainPlot):
         self.pr_z = widget.profiles_z
         pl = self.data.profile_list
 
+        # Displayed profiles, with the color of each profile on the map
+        colors = self.data.profiles_color_names
         profile_list = []
         for profile in range(len(pl)):
             if widgets_list.widget_profiles.checkbox_list[profile].isChecked():
-                profile_list.append([self.pr_x[profile], self.pr_z[profile]])
+                profile_list.append([self.pr_x[profile], self.pr_z[profile],
+                                     colors[profile % len(colors)]])
 
         self.plot_type = "profiles"
         self.xlabel = "[\u03bcm]"
@@ -63,16 +66,15 @@ class PlotProfiles(MainPlot):
 
         if profile_list:
             # Plot the profiles
-            for profile in range(len(profile_list)):
-                self.axes.plot(profile_list[profile][0],
-                               profile_list[profile][1])
+            for x, z, color in profile_list:
+                self.axes.plot(x, z, color=color)
 
             # Plot the bars
             if shared.exp.show_profiles_bars:
                 self.axes.axvline(x=profiles_bar_1, linewidth=2,
-                                  color='r', linestyle='--')
+                                  color='black', linestyle='--')
                 self.axes.axvline(x=profiles_bar_2, linewidth=2,
-                                  color='r', linestyle='--')
+                                  color='black', linestyle='--')
 
         # Plot the labels
         self.plot_labels()

@@ -85,6 +85,8 @@ class ResultsWidget(PYAFWidget):
         self.settings = QtCore.QSettings()
 
         self.current_profile_erase = None
+        # A profile is being drawn (the last one of the profile list)
+        self.drawing_profile = False
 
         self.canvas_resolution = self.parent.canvas_resolution
         self.meshgrid_canvas_size = [300, 340]
@@ -1144,31 +1146,33 @@ class ResultsWidget(PYAFWidget):
                 widgets_list.widget_main.change_curve(xpos, ypos)
 
             elif mode == "profile_add":
+                # New profile, at the end of the list until the release
                 data.profile_starts.append([xpos - 1, ypos - 1])
-                data.profile_list.append([xpos - 1, ypos - 1])
+                data.profile_list.append([[xpos - 1], [ypos - 1]])
+                data.profile_count = len(data.profile_list) - 1
+                self.drawing_profile = True
 
             elif mode == "roi_add" or mode == "roi_erase":
                 self.draw_roi(xpos, ypos)
 
             elif mode == "profile_erase":
-                # Search in profile_list if there is a profile to delete
-                if data.profile_list:
-                    count = 0
-                    for profile in data.profile_list:
-                        for i in range(len(profile[0])):
-                            pos = [profile[0][i], profile[1][i]]
-                            if pos == [xpos - 1, ypos - 1]:
-                                del data.profile_list[count]
-                                del data.profile_starts[count]
-                                data.profile_count -= 1
-                                # We have found the profile, so we stop
-                                break
-                        count += 1
+                # Delete the first profile passing by this pixel
+                for count, profile in enumerate(data.profile_list):
+                    if [xpos - 1, ypos - 1] in \
+                            [list(p) for p in zip(profile[0], profile[1])]:
+                        del data.profile_list[count]
+                        if count < len(data.profile_starts):
+                            del data.profile_starts[count]
+                        break
+                data.profile_count = len(data.profile_list)
+                self.current_profile_erase = None
 
-                # Close profile widget if needed
+                # Close profile widget if needed, else remove the profile
                 w_profiles = widgets_list.widget_profiles
                 if data.profile_count == 0 and w_profiles is not None:
                     widgets_list.widget_profiles.close()
+                elif w_profiles is not None:
+                    w_profiles.update_widget()
 
                 # Reset profiles in slices widget if there is no more profile
                 # (and a custome profile was selected)
@@ -1203,32 +1207,28 @@ class ResultsWidget(PYAFWidget):
         """The canvas_release is called whenever the mouse click is released."""
         data = shared.exp.list[shared.exp.id_selected]
 
-        inaxes = event.inaxes
         button = event.button
 
         if not isinstance(widgets_list.widget_results.MPL_canvas1.canvas,
                           MainPlot):
             return  # Nothing to do if no real canvas
 
-        # Release for profile, only inside canvas
-        axes = widgets_list.widget_results.MPL_canvas1.canvas.axes
-        mode = self.cursor_mode
-        if inaxes == axes and button == 1:
+        # End of a profile (also when the mouse is released outside of the
+        # map): kept if it has at least 3 pixels
+        if self.drawing_profile and button == 1:
+            self.drawing_profile = False
             ls = data.profile_list
-            if mode == "profile_add":
-                length = len(ls[data.profile_count][0])
-
-            if mode == "profile_add" and length >= 3:
-                data.profile_count = data.profile_count + 1
-                self.update_GUI("button_profiles_and_slices")
-
-                # Finalize plotting
-                self.MPL_canvas1.canvas.update_blit("all")
-
-            elif mode == "profile_add" and length < 3 and ls:
-                # Nothing has happened
-                del data.profile_starts[data.profile_count]
-                del data.profile_list[data.profile_count]
+            if ls and len(ls[-1][0]) < 3:
+                del ls[-1]
+                if data.profile_starts:
+                    del data.profile_starts[-1]
+            data.profile_count = len(ls)
+            self.update_GUI("button_profiles_and_slices")
+            # Finalize plotting
+            self.MPL_canvas1.canvas.update_blit("all")
+            # New profile in the profiles window
+            if widgets_list.widget_profiles is not None and ls:
+                widgets_list.widget_profiles.update_widget()
 
         # Releasing for the ROI can be done outside the canvas
         if self.cursor_mode == "roi_add" or self.cursor_mode == "roi_erase":
@@ -1268,21 +1268,16 @@ class ResultsWidget(PYAFWidget):
 
             mode = self.cursor_mode
 
-            if mode == "profile_add":
-                # Delete current profile
-                if data.profile_list:
-                    del data.profile_list[data.profile_count]
-
-                # Add profile to list
-                data.profile_list.append(
-                    misc_tools.make_path(
-                        data.profile_starts[data.profile_count],
-                        [xpos - 1, ypos - 1]))
+            if mode == "profile_add" and self.drawing_profile:
+                # The profile being drawn is the last one: from its start to
+                # the mouse
+                data.profile_list[-1] = misc_tools.make_path(
+                    list(data.profile_starts[-1]), [xpos - 1, ypos - 1])
 
                 # Draw profile
                 cv = self.MPL_canvas1.canvas
-                prof = data.profile_list[data.profile_count]
-                cv.update_blit("profile_preview", profile=prof)
+                cv.update_blit("profile_preview",
+                               profile=data.profile_list[-1])
 
             elif mode == "roi_add" or mode == "roi_erase":
                 # Draw a ROI
