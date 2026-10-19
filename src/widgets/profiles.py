@@ -33,7 +33,6 @@
 
 from qtpy import QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
-from ..tools import math_tools
 from ..tools.gui_tools import PYAFInput
 import numpy
 from ..tools import planefit
@@ -56,41 +55,10 @@ class ProfileWidget(PYAFWidget):
         self.canvas_resolution = self.parent.canvas_resolution
         self.canvas_size = [720, 288]
 
-        # Prepare the profiles to be displayed. The data preparation is done
-        # here because we need these profiles to calculate the x and z deltas
-        # in the widget. Furthermore the profiles only need to be calculated
-        # once.
-
-        dt = shared.exp.current_data
-        d_x = (dt.scan_size_x / float(dt.topography.shape[0])) / 1000.0
-        d_y = (dt.scan_size_y / float(dt.topography.shape[1])) / 1000.0
-        d_xy = numpy.sqrt((d_x ** 2 + d_y ** 2))
-        # Heights with the planefit of the file
-        topo = planefit.topo_map(dt)
-
-        self.profiles_x = []
-        self.profiles_z = []
-        pl = self.profile_list
-        for profile in range(len(pl)):
-            self.profiles_x.append([])
-            self.profiles_z.append([])
-            for count in range(len(pl[profile][0])):
-                if count != 0:
-                    if pl[profile][0][count - 1] == pl[profile][0][count]:
-                        val = self.profiles_x[profile][-1] + d_x
-                        self.profiles_x[profile].append(val)
-                    elif pl[profile][1][count - 1] == pl[profile][1][count]:
-                        val = self.profiles_x[profile][-1] + d_y
-                        self.profiles_x[profile].append(val)
-                    else:
-                        val = self.profiles_x[profile][-1] + d_xy
-                        self.profiles_x[profile].append(val)
-                else:
-                    self.profiles_x[profile].append(count)
-                i = pl[profile][0][count]
-                j = pl[profile][1][count]
-                val = topo[i][j] / 1000.0
-                self.profiles_z[profile].append(val)
+        # Profiles of the values of the map they are drawn on (results tab),
+        # computed once here (x and value deltas of the table) and used by
+        # the plot
+        self.compute_profiles()
 
         self.VL = QtWidgets.QVBoxLayout()
 
@@ -133,8 +101,7 @@ class ProfileWidget(PYAFWidget):
         self.box_profiles_list_HL = QtWidgets.QHBoxLayout()
 
         self.tableWidget = QtWidgets.QTableWidget(len(self.profile_list), 4)
-        header = ["Profile", "Display", "Delta X [nm]", "Delta Z [nm]"]
-        self.tableWidget.setHorizontalHeaderLabels(header)
+        self.set_headers()
 
         # Fill every line of the table
         for i in range(len(self.profile_list)):
@@ -156,7 +123,11 @@ class ProfileWidget(PYAFWidget):
             self.delta_z_labels.append(label_delta_z)
             self.tableWidget.setCellWidget(i, 3, label_delta_z)
 
-        self.tableWidget.resizeColumnsToContents()
+        # Widths of the columns: the value delta takes the remaining space
+        for column, width in enumerate((70, 70, 120)):
+            self.tableWidget.setColumnWidth(column, width)
+        self.tableWidget.horizontalHeader().setStretchLastSection(True)
+        self.tableWidget.verticalHeader().hide()
 
         self.box_profiles_list_HL.addWidget(self.tableWidget)
         self.box_profiles_list.setLayout(self.box_profiles_list_HL)
@@ -175,6 +146,59 @@ class ProfileWidget(PYAFWidget):
         self.update_GUI("labels_delta_x")
         self.update_GUI("labels_delta_z")
 
+    def compute_profiles(self):
+        """Distances along the profiles [um] and values of the map displayed
+        in the results tab at their pixels (in the units of its color bar;
+        heights of the topography without map)."""
+        dt = shared.exp.current_data
+        self.data = dt
+        self.profile_list = dt.profile_list
+        d_x = (dt.scan_size_x / float(dt.nbr_pixels_x)) / 1000.0
+        d_y = (dt.scan_size_y / float(dt.nbr_pixels_y)) / 1000.0
+        d_xy = numpy.sqrt((d_x ** 2 + d_y ** 2))
+
+        values, self.value_label = map_values(dt)
+        unit = self.value_label.rsplit("[", 1)
+        self.value_unit = unit[1].rstrip("]") if len(unit) == 2 else ""
+
+        self.profiles_x = []
+        self.profiles_z = []
+        pl = self.profile_list
+        for profile in range(len(pl)):
+            self.profiles_x.append([])
+            self.profiles_z.append([])
+            for count in range(len(pl[profile][0])):
+                if count != 0:
+                    if pl[profile][0][count - 1] == pl[profile][0][count]:
+                        val = self.profiles_x[profile][-1] + d_x
+                    elif pl[profile][1][count - 1] == pl[profile][1][count]:
+                        val = self.profiles_x[profile][-1] + d_y
+                    else:
+                        val = self.profiles_x[profile][-1] + d_xy
+                    self.profiles_x[profile].append(val)
+                else:
+                    self.profiles_x[profile].append(count)
+                i = pl[profile][0][count]
+                j = pl[profile][1][count]
+                self.profiles_z[profile].append(values[i][j])
+
+    def set_headers(self):
+        """Headers of the table: delta of the values of the map."""
+        unit = " [" + self.value_unit + "]" if self.value_unit else ""
+        self.tableWidget.setHorizontalHeaderLabels(
+            ["Profile", "Display", "Delta X [nm]", "Delta" + unit])
+        self.tableWidget.horizontalHeaderItem(3).setToolTip(
+            "Difference of the values of the map (" + self.value_label +
+            ") between the two bars")
+
+    def update_widget(self):
+        """The map of the results tab changed: profiles of its values."""
+        self.compute_profiles()
+        self.set_headers()
+        self.update_GUI("labels_delta_x")
+        self.update_GUI("labels_delta_z")
+        self.update_MPL("MPL_profiles_canvas")
+
     def update_GUI(self, what):
         """Update the GUI."""
         bar1 = shared.exp.profiles_bar_1
@@ -186,41 +210,25 @@ class ProfileWidget(PYAFWidget):
                 self.delta_x_labels[i].setText(str(round(value)))
 
         elif what == "labels_delta_z":
+            # Values of the profiles at the bars (linear interpolation; the
+            # distances are in um, the bars in nm)
             for profile in range(len(self.profiles_x)):
-                for i in range(len(self.profiles_x[profile])):
-                    x = self.profiles_x[profile][i] * 1000.0
-                    if x == shared.exp.profiles_bar_1:
-                        z1 = self.profiles_z[profile][i]
-                    elif x > shared.exp.profiles_bar_1:
-                        x1b = self.profiles_x[profile][i]
-                        z1b = self.profiles_z[profile][i]
-                        x1a = self.profiles_x[profile][i - 1]
-                        z1a = self.profiles_z[profile][i - 1]
-                        coeffs, _ = \
-                            math_tools.fit_linear([x1a, x1b], [z1a, z1b])
-                        z1 = numpy.polyval([coeffs[0], coeffs[1]], bar1)
-                        break
-
-                for i in range(len(self.profiles_x[profile])):
-                    x = self.profiles_x[profile][i] * 1000.0
-                    if x == shared.exp.profiles_bar_2:
-                        z2 = self.profiles_z[profile][i]
-                    elif x > shared.exp.profiles_bar_2:
-                        x2b = self.profiles_x[profile][i]
-                        z2b = self.profiles_z[profile][i]
-                        x2a = self.profiles_x[profile][i - 1]
-                        z2a = self.profiles_z[profile][i - 1]
-                        coeffs, _ = \
-                            math_tools.fit_linear([x2a, x2b], [z2a, z2b])
-                        z2 = numpy.polyval([coeffs[0], coeffs[1]], bar2)
-                        break
-
+                x = numpy.asarray(self.profiles_x[profile], dtype=float)
+                z = numpy.asarray(self.profiles_z[profile], dtype=float)
+                inside = [x[0] <= bar / 1000.0 <= x[-1]
+                          for bar in (bar1, bar2)]
+                if len(x) < 2 or not all(inside):
+                    # A bar is outside of the profile
+                    self.delta_z_labels[profile].setText("\u2013")
+                    continue
+                z1 = numpy.interp(bar1 / 1000.0, x, z)
+                z2 = numpy.interp(bar2 / 1000.0, x, z)
                 value = abs(z1 - z2)
                 if numpy.isnan(value):
-                    # No topography at one of the bars (no POC found)
+                    # No value at one of the bars (e.g. no POC found)
                     self.delta_z_labels[profile].setText("NaN")
                 else:
-                    self.delta_z_labels[profile].setText(str(round(value)))
+                    self.delta_z_labels[profile].setText("%.4g" % value)
 
     def open_single_figure(self):
         """Open the figure in a separate window."""
@@ -279,3 +287,22 @@ class ProfileWidget(PYAFWidget):
         # Display action
         menu.popup(pos, menu.menuAction())
         menu.exec_()
+
+
+def map_values(data):
+    """Values of the map displayed in the results tab ([x][y], in the units
+    of its color bar, nan without value) and its label. Heights of the
+    topography if there is no map."""
+    from .. import widgets_list
+    canvas = None
+    if widgets_list.widget_results is not None:
+        canvas = getattr(widgets_list.widget_results.MPL_canvas1, "canvas",
+                         None)
+    temp = getattr(canvas, "temp_array", None)
+    if canvas is not None and temp is not None and \
+            getattr(canvas, "data", None) is data and \
+            getattr(canvas, "colorbarlabel", None):
+        values = numpy.ma.filled(numpy.ma.asarray(temp, dtype=float),
+                                 numpy.nan) * canvas.factor
+        return values, canvas.colorbarlabel
+    return planefit.topo_map(data), "Zero-force topography [nm]"

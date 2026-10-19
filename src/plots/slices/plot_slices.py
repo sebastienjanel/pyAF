@@ -322,16 +322,17 @@ class PlotSlices(MainPlot):
 
     def plot_fig(self):
         """Plot the figure."""
+        # Color scale of the elasticity (the slices are elasticity slices,
+        # whatever the map displayed in the results tab)
         self.colortable = ColorTables(
-            self.data.colortableid,
-            self.data.color_saturation,
-            self.data.color_negative,
-            self.data.colortable_max_value *
-            self.factor,
-            self.data.colortable_middle_value *
-            self.factor,
+            self.colortableid,
+            self.color_saturation,
+            self.color_negative,
+            self.colortable_max_value * self.factor,
+            self.colortable_middle_value * self.factor,
             mode="scalarMap",
-            color_nan=self.data.color_nan)
+            color_nan=self.color_nan,
+            min_value=self.colortable_min_value * self.factor)
 
         elasticity = self.data_stiffness_slices[0] * self.factor
         X = numpy.array(self.data_stiffness_slices[1]) / 1000.0

@@ -101,6 +101,11 @@ class ColorTables:
                 extremes["bad"] = color_nan
             cmap = mpl_plt.get_cmap(name).with_extremes(**extremes)
             self.scalarMap = mpl_cm.ScalarMappable(norm=cNorm, cmap=cmap)
+        elif mode == "scalarMap":
+            # Rainbow 1 and Cool-Warm: colormap of their color dictionary
+            # (color bars of the slices and of the 3D view)
+            cmap, norm = self.get_color_as_cdict()
+            self.scalarMap = mpl_cm.ScalarMappable(norm=norm, cmap=cmap)
 
     def get_color_as_list(self, value):
         """Returns the color as a RGBA list."""

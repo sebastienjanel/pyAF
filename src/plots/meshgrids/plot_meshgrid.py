@@ -190,6 +190,7 @@ class PlotMeshGrid(MainPlot):
                 (values >= 0) & (values < low), low, values)
 
         # Plot the meshgrid
+        mesh = None
         if self.colormap != "Rainbow 1" and self.colormap != "Cool-Warm" and \
                 self.data_meshgrid is not None:
             self.colormap = matplotlib.colormaps.get_cmap(self.colormap)
@@ -248,6 +249,9 @@ class PlotMeshGrid(MainPlot):
                                         norm=norm,
                                         edgecolor=edgecolor,
                                         linewidth=linewidth)
+
+        # Map drawn (colors of the erased ROI pixels, see draw_roi)
+        self.mesh = mesh
 
         # Set the ranges
         self.axes.axis([0, self.x_range[-1], 0, self.y_range[-1]])
@@ -522,23 +526,14 @@ class PlotMeshGrid(MainPlot):
 
         elif mode == "local_erase" or mode == "preview_erase":
             # --- Replot background ---
-            self.colortable = ColorTables(
-                self.data.colortableid,
-                self.data.color_saturation,
-                self.data.color_negative,
-                self.data.colortable_max_value *
-                self.factor,
-                self.data.colortable_middle_value *
-                self.factor,
-                mode="scalarMap")
+            # Colors of the map drawn (same color scale, bottom, log scale,
+            # saturation and nan colors as its pixels)
             colors = []
-
-            # Get colors
             for i in range(len(roi)):
                 if roi_mask[i]:
                     value = self.data_meshgrid[roi[i][1]][roi[i][0]]
-                    color = self.colortable.get_color_as_list(value)
-                    colors.append(color)
+                    colors.append(self.mesh.to_rgba(value)
+                                  if self.mesh is not None else self.color_nan)
             self.draw_single_roi(roi, colors, roi_mask, alpha=1.0)
 
     def draw_single_roi(self, roi, color, roi_mask=None, alpha=0.5):

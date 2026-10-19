@@ -602,10 +602,17 @@ class ResultsWidget(PYAFWidget):
                     self.BT_profiles.setEnabled(True)
                 else:
                     self.BT_profiles.setEnabled(False)
-                if data.stiffness_array is not None:
-                    self.BT_slices.setEnabled(True)
-                else:
-                    self.BT_slices.setEnabled(False)
+                # Slices of the elasticity in depth: only with segments
+                # (Tomography, or files computed with segments before)
+                _, step, tomography = data.get_used_indentation()
+                depth = data.stiffness_calculated and (
+                    not data.used_perform_fit or (tomography and step))
+                self.BT_slices.setEnabled(bool(depth))
+                self.BT_slices.setToolTip(
+                    "" if depth else "Slices of the elasticity in depth: "
+                    "available when the elasticity is computed with "
+                    "Tomography\n(one value per indentation segment; "
+                    "Fitting gives one value per curve)")
 
             else:
                 self.BT_profiles.setEnabled(False)
@@ -884,6 +891,9 @@ class ResultsWidget(PYAFWidget):
                 widgets_list.widget_meshgrid_options.update_widget()
             if widgets_list.widget_multimeshgrids is not None:
                 widgets_list.widget_multimeshgrids.update_widget()
+            # Profiles of the values of the new map
+            if widgets_list.widget_profiles is not None:
+                widgets_list.widget_profiles.update_widget()
 
         elif button == "button_multi_meshgrids":
             if widgets_list.widget_multimeshgrids is None:
