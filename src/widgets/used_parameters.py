@@ -39,6 +39,7 @@ from ..tools.PYAFWidget import PYAFWidget
 from .. import shared
 from .. import widgets_list
 from ..tools import misc_tools
+from ..compute_tools.stiffness import contact_models
 from ..tools import params_export
 
 
@@ -89,6 +90,12 @@ class UsedParametersWidget(PYAFWidget):
 
         # Elasticity
         self.LB_model_selected = QtWidgets.QLabel("Not computed")
+        self.LB_tip = QtWidgets.QLabel()
+        self.LB_poisson_ratio = QtWidgets.QLabel()
+        self.LB_method = QtWidgets.QLabel()
+        self.LB_fit_range = QtWidgets.QLabel()
+        self.LB_poc_title = QtWidgets.QLabel("Point of contact")
+        self.LB_poc_title.setFont(self.fontbold)
         self.LB_poc_skip_start = QtWidgets.QLabel()
         self.LB_poc_fit_length = QtWidgets.QLabel()
         self.LB_poc_refit_option = QtWidgets.QLabel()
@@ -100,14 +107,19 @@ class UsedParametersWidget(PYAFWidget):
 
         VL = QtWidgets.QVBoxLayout()
         VL.addWidget(self.LB_model_selected)
+        VL.addWidget(self.LB_tip)
+        VL.addWidget(self.LB_poisson_ratio)
+        VL.addWidget(self.LB_method)
+        VL.addWidget(self.LB_fit_range)
+        VL.addWidget(self.LB_indentation_start)
+        VL.addWidget(self.LB_indentation_step)
+        VL.addWidget(self.LB_indentation_stop)
+        VL.addWidget(self.LB_poc_title)
         VL.addWidget(self.LB_poc_skip_start)
         VL.addWidget(self.LB_poc_fit_length)
         VL.addWidget(self.LB_poc_noise_multiplicator)
         VL.addWidget(self.LB_poc_refit_option)
         VL.addWidget(self.LB_poc_refit_times)
-        VL.addWidget(self.LB_indentation_start)
-        VL.addWidget(self.LB_indentation_step)
-        VL.addWidget(self.LB_indentation_stop)
         VL.addStretch(1)
 
         box_elasticity.setLayout(VL)
@@ -271,6 +283,30 @@ class UsedParametersWidget(PYAFWidget):
             val = dt.used_stiffness_model_selected
             value = "Model : " + str(widgets_list.widget_compute.models[val])
             self.LB_model_selected.setText(value)
+            tip = []
+            if val in contact_models.USES_RADIUS:
+                tip.append("radius " + misc_tools.format_number(
+                    dt.used_tip_radius) + " nm")
+            if val in contact_models.USES_ANGLE:
+                tip.append("half-angle " + misc_tools.format_number(
+                    dt.used_tip_angle) + "\u00b0")
+            self.LB_tip.setText("Tip : " + ", ".join(tip) if tip else "")
+            self.LB_tip.setVisible(bool(tip))
+            self.LB_poisson_ratio.setText(
+                "Poisson ratio : " + str(dt.used_poisson_ratio))
+            fitting = dt.used_perform_fit
+            self.LB_method.setText(
+                "Method : " + ("Fitting" if fitting else "Tomography"))
+            if dt.get_used_fit_range_type() == 1:
+                stop = dt.used_indentation_stop
+                fit_range = str(dt.used_indentation_start) + " to " + \
+                    (str(stop) + " nm" if stop else "end of the curve") + \
+                    " (indentation)"
+            else:
+                fit_range = str(dt.used_force_start) + " to " + \
+                    str(dt.used_force_stop) + " % (force)"
+            self.LB_fit_range.setText("Fit range : " + fit_range)
+            self.LB_fit_range.setVisible(fitting)
             value = "Skip (start) (nm) : " + \
                 str(dt.used_fitparam_poc_skip_start)
             self.LB_poc_skip_start.setText(value)
@@ -283,12 +319,16 @@ class UsedParametersWidget(PYAFWidget):
             self.LB_poc_refit_option.setText(value)
             value = "Refit (times) : " + str(dt.used_fitparam_poc_refit_times)
             self.LB_poc_refit_times.setText(value)
-            value = "Start (nm) : " + str(dt.used_indentation_start)
+            # Segments of the Tomography
+            value = "Segments start (nm) : " + str(dt.used_indentation_start)
             self.LB_indentation_start.setText(value)
-            value = "Step (nm) : " + str(dt.used_indentation_step)
+            value = "Segments step (nm) : " + str(dt.used_indentation_step)
             self.LB_indentation_step.setText(value)
-            value = "Stop (nm) : " + str(dt.used_indentation_stop)
+            value = "Segments stop (nm) : " + str(dt.used_indentation_stop)
             self.LB_indentation_stop.setText(value)
+            for label in (self.LB_indentation_start, self.LB_indentation_step,
+                          self.LB_indentation_stop):
+                label.setVisible(not fitting)
 
         # Events detection
         if dt.events_calculated:
@@ -341,11 +381,11 @@ class UsedParametersWidget(PYAFWidget):
         if dt.work_and_rupture_force1_calculated:
             value = "Fit start (nm) : " + str(dt.used_fitparam_joc_skip_start)
             self.LB_joc_skip_start.setText(value)
-            value = "Fit lenght (nm) : " + str(dt.used_fitparam_joc_fit_length)
+            value = "Fit length (nm) : " + str(dt.used_fitparam_joc_fit_length)
             self.LB_joc_fit_length.setText(value)
             value = "Refit (nm) : " + str(dt.used_fitparam_joc_refit_option)
-            self.LB_joc_refit_times.setText(value)
-            value = "Refit (times)  : " + str(dt.used_fitparam_joc_refit_times)
-            self.LB_joc_noise_multiplicator.setText(value)
-            value = "Noise : " + str(dt.used_fitparam_joc_noise_multiplicator)
             self.LB_joc_refit_option.setText(value)
+            value = "Refit (times) : " + str(dt.used_fitparam_joc_refit_times)
+            self.LB_joc_refit_times.setText(value)
+            value = "Noise : " + str(dt.used_fitparam_joc_noise_multiplicator)
+            self.LB_joc_noise_multiplicator.setText(value)

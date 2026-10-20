@@ -37,7 +37,6 @@ import sys
 import logging
 from qtpy import QtCore, QtGui, QtWidgets
 from .. import consts
-from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..tools import misc_tools
@@ -429,8 +428,6 @@ class EntryWidget(QtWidgets.QDialog):
 
     def load_images(self):
         """Load the images."""
-        path = self.im_path
-
         # Display image in a label
         im1 = Image.open(get_resource_path("01.png")).convert("RGBA")
         im2 = Image.open(get_resource_path("02.png")).convert("RGBA")
@@ -504,17 +501,9 @@ class EntryWidget(QtWidgets.QDialog):
             else:
                 # Check for the folder's size
                 temp_path = os.path.normpath(tempfile.gettempdir() + "/")
-                path = self.settings.value("tempPath", temp_path)
+                path = str(self.settings.value("tempPath", temp_path))
 
-                # get_free_space_mb uses os.statvfs, which is not compatible
-                # with unicode. In this case try to encode the path to make
-                # it work. Solution: move to python3
-                path = str(path).encode("utf8")
-
-                # Deprecated use of get_free_soace_mb in favour of psutil.disk_usage
-                # available = misc_tools.get_free_space_mb(path)
-
-                # Get free disk space in path in mb
+                # Free disk space of the temporary folder [MB]
                 available = psutil.disk_usage(path).free / 1024.0 / 1024.0
 
                 total_size = 0

@@ -32,7 +32,6 @@
 """Tools used to do some statistics and further results sorting."""
 
 import numpy
-from qtpy import QtWidgets
 from .. import widgets_list
 from .. import shared
 from ..tools import results_sorting

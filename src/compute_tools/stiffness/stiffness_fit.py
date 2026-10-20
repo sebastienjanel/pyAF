@@ -34,7 +34,6 @@
 
 import numpy
 import pandas as pd
-from ...tools import search_poc
 from ...tools import curve_tools
 from ...tools import fit_tools
 from . import stiffness_models as sm

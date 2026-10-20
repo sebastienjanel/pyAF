@@ -52,15 +52,21 @@ ITEMS = (
      "Value of each file of the SuperPlot and the tests of the conditions"),
     ("dfs", "DFS fits (CSV)...",
      "Fits of the DFS window (files or speeds) with their points"),
-    ("map", "Map values (TIFF)...",
-     "Values of the map displayed in the Results tab, for its file "
-     "(32-bit TIFF, NaN without value)"),
+    ("map", "Map values (32-bit TIFF, for analysis)...",
+     "Values of the map displayed in the Results tab, for its file: "
+     "32-bit TIFF for ImageJ / Fiji (calibrated in um, with the colour "
+     "table and range of pyAF; NaN without value), to measure"),
+    ("map_figure", "Map figure (PNG, PDF or SVG)...",
+     "The map displayed in the Results tab, with its axes and colour bar "
+     "(300 dpi for PNG)"),
     (None, None, None),
     ("parameters", "Parameters (JSON)...",
      "Parameters of all the files: calibration, acquisition and the "
      "parameters used for the computations"),
     ("all", "Everything to a folder...",
-     "Data table, summary, SuperPlot, DFS fits, maps of the files and "
+     "Everything computed, whatever is displayed: data table and summary "
+     "of all the rows of the Plots tab, SuperPlot of each result type, DFS "
+     "fits, all the maps of the files (values and figures) and the "
      "parameters, in a new folder"),
 )
 
@@ -153,6 +159,17 @@ def export_clicked(parent, key):
                 path += ".tif"
             files = export.export_map(path, shared.exp.id_selected,
                                       map_type)
+    elif key == "map_figure":
+        data = shared.exp.current_data
+        name = os.path.splitext(os.path.basename(str(data.filename)))[0]
+        path = ask_path(parent, "Export the map figure",
+                        name + "_" + export.map_type_name(
+                            data.meshgrid_type) + ".png",
+                        "PNG (*.png);;PDF (*.pdf);;SVG (*.svg)")
+        if path:
+            if not path.lower().endswith((".png", ".pdf", ".svg")):
+                path += ".png"
+            files = export.export_map_figure(path, shared.exp.id_selected)
     elif key == "parameters":
         path = ask_path(parent, "Export the parameters", "parameters.json",
                         "JSON (*.json)")

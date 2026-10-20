@@ -8,10 +8,6 @@ from scipy.optimize import curve_fit, OptimizeWarning
 from . import curve_tools
 from . import search_poc
 
-def get_contact_point_RoV():
-    pass
-
-
 def prepare_data_hertzfit(app, dt, fit_params):
     """
     Prepare data for hertz fit.

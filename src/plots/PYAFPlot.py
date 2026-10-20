@@ -223,7 +223,6 @@ class PYAFPlot(FigureCanvasQTAgg):
         self.fig.clf()
 
         p_type = self.plot_type
-        plot_selected = shared.exp.hist_single_plot_selected
 
         # Plot the asked figure
         if p_type == "meshgrid_tilt_check":

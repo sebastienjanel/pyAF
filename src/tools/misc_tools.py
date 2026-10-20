@@ -37,7 +37,6 @@ import sys
 import copy
 import time
 import numpy
-import ctypes
 import platform
 import logging
 import logging.handlers
@@ -194,26 +193,6 @@ def add_attributes(obj):
     if not hasattr(obj, 'condition') and (isinstance(obj, ResultGroup) or isinstance(obj, Result)):
         default = 0
         setattr(obj, 'condition', default)
-
-
-def get_free_space_mb(folder):
-    """Return folder/drive free space (in bytes)
-
-    http://stackoverflow.com/questions/51658/
-    cross-platform-space-remaining-on-volume-using-python
-    """
-    if platform.uname()[0] == "Windows":
-        free_bytes = ctypes.c_ulonglong(0)
-        ctypes.windll.kernel32.GetDiskFreeSpaceExW(ctypes.c_wchar_p(str(folder, 'utf-8')),
-                                                   None, None,
-                                                   ctypes.pointer(free_bytes))
-
-        return free_bytes.value / 1024 / 1024
-
-    else:
-        st = os.statvfs(folder)
-
-        return st.f_bavail * st.f_frsize / 1024 / 1024
 
 
 def save_used_params(data, mode):
@@ -635,71 +614,6 @@ def make_path(pos_a, pos_b):
             x = [round((item - b) / a) for item in y]
 
     return numpy.asarray([x, y])
-
-
-def reset_computation(data_id, computation_type):
-    """Resets results arrays."""
-    data = shared.exp.list[data_id]
-
-    if computation_type in ("stiffness", "all"):
-        if data.stiffness_calculated:
-            data.stiffness_calculated = False
-
-            shared.exp.temp_file.delete_tables_for_results(str(data_id),
-                                                           "stiffness")
-            shared.exp.temp_file.create_tables_for_results(str(data_id),
-                                                           "stiffness", True)
-
-    if computation_type in ("stiffness_corrected", "all"):
-        if data.stiffness_corrected:
-            data.stiffness_corrected = False
-
-            shared.exp.temp_file.delete_tables_for_results(
-                str(data_id),
-                "stiffness_corrected")
-            shared.exp.temp_file.create_tables_for_results(
-                str(data_id),
-                "stiffness_corrected")
-
-    if computation_type in ("work_and_rupture_force1", "all"):
-        if data.work_and_rupture_force1_calculated:
-            data.work_and_rupture_force1_calculated = False
-
-            shared.exp.temp_file.delete_tables_for_results(
-                str(data_id),
-                "work")
-            shared.exp.temp_file.create_tables_for_results(
-                str(data_id),
-                "work")
-
-    if computation_type in ("events", "all"):
-        if data.events_calculated:
-            data.events_calculated = False
-
-            shared.exp.temp_file.delete_tables_for_results(
-                str(data_id),
-                "events")
-            shared.exp.temp_file.create_tables_for_results(
-                str(data_id),
-                "events")
-
-    if computation_type in ("loading_rates", "all"):
-        if data.loading_rates_calculated:
-            data.loading_rates_calculated = False
-
-            shared.exp.temp_file.delete_tables_for_results(
-                str(data_id),
-                "loading_rates")
-            shared.exp.temp_file.create_tables_for_results(
-                str(data_id),
-                "loading_rates")
-
-    if computation_type in ("viscoelasticity", "all"):
-        data.visco_calculated = False
-        data.visco_results = None
-
-    data.display_curve_type = "defl_ext"
-    data.update()
 
 
 def get_position_on_meshgrid(event):

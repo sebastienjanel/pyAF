@@ -12,5 +12,6 @@ QtPy==2.4.3
 scipy==1.18.1
 seaborn==0.13.2
 statsmodels==0.15.0
+tifffile==2026.10.15
 tables==3.11.1
 vtk==9.7.1

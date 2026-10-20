@@ -31,7 +31,7 @@
 
 """Widget used to go through the curves."""
 
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 from ... import widgets_list
 from ...tools.gui_tools import PYAFButton

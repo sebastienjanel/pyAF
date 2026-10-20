@@ -32,7 +32,6 @@
 """Tools used to fetch and sort the results."""
 
 import numpy
-import pandas as pd
 from .. import shared
 from ..tools import math_tools
 from ..tools import curve_tools
@@ -264,97 +263,6 @@ class GetResults:
                     values.append([val, val, val, val])
         # print(f"Groups:{[groups, values]}")
         return [groups, values]
-
-    def get_results_conditions(self, force_type=None):
-        """"Gets the results for a experimental condition."""
-        # Used by DFS widget and exporting
-        if force_type is not None:
-            self.type = force_type
-
-        values = []
-        conditions = []
-        conditions_forces = []
-        conditions_lr = []
-        for i in range(len(shared.exp.conditions_list)):
-            conditions.append([])
-            # For loading rates
-            conditions_forces.append([])
-            conditions_lr.append([])
-
-        for i in range(len(shared.exp.groups_list)):
-            grp = shared.exp.groups_list[i]
-
-            if grp.condition != 0:
-                if self.export != "conditions":  # How to manage this
-                    # Get the values from single_data which has already been
-                    # prepared. Is really faster
-                    if shared.groups_data is not None:
-                        result = shared.groups_data[i]
-                    else:
-                        # When the refresh at load checkbox is unclicked,
-                        # single data is still set to None. Return nothing
-                        # in this case.
-                        result = []
-                else:
-                    # Refetch the data for exporting
-                    result = self.get_results_groups(force_type)[0][i]
-
-                if self.type != "loading_rates":
-                    conditions[grp.condition].extend(result)
-                else:
-                    conditions_forces[grp.condition].extend(result[0])
-                    conditions_lr[grp.condition].extend(result[1])
-
-                if widgets_list.widget_progressbar is not None:
-                    widgets_list.widget_progressbar.update()
-
-        if self.type != "loading_rates":
-            for i in range(len(conditions)):
-                if conditions[i]:
-                    values.append([len(conditions[i]),
-                                   numpy.mean(conditions[i]),
-                                   numpy.median(conditions[i]),
-                                   numpy.std(conditions[i]), 0])
-                else:
-                    values.append([0, 0, 0, 0, 0])
-
-        elif self.type == "loading_rates":
-            for i in range(len(conditions)):
-                if conditions_forces[i]:
-                    values.append([len(conditions[i]),
-                                   numpy.mean(conditions_lr[i]),
-                                   numpy.median(conditions_lr[i]),
-                                   numpy.std(conditions_lr[i]), 0])
-
-                    conditions[i] = numpy.array([conditions_forces[i], conditions_lr[i]])
-                else:
-                    values.append([0, 0, 0, 0, 0])
-        # print(f"Conditions:{[conditions, values]}")
-        return [conditions, values]
-
-    def get_results_statistical(self, force_type=None):
-        """"Gets the results for a experimental condition."""
-        # Used by DFS widget and exporting
-        if force_type is not None:
-            self.type = force_type
-
-        groups = []
-        conditions = []
-        data = []
-
-        for i in range(1, len(shared.exp.groups_list)):
-            grp = shared.exp.groups_list[i]
-            if shared.groups_data is not None:
-                dt = numpy.asarray(shared.groups_data[i])
-                grps = numpy.ones(dt.shape, dtype=int) * grp.group_id
-                conds = numpy.ones(dt.shape, dtype=int) * grp.condition
-
-                groups.extend(grps)
-                conditions.extend(conds)
-                data.extend(dt)
-
-        # Construct data frame used for plots
-        shared.statistics_data = pd.DataFrame({'Replicate': groups, 'Condition': conditions, 'Data': data})
 
     def prepare_stiffness(self):
         """Get the stiffness results."""

@@ -34,7 +34,7 @@
 Friddle-Noy-De Yoreo fits, see dfs_tools)."""
 
 import numpy
-from qtpy import QtCore, QtWidgets
+from qtpy import QtWidgets
 from ..tools import gui_tools
 from ..tools import misc_tools
 from ..tools import dfs_tools

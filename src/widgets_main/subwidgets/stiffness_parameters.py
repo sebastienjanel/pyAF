@@ -33,10 +33,9 @@
 
 from ... import shared
 from ... import widgets_list
-from qtpy import QtCore, QtWidgets
+from qtpy import QtWidgets
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools.gui_tools import PYAFInput, PYAFComboBox
-from ...tools.gui_tools import PYAFCheckBox
 from ...tools import misc_tools
 
 

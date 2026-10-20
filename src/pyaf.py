@@ -88,18 +88,8 @@ if multiprocessing.current_process().name == "MainProcess":
     # Check for the versions. See PEP 386 for the check
     # [AD: deprecated under PEP 386 (!)]
     from packaging.version import Version
-    import tables
-    import platform
     from src.tools.utils import module_exists
 
-    """if Version(tables.__version__) < Version("3.0"):
-        message = "PyTables version is " + tables.__version__ + "." \
-                  " Version 3.0.x is needed."
-        sys.exit(message)"""
-    """if Version(matplotlib.__version__) < Version("1.4.0"):
-        message = "Matplotlib's version is " + matplotlib.__version__ + "." \
-            " Version 1.4.0 is needed."
-        sys.exit(message)"""
     if module_exists("vtk"):
         import vtk
         if vtk.VTK_MAJOR_VERSION <= 5:

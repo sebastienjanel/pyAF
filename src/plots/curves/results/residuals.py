@@ -1,5 +1,4 @@
 from ..plot_curve import PlotCurve
-from ....tools import curve_tools
 
 class ResultsResiduals(PlotCurve):
     """Plots the Force - Indentation curve."""

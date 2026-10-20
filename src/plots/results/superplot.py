@@ -33,7 +33,6 @@
 """SuperPlot of the conditions (Lord et al., J Cell Biol 2020)."""
 
 import numpy
-import seaborn
 
 from .plot_results import PlotResults
 from .single import set_white_background, quasirandom_offsets

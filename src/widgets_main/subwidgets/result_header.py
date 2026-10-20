@@ -34,8 +34,8 @@ Custom table header class allowing to embed a checkbox on the header first colum
 This checkbox is used to allow the user to select all the rows at once.
 """
 
-from qtpy.QtCore import Qt, QRect, Signal
-from qtpy.QtWidgets import QTableWidget, QApplication, QHeaderView, QStyleOptionButton, QStyle
+from qtpy.QtCore import QRect, Signal
+from qtpy.QtWidgets import QHeaderView, QStyleOptionButton, QStyle
 
 
 class QCheckableHeader(QHeaderView):

@@ -151,14 +151,6 @@ class LayerAFM(Layer):
         if widgets_list.widget_progressbar is not None:
             widgets_list.widget_progressbar.close()
 
-    def update_smoothing(self):
-        """Update only the smoothing of the tomography."""
-        self.parent.renderer.RemoveActor(self.actor)
-
-        self.actor = self.get_smoothed_actor()
-
-        self.finish_update_tomography()
-
     def get_smoothed_actor(self):
         """Smooth the tomography actor."""
         # Use a filter to smooth the data (will add triangles and smooth),

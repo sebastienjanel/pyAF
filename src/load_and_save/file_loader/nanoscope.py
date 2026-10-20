@@ -388,8 +388,6 @@ class LoaderNanoscope:
         """
         data = shared.exp.list[self.unique_id]
 
-        error_positions = []
-
         # Get the piezo image array from the temp file
         tf = shared.exp.temp_file.file
         dt = "/data/_" + str(self.unique_id)

@@ -371,17 +371,3 @@ class PlotResults(MainPlot):
                 y = dfs_tools.model_force(fit, x)
                 self.axes.plot(x, y, "r", linewidth=2)
 
-    def prepare_min_max_x(self, ranges):
-        """Method used to prepare the min max values for the x axis."""
-        if ranges:
-            ranges_min = []
-            ranges_max = []
-            for r in ranges:
-                ranges_min.append(r[0])
-                ranges_max.append(r[1])
-        else:
-            ranges_min = 0
-            ranges_max = 1
-
-        self.hist_x_min = numpy.amin(ranges_min)
-        self.hist_x_max = numpy.amax(ranges_max)

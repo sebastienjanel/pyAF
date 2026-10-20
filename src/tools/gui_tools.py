@@ -358,24 +358,6 @@ class CenteredCellCheckbox(QtWidgets.QWidget):
 
 
 
-class CenteredCellInput(QtWidgets.QWidget):
-    """A centered input field for the tablewidgets."""
-
-    def __init__(self, parent, name, cell_id):
-        super().__init__()
-
-        layout = QtWidgets.QVBoxLayout()
-        layout.setAlignment(QtCore.Qt.AlignHCenter)
-        self.input = QtWidgets.QLineEdit()
-        layout.addWidget(self.input)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        self.setLayout(layout)
-
-        self.input.editingFinished.connect(
-            lambda: parent.input_updated(name, cell_id))
-
-
 class CenteredCellRadioButton(QtWidgets.QWidget):
     """A centered radiobutton for the tablewidgets."""
 

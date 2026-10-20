@@ -281,17 +281,6 @@ def fit_linear(curve_x, curve_y):
 
 
 
-def find_non_flat(curve):
-    """Find non flat part of a curve."""
-    indice = 0
-    prev_val = curve[indice]
-    next_val = curve[indice + 1]
-    while prev_val == next_val and indice + 1 <= len(curve):
-        indice += 1
-        next_val, prev_val = curve[indice], next_val
-    return indice
-
-
 def find_intersection(line1, line2):
     """Find intersection between two lines, given their coefficients."""
     # y1 = ax + b and y2 = cx + d, if y1 = y2 => x(a-c) = d-b

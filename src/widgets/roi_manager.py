@@ -197,6 +197,7 @@ class RoiManagerWidget(PYAFWidget):
 
             if indexes:
                 self.update_planefit_roi(data, indexes)
+                self.update_substrate_roi(data, indexes)
                 for i in indexes:
                     del data.roi_list[i]
                     self.TW.removeRow(i)
@@ -427,6 +428,19 @@ class RoiManagerWidget(PYAFWidget):
         else:
             data.planefit_roi -= sum(1 for i in removed
                                      if i < data.planefit_roi)
+
+    @staticmethod
+    def update_substrate_roi(data, removed):
+        """Keep the substrate ROI of the bottom effect correction when ROIs
+        are removed (roi_glass_id: its position + 1; none if it is
+        removed)."""
+        if not data.roi_glass_id:
+            return
+        index = data.roi_glass_id - 1
+        if index in removed:
+            data.roi_glass_id = 0
+        else:
+            data.roi_glass_id -= sum(1 for i in removed if i < index)
 
     def update_results(self):
         """Update the results in the results tables."""

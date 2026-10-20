@@ -32,7 +32,8 @@
 
 """Exports of the results (see the Export menu): CSV tables (one row per
 curve or event, summary per row), SuperPlot values and tests, DFS fits,
-maps (TIFF of the values) and the parameters (JSON).
+maps (32-bit TIFF of the values for ImageJ / Fiji, and figures) and the
+parameters (JSON).
 
 Every data export writes its parameters next to it (name.params.json, see
 tools.params_export). The values are in SI units (elasticity in Pa, or the
@@ -43,9 +44,10 @@ in N/s, distances in m, indentation in nm).
 import csv
 import os
 
+import matplotlib
 import numpy as np
 import pandas as pd
-from PIL import Image
+import tifffile
 
 from .. import shared
 from ..tools import dfs_tools
@@ -53,6 +55,7 @@ from ..tools import map_values
 from ..tools import params_export
 from ..tools import results_sorting
 from ..tools import superplot_tools
+from ..tools.colortables import ColorTables
 
 
 def csv_path(path):
@@ -76,14 +79,20 @@ def group_and_condition(result):
     return group, condition
 
 
-def data_tables():
-    """Tables of the checked rows of the Plots tab: values (one line per
-    curve, or per event for the curves with events, the values of the
-    curve being repeated on the lines of its events; filtered as in the
-    plots) and descriptive statistics of each row."""
+def data_tables(rows=None):
+    """Tables of the rows of the Plots tab (the checked ones by default):
+    values (one line per curve, or per event for the curves with events,
+    the values of the curve being repeated on the lines of its events;
+    filtered as in the plots) and descriptive statistics of each row."""
     tables = []
     stats = []
-    for row, result, data in exported_rows():
+    if rows is None:
+        selected = exported_rows()
+    else:
+        selected = [(row, shared.exp.results_list[row],
+                     shared.exp.list[shared.exp.results_list[row].data_id])
+                    for row in rows]
+    for row, result, data in selected:
         curves, events, row_stats = get_r_tables(row, data)
 
         if curves is None and events is None:
@@ -120,25 +129,27 @@ def checked_rows():
     return [row for row, _, _ in exported_rows()]
 
 
-def export_data_table(path):
-    """Values of the checked rows, one line per curve (or event). Returns
-    the written files."""
+def export_data_table(path, rows=None):
+    """Values of the rows (the checked ones by default), one line per curve
+    (or event). Returns the written files."""
     path = csv_path(path)
-    data_df, _ = data_tables()
+    rows = checked_rows() if rows is None else rows
+    data_df, _ = data_tables(rows)
     data_df.to_csv(path, index=False)
     json_path = params_export.write_sidecar(
-        path, "Data table (one row per curve or event)", rows=checked_rows())
+        path, "Data table (one row per curve or event)", rows=rows)
     return [path, json_path]
 
 
-def export_summary(path):
-    """Descriptive statistics of each checked row. Returns the written
-    files."""
+def export_summary(path, rows=None):
+    """Descriptive statistics of each row (the checked ones by default).
+    Returns the written files."""
     path = csv_path(path)
-    _, stats_df = data_tables()
+    rows = checked_rows() if rows is None else rows
+    _, stats_df = data_tables(rows)
     stats_df.to_csv(path, index=False)
     json_path = params_export.write_sidecar(
-        path, "Summary per row", rows=checked_rows())
+        path, "Summary per row", rows=rows)
     return [path, json_path]
 
 
@@ -362,20 +373,77 @@ def map_type_name(map_type):
         "stiffness", "elasticity")
 
 
+def map_lut(data, map_type):
+    """Colour table of a map (as in pyAF) for ImageJ: (3, 256) uint8."""
+    opts = data.get_color_opts(map_type)
+    tables = ColorTables()
+    name = tables.colortables_mpl_list[opts[0]]
+    if name in ("Rainbow 1", "Cool-Warm"):
+        factor = map_values.factor(data, map_type)
+        cmap, _ = ColorTables(opts[0], None, None, opts[2] * factor,
+                              opts[3] * factor).get_color_as_cdict()
+    else:
+        cmap = matplotlib.colormaps[name]
+    colors = cmap(np.linspace(0.0, 1.0, 256))[:, :3]
+    return np.round(colors * 255).astype(np.uint8).T
+
+
 def export_map(path, data_id, map_type):
     """Values of a map of a file as a 32-bit TIFF (NaN where there is no
-    value; in the units of the colour bar, see map_values), with the
-    parameters in its description. Returns the written file."""
+    value; in the units of the colour bar, see map_values) for ImageJ /
+    Fiji: pixel size in um, the colour table and the range of the colour
+    scale of pyAF (the values are not changed), and the parameters in the
+    information of the image (Image > Show Info). Returns the written
+    file."""
     data = shared.exp.list[data_id]
-    values = map_values.values(data, map_type) * map_values.factor(
-        data, map_type)
+    factor = map_values.factor(data, map_type)
+    values = map_values.values(data, map_type) * factor
     # Rows of the image: y, from the top
-    image = Image.fromarray(np.flipud(values.T).astype(np.float32), mode="F")
-    description = params_export.tiff_description(
+    image = np.ascontiguousarray(np.flipud(values.T), dtype=np.float32)
+    opts = data.get_color_opts(map_type)
+    low, high = float(opts[1] * factor), float(opts[2] * factor)
+    if not high > low:
+        finite = image[np.isfinite(image)]
+        low, high = (float(finite.min()), float(finite.max())) \
+            if finite.size else (0.0, 1.0)
+    pixel_x = data.scan_size_x / data.nbr_pixels_x / 1000.0
+    pixel_y = data.scan_size_y / data.nbr_pixels_y / 1000.0
+    info = params_export.tiff_description(
         "Map " + map_values.label(data, map_type), path, [data_id],
-        options={"map": map_type, "unit": map_values.label(data, map_type)})
-    image.save(path, tiffinfo={270: description})
+        options={"map": map_type, "unit": map_values.label(data, map_type),
+                 "pixel_size_um": [pixel_x, pixel_y]})
+    tifffile.imwrite(
+        path, image, imagej=True,
+        resolution=(1.0 / pixel_x, 1.0 / pixel_y),
+        metadata={"unit": "um", "min": low, "max": high,
+                  "Ranges": (low, high), "LUTs": [map_lut(data, map_type)],
+                  "Info": info})
     return [path]
+
+
+def export_map_figure(path, data_id, dpi=300):
+    """Figure of the map of a file as displayed in the Results tab (axes,
+    colour bar), PNG, PDF or SVG (by the extension), with its parameters
+    next to it. Returns the written files."""
+    from ..plots.PYAFPlot import PYAFPlot
+
+    previous = shared.exp.id_selected
+    red_square = shared.exp.meshgrid_display_red_square
+    shared.exp.id_selected = data_id
+    # Without the square of the selected curve (on the screen only)
+    shared.exp.meshgrid_display_red_square = False
+    try:
+        with matplotlib.rc_context({"savefig.dpi": dpi,
+                                    "savefig.bbox": "tight"}):
+            PYAFPlot(None, "meshgrid", save_path=path)
+    finally:
+        shared.exp.id_selected = previous
+        shared.exp.meshgrid_display_red_square = red_square
+    data = shared.exp.list[data_id]
+    json_path = params_export.write_sidecar(
+        path, "Map figure", data_ids=[data_id],
+        options={"map": data.meshgrid_type})
+    return [path, json_path]
 
 
 def export_parameters(path):
@@ -388,28 +456,81 @@ def export_parameters(path):
     return [path]
 
 
+# Result types of the SuperPlots, with the computation they need
+RESULT_TYPES = (("stiffness", "stiffness_calculated"),
+                ("work", "work_and_rupture_force1_calculated"),
+                ("rupture_force", "work_and_rupture_force1_calculated"),
+                ("events_forces", "events_calculated"),
+                ("events_per_curve", "events_calculated"),
+                ("events_rupture_force", "events_calculated"),
+                ("events_distance", "events_calculated"),
+                ("visco_e0", "visco_calculated"),
+                ("visco_fluidity", "visco_calculated"),
+                ("visco_tan_delta", "visco_calculated"))
+
+
+def computed_result_types():
+    """Result types computed for at least one file."""
+    return [name for name, flag in RESULT_TYPES
+            if any(getattr(data, flag, False) for data in shared.exp.list)]
+
+
+def export_superplots(folder):
+    """SuperPlot of each computed result type (superplot_<type>.csv), the
+    values of the rows being computed for each type, then for the
+    displayed one again. Returns the written files."""
+    from . import stat_tools
+
+    if not any(g.condition for g in shared.exp.groups_list[1:]):
+        return []
+    files = []
+    displayed = shared.exp.results_type
+    try:
+        for name in computed_result_types():
+            shared.exp.results_type = name
+            stat_tools.get_values()
+            files += export_superplot(os.path.join(
+                folder, "superplot_" + map_type_name(name) + ".csv"))
+    finally:
+        shared.exp.results_type = displayed
+        stat_tools.get_values()
+    return files
+
+
 def export_all(folder):
-    """Everything in a folder: data table, summary, SuperPlot, DFS fits,
-    maps of the files (the map displayed in the Results tab for each file)
-    and the parameters. Returns the written files."""
+    """Everything computed in a folder: data table and summary of all the
+    rows of the Plots tab (all the computed results of each row), SuperPlot
+    of each computed result type, DFS fits, all the computed maps of the
+    files (values in maps/, figures in figures/) and the parameters.
+    Returns the written files."""
     os.makedirs(folder, exist_ok=True)
     files = []
-    if shared.single_data is not None and checked_rows():
-        files += export_data_table(os.path.join(folder, "data_table.csv"))
-        files += export_summary(os.path.join(folder, "summary.csv"))
-    files += export_superplot(os.path.join(folder, "superplot.csv"))
+    rows = list(range(len(shared.exp.results_list)))
+    if rows:
+        files += export_data_table(os.path.join(folder, "data_table.csv"),
+                                   rows)
+        files += export_summary(os.path.join(folder, "summary.csv"), rows)
+    files += export_superplots(folder)
     for mode, name in (("single", "dfs_fits_files.csv"),
                        ("groups", "dfs_fits_speeds.csv")):
         files += export_dfs_fits(os.path.join(folder, name), mode)
     maps = os.path.join(folder, "maps")
+    figures = os.path.join(folder, "figures")
+    os.makedirs(maps, exist_ok=True)
+    os.makedirs(figures, exist_ok=True)
     for data_id, data in enumerate(shared.exp.list):
-        available = map_values.available_maps(data)
-        map_type = data.meshgrid_type if data.meshgrid_type in available \
-            else "piezo"
-        os.makedirs(maps, exist_ok=True)
-        name = os.path.splitext(os.path.basename(str(data.filename)))[0]
-        files += export_map(os.path.join(
-            maps, name + "_" + map_type_name(map_type) + ".tif"),
-            data_id, map_type)
+        base = os.path.splitext(os.path.basename(str(data.filename)))[0]
+        displayed = data.meshgrid_type
+        try:
+            for map_type in map_values.available_maps(data):
+                name = base + "_" + map_type_name(map_type)
+                files += export_map(os.path.join(maps, name + ".tif"),
+                                    data_id, map_type)
+                # The figure of the map (drawn for the map of the file)
+                data.meshgrid_type = map_type
+                files += export_map_figure(
+                    os.path.join(figures, name + ".png"), data_id)
+        finally:
+            data.meshgrid_type = displayed
     files += export_parameters(os.path.join(folder, "parameters.json"))
     return files

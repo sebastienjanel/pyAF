@@ -871,19 +871,30 @@ class ComputeWidget(PYAFWidget):
                 "" if reason is None else "Not available: " + reason)
 
         if element == "roi_list_height_corr" or element == "all":
-            # Remove old items
+            # ROIs set as substrate in the ROI manager, numbered as in it
+            # (position in the list; roi_glass_id: position + 1, 0: none)
+            substrates = [index + 1 for index, roi in
+                          enumerate(data.roi_list)
+                          if roi.glass_coeffs is not None]
+            if data.roi_glass_id not in substrates:
+                # The substrate ROI was removed or unset
+                data.roi_glass_id = 0
+            if data.roi_glass_id == 0 and len(substrates) == 1 and \
+                    not data.user_h:
+                # A single substrate: chosen
+                data.roi_glass_id = substrates[0]
+            self.list_roi_glass.blockSignals(True)
             self.list_roi_glass.clear()
-
-            # Add rois
             self.list_roi_glass.addItem("None")
-            count = 1
-            for roi in shared.exp.current_data.roi_list:
-                if roi.glass_coeffs is not None:
-                    self.list_roi_glass.addItem(str(roi.roi_id + 1))
-                    # Select
-                    if data.roi_glass_id == roi.roi_id + 1:
-                        self.list_roi_glass.setCurrentIndex(count)
-                    count += 1
+            for number in substrates:
+                self.list_roi_glass.addItem(str(number))
+            self.list_roi_glass.setCurrentText(
+                str(data.roi_glass_id) if data.roi_glass_id else "None")
+            self.list_roi_glass.blockSignals(False)
+            # Inputs and button with the substrate (also after "all": the
+            # button is updated above, before the substrate)
+            self.update_GUI("IN_user_h")
+            self.update_GUI("BT_height_correction")
 
         if element == "IN_user_h" or element == "all":
             # Empty input when no value is defined
