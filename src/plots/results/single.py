@@ -49,6 +49,9 @@ from ...tools import dfs_tools
 # file is 1)
 JITTER = 0.15
 
+# Colors of the DFS fits (distinct from the colors of the files)
+FIT_COLORS = ("red", "black", "darkviolet", "darkorange", "teal")
+
 
 # Maximum space given to each file on the x axis, in pixels: with few files
 # the violins would otherwise fill the whole width of the plot
@@ -230,23 +233,43 @@ class PlotSingleResults(PlotResults):
                     label += ", " + str(int((~positive).sum())) + \
                         " with r ≤ 0 not shown"
                 label += ")"
-                ax.scatter(lrs[positive], forces[positive], s=6,
-                           color=color, alpha=0.35, linewidths=0, zorder=2)
+                if opts["lr_events"]:
+                    ax.scatter(lrs[positive], forces[positive], s=6,
+                               color=color, alpha=0.35, linewidths=0,
+                               zorder=2)
                 r, f, r_q, f_q = dfs_tools.median_point(forces, lrs)
-                if r > 0:
+                if opts["lr_medians"] and r > 0:
+                    # Median point, with the quartiles if asked
+                    bars = opts["lr_error_bars"]
                     ax.errorbar(
-                        r, f, xerr=[[r - r_q[0]], [r_q[1] - r]],
-                        yerr=[[f - f_q[0]], [f_q[1] - f]], fmt="o",
-                        markersize=8, color=color, markeredgecolor="black",
-                        ecolor="black", elinewidth=1, capsize=3, zorder=4,
-                        label=label)
+                        r, f,
+                        xerr=[[r - r_q[0]], [r_q[1] - r]] if bars else None,
+                        yerr=[[f - f_q[0]], [f_q[1] - f]] if bars else None,
+                        fmt="o", markersize=8, color=color,
+                        markeredgecolor="black", ecolor="black",
+                        elinewidth=1, capsize=3, zorder=4, label=label)
                 else:
-                    ax.scatter([], [], color=color, label=label)
+                    # Entry of the legend only
+                    ax.scatter([], [], s=30, color=color, label=label)
 
             self.plot_dfs_fits(ax)
             ax.set_xscale("log")
-            ax.legend(fontsize="small", loc="upper left")
+            handles, labels = ax.get_legend_handles_labels()
+            if not opts["legend"]:
+                # Only the fits (the files are listed in the table)
+                kept = [(h, lab) for h, lab in zip(handles, labels)
+                        if lab.startswith("Fit ")]
+                handles = [h for h, _ in kept]
+                labels = [lab for _, lab in kept]
+            if handles:
+                # Several columns for many files
+                ax.legend(handles, labels, fontsize="small",
+                          loc="upper left",
+                          ncol=max(1, int(numpy.ceil(len(handles) / 15))))
 
+        if opts["x_mode"] == "manual" and items and \
+                0 < opts["x_min"] < opts["x_max"]:
+            ax.set_xlim(opts["x_min"], opts["x_max"])
         if opts["y_mode"] == "manual":
             ax.set_ylim(opts["y_min"], opts["y_max"])
         ax.set_xlabel("Loading rate [pN/s]", fontproperties=self.font)
@@ -258,8 +281,8 @@ class PlotSingleResults(PlotResults):
         self.start_plot()
 
     def plot_dfs_fits(self, ax):
-        """Lines of the displayed Bell-Evans fits, with the points of the
-        binned fits."""
+        """Curves of the displayed fits (Bell-Evans, DHS, Friddle-Noy-De
+        Yoreo), with the points of the binned fits (labels "Fit n ...")."""
         number = 0
         for fit in dfs_tools.get_fits(self.MODE):
             number += 1
@@ -267,21 +290,41 @@ class PlotSingleResults(PlotResults):
                 continue
             r = numpy.array(fit["points_r"])
             line_r = numpy.logspace(numpy.log10(r.min()),
-                                    numpy.log10(r.max()), 50)
-            # Fit in SI units, plot in pN and pN/s
-            line_f = (fit["a"] * numpy.log(line_r * 1e-12) + fit["b"]) * 1e12
+                                    numpy.log10(r.max()), 300)
+            line_f = dfs_tools.model_force(fit, line_r)
+            color = FIT_COLORS[(number - 1) % len(FIT_COLORS)]
+            model = fit.get("model", "bell")
             if numpy.isfinite(fit["x"]):
-                label = ("Fit " + str(number) + ": x = " +
+                label = ("Fit " + str(number) + " (" +
+                         dfs_tools.MODELS[model][0] + "): x = " +
                          "%.3g nm, koff = %.3g s$^{-1}$" % (fit["x"] * 1e9,
                                                            fit["koff"]))
+                if "dG" in fit:
+                    label += ", $\\Delta G^\\ddagger$ = %.3g $k_BT$" % \
+                        fit["dG"]
+                elif "feq" in fit:
+                    label += ", $f_{eq}$ = %.3g pN" % fit["feq"]
             else:
                 label = "Fit " + str(number) + ": slope ≤ 0"
-            ax.plot(line_r, line_f, "-", color="red", linewidth=2, zorder=5,
+            ax.plot(line_r, line_f, "-", color=color, linewidth=2, zorder=5,
                     label=label)
             if fit["method"] == "binned":
-                ax.plot(r, fit["points_f"], "s", markersize=6,
-                        markerfacecolor="none", markeredgecolor="red",
-                        zorder=5)
+                # Points of the binned fits (the other ones are the median
+                # points of the files), with the quartiles of their events
+                # (fits of the older versions: no quartiles)
+                f = numpy.array(fit["points_f"])
+                q_r = numpy.array(fit.get("points_r_q", []))
+                q_f = numpy.array(fit.get("points_f_q", []))
+                if len(q_r) == len(r) and len(q_f) == len(r):
+                    xerr = [r - q_r[:, 0], q_r[:, 1] - r]
+                    yerr = [numpy.clip(f - q_f[:, 0], 0, None),
+                            numpy.clip(q_f[:, 1] - f, 0, None)]
+                else:
+                    xerr = yerr = None
+                ax.errorbar(r, f, xerr=xerr, yerr=yerr, fmt="s",
+                            markersize=6, markerfacecolor="none",
+                            markeredgecolor=color, ecolor=color,
+                            elinewidth=1, capsize=3, zorder=5)
 
     @staticmethod
     def plot_boxes(ax, values, notch):

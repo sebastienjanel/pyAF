@@ -113,7 +113,9 @@ class ChangeFilterWidget(QtWidgets.QDialog):
         if self.batch:
             nbr = len(self.get_selected_rows())
             where = "the " + str(nbr) + " selected row" + \
-                ("s" if nbr > 1 else "") + " of the table"
+                ("s" if nbr > 1 else "") + " of the table and to " + \
+                ("their files" if nbr > 1 else "its file") + \
+                " (Results tab)"
         elif shared.exp.apply_to_all_data:
             # Results tab with "apply to all" (see update_parents)
             where = "all the files"
@@ -176,6 +178,7 @@ class ChangeFilterWidget(QtWidgets.QDialog):
 
         if self.batch:
             wl = widgets_list.widget_results_single
+            data_ids = []
             for row in self.get_selected_rows():
                 result = shared.exp.results_list[row]
                 if self.is_dist:
@@ -186,9 +189,15 @@ class ChangeFilterWidget(QtWidgets.QDialog):
                     result.filter_slope_min = val_min
                     result.filter_slope_max = val_max
                 wl.update_filter_cells(row)
+                if result.data_id not in data_ids:
+                    data_ids.append(result.data_id)
 
             # Recompute the values with the new filters
             wl.schedule_refresh()
+
+            # The files of the rows get the filter too (curves and maps of
+            # the Results tab), as the rows get the one of the Results tab
+            self.update_files(data_ids, val_min, val_max, keep)
 
         else:
             data = shared.exp.current_data
@@ -203,6 +212,27 @@ class ChangeFilterWidget(QtWidgets.QDialog):
             self.update_plots_rows()
 
         self.close()
+
+    def update_files(self, data_ids, val_min, val_max, keep):
+        """Give the filter set in the Plots tab to the files of its rows,
+        and refresh their events and the plots of the Results tab."""
+        for data_id in data_ids:
+            data = shared.exp.list[data_id]
+            if self.is_dist:
+                data.events_results_filter_dist_min = val_min
+                data.events_results_filter_dist_max = val_max
+                data.events_results_filter_dist_keep = keep
+            else:
+                data.events_results_filter_slope_min = val_min
+                data.events_results_filter_slope_max = val_max
+            if data.events_calculated:
+                events_refresher.update_events(data_id=data_id)
+        results = widgets_list.widget_results
+        if results is not None:
+            results.update_MPL("MPL_canvas1")
+            results.update_MPL("MPL_canvas2")
+        if widgets_list.widget_multimeshgrids is not None:
+            widgets_list.widget_multimeshgrids.update_widget()
 
     def update_plots_rows(self):
         """Give the filter of the file (and of the other files if it was

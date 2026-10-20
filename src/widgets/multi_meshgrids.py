@@ -35,13 +35,25 @@ import os
 import textwrap
 from .. import shared
 from .. import widgets_list
-from qtpy import QtGui, QtCore, QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import ClearWidgetsFromLayout
+from ..tools import gui_tools
+from ..tools import map_values
 from ..tools import misc_tools
 from ..tools.PYAFWidget import PYAFWidget
 from ..plots.PYAFPlot import PYAFPlot
+
+
+def map_available(data, map_type):
+    """Whether a map is computed for a file (the slices: elasticity by
+    Tomography)."""
+    if map_type in ("stiffness_slice", "stiffness_corr_slice"):
+        base = map_type.replace("_slice", "")
+        return base in map_values.available_maps(data) and \
+            data.get_used_indentation()[1] != 0
+    return map_type in map_values.available_maps(data)
 
 
 class MultiMeshgridsWidget(PYAFWidget):
@@ -160,7 +172,6 @@ class MultiMeshgridsWidget(PYAFWidget):
                 data_id=datasetid,
                 min_size=[144, 144])
             MPL_canvas.setContentsMargins(0, 0, 0, 0)
-            MPL_canvas.mpl_connect("scroll_event", self.scroll_on_mesh)
             MPL_canvas.mpl_connect("button_press_event", self.click_on_mesh)
 
             widg = QtWidgets.QWidget()
@@ -211,6 +222,12 @@ class MultiMeshgridsWidget(PYAFWidget):
                               (5, " Slice (BEC)")):
             self.list_choser.setItemText(index, name + suffix)
         self.list_choser.fit_to_contents()
+        # Maps computed for none of the files: greyed out
+        for index, map_type in enumerate(misc_tools.MESHGRID_TYPES):
+            if any(map_available(data, map_type) for data in shared.exp.list):
+                gui_tools.enable_combobox_item(self.list_choser, index)
+            else:
+                gui_tools.disable_combobox_item(self.list_choser, index)
         self.list_choser.setCurrentIndex(meshgrid_type)
 
         self.update_MPL()
@@ -254,23 +271,6 @@ class MultiMeshgridsWidget(PYAFWidget):
                 i = i + 1
 
         self.current_nbr_cols = nbr_cols
-
-    def scroll_on_mesh(self, event):
-        """Fetch scroll events on the meshgrids and scroll all the frame.
-
-        The matplotib plots fetch the scroll events. We have to connect the
-        plot to this method to fetch the scroll events. The scroll step is
-        multiplied by 120 as it was divided by 120 in matplotlib.
-        Then a dummy QWheelEvent is created with only the step value filled;
-        this event is then sent to the vertical scrollbar.
-        """
-        step = event.step * 120.0
-
-        event = QtGui.QWheelEvent(QtCore.QPoint(), step,
-                                  QtCore.Qt.NoButton, QtCore.Qt.NoModifier)
-
-        scrollbar = self.scroll_area.verticalScrollBar()
-        scrollbar.event(event)
 
     def click_on_mesh(self, event):
         """Called when clicking on meshgrid.

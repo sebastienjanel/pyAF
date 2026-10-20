@@ -304,14 +304,17 @@ class ResultsSingleWidget(PYAFWidget):
     def update_MPL(self):
         """Update the plot.
 
-        The plot fills the visible area, and gets wider (with a scroll bar)
-        when there are too many files for it.
+        The plot fills the visible area, and the violin plots get wider
+        (with a scroll bar) when there are too many files for them (not the
+        force vs loading rate plot).
         """
         viewport = self.SA_plot.viewport().size()
         nbr_files = sum(1 for result in shared.exp.results_list
                         if result.display)
         width = max(viewport.width(),
                     PLOT_MARGINS_WIDTH + nbr_files * VIOLIN_WIDTH)
+        if shared.exp.results_type == "loading_rates":
+            width = viewport.width()
         height = max(viewport.height(), PLOT_MIN_HEIGHT)
         if self.MPL_canva.size() != QtCore.QSize(width, height):
             self.MPL_canva.resize(width, height)

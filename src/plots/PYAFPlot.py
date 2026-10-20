@@ -371,6 +371,41 @@ class PYAFPlot(FigureCanvasQTAgg):
             if self.is_not_first is False:
                 self.is_not_first = True
 
+    def wheelEvent(self, event):
+        """Mouse wheel and trackpad: matplotlib gets the scroll event, then
+        the scroll area of the plot scrolls (violins of many files,
+        multiple meshgrids); the canvas takes the events, they do not reach
+        the scroll area by themselves.
+
+        Trackpad: by its pixels; mouse wheel: by lines (120 per notch). A
+        vertical swipe scrolls horizontally when the area only scrolls
+        horizontally (violins wider than the window)."""
+        super().wheelEvent(event)
+        area = self.parentWidget()
+        while area is not None and \
+                not isinstance(area, QtWidgets.QAbstractScrollArea):
+            area = area.parentWidget()
+        if area is None:
+            return
+        hbar = area.horizontalScrollBar()
+        vbar = area.verticalScrollBar()
+        pixel = event.pixelDelta()
+        if not pixel.isNull():
+            dx, dy = pixel.x(), pixel.y()
+        else:
+            angle = event.angleDelta()
+            lines = QtWidgets.QApplication.wheelScrollLines()
+            dx = angle.x() / 120.0 * lines * hbar.singleStep()
+            dy = angle.y() / 120.0 * lines * vbar.singleStep()
+        if vbar.maximum() > vbar.minimum():
+            vbar.setValue(int(round(vbar.value() - dy)))
+            hbar.setValue(int(round(hbar.value() - dx)))
+        else:
+            # Only horizontal: the vertical swipes scroll it too
+            delta = dx if abs(dx) > abs(dy) else dy
+            hbar.setValue(int(round(hbar.value() - delta)))
+        event.accept()
+
     def resizeEvent(self, ev):
         """Reimplement resizeEvent to manage plot redrawing."""
         p_type = self.plot_type

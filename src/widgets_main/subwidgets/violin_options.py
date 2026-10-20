@@ -32,14 +32,14 @@
 
 """Options of the violin plots of the plots and grouped plots tabs."""
 
-from qtpy import QtWidgets
+from qtpy import QtCore, QtWidgets
 from ... import consts
 from ... import shared
 from ... import widgets_list
 from ... import experiment
 from ...tools import misc_tools, palettes, stat_tools
-from ...tools.gui_tools import PYAFButton, PYAFCheckBox, PYAFComboBox, \
-    PYAFInput
+from ...tools.gui_tools import PYAFButton, PYAFComboBox, PYAFInput, \
+    PYAFToggle
 from ...tools.PYAFWidget import PYAFWidget
 
 INNER = ("Box", "Notched box", "Quartiles", "None")
@@ -52,6 +52,11 @@ ZEROS_TOOLTIP = (
     "A 0 can be a real value (e.g. a curve without events) or a curve\n"
     "without result. For the loading rates, the events with a force <= 0\n"
     "are removed.")
+
+
+def round3(value):
+    """Value with 3 significant digits (limits taken from the plot)."""
+    return float("%.3g" % value)
 
 
 class ViolinOptionsWidget(PYAFWidget):
@@ -71,7 +76,7 @@ class ViolinOptionsWidget(PYAFWidget):
         box = QtWidgets.QGroupBox("Violin plot")
         self.box = box
         form = QtWidgets.QFormLayout()
-        form.setLabelAlignment(form.labelAlignment())
+        form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
         self.list_inner = PYAFComboBox(self, "inner")
         for item in INNER:
@@ -117,6 +122,12 @@ class ViolinOptionsWidget(PYAFWidget):
             "ColorBrewer ones. Custom: the colors chosen row by row.")
 
         self.BT_color = PYAFButton(self, "rows_color", "Rows...", size=60)
+        # As high as the list: the row stays aligned with its label (no
+        # margin and vertical padding of the theme, to keep room for the
+        # text)
+        self.BT_color.setStyleSheet(
+            "QPushButton { margin: 0px; padding: 0px 1.2ex; }")
+        self.BT_color.setFixedHeight(self.list_palette.sizeHint().height())
         self.BT_color.setToolTip(
             "Choose the color of the rows selected in the table")
         colors = QtWidgets.QHBoxLayout()
@@ -133,48 +144,91 @@ class ViolinOptionsWidget(PYAFWidget):
             "of the density).")
         form.addRow("Smoothing", self.IN_bw_adjust)
 
-        self.CB_cut = PYAFCheckBox(self, "cut", "Truncate at data range")
-        self.CB_cut.setToolTip(
+        self.TG_cut = PYAFToggle(self, "cut", "Truncate at data range")
+        self.TG_cut.setToolTip(
             "Draw the density estimate (KDE) only between the smallest and\n"
             "the largest value. Unticked, it extends 2 bandwidths beyond\n"
             "them, where there is no data.")
 
-        self.CB_log = PYAFCheckBox(self, "log_scale", "Log scale")
-        self.CB_log.setToolTip("Log scale (the values <= 0 are not shown)")
+        self.TG_log = PYAFToggle(self, "log_scale", "Log scale")
+        self.TG_log.setToolTip("Log scale (the values <= 0 are not shown)")
 
-        self.CB_counts = PYAFCheckBox(self, "show_counts", "Number of values")
-        self.CB_counts.setToolTip(
+        self.TG_counts = PYAFToggle(self, "show_counts", "Number of values")
+        self.TG_counts.setToolTip(
             "Display the number of values under the names")
 
-        self.CB_zeros = PYAFCheckBox(self, "zeros", "Remove \u2264 0")
-        self.CB_zeros.setToolTip(ZEROS_TOOLTIP)
+        self.TG_zeros = PYAFToggle(self, "zeros", "Remove \u2264 0")
+        self.TG_zeros.setToolTip(ZEROS_TOOLTIP)
 
-        self.CB_y_manual = PYAFCheckBox(self, "y_manual", "Manual Y limits")
-        self.CB_white = PYAFCheckBox(self, "white", "White background")
-        self.CB_white.setToolTip(
+        self.TG_y_manual = PYAFToggle(self, "y_manual", "Y limits")
+        self.TG_y_manual.setToolTip("Limits of the Y axis (else automatic)")
+        self.TG_x_manual = PYAFToggle(self, "x_manual", "X limits")
+        self.TG_x_manual.setToolTip(
+            "Limits of the X axis of the force vs loading rate plot [pN/s] "
+            "(else automatic)")
+        self.TG_white = PYAFToggle(self, "white", "White background")
+        self.TG_white.setToolTip(
             "White background and black axes, for the publications (also in\n"
             "the window of Figures > Open results)")
 
-        # Checkboxes on two columns
-        checkboxes = QtWidgets.QGridLayout()
-        checkboxes.setContentsMargins(0, 0, 0, 0)
-        for i, checkbox in enumerate((self.CB_cut, self.CB_log,
-                                      self.CB_counts, self.CB_zeros,
-                                      self.CB_white, self.CB_y_manual)):
-            checkboxes.addWidget(checkbox, i // 2, i % 2)
-        form.addRow(checkboxes)
+        self.TG_legend = PYAFToggle(self, "legend", "Legend")
+        self.TG_legend.setToolTip(
+            "Legend of the files (force vs loading rate plot); the fits "
+            "of the DFS window keep theirs")
 
+        # Loading rate plot: events, median point of each file (or
+        # replicate) and its quartiles
+        what = "replicate" if mode == "groups" else "file"
+        self.TG_events = PYAFToggle(self, "lr_events", "Unique events")
+        self.TG_events.setToolTip("Each event (force vs loading rate)")
+        self.TG_medians = PYAFToggle(self, "lr_medians", "Median per " + what)
+        self.TG_medians.setToolTip(
+            "Point at the median loading rate and median force of each " +
+            what)
+        self.TG_errors = PYAFToggle(self, "lr_error_bars",
+                                    what.capitalize() + " error bar")
+        self.TG_errors.setToolTip(
+            "Quartiles (25-75 %) of the loading rates and forces of each " +
+            what)
+
+        # Toggles on two columns, the switches aligned (labels of the same
+        # width in a column), those of the displayed plot (see arrange)
+        self.toggles_violins = (self.TG_cut, self.TG_log, self.TG_counts,
+                                self.TG_zeros, self.TG_white)
+        self.toggles_lr = (self.TG_events, self.TG_medians, self.TG_errors,
+                           self.TG_zeros, self.TG_white, self.TG_legend)
+        self.grid = QtWidgets.QGridLayout()
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setHorizontalSpacing(16)
+        self.grid.setColumnStretch(2, 1)
+        form.addRow(self.grid)
+        self.form = form
+        self.arranged = None
+
+        # Limits: toggle and range on a row, the switches aligned with the
+        # first column of toggles
         self.IN_y_min = PYAFInput(self, "y_min", "", width=70)
         self.IN_y_min.input.setValidator(misc_tools.validator("F"))
         self.IN_y_max = PYAFInput(self, "y_max", "", width=70)
         self.IN_y_max.input.setValidator(misc_tools.validator("F"))
-        y_range = QtWidgets.QHBoxLayout()
-        y_range.setContentsMargins(0, 0, 0, 0)
-        y_range.addWidget(self.IN_y_min)
-        y_range.addWidget(QtWidgets.QLabel("to"))
-        y_range.addWidget(self.IN_y_max)
-        y_range.addStretch()
-        form.addRow("Y range", y_range)
+        self.IN_x_min = PYAFInput(self, "x_min", "", width=70)
+        self.IN_x_min.input.setValidator(misc_tools.validator("PF"))
+        self.IN_x_max = PYAFInput(self, "x_max", "", width=70)
+        self.IN_x_max.input.setValidator(misc_tools.validator("PF"))
+        self.limit_rows = []
+        for toggle, low, high in ((self.TG_y_manual, self.IN_y_min,
+                                   self.IN_y_max),
+                                  (self.TG_x_manual, self.IN_x_min,
+                                   self.IN_x_max)):
+            row = QtWidgets.QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.addWidget(toggle)
+            row.addWidget(low)
+            row.addWidget(QtWidgets.QLabel("to"))
+            row.addWidget(high)
+            row.addStretch()
+            form.addRow(row)
+            self.limit_rows.append(row)
 
         box.setLayout(form)
 
@@ -184,6 +238,35 @@ class ViolinOptionsWidget(PYAFWidget):
         self.setLayout(layout)
 
         self.update_widget()
+
+    def arrange(self, violins):
+        """Options of the displayed plot: violins, or forces vs loading
+        rates (the others are hidden), the toggles on two columns."""
+        if self.arranged == violins:
+            return
+        self.arranged = violins
+        for widget in (self.list_inner, self.list_points,
+                       self.list_density_norm, self.IN_bw_adjust):
+            self.form.setRowVisible(widget, violins)
+        # X limits: loading rate plot
+        self.form.setRowVisible(self.limit_rows[1], not violins)
+
+        for toggle in set(self.toggles_violins + self.toggles_lr):
+            self.grid.removeWidget(toggle)
+            toggle.hide()
+        toggles = self.toggles_violins if violins else self.toggles_lr
+        widths = []
+        for column in (0, 1):
+            items = toggles[column::2]
+            width = max(t.label.sizeHint().width() for t in items)
+            widths.append(width)
+            for row, toggle in enumerate(items):
+                toggle.label.setFixedWidth(width)
+                self.grid.addWidget(toggle, row, column)
+                toggle.show()
+        # Limits aligned with the first column
+        for toggle in (self.TG_y_manual, self.TG_x_manual):
+            toggle.label.setFixedWidth(widths[0])
 
     def update_widget(self):
         """Display the current options."""
@@ -196,27 +279,36 @@ class ViolinOptionsWidget(PYAFWidget):
             options["bw_adjust"]))
         self.list_palette.setCurrentIndex(
             self.list_palette.findText(options["palette"]))
-        self.CB_cut.setChecked(options["cut"])
-        self.CB_log.setChecked(options["log_scale"])
-        self.CB_counts.setChecked(options["show_counts"])
-        self.CB_white.setChecked(options["background"] == "White")
-        self.CB_zeros.setChecked(shared.exp.hist_remove_zeros)
+        self.TG_cut.setChecked(options["cut"])
+        self.TG_log.setChecked(options["log_scale"])
+        self.TG_counts.setChecked(options["show_counts"])
+        self.TG_legend.setChecked(options["legend"])
+        self.TG_events.setChecked(options["lr_events"])
+        self.TG_medians.setChecked(options["lr_medians"])
+        self.TG_errors.setChecked(options["lr_error_bars"])
+        self.TG_white.setChecked(options["background"] == "White")
+        self.TG_zeros.setChecked(shared.exp.hist_remove_zeros)
         manual = options["y_mode"] == "manual"
-        self.CB_y_manual.setChecked(manual)
+        self.TG_y_manual.setChecked(manual)
         self.IN_y_min.changeValue(misc_tools.format_number(options["y_min"]))
         self.IN_y_max.changeValue(misc_tools.format_number(options["y_max"]))
         self.IN_y_min.setEnabled(manual)
         self.IN_y_max.setEnabled(manual)
+        manual_x = options["x_mode"] == "manual"
+        self.TG_x_manual.setChecked(manual_x)
+        self.IN_x_min.changeValue(misc_tools.format_number(options["x_min"]))
+        self.IN_x_max.changeValue(misc_tools.format_number(options["x_max"]))
 
         # The loading rates are plotted as forces vs loading rates (no
-        # violins): only the colors, the background and the Y limits apply
+        # violins): their own options
         violins = shared.exp.results_type != "loading_rates"
         self.box.setTitle("Violin plot" if violins
                           else "Force vs loading rate plot")
-        for widget in (self.list_inner, self.list_points,
-                       self.list_density_norm, self.IN_bw_adjust,
-                       self.CB_cut, self.CB_log, self.CB_counts):
-            widget.setEnabled(violins)
+        self.arrange(violins)
+        self.IN_x_min.setEnabled(manual_x)
+        self.IN_x_max.setEnabled(manual_x)
+        # Error bars of the median points
+        self.TG_errors.setEnabled(options["lr_medians"])
 
     def list_updated(self, name):
         """Called when a list is changed."""
@@ -270,25 +362,41 @@ class ViolinOptionsWidget(PYAFWidget):
         """Called when a checkbox is clicked."""
         options = self.get_options()
         if name == "cut":
-            options["cut"] = self.CB_cut.isChecked()
+            options["cut"] = self.TG_cut.isChecked()
         elif name == "log_scale":
-            options["log_scale"] = self.CB_log.isChecked()
+            options["log_scale"] = self.TG_log.isChecked()
         elif name == "show_counts":
-            options["show_counts"] = self.CB_counts.isChecked()
+            options["show_counts"] = self.TG_counts.isChecked()
+        elif name == "legend":
+            options["legend"] = self.TG_legend.isChecked()
+        elif name in ("lr_events", "lr_medians", "lr_error_bars"):
+            toggle = {"lr_events": self.TG_events,
+                      "lr_medians": self.TG_medians,
+                      "lr_error_bars": self.TG_errors}[name]
+            options[name] = toggle.isChecked()
+            self.TG_errors.setEnabled(options["lr_medians"])
         elif name == "white":
             options["background"] = \
-                "White" if self.CB_white.isChecked() else "Theme"
+                "White" if self.TG_white.isChecked() else "Theme"
         elif name == "y_manual":
-            manual = self.CB_y_manual.isChecked()
+            manual = self.TG_y_manual.isChecked()
             options["y_mode"] = "manual" if manual else "auto"
             if manual:
                 # Start from the current limits of the plot
                 ymin, ymax = self.parent.MPL_canva.canvas.axes.get_ylim()
-                options["y_min"], options["y_max"] = ymin, ymax
+                options["y_min"], options["y_max"] = round3(ymin), round3(ymax)
+            self.update_widget()
+        elif name == "x_manual":
+            manual = self.TG_x_manual.isChecked()
+            options["x_mode"] = "manual" if manual else "auto"
+            if manual:
+                # Start from the current limits of the plot
+                xmin, xmax = self.parent.MPL_canva.canvas.axes.get_xlim()
+                options["x_min"], options["x_max"] = round3(xmin), round3(xmax)
             self.update_widget()
         elif name == "zeros":
             # Changes the values: recompute the table and the plot
-            shared.exp.hist_remove_zeros = self.CB_zeros.isChecked()
+            shared.exp.hist_remove_zeros = self.TG_zeros.isChecked()
             widgets_list.widget_results_single.button_clicked("refresh_hist")
             return
         self.replot()
@@ -308,6 +416,10 @@ class ViolinOptionsWidget(PYAFWidget):
             options["y_min"] = self.IN_y_min.get_float_value()
         elif name == "y_max":
             options["y_max"] = self.IN_y_max.get_float_value()
+        elif name == "x_min":
+            options["x_min"] = self.IN_x_min.get_float_value()
+        elif name == "x_max":
+            options["x_max"] = self.IN_x_max.get_float_value()
         self.replot()
 
     def replot(self):

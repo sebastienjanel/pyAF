@@ -383,9 +383,17 @@ def default_violin_options():
                                          # Number of values
         "log_scale": False,
         "show_counts": True,             # Number of values under the names
+        "legend": True,                  # Legend of the files (loading
+                                         # rates)
+        "lr_events": True,               # Loading rate plot: events,
+        "lr_medians": True,              # median point of each file, and
+        "lr_error_bars": True,           # its quartiles
         "y_mode": "auto",                # auto or manual
         "y_min": 0.0,
         "y_max": 100.0,
+        "x_mode": "auto",                # X limits of the loading rate
+        "x_min": 1.0,                    # plot: auto or manual [pN/s]
+        "x_max": 1e6,
         "palette": "ggplot2",            # Name in palettes.NAMES, or
                                          # palettes.CUSTOM
         "background": "Theme"}           # Theme or White

@@ -730,7 +730,8 @@ def get_position_on_meshgrid(event):
 
 
 class DoubleValidator(QtGui.QDoubleValidator):
-    """Validator for the floats, accepting "." and "," as decimal point.
+    """Validator for the floats, accepting "." and "," as decimal point,
+    and the scientific notation (1e5, 2.5E-3).
 
     The values are displayed with a ".", and get_float_value accepts both,
     whatever the language of the computer (QDoubleValidator alone only
@@ -740,7 +741,9 @@ class DoubleValidator(QtGui.QDoubleValidator):
     def __init__(self, allow_empty=False):
         super().__init__()
         self.setLocale(QtCore.QLocale.c())
-        self.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        # Scientific notation accepted (e.g. 1e5, as format_number writes
+        # the large values), the standard one too
+        self.setNotation(QtGui.QDoubleValidator.ScientificNotation)
         # An empty input is accepted (to remove an optional value)
         self.allow_empty = allow_empty
 

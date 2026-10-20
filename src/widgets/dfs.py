@@ -30,7 +30,8 @@
 # knowledge of the CeCILL license and that you accept its terms.
 
 """Display a list with results of DFS experiments."""
-"""Window of the dynamic force spectroscopy (Bell-Evans fits)."""
+"""Window of the dynamic force spectroscopy (Bell-Evans, DHS and
+Friddle-Noy-De Yoreo fits, see dfs_tools)."""
 
 import numpy
 from qtpy import QtCore, QtWidgets
@@ -45,7 +46,8 @@ from ..tools.PYAFWidget import PYAFWidget
 from .. import widgets_list
 from .. import shared
 
-COLUMNS = ["", "Method", "Points", "x [nm]", "koff [s⁻¹]", "R²"]
+COLUMNS = ["", "Model", "Points", "x [nm]", "koff [s⁻¹]",
+           "\u0394G\u2021 / feq", "R²"]
 
 
 def number(value, error=None):
@@ -59,11 +61,11 @@ def number(value, error=None):
 
 
 class DFSWidget(PYAFWidget):
-    """Bell-Evans fits of the forces vs the loading rates of the files (plots
-    tab) or of the groups (grouped plots tab) displayed in the plot.
-
-    The fit F = a ln(r) + b gives the distance to the barrier x = kBT / a and
-    the dissociation rate koff = exp(-b / a) / a.
+    """Fits of the forces vs the loading rates of the files (plots tab) or
+    of the groups (grouped plots tab) displayed in the plot: Bell-Evans (on
+    the median forces), DHS and Friddle-Noy-De Yoreo (also on the median
+    forces),
+    see dfs_tools.
     """
 
     def __init__(self, parent):
@@ -84,11 +86,35 @@ class DFSWidget(PYAFWidget):
         self.HL.addWidget(self.RBT_groups)
         self.HL.addStretch(1)
 
+        # Model of the fit
+        self.HL_model = QtWidgets.QHBoxLayout()
+        self.list_model = PYAFComboBox(self, "model")
+        for name, _ in dfs_tools.MODELS.values():
+            self.list_model.addItem(name)
+        self.list_model.setToolTip(
+            "Bell-Evans: F* = kBT/x ln(r x / (kBT koff)), linear in ln(r); "
+            "to use unless the spectrum is curved.\nFitted on the median "
+            "forces with their exact Bell-Evans expression.\n\nDHS "
+            "(Dudko-Hummer-Szabo): curved spectrum (x decreases with the "
+            "force), gives also the height\nof the barrier \u0394G\u2021; "
+            "\u03bd = 1/2 for a cusp barrier, 2/3 for a linear-cubic one. "
+            "Needs a wide range of loading rates.\n\nFriddle-Noy-De "
+            "Yoreo: rebinding, plateau at the equilibrium force feq at low "
+            "loading rates,\nthen Bell-Evans.\n\nAll the models are "
+            "fitted on the median forces (the mean is pulled up by the "
+            "multiple bonds\nand the nonspecific adhesions). DHS and "
+            "Friddle-Noy-De Yoreo: 3 parameters, at least 4 points.")
+        self.list_model.fit_to_contents()
+        self.HL_model.addWidget(QtWidgets.QLabel("Model:"))
+        self.HL_model.addWidget(self.list_model)
+        self.HL_model.addStretch(1)
+
         # Method of the fit
         self.HL_method = QtWidgets.QHBoxLayout()
         self.list_method = PYAFComboBox(self, "method")
         self.list_method.addItem("Medians per file")
         self.list_method.addItem("Binned events")
+        self.list_method.fit_to_contents()
         self.list_method.setToolTip(
             "Medians per file: one point per displayed file (or speed), at "
             "the median loading rate\nand the median force of its events "
@@ -114,7 +140,7 @@ class DFSWidget(PYAFWidget):
         self.tableWidget.setSelectionBehavior(behavior)
         self.tableWidget.horizontalHeader().setHighlightSections(False)
         self.tableWidget.setHorizontalHeaderLabels(COLUMNS)
-        for col, width in enumerate((30, 130, 60, 110, 130, 60)):
+        for col, width in enumerate((30, 175, 50, 110, 130, 120, 60)):
             self.tableWidget.setColumnWidth(col, width)
         self.tableWidget.horizontalHeader().setStretchLastSection(True)
         self.tableWidget.verticalHeader().hide()
@@ -126,6 +152,7 @@ class DFSWidget(PYAFWidget):
         self.HL_buttons.addWidget(self.BT_remove)
 
         self.VL.addLayout(self.HL)
+        self.VL.addLayout(self.HL_model)
         self.VL.addLayout(self.HL_method)
         self.VL.addWidget(self.LB_info)
         self.VL.addWidget(self.tableWidget)
@@ -138,8 +165,12 @@ class DFSWidget(PYAFWidget):
         """Do nothing here (the number of bins is read when fitting)."""
 
     def list_updated(self, _):
-        """Method of the fit changed."""
+        """Model or method of the fit changed."""
         self.update_widget()
+
+    def model(self):
+        """Selected model."""
+        return list(dfs_tools.MODELS)[self.list_model.currentIndex()]
 
     def method(self):
         """Selected method."""
@@ -164,13 +195,20 @@ class DFSWidget(PYAFWidget):
                     "tab to fit them.")
                 return
             nbr_bins = self.IN_bins.get_int_value() or 10
-            result = dfs_tools.new_fit(mode, self.method(), nbr_bins)
+            result = dfs_tools.new_fit(mode, self.method(), nbr_bins,
+                                       self.model())
             if isinstance(result, str):
                 QtWidgets.QMessageBox.warning(self, "DFS", result)
                 return
             dfs_tools.get_fits(mode).append(result)
             self.update_widget()
             self.update_plot()
+            warning = self.fit_warning(result)
+            if result.get("bell_limit"):
+                QtWidgets.QMessageBox.information(
+                    self, "DFS", self.bell_limit_text(result))
+            elif warning:
+                QtWidgets.QMessageBox.warning(self, "DFS", warning)
 
         elif button == "GRP_buttons":
             if self.GRP_buttons.checkedId() == 0:
@@ -203,10 +241,16 @@ class DFSWidget(PYAFWidget):
         # For the DFS, the replicates are the speeds
         what = "speed" if mode == "groups" else "file"
         self.list_method.setItemText(0, "Medians per " + what)
+        self.list_method.fit_to_contents()
         self.IN_bins.setEnabled(self.method() == "binned")
         nbr = len(dfs_tools.get_items(mode))
+        formulas = {
+            "bell": "F* = (kBT/x) ln(r x / (kBT koff)), on the median forces",
+            "dhs_cusp": "DHS, \u03bd = 1/2, on the median forces",
+            "dhs_cubic": "DHS, \u03bd = 2/3, on the median forces",
+            "fnd": "Friddle-Noy-De Yoreo, on the median forces"}
         self.LB_info.setText(
-            "Fit F = (kBT/x) ln(r x / (kBT koff)) on the " + what + "s "
+            "Fit " + formulas[self.model()] + ", of the " + what + "s "
             "displayed in the plot (" + str(nbr) + " " + what +
             ("s" if nbr != 1 else "") + ").")
 
@@ -222,14 +266,26 @@ class DFSWidget(PYAFWidget):
             cb.setEnabled(fit["method"] != "old")
 
             if fit["method"] == "old":
-                method = "Old fit (not drawn)"
-            elif fit["method"] == "binned":
-                method = "Binned (" + str(fit["nbr_bins"]) + " bins)"
+                name = "Old fit (not drawn)"
             else:
-                method = "Medians"
-            texts = [method, number(fit.get("nbr_points")),
+                name = dfs_tools.MODELS[fit.get("model", "bell")][0]
+                if fit["method"] == "binned":
+                    name += ", " + str(fit["nbr_bins"]) + " bins"
+                if fit.get("bell_limit"):
+                    name += " = Bell-Evans"
+                elif self.fit_warning(fit):
+                    name = "\u26a0 " + name
+            if "dG" in fit:
+                third = "\u221e (no curvature)" if fit.get("bell_limit") \
+                    else number(fit["dG"], fit["sdG"]) + " kBT"
+            elif "feq" in fit:
+                third = "0 (no plateau)" if fit.get("bell_limit") \
+                    else number(fit["feq"], fit["sfeq"]) + " pN"
+            else:
+                third = "–"
+            texts = [name, number(fit.get("nbr_points")),
                      number(fit["x"] * 1e9, fit["sx"] * 1e9),
-                     number(fit["koff"], fit["skoff"]),
+                     number(fit["koff"], fit["skoff"]), third,
                      number(fit.get("r2"))]
             tooltip = self.tooltip(fit)
             for col, text in enumerate(texts, start=1):
@@ -238,6 +294,42 @@ class DFSWidget(PYAFWidget):
                 label.setToolTip(tooltip)
                 self.tableWidget.setCellWidget(
                     i, col, gui_tools.CenteredCellwidget(label))
+
+    @staticmethod
+    def bell_limit_text(fit):
+        """Explanation of a fit that reduced to Bell-Evans."""
+        if fit.get("model") == "fnd":
+            return ("No plateau at low loading rates: feq = 0, the "
+                    "Friddle-Noy-De Yoreo model is then Bell-Evans (same "
+                    "curve).\nNo rebinding is seen in these data: "
+                    "Bell-Evans is enough.")
+        return ("No curvature: \u0394G\u2021 goes to its maximum, the DHS "
+                "model is then Bell-Evans (same curve).\nThe spectrum is "
+                "linear in ln(r): Bell-Evans is enough (a wider range of "
+                "loading rates may show a curvature).")
+
+    @staticmethod
+    def fit_warning(fit):
+        """Text if the fit does not describe the data (empty if fine)."""
+        if fit.get("method") == "old":
+            return ""
+        if fit.get("model", "bell") == "bell" and fit.get("a", 1) <= 0:
+            return ("The force does not increase with the loading rate: no "
+                    "Bell-Evans parameters.")
+        if fit.get("at_bound"):
+            return ("Parameter at the limit of its range (" +
+                    ", ".join(fit["at_bound"]) + "): the model does not "
+                    "describe these points (the force should increase with "
+                    "the loading rate,\nwith a curvature for DHS or a "
+                    "plateau at low loading rates for Friddle-Noy-De "
+                    "Yoreo). The curve is not reliable.")
+        r2 = fit.get("r2", numpy.nan)
+        if numpy.isfinite(r2) and r2 < 0.5:
+            return ("The curve describes the points poorly (R\u00b2 = %.2g): "
+                    "the model does not fit these data (the force should "
+                    "increase with the loading rate).\nThe parameters are "
+                    "not reliable." % r2)
+        return ""
 
     @staticmethod
     def tooltip(fit):
@@ -251,23 +343,54 @@ class DFSWidget(PYAFWidget):
         if temps[1] - temps[0] > 0.01:
             temp += " (mean of " + number(temps[0] - 273.15) + " to " + \
                 number(temps[1] - 273.15) + " °C)"
-        text = ("F = a ln(r) + b (F in N, r in N/s)\n"
-                "a = " + number(fit["a"], fit["sa"]) + " N\n"
-                "b = " + number(fit["b"], fit["sb"]) + " N\n"
-                "x = kBT / a = " + number(fit["x"] * 1e9, fit["sx"] * 1e9) +
-                " nm\nkoff = exp(-b/a) / a = " +
-                number(fit["koff"], fit["skoff"]) + " s⁻¹\n"
-                "R² = " + number(fit["r2"]) + ", T = " + temp + "\n" +
-                str(fit["nbr_points"]) + " points, " +
-                str(fit["nbr_events"]) + " events")
+        model = fit.get("model", "bell")
+        x = number(fit["x"] * 1e9, fit["sx"] * 1e9)
+        koff = number(fit["koff"], fit["skoff"])
+        if model == "bell":
+            text = ("Bell-Evans: F* = kBT/x ln(r x / (kBT koff))\n"
+                    "Linear fit F = a ln(r) + b (F in N, r in N/s) of the "
+                    "median forces:\na = " + number(fit["a"], fit["sa"]) +
+                    " N, b = " + number(fit["b"], fit["sb"]) + " N\n")
+            if fit.get("median_exact"):
+                text += ("x and koff fitted with the exact median of the "
+                         "Bell-Evans distribution\n(F = kBT/x ln(1 + ln2 "
+                         "r x / (kBT koff)); the line gives koff / ln 2)\n")
+            elif fit.get("koff_corrected"):
+                text += ("Fit of an older version: koff corrected for the "
+                         "median forces (x ln 2)\n")
+            text += "x = " + x + " nm\nkoff = " + koff + " s⁻¹\n"
+        elif model in dfs_tools.NU:
+            text = ("DHS, \u03bd = %.3g, fitted on the median forces "
+                    "(exact median of the model):\n"
+                    "x = " % fit["nu"] + x + " nm\nkoff = " + koff +
+                    " s⁻¹\n\u0394G\u2021 = " +
+                    number(fit["dG"], fit["sdG"]) + " kBT\n")
+        else:
+            text = ("Friddle-Noy-De Yoreo, fitted on the median forces:\n"
+                    "x = " + x + " nm\nkoff = " + koff + " s⁻¹\n"
+                    "feq = " + number(fit["feq"], fit["sfeq"]) + " pN\n"
+                    "\u0394Gbu = feq\u00b2 / (2 kc) = " +
+                    number(fit["dGbu"]) + " kBT, with the spring constant "
+                    "of the cantilever\n(kc = " + number(fit["kc"]) +
+                    " N/m; the linker makes the effective kc softer and "
+                    "\u0394Gbu larger)\n")
+        text += ("R² = " + number(fit["r2"]) + ", T = " + temp + "\n" +
+                 str(fit["nbr_points"]) + " points, " +
+                 str(fit["nbr_events"]) + " events")
         if fit["nbr_negative"]:
             text += "\n" + str(fit["nbr_negative"]) + \
                 " events with a loading rate ≤ 0 not used (log)"
-        if fit["a"] <= 0:
+        if model == "bell" and fit["a"] <= 0:
             text += ("\nThe force does not increase with the loading rate "
                      "(a ≤ 0): no x and koff")
-        if fit["nbr_points"] < 3:
-            text += "\nNo standard errors with 2 points"
+        if fit.get("bell_limit"):
+            text += "\n" + DFSWidget.bell_limit_text(fit)
+        if fit.get("at_bound"):
+            text += ("\nParameter at the limit of its range (" +
+                     ", ".join(fit["at_bound"]) + "): the data do not "
+                     "determine it (curvature or plateau not visible?)")
+        if not numpy.isfinite(fit["sx"]):
+            text += "\nNo standard errors (too few points)"
         return text
 
     def checkbox_clicked(self, checkbox, row):

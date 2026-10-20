@@ -437,6 +437,14 @@ def find_force_from_fits(curve, fits, positions):
         # Position of Y1, Y2
         xleft, yleft = math_tools.find_intersection(coeffs, coef_left)
         xright, yright = math_tools.find_intersection(coeffs, coef_right)
+        # Fit of the step parallel to a horizontal fit (e.g. a step of a
+        # single point, fitted by a horizontal line): the horizontal fit
+        # at the middle of the event
+        x_middle = curve_x[positions[i][1]]
+        if yleft is None:
+            xleft, yleft = x_middle, numpy.polyval(coef_left, x_middle)
+        if yright is None:
+            xright, yright = x_middle, numpy.polyval(coef_right, x_middle)
 
         # Get the force
         found_force = abs(yleft - yright)

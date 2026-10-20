@@ -39,6 +39,7 @@ import seaborn as sns
 
 from ..plot_main import MainPlot
 from ... import shared
+from ...tools import dfs_tools
 from ...tools.results_sorting import VISCO_TYPES
 
 
@@ -360,14 +361,14 @@ class PlotResults(MainPlot):
         """Plot the fit for the DFS experiment."""
         if self.lr_fits is not None and self.lr_fits:
             for fit in self.lr_fits:
-                # Bell-Evans fits (see dfs_tools), the old ones are not drawn
+                # Fits of dfs_tools, the old ones are not drawn
                 if not isinstance(fit, dict) or not fit.get("display") or \
                         fit["method"] == "old":
                     continue
                 r = numpy.array(fit["points_r"])
                 x = numpy.logspace(numpy.log10(r.min()),
-                                   numpy.log10(r.max()), 50)
-                y = (fit["a"] * numpy.log(x * 1e-12) + fit["b"]) * 1e12
+                                   numpy.log10(r.max()), 300)
+                y = dfs_tools.model_force(fit, x)
                 self.axes.plot(x, y, "r", linewidth=2)
 
     def prepare_min_max_x(self, ranges):
