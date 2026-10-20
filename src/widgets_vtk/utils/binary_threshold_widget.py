@@ -31,7 +31,7 @@
 
 """Small widget allowing to set the options for the binary thresholding."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from ... import shared
 from ... import widgets_list

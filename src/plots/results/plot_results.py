@@ -39,6 +39,8 @@ import seaborn as sns
 
 from ..plot_main import MainPlot
 from ... import shared
+from ...tools import dfs_tools
+from ...tools.results_sorting import VISCO_TYPES
 
 
 class PlotResults(MainPlot):
@@ -160,7 +162,7 @@ class PlotResults(MainPlot):
                 self.xlabel = ""
             else:
                 self.xlabel = "Force [pN]"
-        elif rt == "events_per_curves":
+        elif rt == "events_per_curve":
             if self.plot_selected == "box":
                 self.xlabel = ""
             else:
@@ -180,6 +182,11 @@ class PlotResults(MainPlot):
                 self.xlabel = ""
             else:
                 self.xlabel = "Loading rate [pN/s]"
+        elif rt in VISCO_TYPES:
+            if self.plot_selected == "box":
+                self.xlabel = ""
+            else:
+                self.xlabel = VISCO_TYPES[rt]["label"]
 
         if pt == "results_single":
             if self.plot_selected == "box":
@@ -189,7 +196,7 @@ class PlotResults(MainPlot):
                     self.ylabel = "Detachment force [pN]"
                 elif rt == "events_forces":
                     self.ylabel = "Force [pN]"
-                elif rt == "events_per_curves":
+                elif rt == "events_per_curve":
                     self.ylabel = "Events per curve"
                 elif rt == "events_rupture_force":
                     self.ylabel = "Detachment force [pN]"
@@ -197,6 +204,8 @@ class PlotResults(MainPlot):
                     self.ylabel = "Distance [nm]"
                 elif rt == "loading_rates":
                     self.ylabel = "Loading rate [pN/s]"
+                elif rt in VISCO_TYPES:
+                    self.ylabel = VISCO_TYPES[rt]["label"]
             else:
                 if shared.exp.norm_hist_single:
                     self.ylabel = r"Probability density"
@@ -352,22 +361,13 @@ class PlotResults(MainPlot):
         """Plot the fit for the DFS experiment."""
         if self.lr_fits is not None and self.lr_fits:
             for fit in self.lr_fits:
-                if fit[4]:
-                    x = [fit[2], fit[3]]
-                    y = [fit[0] * fit[2] + fit[1], fit[0] * fit[3] + fit[1]]
-                    self.axes.plot(x, y, "r", linewidth=2)
+                # Fits of dfs_tools, the old ones are not drawn
+                if not isinstance(fit, dict) or not fit.get("display") or \
+                        fit["method"] == "old":
+                    continue
+                r = numpy.array(fit["points_r"])
+                x = numpy.logspace(numpy.log10(r.min()),
+                                   numpy.log10(r.max()), 300)
+                y = dfs_tools.model_force(fit, x)
+                self.axes.plot(x, y, "r", linewidth=2)
 
-    def prepare_min_max_x(self, ranges):
-        """Method used to prepare the min max values for the x axis."""
-        if ranges:
-            ranges_min = []
-            ranges_max = []
-            for r in ranges:
-                ranges_min.append(r[0])
-                ranges_max.append(r[1])
-        else:
-            ranges_min = 0
-            ranges_max = 1
-
-        self.hist_x_min = numpy.amin(ranges_min)
-        self.hist_x_max = numpy.amax(ranges_max)

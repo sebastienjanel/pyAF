@@ -17,6 +17,8 @@ It computes:
 
 This software is governed by the CeCILL license under French law and abiding by the rules of distribution of free software. You can use, modify and/or redistribute the software under the terms of the CeCILL license as circulated by CEA, CNRS and INRIA at the following URL "http://www.cecill.info".
 
+The plots use the Inter font (https://rsms.me/inter), shipped in src/fonts under the SIL Open Font License 1.1 (src/fonts/OFL.txt).
+
 Main coding made by Michka Popoff (https://theses.fr/api/v1/document/2014LIL10220).
 Modified by Antoine Dujardin, Simone Bovio, Javier Lopez-Alonso, Nuno Duarte, Sébastien Janel.
 
@@ -28,7 +30,7 @@ Check as much as possible results provided vs other software (e.g. JPK DP) to ru
 
 INSTALL procedure with PyCharm software (free for academics):
 - clone the repository (https://github.com/sebastienjanel/pyAF.git) in PyCharm (File/Project from Version Control)
-- install/select a Python3 interpreter
+- install/select a Python 3 interpreter (3.11 or newer, 3.13 recommended)
 - install required packages from the terminal of PyCharm: pip install -r requirements.txt
 - configure the Run/Debug configuration by choosing the script /pyAF/main.py with the Python version of your venv
 - click run

@@ -34,6 +34,7 @@
 import numpy
 import copy
 from ..plot_curve import PlotCurve
+from ....tools import misc_tools
 
 
 class ResultsDeflExt(PlotCurve):
@@ -49,9 +50,9 @@ class ResultsDeflExt(PlotCurve):
 
         # Labels
         if self.data.curve_distance_units == "nm":
-            self.xlabel = "Scanner Extension [nm]"
+            self.xlabel = misc_tools.z_label(self.data)
         elif self.data.curve_distance_units == "um":
-            self.xlabel = "Scanner Extension [\u03bcm]"
+            self.xlabel = misc_tools.z_label(self.data, "\u03bcm")
         self.ylabel = "Deflection [nm]"
 
         # Show or hide the curves

@@ -184,18 +184,34 @@ def get_loading_rate_for_curve(curve, pos1, pos2, speed, lr_coef):
                 pos = curve_z[indexbottom] + force_step
                 x, y = math_tools.find_intersection([0, pos], [a, b])
 
-        if x is not None or y is not None:
+        # Slope of the force: linear fit of the points of the segment, from
+        # the end of the event to the force step (less sensitive to the
+        # noise than the secant between its two ends). Secant with less
+        # than 3 points.
+        seg = slice(int(indexbottom), int(ztop) + 1)
+        seg_x = numpy.asarray(curve_x[seg], dtype=float)
+        seg_z = numpy.asarray(curve_z[seg], dtype=float)
+        fitted = len(seg_x) >= 3 and numpy.ptp(seg_x) > 0 and \
+            numpy.all(numpy.isfinite(seg_x)) and \
+            numpy.all(numpy.isfinite(seg_z))
+        if fitted:
+            a, b = numpy.polyfit(seg_x, seg_z, 1)
+            x_end = x if x is not None else curve_x[ztop]
+            boundaries = [[curve_x[indexbottom], x_end],
+                          [a * curve_x[indexbottom] + b, a * x_end + b]]
+        elif x is not None or y is not None:
             a, b = math_tools.find_line_coefs(
                 [curve_x[indexbottom], curve_z[indexbottom]], [x, y])
+            boundaries = [[curve_x[indexbottom], x], [curve_z[indexbottom], y]]
         else:
             a = None
+            boundaries = [[curve_x[indexbottom], x], [curve_z[indexbottom], y]]
 
         if a is None:
             loading_rates.append(0)
         else:
             loading_rates.append(a * speed)
 
-        fit_boundaries.append(
-            [[curve_x[indexbottom], x], [curve_z[indexbottom], y]])
+        fit_boundaries.append(boundaries)
 
     return loading_rates, fit_boundaries

@@ -33,8 +33,9 @@
 
 import sys
 import webbrowser
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..load_and_save.save import Save
+from . import export_menu
 from . import tablewidget
 from .export_figure import export_figure
 from ..widgets_vtk.utils.save import save_layers
@@ -90,16 +91,6 @@ def create_menu(parent):
     # Results menu
     results_menu = parent.menu.addMenu("Plots")
 
-    action = QtWidgets.QAction("TXT export", parent)
-    action.triggered.connect(lambda: tablewidget.export_results("classic_format"))
-    results_menu.addAction(action)
-    list_actions["export_selected"] = action
-
-    action = QtWidgets.QAction("R export (selected)", parent)
-    action.triggered.connect(lambda: tablewidget.export_results("r_format"))
-    results_menu.addAction(action)
-    list_actions["export_selected_r"] = action
-
     action = QtWidgets.QAction("Rename row", parent)
     action.triggered.connect(tablewidget.rename_result)
     results_menu.addAction(action)
@@ -119,6 +110,9 @@ def create_menu(parent):
     action.triggered.connect(tablewidget.change_color)
     results_menu.addAction(action)
     list_actions["row_color"] = action
+
+    # Export menu (data, parameters)
+    export_menu.add_menu(parent, parent.menu)
 
     # Figures menu
     figure_menu = parent.menu.addMenu("Figures")

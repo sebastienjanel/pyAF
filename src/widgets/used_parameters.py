@@ -31,10 +31,16 @@
 
 """Displays the used parameters for the computation."""
 
-from PyQt5 import QtWidgets
+import os
+
+from qtpy import QtWidgets
+from ..tools.gui_tools import PYAFButton
 from ..tools.PYAFWidget import PYAFWidget
 from .. import shared
 from .. import widgets_list
+from ..tools import misc_tools
+from ..compute_tools.stiffness import contact_models
+from ..tools import params_export
 
 
 class UsedParametersWidget(PYAFWidget):
@@ -48,6 +54,9 @@ class UsedParametersWidget(PYAFWidget):
 
         box_curve_modif = QtWidgets.QGroupBox("General informations")
         box_elasticity = QtWidgets.QGroupBox("Elasticity")
+        # Stiffness when computed by Tomography (see update_widget)
+        self.box_elasticity = box_elasticity
+        box_visco = QtWidgets.QGroupBox("Viscoelasticity")
         box_work_and_rupture_force = QtWidgets.QGroupBox("Work and rupture force")
         box_events = QtWidgets.QGroupBox("Events")
 
@@ -81,6 +90,12 @@ class UsedParametersWidget(PYAFWidget):
 
         # Elasticity
         self.LB_model_selected = QtWidgets.QLabel("Not computed")
+        self.LB_tip = QtWidgets.QLabel()
+        self.LB_poisson_ratio = QtWidgets.QLabel()
+        self.LB_method = QtWidgets.QLabel()
+        self.LB_fit_range = QtWidgets.QLabel()
+        self.LB_poc_title = QtWidgets.QLabel("Point of contact")
+        self.LB_poc_title.setFont(self.fontbold)
         self.LB_poc_skip_start = QtWidgets.QLabel()
         self.LB_poc_fit_length = QtWidgets.QLabel()
         self.LB_poc_refit_option = QtWidgets.QLabel()
@@ -92,17 +107,29 @@ class UsedParametersWidget(PYAFWidget):
 
         VL = QtWidgets.QVBoxLayout()
         VL.addWidget(self.LB_model_selected)
+        VL.addWidget(self.LB_tip)
+        VL.addWidget(self.LB_poisson_ratio)
+        VL.addWidget(self.LB_method)
+        VL.addWidget(self.LB_fit_range)
+        VL.addWidget(self.LB_indentation_start)
+        VL.addWidget(self.LB_indentation_step)
+        VL.addWidget(self.LB_indentation_stop)
+        VL.addWidget(self.LB_poc_title)
         VL.addWidget(self.LB_poc_skip_start)
         VL.addWidget(self.LB_poc_fit_length)
         VL.addWidget(self.LB_poc_noise_multiplicator)
         VL.addWidget(self.LB_poc_refit_option)
         VL.addWidget(self.LB_poc_refit_times)
-        VL.addWidget(self.LB_indentation_start)
-        VL.addWidget(self.LB_indentation_step)
-        VL.addWidget(self.LB_indentation_stop)
         VL.addStretch(1)
 
         box_elasticity.setLayout(VL)
+
+        # Viscoelasticity
+        self.LB_visco = QtWidgets.QLabel("Not computed")
+        VL = QtWidgets.QVBoxLayout()
+        VL.addWidget(self.LB_visco)
+        VL.addStretch(1)
+        box_visco.setLayout(VL)
 
         # Work
         self.LB_joc_skip_start = QtWidgets.QLabel("Not computed")
@@ -162,12 +189,43 @@ class UsedParametersWidget(PYAFWidget):
         # Final Layout
         HL.addWidget(box_curve_modif)
         HL.addWidget(box_elasticity)
+        HL.addWidget(box_visco)
         HL.addWidget(box_work_and_rupture_force)
         HL.addWidget(box_events)
 
-        self.setLayout(HL)
+        # Parameters of the file as JSON (all the parameters, also in the
+        # Export menu for all the files)
+        self.BT_save = PYAFButton(self, "save_json", "Save as JSON...")
+        self.BT_save.setToolTip(
+            "Saves all the parameters of this file (calibration, "
+            "acquisition, computations) in a JSON file")
+        HL_buttons = QtWidgets.QHBoxLayout()
+        HL_buttons.addStretch(1)
+        HL_buttons.addWidget(self.BT_save)
+        VL_main = QtWidgets.QVBoxLayout()
+        VL_main.addLayout(HL)
+        VL_main.addLayout(HL_buttons)
+
+        self.setLayout(VL_main)
 
         self.update_widget()
+
+    def button_clicked(self, name):
+        """Saves the parameters of the file as JSON."""
+        if name != "save_json":
+            return
+        from ..utils import export_menu
+        data = shared.exp.current_data
+        base = os.path.splitext(os.path.basename(str(data.filename)))[0]
+        path = export_menu.ask_path(self, "Save the parameters",
+                                    base + ".params.json", "JSON (*.json)")
+        if not path:
+            return
+        if not path.lower().endswith(".json"):
+            path += ".json"
+        params_export.write(path, params_export.build(
+            "Parameters of a file", path, data_ids=[shared.exp.id_selected]))
+        export_menu.done(self, [path])
 
     def update_widget(self):
         """Update the GUI."""
@@ -194,15 +252,61 @@ class UsedParametersWidget(PYAFWidget):
         # - Other
         self.LB_defl_sens.setText(
             "Deflection sensitivity (nm/V) : " +
-            str(dt.used_deflection_sensitivity))
+            misc_tools.format_number(dt.used_deflection_sensitivity))
         self.LB_spring_constant.setText(
-            "Spring constant (N/m) : " + str(dt.used_spring_constant * 1e9))
+            "Spring constant (N/m) : " +
+            misc_tools.format_number(dt.used_spring_constant * 1e9))
+
+        # Viscoelasticity
+        if dt.visco_calculated:
+            solver = "Numerical" if dt.used_visco_bec or \
+                dt.used_visco_solver == 1 else "Analytical"
+            beta = "auto" if dt.used_visco_beta_auto else \
+                str(dt.used_visco_beta_init)
+            self.LB_visco.setText(
+                "Solver : " + solver +
+                "\nB.E.C. : " + ("yes" if dt.used_visco_bec else "no") +
+                "\nViscous drag corrected : " +
+                ("yes" if dt.used_visco_drag_correction else "no") +
+                "\nBaseline before contact (nm) : " +
+                str(dt.used_visco_contact_offset) +
+                "\nPoints : " + str(dt.used_visco_nbr_points) +
+                "\nInitial fluidity : " + beta)
+        else:
+            self.LB_visco.setText("Not computed")
+
+        # Stiffness when computed by Tomography
+        self.box_elasticity.setTitle(misc_tools.elasticity_name([dt]))
 
         # Elasticity
         if dt.stiffness_calculated:
             val = dt.used_stiffness_model_selected
             value = "Model : " + str(widgets_list.widget_compute.models[val])
             self.LB_model_selected.setText(value)
+            tip = []
+            if val in contact_models.USES_RADIUS:
+                tip.append("radius " + misc_tools.format_number(
+                    dt.used_tip_radius) + " nm")
+            if val in contact_models.USES_ANGLE:
+                tip.append("half-angle " + misc_tools.format_number(
+                    dt.used_tip_angle) + "\u00b0")
+            self.LB_tip.setText("Tip : " + ", ".join(tip) if tip else "")
+            self.LB_tip.setVisible(bool(tip))
+            self.LB_poisson_ratio.setText(
+                "Poisson ratio : " + str(dt.used_poisson_ratio))
+            fitting = dt.used_perform_fit
+            self.LB_method.setText(
+                "Method : " + ("Fitting" if fitting else "Tomography"))
+            if dt.get_used_fit_range_type() == 1:
+                stop = dt.used_indentation_stop
+                fit_range = str(dt.used_indentation_start) + " to " + \
+                    (str(stop) + " nm" if stop else "end of the curve") + \
+                    " (indentation)"
+            else:
+                fit_range = str(dt.used_force_start) + " to " + \
+                    str(dt.used_force_stop) + " % (force)"
+            self.LB_fit_range.setText("Fit range : " + fit_range)
+            self.LB_fit_range.setVisible(fitting)
             value = "Skip (start) (nm) : " + \
                 str(dt.used_fitparam_poc_skip_start)
             self.LB_poc_skip_start.setText(value)
@@ -215,12 +319,16 @@ class UsedParametersWidget(PYAFWidget):
             self.LB_poc_refit_option.setText(value)
             value = "Refit (times) : " + str(dt.used_fitparam_poc_refit_times)
             self.LB_poc_refit_times.setText(value)
-            value = "Start (nm) : " + str(dt.used_indentation_start)
+            # Segments of the Tomography
+            value = "Segments start (nm) : " + str(dt.used_indentation_start)
             self.LB_indentation_start.setText(value)
-            value = "Step (nm) : " + str(dt.used_indentation_step)
+            value = "Segments step (nm) : " + str(dt.used_indentation_step)
             self.LB_indentation_step.setText(value)
-            value = "Stop (nm) : " + str(dt.used_indentation_stop)
+            value = "Segments stop (nm) : " + str(dt.used_indentation_stop)
             self.LB_indentation_stop.setText(value)
+            for label in (self.LB_indentation_start, self.LB_indentation_step,
+                          self.LB_indentation_stop):
+                label.setVisible(not fitting)
 
         # Events detection
         if dt.events_calculated:
@@ -273,11 +381,11 @@ class UsedParametersWidget(PYAFWidget):
         if dt.work_and_rupture_force1_calculated:
             value = "Fit start (nm) : " + str(dt.used_fitparam_joc_skip_start)
             self.LB_joc_skip_start.setText(value)
-            value = "Fit lenght (nm) : " + str(dt.used_fitparam_joc_fit_length)
+            value = "Fit length (nm) : " + str(dt.used_fitparam_joc_fit_length)
             self.LB_joc_fit_length.setText(value)
             value = "Refit (nm) : " + str(dt.used_fitparam_joc_refit_option)
-            self.LB_joc_refit_times.setText(value)
-            value = "Refit (times)  : " + str(dt.used_fitparam_joc_refit_times)
-            self.LB_joc_noise_multiplicator.setText(value)
-            value = "Noise : " + str(dt.used_fitparam_joc_noise_multiplicator)
             self.LB_joc_refit_option.setText(value)
+            value = "Refit (times) : " + str(dt.used_fitparam_joc_refit_times)
+            self.LB_joc_refit_times.setText(value)
+            value = "Noise : " + str(dt.used_fitparam_joc_noise_multiplicator)
+            self.LB_joc_noise_multiplicator.setText(value)

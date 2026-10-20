@@ -45,11 +45,14 @@ this :
 
 """
 
-import numpy
 import logging
+import re
+
+import numpy
 from . import shared
 from .single import SingleFile
 from .tools import math_tools
+from .tools import palettes
 
 
 class Experiment:
@@ -131,7 +134,8 @@ class Experiment:
         self.parsed_random_curves = []
 
         # Last ten selected curves?
-        self.last_ten_curves = [[0, 0]]
+        # Positions in user coordinates (from 1)
+        self.last_ten_curves = [[1, 1]]
         self.pos_in_last_ten_curves = 0
 
         # Display approach/retraction legend on curve plot
@@ -169,7 +173,7 @@ class Experiment:
         self.hist_experiment_min_x = 0
         self.hist_experiment_max_y = 100
         self.hist_experiment_min_y = 0
-        self.hist_remove_zeros = True
+        self.hist_remove_zeros = False
         self.hist_log = False
         self.hist_single_display_pdf_fit = True
         self.hist_groups_display_pdf_fit = True
@@ -190,6 +194,11 @@ class Experiment:
         self.norm_hist_experiment = True
 
         self.hist_single_plot_selected = "hist"
+
+        # Options of the violin plots of the single results (plots tab) and
+        # of the groups (grouped plots tab)
+        self.violin_single = default_violin_options()
+        self.violin_groups = default_violin_options()
         self.hist_groups_plot_selected = "hist"
 
         # Selected flatten order
@@ -285,8 +294,10 @@ class Experiment:
 
         # Available Themes
         self.theme_list = ["Light", "Dark"]
-        # Light theme is the default
-        self.current_theme = "Dark"
+        # Theme of the application (see gui_styles.theme_handler): a
+        # preference of pyAF, not saved with the experiments
+        from .gui_styles import theme_handler
+        self.current_theme = theme_handler.current_theme
 
     @property
     def current_data(self):
@@ -351,10 +362,81 @@ class ResultGroup:
         if self.group_id == 0:
             self.name = "None"
         else:
-            self.name = "Group " + str(group_id)
+            self.name = "Replicate " + str(group_id)
         self.color = None  # Color for the histograms
 
         self.condition = 0  # 0 = No condition
+        # Experiment of the replicate (SuperPlots colors and pairing), None:
+        # its order in its condition
+        self.experiment = None
+
+
+def default_violin_options():
+    """Default options of the violin plots."""
+    return {
+        "inner": "Box",                  # Box, Notched box, Quartiles or
+                                         # None
+        "points": "None",                # None, Strip or Swarm
+        "bw_adjust": 1.0,                # Factor of the KDE bandwidth
+        "cut": False,                    # Violins limited to the data
+        "density_norm": "Same width",    # Same width, Same area or
+                                         # Number of values
+        "log_scale": False,
+        "show_counts": True,             # Number of values under the names
+        "legend": True,                  # Legend of the files (loading
+                                         # rates)
+        "lr_events": True,               # Loading rate plot: events,
+        "lr_medians": True,              # median point of each file, and
+        "lr_error_bars": True,           # its quartiles
+        "y_mode": "auto",                # auto or manual
+        "y_min": 0.0,
+        "y_max": 100.0,
+        "x_mode": "auto",                # X limits of the loading rate
+        "x_min": 1.0,                    # plot: auto or manual [pN/s]
+        "x_max": 1e6,
+        "palette": "ggplot2",            # Name in palettes.NAMES, or
+                                         # palettes.CUSTOM
+        "background": "Theme"}           # Theme or White
+
+
+def get_violin_options(exp, mode="single"):
+    """Options of a violin plot of an experiment (the defaults for the
+    missing ones, e.g. for the files saved before they were added).
+
+    mode is "single" (plots tab) or "groups" (grouped plots tab).
+    """
+    attribute = "violin_" + mode
+    saved = getattr(exp, attribute, None)
+    options = default_violin_options()
+    if saved is None:
+        # Files saved before the violins: keep the colors of the files
+        options["palette"] = palettes.CUSTOM
+    options.update(saved or {})
+    # Names of the first versions
+    options["points"] = {"Strip": "Jitter", "Swarm": "Beeswarm"}.get(
+        options["points"], options["points"])
+    setattr(exp, attribute, options)
+    return options
+
+
+def get_plotted_items(exp, mode="single"):
+    """Results (plots tab) or groups (grouped plots tab, without the None
+    group) of an experiment: the rows of the table."""
+    if mode == "groups":
+        return exp.groups_list[1:]
+    return exp.results_list
+
+
+def apply_palette(exp, mode="single"):
+    """Sets the colors of the results or of the groups with the palette of
+    their violin plot (nothing for the custom colors)."""
+    name = get_violin_options(exp, mode)["palette"]
+    if name == palettes.CUSTOM:
+        return
+    items = get_plotted_items(exp, mode)
+    colors = palettes.get_colors(name, len(items))
+    for item, color in zip(items, colors):
+        item.color = color
 
 
 class ConditionGroup:
@@ -402,6 +484,15 @@ def add_result(unique_id, name):
         result = Result(len(shared.exp.results_list), unique_id)
         shared.exp.results_list.append(result)
         result.name = name
+        result.short_name = auto_short_name(name)
+
+        # Filters of the events: the ones of the Results tab
+        data = shared.exp.list[unique_id]
+        result.filter_dist_min = data.events_results_filter_dist_min
+        result.filter_dist_max = data.events_results_filter_dist_max
+        result.filter_dist_keep = data.events_results_filter_dist_keep
+        result.filter_slope_min = data.events_results_filter_slope_min
+        result.filter_slope_max = data.events_results_filter_slope_max
 
         # Set the color. Go through the list and determine a color
         # periodically.
@@ -409,6 +500,24 @@ def add_result(unique_id, name):
         while pos >= len(shared.colors_list):
             pos = pos - len(shared.colors_list)
         result.color = shared.colors_list[pos]
+        # Colors of the palette (some change with the number of files)
+        apply_palette(shared.exp)
+
+
+def auto_short_name(name):
+    """Name of a file without the end added by the AFM software: the
+    extension of the Bruker files (.spm, with the number of the file, e.g.
+    .0_00012.spm), and of the JPK files (.jpk-force-map or .jpk-qi-data,
+    with the milliseconds of the time, e.g. .311.jpk-force-map)."""
+    short = re.sub(r"(\.\d+_\d+)?\.spm$", "", name)
+    short = re.sub(r"(\.\d+)?\.jpk-(force-map|qi-data)$", "", short)
+    return short or name
+
+
+def get_short_name(result):
+    """Name of a result in the plots."""
+    short_name = getattr(result, "short_name", "")
+    return short_name or auto_short_name(result.name)
 
 
 class Result:
@@ -423,12 +532,14 @@ class Result:
         self.group = 0  # 0 = no group
         self.slice = 0  # 0 = All
 
-        # Filtering of the events by distance from JOC, in nm
-        self.filter_dist_left = 0
-        self.filter_dist_right = 0
-        self.filter_dist_keep_middle = False
+        # Filtering of the events by distance from the jump of contact, in
+        # nm (see tools.event_filter_tools): the events between min and max
+        # are removed, or the only ones kept if filter_dist_keep is True
+        self.filter_dist_min = 0
+        self.filter_dist_max = 0
+        self.filter_dist_keep = False
 
-        # Event filtering by slope of the fit on the right
+        # Event filtering by slope of the fit next to the event
         self.filter_slope_min = 0
         self.filter_slope_max = 0
 
@@ -436,6 +547,9 @@ class Result:
         self.dist_to_joc = 0
         self.sub_type = 0  # 0 = normal, 1 = corrected
         self.name = ""
+        # Name in the plots ("": the name without its extension, see
+        # get_short_name)
+        self.short_name = ""
         self.color = None  # Color for the histograms (defined by add_result)
 
         # Experimental condition
@@ -460,3 +574,6 @@ class ROI:
         self.color = 0
         self.glass_coeffs = None
         self.values = []
+        # Pixels whose curves were discarded with "Discard data" (to keep
+        # them again)
+        self.discarded = []

@@ -32,12 +32,13 @@
 """Widget used to display slices in the tomography."""
 
 import os
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 from ..widgets_small.slices_axes import SlicesAxesWidget
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.PYAFWidget import PYAFWidget
 from ..widgets.progressbar import Progressbar
+from ..tools import params_export
 from .. import widgets_list
 from .. import shared
 import tables
@@ -105,7 +106,7 @@ class SlicesWidget(PYAFWidget):
         self.GL_slices.addWidget(self.canvas, 0, 0, 1, 1)
         self.GL_slices.addWidget(self.CB_display_topo, 1, 0)
         self.GL_slices.addWidget(self.CB_aspect, 1, 1)
-        self.GL_slices.addLayout(self.HL_lists, 2, 0, 1, 0)
+        self.GL_slices.addLayout(self.HL_lists, 2, 0, 1, 1)
 
         self.VL_box_slices.addLayout(self.GL_slices)
         self.box_slices.setLayout(self.VL_box_slices)
@@ -211,15 +212,13 @@ class SlicesWidget(PYAFWidget):
 
         if not filename:
             return
-        else:
-            # Add extension (for Linux, on OS X it will work out of the box)
-            ends1 = filename.endswith(".tif")
-            ends2 = filename.endswith(".tiff")
-            if ends1 and ends2 is False:
-                filename += ".tif"
-
-            orig_save_path = str(filename).split(".")[0]
-            ext = str(filename).split(".")[1]
+        # Extension added if missing (Linux); name of the slices:
+        # name_0.tif... (no split at the dots of the folders)
+        filename = str(filename)
+        if not filename.lower().endswith((".tif", ".tiff")):
+            filename += ".tif"
+        orig_save_path, ext = os.path.splitext(filename)
+        ext = ext[1:]
 
         # Save the oldposition to reset it afterwards
         old_pos = self.list_position.currentIndex()
@@ -270,6 +269,11 @@ class SlicesWidget(PYAFWidget):
 
         # Close the progressbar
         widgets_list.widget_progressbar.close()
+
+        # Parameters of the file, next to the images
+        params_export.write_sidecar(
+            orig_save_path + "." + ext, "Slices of the elasticity (images)",
+            data_ids=[shared.exp.list.index(self.data)])
 
     def update_MPL(self):
         """Update the plots."""
@@ -329,12 +333,9 @@ class SlicesWidget(PYAFWidget):
 
         elif event.button == 3 and event.inaxes == self.canvas.canvas.axes:
             # Right click, open a menu
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.canvas.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             self.popUpMenu(pos)
 
     def get_position_on_meshgrid(self, event):

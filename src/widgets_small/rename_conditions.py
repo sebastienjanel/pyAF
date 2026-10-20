@@ -31,7 +31,7 @@
 
 """Widget used to rename the groups."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFButton
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFInput
@@ -77,19 +77,17 @@ class RenameConditionsWidget(PYAFWidget):
                 name = str(self.input_list[i - 1].get_str_value())
                 shared.exp.conditions_list[i].name = name
 
-            # Update the names in the histogram's list
+            # Update the names in the histogram's list (keep the choices of
+            # the table)
+            widgets_list.widget_results_single.save_hist_prefs()
             widgets_list.widget_results_single.reset_table()
             widgets_list.widget_results_single.update_widget()
 
-            tw = widgets_list.widget_results_experiment.tableWidget
+            # Update the names in the lists of the grouped plots tab
+            widgets_list.widget_results_groups.reset_table()
 
-            # Update the names in the histogram's group's list
-            for i in range(1, len(shared.exp.conditions_list), 1):
-                name = shared.exp.conditions_list[i].name
-                tw.item(i - 1, 1).setText(name)
-
-            # Update the groups plot
-            widgets_list.widget_results_experiment.update_MPL()
+            # Update the SuperPlots tab
+            widgets_list.widget_results_experiment.update_widget()
 
             # Close widget
             self.close()

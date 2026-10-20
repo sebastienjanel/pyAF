@@ -49,12 +49,11 @@ def get_isosurface(input_image, sizes, res, color, flip):
     else:
         image = input_image
 
-    itk_vtk_converter = itk.ImageToVTKImageFilter[image_type].New()
-    itk_vtk_converter.SetInput(image)
-    itk_vtk_converter.Update()
+    if flip != [0, 0, 0]:
+        flip_filter.Update()
 
     imageData = vtk.vtkImageData()
-    imageData.DeepCopy(itk_vtk_converter.GetOutput())
+    imageData.DeepCopy(itk.vtk_image_from_image(image))
     # Spacing = 1, 1, 1 by default
     imageData.SetSpacing(res[0], res[1], res[2])
 

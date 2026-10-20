@@ -36,7 +36,7 @@ from .. import shared
 from .. import widgets_list
 
 
-def apply_to_all(mode, option=None, oldid=None):
+def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
     """Used to apply preferences to all files in the experiment.
 
     Lets says you want to change the values of a colorscale for a meshgrid in
@@ -91,6 +91,10 @@ def apply_to_all(mode, option=None, oldid=None):
             elif (mt == "events_per_curve" or mt == "events_rupture_force") \
                     and dt.events_calculated:
                 dt.meshgrid_type = mt
+            elif mt.startswith("visco_") and dt.visco_calculated:
+                dt.meshgrid_type = mt
+            elif mt.startswith("fit_") and dt.has_fit_quality():
+                dt.meshgrid_type = mt
             elif mt == "piezo":
                 dt.meshgrid_type = mt
 
@@ -130,12 +134,12 @@ def apply_to_all(mode, option=None, oldid=None):
             if dt.events_calculated:
                 dt.events_results_display_annotations = \
                     cur.events_results_display_annotations
-                dt.events_results_filter_dist_left = \
-                    cur.events_results_filter_dist_left
-                dt.events_results_filter_dist_right = \
-                    cur.events_results_filter_dist_right
-                dt.events_results_filter_dist_keep_middle = \
-                    cur.events_results_filter_dist_keep_middle
+                dt.events_results_filter_dist_min = \
+                    cur.events_results_filter_dist_min
+                dt.events_results_filter_dist_max = \
+                    cur.events_results_filter_dist_max
+                dt.events_results_filter_dist_keep = \
+                    cur.events_results_filter_dist_keep
                 dt.events_display_results_filter_dist = \
                     cur.events_display_results_filter_dist
                 dt.events_results_filter_slope_min = \
@@ -153,19 +157,38 @@ def apply_to_all(mode, option=None, oldid=None):
             # Colortable colors
             # (important to have deepcopy here because these are lists)
 
-            if cur.is_single is False:
-                # This one is only updated in case of a meshgrid. Else the max
-                # value is 0 and all the meshgrids will have a colorscale
-                # with a maximum set to 0, resulting in an error
+            if cur.is_single is False and from_color_options:
+                # Only when the scale is changed in the color options: the
+                # piezo heights of the files are not comparable, each file
+                # keeps its own scale otherwise. (Only in case of a meshgrid,
+                # else the max value is 0)
                 dt.color_opts_piezo = copy.deepcopy(cur.color_opts_piezo)
 
             dt.color_opts_topo = copy.deepcopy(cur.color_opts_topo)
-            dt.color_opts_stiffness = copy.deepcopy(cur.color_opts_stiffness)
+            if from_color_options:
+                # Same for the elasticity: each file keeps its automatic
+                # scale (cells, gels and substrates differ by orders of
+                # magnitude), unless the scale is changed in the color
+                # options
+                dt.color_opts_stiffness = \
+                    copy.deepcopy(cur.color_opts_stiffness)
             dt.color_opts_work = copy.deepcopy(cur.color_opts_work)
             dt.color_opts_rupture_force1 = \
                 copy.deepcopy(cur.color_opts_rupture_force1)
             dt.color_opts_events_per_curve = \
                 copy.deepcopy(cur.color_opts_events_per_curve)
+            if from_color_options:
+                # Moduli: each file keeps its automatic scale, as the
+                # elasticity
+                for name in ("color_opts_visco_e0", "color_opts_visco_storage",
+                             "color_opts_visco_loss"):
+                    setattr(dt, name, copy.deepcopy(getattr(cur, name)))
+            for name in ("color_opts_visco_fluidity",
+                         "color_opts_visco_tan_delta", "color_opts_fit_r2",
+                         "color_opts_fit_poc_fixed"):
+                setattr(dt, name, copy.deepcopy(getattr(cur, name)))
+            dt.stiffness_color_log = getattr(cur, "stiffness_color_log",
+                                             False)
             dt.color_saturation = cur.color_saturation
             dt.color_negative = cur.color_negative
             dt.color_nan = cur.color_nan
@@ -193,18 +216,22 @@ def apply_to_all(mode, option=None, oldid=None):
                 dt.stiffness_model_selected = cur.stiffness_model_selected
                 dt.tomography = cur.tomography
                 dt.tip_radius = cur.tip_radius
+                dt.tip_radii = dict(cur.tip_radii)
                 dt.tip_angle = cur.tip_angle
+                dt.tip_angles = dict(cur.tip_angles)
                 dt.poisson_ratio = cur.poisson_ratio
-                dt.perform_fit = cur.perform_fit
+                # Tomography or Fitting (perform_fit follows)
+                dt.stiffness_mode = cur.stiffness_mode
                 dt.fit_range_type = cur.fit_range_type
+                # All the ranges (the indentation ones are also used by
+                # Tomography, whatever the fit range type)
                 dt.indentation_start = cur.indentation_start
-                if dt.fit_range_type == 0:
-                    dt.force_start = cur.force_start
-                    dt.force_stop = cur.force_stop
-                elif dt.fit_range_type == 1:
-                    dt.indentation_stop = cur.indentation_stop
-                    dt.indentation_step = cur.indentation_step
-                dt.strict_stop = cur.strict_stop
+                dt.indentation_stop = cur.indentation_stop
+                dt.indentation_step = cur.indentation_step
+                dt.force_start = cur.force_start
+                dt.force_stop = cur.force_stop
+                dt.fit_min_indentation = cur.fit_min_indentation
+                dt.fit_poc_window = cur.fit_poc_window
                 dt.fitparam_poc_skip_start = cur.fitparam_poc_skip_start
                 dt.fitparam_poc_fit_length = cur.fitparam_poc_fit_length
                 dt.fitparam_poc_refit_option = cur.fitparam_poc_refit_option
@@ -225,6 +252,16 @@ def apply_to_all(mode, option=None, oldid=None):
                 dt = exp.list[i]
                 cur = exp.list[oldid]
                 dt.user_h = cur.user_h
+
+        if exp.compute_type == "viscoelasticity" or mode == "all":
+            cur = exp.list[oldid]
+            for dt in exp.list:
+                # Not the frequency of E' and E'': each file has its own,
+                # within the time scales of its curves (see the input)
+                for name in ("solver", "bec", "contact_offset", "nbr_points",
+                             "beta_auto", "beta_init", "drag_correction"):
+                    setattr(dt, "visco_" + name,
+                            getattr(cur, "visco_" + name))
 
         if exp.compute_type == "work_and_rupture_force" or mode == "all":
             for i in range(len(exp.list)):

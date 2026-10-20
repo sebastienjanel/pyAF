@@ -32,19 +32,18 @@
 """Layer for images in VTK."""
 
 import os
-import vtk
+from scipy import ndimage
 from ... import shared
 from .layer import Layer
-from PIL import Image
 from ...tools import misc_tools
 from ..utils.common import fill_image_sizes
-from ..utils.vtk_image import get_actor_plane
+from ..utils.vtk_image import get_actor_plane, image_source, read_image
 
 
 class LayerSingleImage(Layer):
     """Creates an single image layer.
 
-    Works only with a single tiff file.
+    Works only with a single tiff file (8 or 16 bits, gray or color).
     Sometimes the tiff you will get will not have the right orientation
     (it will be mirored or inverted ...) Then you will have to specify
     a tiff orientation in the menu
@@ -62,49 +61,40 @@ class LayerSingleImage(Layer):
         self.bind = True
         self.from_itk = None  # DEBUG value
 
-        try:
-            im = Image.open(path)
-        except IOError:
-            # The image was not recognized
+        # 8 or 16 bits, gray or color (not the stacks)
+        images = read_image(path)
+        if images is None:
             self.load_error = True
             return None
+        self.pixels, self.gray = images
 
-        # Check if the image is a 8 bit tiff, else return
-        # See http://svn.effbot.org/public/tags/pil-1.1.4/libImaging/Unpack.c
-        # (at end) for list of modes (L = grayscale, P = palette)
-        if im.mode != "L" and im.mode != "P":
-            self.load_error = True
-            return None
-
-        # Check for 3D stacks, this is not allowed here
-        is_stack = False
-        try:
-            im.seek(1)
-            im.getpixel((0, 0))
-            is_stack = True
-        except EOFError:
-            is_stack = False
-
-        if is_stack:
-            self.load_error = True
-            return None
-
-        size = [im.size[0], im.size[1]]
+        size = [self.pixels.shape[1], self.pixels.shape[0]]
         # Store the sizes of the images (are defined in layer.py)
         fill_image_sizes(self, size, misc_tools.get_tiff_calibration(path))
 
-        # Read the image which will be the texture
-        self.tiff = vtk.vtkTIFFReader()
-        self.tiff.SetFileName(path)
+        # Textures: the image, or its gray levels through the LUT
+        self.image = image_source(self.pixels)
+        self.image_gray = image_source(self.gray)
 
-        lut = self.get_current_lut_options()
-        flip = self.get_current_flip_options()
-        size = [self.size_x, self.size_y]
-        self.actor = get_actor_plane(self.tiff, size, self.pos_z, lut, flip)
+        self.actor = self.get_actor()
 
         self.init_axes()
 
         self.addToRenderer()
+
+    def get_actor(self):
+        """Plane with the image (gray levels colored by the LUT)."""
+        lut = self.get_current_lut_options()
+        flip = self.get_current_flip_options()
+        if self.smooth_gaussian > 0:
+            # Gaussian filter (standard deviation in pixels), each color
+            pixels = self.gray if lut["use"] else self.pixels
+            sigma = [self.smooth_gaussian] * 2 + [0] * (pixels.ndim - 2)
+            image = image_source(ndimage.gaussian_filter(pixels, sigma))
+        else:
+            image = self.image_gray if lut["use"] else self.image
+        return get_actor_plane(image, [self.size_x, self.size_y],
+                               self.pos_z, lut, flip)
 
     def addToRenderer(self):
         """Add actor to renderer."""
@@ -118,10 +108,7 @@ class LayerSingleImage(Layer):
         """Update the image layer actor."""
         self.remove_actors()
 
-        lut = self.get_current_lut_options()
-        flip = self.get_current_flip_options()
-        size = [self.size_x, self.size_y]
-        self.actor = get_actor_plane(self.tiff, size, self.pos_z, lut, flip)
+        self.actor = self.get_actor()
 
         # Add the actor to the renderer
         self.addToRenderer()

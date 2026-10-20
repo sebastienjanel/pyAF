@@ -33,14 +33,20 @@
 
 import numpy
 import matplotlib
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, LogNorm
+from matplotlib.ticker import MaxNLocator
 from ... import widgets_list
 from ... import shared
-from PyQt5 import QtCore
+from qtpy import QtCore
 import matplotlib.font_manager as fm
 from matplotlib.collections import PolyCollection, LineCollection
 from ...tools.colortables import ColorTables
 from ...tools import misc_tools
+from ...single import ELASTICITY_PERCENTILES
+
+# Viscoelastic moduli maps (log scale and first color below the scale, as
+# the elasticity)
+MODULUS_MAPS = ("visco_e0", "visco_storage", "visco_loss")
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from ..plot_main import MainPlot
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
@@ -168,41 +174,45 @@ class PlotMeshGrid(MainPlot):
             edgecolor = "face"
             linewidth = 30.0 / 72.0
 
+        # Log color scale (elasticity maps)
+        log_norm = self.get_log_norm()
+
+        # Elasticity: the positive values below the bottom of the scale
+        # (2nd percentile by default) have the first color of the scale,
+        # the color of the negative values is kept for the negative ones
+        mesh = str(self.mesh_type)
+        low = log_norm.vmin if log_norm is not None else \
+            self.colortable_min_value * self.factor
+        if self.data_meshgrid is not None and low > 0 and \
+                (mesh.startswith("stiffness") or mesh in MODULUS_MAPS):
+            values = numpy.ma.asarray(self.data_meshgrid, dtype=float)
+            self.data_meshgrid = numpy.ma.where(
+                (values >= 0) & (values < low), low, values)
+
         # Plot the meshgrid
+        mesh = None
         if self.colormap != "Rainbow 1" and self.colormap != "Cool-Warm" and \
                 self.data_meshgrid is not None:
-            if self.mesh_type == "events_per_curve":
-                # Discrete self.colormap for the events
-                self.colormap = matplotlib.cm.get_cmap(self.colormap)
-
-                # Adjust the number of bins to fit the colormap's size
-                ncolors = self.colormap.N
-                bounds = list(range(int(self.colortable_min_value * self.factor),
-                                    int(self.colortable_max_value * self.factor)))
-
-                # Ensure bounds don't exceed colormap's size
-                if len(bounds) > ncolors:
-                    # If too many bins, reduce the range or step size
-                    step_size = max(1, len(bounds) // ncolors)
-                    bounds = bounds[::step_size]
-
-                norm = matplotlib.colors.BoundaryNorm(bounds, self.colormap.N)
-            else:
-                # Normal self.colormap for the other meshgrid types
-                self.colormap = matplotlib.cm.get_cmap(self.colormap)
-                if self.color_saturation is not None:
-                    self.colormap.set_over(self.color_saturation)
-                    self.colormap.set_under(self.color_negative)
+            self.colormap = matplotlib.colormaps.get_cmap(self.colormap)
+            if self.color_saturation is not None:
+                self.colormap = self.colormap.with_extremes(
+                    over=self.color_saturation, under=self.color_negative)
 
             # If some values are masked, define their color
             if self.color_nan is not None:
-                self.colormap.set_bad(self.color_nan)
+                self.colormap = self.colormap.with_extremes(
+                    bad=self.color_nan)
 
-            # Define norm with vmin and vmax
-            norm = Normalize(
-                vmin=self.colortable_min_value * self.factor,
-                vmax=self.colortable_max_value * self.factor
-            )
+            if self.mesh_type == "events_per_curve":
+                self.colormap, norm = self.get_events_colorscale(self.colormap)
+            elif log_norm is not None:
+                norm = log_norm
+            else:
+                # Define norm with vmin and vmax
+                norm = Normalize(
+                    vmin=self.colortable_min_value * self.factor,
+                    vmax=self.colortable_max_value * self.factor
+                )
 
             mesh = self.axes.pcolormesh(
                 self.x_range,
@@ -215,29 +225,23 @@ class PlotMeshGrid(MainPlot):
 
         elif (self.colormap in ("Rainbow 1", "Cool-Warm")
               and self.data_meshgrid is not None):
-            # Rainbow 1 and Cool-Warm
+            # Rainbow 1 and Cool-Warm. Use the colortable and values of this
+            # meshgrid (in a multimeshgrid they differ from the data's ones)
             self.colortable = ColorTables(
-                self.data.colortableid,
-                self.data.color_saturation,
-                self.data.color_negative,
-                self.data.colortable_max_value *
+                self.colortables.colortables_mpl_list.index(self.colormap),
+                self.color_saturation,
+                self.color_negative,
+                self.colortable_max_value *
                 self.factor,
-                self.data.colortable_middle_value *
+                self.colortable_middle_value *
                 self.factor,
                 color_nan=self.color_nan)
 
+            self.colormap, norm = self.colortable.get_color_as_cdict()
             if self.mesh_type == "events_per_curve":
-                # Discrete self.colormap for the events
-                diff = (self.colortable_max_value -
-                        self.colortable_min_value) * self.factor
-                self.colormap, norm = self.colortable.get_color_as_cdict(
-                    freq=int(diff) - 1)
-                bounds = list(range(int(self.colortable_min_value * self.factor),
-                               int(self.colortable_max_value * self.factor)))
-                norm = matplotlib.colors.BoundaryNorm(bounds, self.colormap.N)
-            else:
-                # Normal self.colormap for the other meshgrid types
-                self.colormap, norm = self.colortable.get_color_as_cdict()
+                self.colormap, norm = self.get_events_colorscale(self.colormap)
+            elif log_norm is not None:
+                norm = log_norm
 
             mesh = self.axes.pcolormesh(self.x_range, self.y_range,
                                         self.data_meshgrid,
@@ -245,6 +249,9 @@ class PlotMeshGrid(MainPlot):
                                         norm=norm,
                                         edgecolor=edgecolor,
                                         linewidth=linewidth)
+
+        # Map drawn (colors of the erased ROI pixels, see draw_roi)
+        self.mesh = mesh
 
         # Set the ranges
         self.axes.axis([0, self.x_range[-1], 0, self.y_range[-1]])
@@ -265,6 +272,14 @@ class PlotMeshGrid(MainPlot):
                     cax=cax,
                     cmap=self.colormap,
                     norm=norm)
+            if self.mesh_type == "events_per_curve":
+                # Integer ticks, at the center of their color
+                vmin, vmax = norm.boundaries[0] + 0.5, norm.boundaries[-1] - 0.5
+                ticks = MaxNLocator(integer=True).tick_values(vmin, vmax)
+                self.color_bar.set_ticks(
+                    [t for t in ticks if vmin <= t <= vmax])
+                self.color_bar.minorticks_off()
+
             # Color bar label
             self.color_bar.set_label(self.colorbarlabel,
                                      fontproperties=self.font)
@@ -277,12 +292,14 @@ class PlotMeshGrid(MainPlot):
             for tick in self.color_bar.ax.get_yticklabels():
                 tick.set_fontproperties(self.font)
 
-        if self.settings.value("ClassicMeshgridStyle", True):
-            self.plot_labels()
-
+        # The non classic style is only used for the maps of the data and
+        # results tabs
         pt = self.plot_type
         tp = (pt == "meshgrid" or pt == "meshgrid_data")
         st = self.settings.value("ClassicMeshgridStyle", True)
+
+        if st or not tp:
+            self.plot_labels()
 
         if tp and st is False:
             vert = self.scan_size_y / 100.0
@@ -293,10 +310,9 @@ class PlotMeshGrid(MainPlot):
             self.axes.get_yaxis().set_ticklabels([])
             self.axes.get_yaxis().set_ticks([])
 
-            # Add scale bar
-            # Font (use the font I ship)
-            path = misc_tools.get_app_path() + "/fonts/HelveticaNowText-Regular.ttf"
-            ft = fm.FontProperties(fname=path, size=10)
+            # Add scale bar (font of the plots)
+            ft = fm.FontProperties(
+                family=matplotlib.rcParams["font.family"], size=10)
 
             # label = u"1 \u03bcm" Label deactivated for the moment
             label = ""
@@ -317,6 +333,48 @@ class PlotMeshGrid(MainPlot):
 
         # Do the actual plotting, is defined in MainPlot class
         self.start_plot()
+
+    def get_log_norm(self):
+        """Log color scale of the elasticity maps (None if not asked). A log
+        scale can not start at 0: the minimum is then the 2nd percentile of
+        the positive values of the map (the lowest value would let a noisy
+        pixel squeeze the colors)."""
+        mesh = self.mesh_type
+        if mesh is None or not (str(mesh).startswith("stiffness") or
+                                mesh in MODULUS_MAPS) or \
+                not getattr(self.data, "stiffness_color_log", False) or \
+                self.data_meshgrid is None:
+            return None
+        vmax = self.colortable_max_value * self.factor
+        vmin = self.colortable_min_value * self.factor
+        if vmin <= 0:
+            values = numpy.asarray(self.data_meshgrid, dtype=float)
+            values = values[numpy.isfinite(values) & (values > 0)]
+            if values.size == 0:
+                return None
+            vmin = float(numpy.percentile(values,
+                                          ELASTICITY_PERCENTILES[0]))
+        if vmax <= vmin:
+            return None
+        return LogNorm(vmin=vmin, vmax=vmax)
+
+    def get_events_colorscale(self, colormap):
+        """Returns a discrete colorscale for the number of events.
+
+        There is one color per number of events, from the min to the max
+        values of the colorscale, each number being at the center of its
+        color. The values above the max (or below the min) get the
+        saturation (or negative) color of the colormap.
+        """
+        vmin = int(round(self.colortable_min_value * self.factor))
+        vmax = max(int(round(self.colortable_max_value * self.factor)), vmin)
+        nbr_colors = vmax - vmin + 1
+
+        colormap = colormap.resampled(nbr_colors)
+        bounds = numpy.arange(vmin - 0.5, vmax + 1.0)
+        norm = matplotlib.colors.BoundaryNorm(bounds, nbr_colors)
+
+        return colormap, norm
 
     def draw_check_tilt_squares(self):
         """Show tilted correction.
@@ -381,10 +439,7 @@ class PlotMeshGrid(MainPlot):
             verts = numpy.array([(x1, y1), (x2, y2), (x3, y3), (x4, y4)])
             coll = PolyCollection([verts], facecolors="none",
                                   edgecolors="r", linewidths=2)
-            self.axes.add_collection(coll)
-
-            if self.parent.canvas is not None:
-                self.axes.draw_artist(coll)
+            self.add_blit_artist(coll)
 
     def draw_profiles(self, mode, profile=None,
                       profile_id=None, closing=False):
@@ -453,10 +508,7 @@ class PlotMeshGrid(MainPlot):
 
         coll = LineCollection(verts, linewidths=2,
                               colors=color, linestyle="solid")
-
-        self.axes.add_collection(coll)
-        if self.parent.canvas is not None:
-            self.axes.draw_artist(coll)
+        self.add_blit_artist(coll)
 
     def draw_roi(self, mode, roi=None, roi_mask=None):
         """Draw the ROIS on a meshgrid."""
@@ -474,23 +526,14 @@ class PlotMeshGrid(MainPlot):
 
         elif mode == "local_erase" or mode == "preview_erase":
             # --- Replot background ---
-            self.colortable = ColorTables(
-                self.data.colortableid,
-                self.data.color_saturation,
-                self.data.color_negative,
-                self.data.colortable_max_value *
-                self.factor,
-                self.data.colortable_middle_value *
-                self.factor,
-                mode="scalarMap")
+            # Colors of the map drawn (same color scale, bottom, log scale,
+            # saturation and nan colors as its pixels)
             colors = []
-
-            # Get colors
             for i in range(len(roi)):
                 if roi_mask[i]:
                     value = self.data_meshgrid[roi[i][1]][roi[i][0]]
-                    color = self.colortable.get_color_as_list(value)
-                    colors.append(color)
+                    colors.append(self.mesh.to_rgba(value)
+                                  if self.mesh is not None else self.color_nan)
             self.draw_single_roi(roi, colors, roi_mask, alpha=1.0)
 
     def draw_single_roi(self, roi, color, roi_mask=None, alpha=0.5):
@@ -512,85 +555,74 @@ class PlotMeshGrid(MainPlot):
         pcoll_np = PolyCollection(all_verts, facecolors=color,
                                   edgecolors=color, linewidth=1)
         pcoll_np.set_alpha(alpha)
-        self.axes.add_collection(pcoll_np)
+        self.add_blit_artist(pcoll_np)
+
+    def add_blit_artist(self, artist):
+        """Adds an artist drawn over the meshgrid (ROIs, profiles, discarded
+        curves...) and draws it. The artists of the previous redraw are
+        removed by clear_blit_artists (else they pile up in the axes and the
+        meshgrid gets slower at each mouse move)."""
+        self.__dict__.setdefault("blit_artists", []).append(artist)
+        self.axes.add_collection(artist)
         if self.parent.canvas is not None:
-            self.axes.draw_artist(pcoll_np)
+            self.axes.draw_artist(artist)
+
+    def clear_blit_artists(self):
+        """Removes the artists drawn over the meshgrid at the last redraw
+        (the drawn image is not changed)."""
+        for artist in self.__dict__.get("blit_artists", []):
+            try:
+                artist.remove()
+            except (ValueError, NotImplementedError):
+                pass
+        self.blit_artists = []
+
+    def pixel_squares(self, positions):
+        """Corners of the squares of the pixels."""
+        squares = []
+        for i, j in positions:
+            x0, y0 = i * self.x_size, j * self.y_size
+            x1, y1 = x0 + self.x_size, y0 + self.y_size
+            squares.append([(x1, y1), (x1, y0), (x0, y0), (x0, y1)])
+        return squares
 
     def draw_corrupted(self):
-        """Draws a sign on the meshgrid when a curve is corrupted.
+        """Draws a sign on the meshgrid when a curve is discarded.
 
-        (Grey square and a red cross)
+        (White square and a red cross, all the curves in one collection)
         """
+        artists = []
         if (self.data.discarded_curves is not None
                 and shared.exp.meshgrid_display_discarded):
-            for i in range(self.nbr_pixels_x):
-                for j in range(self.nbr_pixels_y):
-                    if self.data.discarded_curves[i][j]:
-                        x1 = i * self.x_size + self.x_size
-                        y1 = j * self.y_size + self.y_size
-                        x2 = i * self.x_size + self.x_size
-                        y2 = j * self.y_size
-                        x3 = i * self.x_size
-                        y3 = j * self.y_size
-                        x4 = i * self.x_size
-                        y4 = j * self.y_size + self.y_size
-
-                        verts = numpy.array([(x1, y1), (x2, y2),
-                                             (x3, y3), (x4, y4)])
-                        coll = PolyCollection([verts],
-                                              facecolors="w", edgecolors="w")
-                        self.axes.add_collection(coll)
-
-                        if self.parent.canvas is not None:
-                            self.axes.draw_artist(coll)
-
-                        verts = numpy.array([(x1, y1), (x3, y3)])
-                        coll = LineCollection(
-                            [verts],
-                            linewidths=1,
-                            colors="r",
-                            linestyle="solid")
-                        self.axes.add_collection(coll)
-
-                        if self.parent.canvas is not None:
-                            self.axes.draw_artist(coll)
-
-                        verts = numpy.array([(x2, y2), (x4, y4)])
-                        coll = LineCollection(
-                            [verts],
-                            linewidths=1,
-                            colors="r",
-                            linestyle="solid")
-                        self.axes.add_collection(coll)
-
-                        if self.parent.canvas is not None:
-                            self.axes.draw_artist(coll)
+            positions = numpy.argwhere(
+                numpy.asarray(self.data.discarded_curves) != 0)
+            if len(positions):
+                squares = self.pixel_squares(positions)
+                crosses = []
+                for (p1, p2, p3, p4) in squares:
+                    crosses.append([p1, p3])
+                    crosses.append([p2, p4])
+                artists = [PolyCollection(squares, facecolors="w",
+                                          edgecolors="w"),
+                           LineCollection(crosses, linewidths=1, colors="r",
+                                          linestyle="solid")]
+        for artist in artists:
+            self.add_blit_artist(artist)
 
     def draw_missing_z(self):
         """Draws a sign on the meshgrid when a z value in a piezo image is missing.
 
         (Blue square)
         """
-        if (shared.exp.missing_z_positions is not None \
+        artists = []
+        if (shared.exp.missing_z_positions is not None
                 and shared.exp.meshgrid_display_missing_z):
-            for x, y in shared.exp.missing_z_positions:
-                x1 = x * self.x_size + self.x_size
-                y1 = y * self.y_size + self.y_size
-                x2 = x * self.x_size + self.x_size
-                y2 = y * self.y_size
-                x3 = x * self.x_size
-                y3 = y * self.y_size
-                x4 = x * self.x_size
-                y4 = y * self.y_size + self.y_size
-
-                verts = numpy.array([(x1, y1), (x2, y2),
-                                     (x3, y3), (x4, y4)])
-                coll = PolyCollection([verts],
-                                      facecolors="b", edgecolors="b")
-                self.axes.add_collection(coll)
-
-                if self.parent.canvas is not None:
-                    self.axes.draw_artist(coll)
+            squares = self.pixel_squares(shared.exp.missing_z_positions)
+            if squares:
+                artists = [PolyCollection(squares, facecolors="b",
+                                          edgecolors="b")]
+        for artist in artists:
+            self.add_blit_artist(artist)
 
     def update_blit(self, mode, roi=None, roi_mask=None, profile=None,
                     profile_id=None, closing=False):
@@ -598,8 +630,17 @@ class PlotMeshGrid(MainPlot):
 
         http://matplotlib.org/examples/animation/animation_blit_qt4.html
         """
+        self.clear_blit_artists()
+
+        if mode == "discarded":
+            # Redraw everything (the saved background has the old marks)
+            mode = "all"
+
+        # The clean backgrounds are saved 100 ms after a redraw of the
+        # meshgrid (refresh_blitting): nothing to restore before
         if mode == "all":
-            self.parent.restore_region(self.empty_bbox)
+            if self.empty_bbox is not None:
+                self.parent.restore_region(self.empty_bbox)
 
         elif mode == "preview_add" or mode == "preview_erase" or \
                 mode == "profile_preview" or \
@@ -614,7 +655,8 @@ class PlotMeshGrid(MainPlot):
 
         elif mode == "local_add" or mode == "local_erase":
             if self.first_blit:
-                self.parent.restore_region(self.current_bbox)
+                if self.current_bbox is not None:
+                    self.parent.restore_region(self.current_bbox)
                 self.first_blit = False
             else:
                 bbox = self.fig.canvas.copy_from_bbox(self.axes.bbox)
@@ -623,6 +665,12 @@ class PlotMeshGrid(MainPlot):
         if (self.plot_type in ("meshgrid", "meshgrid_data",
                                "meshgrid_tilt_check")):
             if self.plot_type != "meshgrid_tilt_check":
+                # Discarded curves under the ROIs and the profiles (else they
+                # hide them). The previews and the local drawings start from
+                # a background which has them already
+                if mode == "all":
+                    self.draw_corrupted()
+
                 # Draw ROI first
                 if roi is not None or mode == "all":
                     self.draw_roi(mode, roi, roi_mask)
@@ -634,10 +682,6 @@ class PlotMeshGrid(MainPlot):
             if mode == "all" and self.parent is not None:
                 self.current_bbox = \
                     self.parent.copy_from_bbox(self.axes.bbox)
-
-            if self.plot_type != "meshgrid_tilt_check":
-                # Draw corrupted curves if needed
-                self.draw_corrupted()
 
         if self.mesh_type in ("piezo", "topo") or self.plot_type == "small_meshgrid_compute":
             self.draw_missing_z()

@@ -35,9 +35,10 @@ import numpy
 from .. import shared
 from .. import widgets_list
 import logging
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import gui_tools
 from ..tools import math_tools
+from ..tools import planefit
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFButtonGroup
@@ -64,20 +65,23 @@ class RoiManagerWidget(PYAFWidget):
         self.VL = QtWidgets.QVBoxLayout()
         self.HL = QtWidgets.QHBoxLayout()
 
-        self.TW = QtWidgets.QTableWidget(0, 7)
+        self.TW = QtWidgets.QTableWidget(0, 8)
         self.TW.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.TW.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.TW.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        labels = ["", "", "", "Pixels", "Area [nm^2]", "Color", ""]
+        labels = ["#", "Draw", "Show", "Pixels", "Area [µm²]", "Color",
+                  "Substrate", "Data"]
         self.TW.setHorizontalHeaderLabels(labels)
-        self.TW.setFixedWidth(460)
-        self.TW.setColumnWidth(0, 40)
-        self.TW.setColumnWidth(1, 40)
-        self.TW.setColumnWidth(2, 40)
-        self.TW.setColumnWidth(3, 100)
-        self.TW.setColumnWidth(4, 100)
-        self.TW.setColumnWidth(5, 100)
-        self.TW.setColumnWidth(6, 40)
+        tooltips = ["", "ROI drawn or erased with the right click menu of "
+                    "the map", "Display the ROI on the map", "", "", "",
+                    "ROI defined as substrate", "Curves of the ROI "
+                    "discarded with Discard data"]
+        for col, tooltip in enumerate(tooltips):
+            self.TW.horizontalHeaderItem(col).setToolTip(tooltip)
+        widths = [30, 45, 45, 60, 85, 100, 75, 80]
+        for col, width in enumerate(widths):
+            self.TW.setColumnWidth(col, width)
+        self.TW.setFixedWidth(sum(widths) + 4)
         self.TW.verticalHeader().hide()
         self.TW.cellClicked.connect(self.tableWidget_clicked)
 
@@ -96,7 +100,23 @@ class RoiManagerWidget(PYAFWidget):
         self.button_remove = PYAFButton(self, "remove", "Remove")
         self.button_invert = PYAFButton(self, "invert", "Invert to new")
         self.BT_glass = PYAFButton(self, "glass", "Define as substrate")
-        self.BT_discard = PYAFButton(self, "discard", "Discard from ROI")
+        self.BT_planefit = PYAFButton(self, "planefit", "Planefit")
+        self.BT_planefit.setToolTip(
+            "Fit a plane (offset and tilt) on the selected substrate ROI and\n"
+            "subtract it from the piezo height and topography maps of this\n"
+            "file: the substrate becomes the zero height. Only the maps are\n"
+            "corrected, not the computations. Define the ROI as substrate\n"
+            "first.")
+        self.BT_discard = PYAFButton(self, "discard", "Discard data")
+        self.BT_discard.setToolTip(
+            "Discard data: the curves of the selected ROI are not used in\n"
+            "the results (crossed on the maps). The ROI is kept.\n"
+            "Keep data: use these curves again.")
+        self.BT_volume = PYAFButton(self, "volume", "Compute volume")
+        self.BT_volume.setToolTip(
+            "Volume between the zero-force topography and the plane of the\n"
+            "selected substrate ROI, over the whole map. Define the ROI as\n"
+            "substrate first.")
 
         self.VL_options.addWidget(self.input_size)
         self.VL_options.addWidget(self.radiobutton_square)
@@ -104,9 +124,11 @@ class RoiManagerWidget(PYAFWidget):
         self.VL_options.addWidget(self.radiobutton_dot)
         self.VL_options.addWidget(self.button_add)
         self.VL_options.addWidget(self.button_remove)
+        self.VL_options.addWidget(self.BT_discard)
         self.VL_options.addWidget(self.button_invert)
         self.VL_options.addWidget(self.BT_glass)
-        self.VL_options.addWidget(self.BT_discard)
+        self.VL_options.addWidget(self.BT_planefit)
+        self.VL_options.addWidget(self.BT_volume)
         self.VL_options.addStretch(1)
 
         self.HL.addWidget(self.TW)
@@ -138,7 +160,7 @@ class RoiManagerWidget(PYAFWidget):
 
             self.logger.debug("Adding ROI %s", newid)
 
-            data.roi_list.append(experiment.ROI(newid))
+            data.roi_list.append(new_roi(data, newid))
 
             self.update_widget()
             self.update_results()
@@ -174,15 +196,22 @@ class RoiManagerWidget(PYAFWidget):
             self.logger.debug("Removing ROI %s", indexes)
 
             if indexes:
+                self.update_planefit_roi(data, indexes)
+                self.update_substrate_roi(data, indexes)
                 for i in indexes:
                     del data.roi_list[i]
                     self.TW.removeRow(i)
-                    # Move the selected row if needed
-                    if i <= data.roi_selected_row:
-                        data.roi_selected_row = data.roi_selected_row - 1
 
-                if self.TW.rowCount() == 0:
+                # ROI used to draw: the same one if it is kept, else the
+                # first one
+                active = data.roi_selected_row
+                if not data.roi_list:
                     data.roi_selected_row = None
+                elif active is None or active in indexes:
+                    data.roi_selected_row = 0
+                else:
+                    data.roi_selected_row = active - sum(
+                        1 for i in indexes if i < active)
 
                 if data.roi_selected_row is not None:
                     self.TW.selectRow(0)
@@ -219,7 +248,7 @@ class RoiManagerWidget(PYAFWidget):
                     "old ROI = %s")
                 self.logger.debug(txt, newid, index)
 
-                data.roi_list.append(experiment.ROI(newid))
+                data.roi_list.append(new_roi(data, newid))
 
                 # Get new values (can be slow)
                 inverted_roi = []
@@ -245,7 +274,7 @@ class RoiManagerWidget(PYAFWidget):
 
         elif button == "glass":
             x_size = data.scan_size_x / data.nbr_pixels_x
-            y_size = data.scan_size_x / data.nbr_pixels_x
+            y_size = data.scan_size_y / data.nbr_pixels_y
 
             for item in self.TW.selectionModel().selectedRows():
                 index = item.row()
@@ -265,6 +294,10 @@ class RoiManagerWidget(PYAFWidget):
                     y = numpy.array(y)
                     z = numpy.array(z)
 
+                    # Ignore the pixels without topography (no POC found)
+                    finite = numpy.isfinite(z)
+                    x, y, z = x[finite], y[finite], z[finite]
+
                     # Get the coefficients of the 2D fit
                     co = math_tools.polyfit2d(
                         x,
@@ -279,32 +312,144 @@ class RoiManagerWidget(PYAFWidget):
 
                     roi.glass_coeffs = None
 
+                    # The planefit used this substrate
+                    if data.planefit_applied and data.planefit_roi == index:
+                        self.set_planefit(data, None)
+
             self.update_widget()
             widgets_list.widget_compute.update_GUI("roi_list_height_corr")
 
+        elif button == "volume":
+            self.show_volume(data)
+
+        elif button == "planefit":
+            rows = [item.row()
+                    for item in self.TW.selectionModel().selectedRows()]
+            if planefit.get_planefit_roi(data) is not None:
+                # Remove the planefit
+                self.set_planefit(data, None)
+            elif rows:
+                self.set_planefit(data, rows[0])
+            self.update_GUI("BT_glass")
+
         elif button == "discard":
-            # Get the list of pixels in the ROI
-            array = data.roi_list[data.roi_selected_row].values
+            # Discard (or keep again) the curves of the selected ROI
+            rows = [item.row()
+                    for item in self.TW.selectionModel().selectedRows()]
+            if not rows:
+                return
+            roi = data.roi_list[rows[0]]
+            if getattr(roi, "discarded", []):
+                # Keep data: only the curves discarded by this ROI (not the
+                # ones discarded otherwise)
+                for i, j in roi.discarded:
+                    data.discarded_curves[i][j] = 0
+                roi.discarded = []
+            else:
+                roi.discarded = []
+                for i, j in roi.values:
+                    if data.discarded_curves[i][j] == 0:
+                        data.discarded_curves[i][j] = 1
+                        roi.discarded.append([i, j])
+            self.update_widget()
 
-            # Discard the curves
-            for item in array:
-                data.discarded_curves[item[0]][item[1]] = 1
-
-            # Refresh the meshgrids
+            # Refresh the meshgrids and the results
             widgets_list.widget_data.meshgrid.update_plot()
             widgets_list.widget_results.update_MPL("MPL_canvas1")
+            self.update_results()
+
+    def set_planefit(self, data, roi_index):
+        """Apply the planefit with a substrate ROI (None: remove it), then
+        rescale and redraw the height maps."""
+        self.logger.debug("Planefit with ROI %s", roi_index)
+        data.planefit_applied = roi_index is not None
+        data.planefit_roi = roi_index
+        planefit.reset_color_scales(data)
+        if data.meshgrid_type in ("piezo", "topo"):
+            widgets_list.widget_results.update_MPL("MPL_canvas1")
+        if widgets_list.widget_multimeshgrids is not None:
+            widgets_list.widget_multimeshgrids.update_widget()
+        self.update_3D(data)
+
+    def show_volume(self, data):
+        """Computes the volume above the selected substrate ROI and displays
+        it."""
+        rows = [item.row() for item in self.TW.selectionModel().selectedRows()]
+        if not rows or data.roi_list[rows[0]].glass_coeffs is None:
+            return
+        res = planefit.get_volume(data, data.roi_list[rows[0]])
+        x_size, y_size = res["pixel_size"]
+        title = ("Volume relative to the plane of the substrate ROI " +
+                 str(rows[0] + 1))
+        text = ("Zero-force topography, whole map\n\n"
+                "Net volume: %.4g µm³\n"
+                "Above the plane: %.4g µm³\n"
+                "Below the plane: %.4g µm³\n"
+                "Maximum height: %.4g nm\n\n"
+                "%d pixels of %.4g × %.4g nm") % (
+                    res["net"] * 1e-9, res["above"] * 1e-9,
+                    res["below"] * 1e-9, res["max_height"], res["pixels"],
+                    x_size, y_size)
+        if res["no_topography"]:
+            text += ("\n%d pixels without topography (no contact point) are "
+                     "not counted") % res["no_topography"]
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle("Volume - " + data.filename)
+        box.setText(title)
+        box.setInformativeText(text)
+        box.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        box.exec()
+
+    @staticmethod
+    def update_3D(data):
+        """Redraw the 3D layers of the file (tomography and substrates)."""
+        if widgets_list.widget_vtk is None:
+            return
+        for layer in shared.layer_list:
+            if layer.type not in ("afm", "glass"):
+                continue
+            if shared.exp.list[layer.afm_id] is not data:
+                continue
+            if layer.type == "afm":
+                layer.update_tomography()
+            else:
+                layer.update_actor()
+
+    def update_planefit_roi(self, data, removed):
+        """Keep the index of the planefit ROI when ROIs are removed (no
+        planefit if its ROI is removed)."""
+        if data.planefit_roi is None:
+            return
+        if data.planefit_roi in removed:
+            data.planefit_applied = False
+            data.planefit_roi = None
+            planefit.reset_color_scales(data)
+            self.update_3D(data)
+        else:
+            data.planefit_roi -= sum(1 for i in removed
+                                     if i < data.planefit_roi)
+
+    @staticmethod
+    def update_substrate_roi(data, removed):
+        """Keep the substrate ROI of the bottom effect correction when ROIs
+        are removed (roi_glass_id: its position + 1; none if it is
+        removed)."""
+        if not data.roi_glass_id:
+            return
+        index = data.roi_glass_id - 1
+        if index in removed:
+            data.roi_glass_id = 0
+        else:
+            data.roi_glass_id -= sum(1 for i in removed if i < index)
 
     def update_results(self):
         """Update the results in the results tables."""
-        if self.parent.parent.tabs.currentIndex() != 3:
-            # Update later if we go on results tab
+        if self.parent.parent.tabs.currentIndex() in (3, 4):
+            # A plots tab is displayed: recompute the values now (the values
+            # are recomputed when going to the plots tabs from the others)
+            widgets_list.widget_results_single.schedule_refresh()
+        else:
             self.parent.parent.update_results = True
-        elif self.parent.parent.tabs.currentIndex() == 3:
-            # We are on the results tab, we should update directly
-            widgets_list.widget_results_single.update_widget()
-        elif self.parent.parent.tabs.currentIndex() == 4:
-            # We are on the results tab, we should update directly
-            widgets_list.widget_results_groups.update_widget()
 
     def checkbox_clicked(self, checkbox, cb_id):
         """Called when a checkbox is clicked."""
@@ -334,7 +479,7 @@ class RoiManagerWidget(PYAFWidget):
         # Add the rows to the tablewidget
         for i in range(len(data.roi_list)):
             self.TW.insertRow(i)
-            self.TW.setRowHeight(i, 25)
+            self.TW.setRowHeight(i, 32)
 
             # Index
             label = QtWidgets.QLabel()
@@ -368,7 +513,8 @@ class RoiManagerWidget(PYAFWidget):
             one_area = xsize * ysize
             label = QtWidgets.QLabel()
             label.setFont(self.parent.parent.smallfont)
-            label.setText(str(len(data.roi_list[i].values) * one_area))
+            area = len(data.roi_list[i].values) * one_area * 1e-6
+            label.setText("%.4g" % area)
             self.TW.setCellWidget(i, 4, gui_tools.CenteredCellwidget(label))
 
             # Color
@@ -377,16 +523,24 @@ class RoiManagerWidget(PYAFWidget):
             for j in range(len(data.roi_color_names)):
                 colorlist.addItem(data.roi_color_names[j])
             colorlist.setCurrentIndex(data.roi_list[i].color)
-            self.TW.setCellWidget(i, 5, colorlist)
+            # In a layout, to keep the size of the cell
+            self.TW.setCellWidget(i, 5, gui_tools.FullCellWidget(colorlist))
 
             # Glass
             label = QtWidgets.QLabel()
             label.setFont(self.parent.parent.smallfont)
             if data.roi_list[i].glass_coeffs is not None:
-                label.setText("G")
+                label.setText("Yes")
             else:
                 label.setText("")
             self.TW.setCellWidget(i, 6, gui_tools.CenteredCellwidget(label))
+
+            # Discarded data
+            label = QtWidgets.QLabel()
+            label.setFont(self.parent.parent.smallfont)
+            if getattr(data.roi_list[i], "discarded", []):
+                label.setText("Discarded")
+            self.TW.setCellWidget(i, 7, gui_tools.CenteredCellwidget(label))
 
         # Select rows
         for row in selected_rows:
@@ -437,6 +591,25 @@ class RoiManagerWidget(PYAFWidget):
             # No Roi defined, disable glass button
             self.BT_glass.setEnabled(False)
 
+        if element == "BT_glass":
+            # Planefit: with the selected ROI if it is a substrate, or to
+            # remove the current planefit
+            applied = planefit.get_planefit_roi(data) is not None
+            rows = [item.row()
+                    for item in self.TW.selectionModel().selectedRows()]
+            substrate = bool(rows) and \
+                data.roi_list[rows[0]].glass_coeffs is not None
+            self.BT_planefit.setText(
+                "Remove planefit" if applied else "Planefit")
+            self.BT_planefit.setEnabled(applied or substrate)
+            self.BT_volume.setEnabled(substrate and data.stiffness_calculated)
+            discarded = bool(rows) and \
+                bool(getattr(data.roi_list[rows[0]], "discarded", []))
+            self.BT_discard.setText("Keep data" if discarded
+                                    else "Discard data")
+            self.BT_discard.setEnabled(discarded or (
+                bool(rows) and bool(data.roi_list[rows[0]].values)))
+
     def input_updated(self, name):
         """Called when an input is updated."""
         if name == "size":
@@ -451,10 +624,21 @@ class RoiManagerWidget(PYAFWidget):
         if name == "colorlist":
             for i in range(len(data.roi_list)):
                 cell = self.TW.cellWidget(i, 5)
-                data.roi_list[i].color = cell.currentIndex()
+                data.roi_list[i].color = cell.widget.currentIndex()
             self.parent.MPL_canvas1.canvas.update_blit("all")
 
             update_roi_on_multimeshgrids_widget()
+
+
+def new_roi(data, roi_id):
+    """New ROI, with the first color not used by the other ROIs of the file
+    (the colors are used again when all of them are used)."""
+    roi = experiment.ROI(roi_id)
+    used = [other.color for other in data.roi_list]
+    nbr_colors = len(data.roi_color_names)
+    free = [i for i in range(nbr_colors) if i not in used]
+    roi.color = free[0] if free else len(data.roi_list) % nbr_colors
+    return roi
 
 
 def update_roi_on_multimeshgrids_widget():

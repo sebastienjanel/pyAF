@@ -66,7 +66,8 @@ class ComputeEventsDetectionMSF(PlotCurve):
         window_size = self.data.events_msf_window_size
 
         msf_curve_y = events_tools.apply_msf(curve_x, curve_y, window_size)
-        w2 = window_size / 2
+        # Half window, in points (same as for the events detection)
+        w2 = int(window_size / 2.0)
 
         self.curve_retraction = [curve_x[w2:-w2], msf_curve_y]
 
@@ -75,7 +76,8 @@ class ComputeEventsDetectionMSF(PlotCurve):
         # Plot threshold as green line
         self.fits_lines_conv[1] = [threshold] * len(curve_x[w2:-w2])
 
-        self.axes.set_ylim([-threshold * 5, threshold * 5])
+        if threshold > 0:
+            self.axes.set_ylim([-threshold * 5, threshold * 5])
 
         self.display_events_detection_exclude_square = True
 

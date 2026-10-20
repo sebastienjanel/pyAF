@@ -35,11 +35,12 @@
 import logging
 from ... import shared
 from ... import widgets_list
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools import misc_tools
 from ...tools import gui_tools
+from ...tools.results_sorting import VISCO_TYPES
 
 
 class ResultsChooserWidget(PYAFWidget):
@@ -62,6 +63,11 @@ class ResultsChooserWidget(PYAFWidget):
         self.list_choser.addItem("Event max. force")
         self.list_choser.addItem("Loading rates")
         self.list_choser.addItem("Distance to Joc")
+        for values in VISCO_TYPES.values():
+            self.list_choser.addItem(values["name"])
+
+        # Wide enough for the longest result type
+        self.list_choser.fit_to_contents()
 
         self.VL.addWidget(self.list_choser)
 
@@ -91,6 +97,7 @@ class ResultsChooserWidget(PYAFWidget):
             found_work = False
             found_events = False
             found_lr = False
+            found_visco = False
 
             for item in shared.exp.list:
                 if item.stiffness_array is not None:
@@ -101,6 +108,12 @@ class ResultsChooserWidget(PYAFWidget):
                     found_events = True
                 if item.loading_rates_calculated:
                     found_lr = True
+                if item.visco_calculated:
+                    found_visco = True
+
+            # Stiffness when computed by Tomography
+            self.list_choser.setItemText(0, misc_tools.elasticity_name())
+            self.list_choser.fit_to_contents()
 
             if found_stiffness:
                 gui_tools.enable_combobox_item(self.list_choser, 0)
@@ -130,6 +143,12 @@ class ResultsChooserWidget(PYAFWidget):
             else:
                 gui_tools.disable_combobox_item(self.list_choser, 6)
 
+            for index in (8, 9, 10):
+                if found_visco:
+                    gui_tools.enable_combobox_item(self.list_choser, index)
+                else:
+                    gui_tools.disable_combobox_item(self.list_choser, index)
+
             if shared.exp.results_type == "stiffness":
                 self.list_choser.setCurrentIndex(0)
             elif shared.exp.results_type == "work":
@@ -146,3 +165,6 @@ class ResultsChooserWidget(PYAFWidget):
                 self.list_choser.setCurrentIndex(6)
             elif shared.exp.results_type == "events_distance":
                 self.list_choser.setCurrentIndex(7)
+            elif shared.exp.results_type in VISCO_TYPES:
+                self.list_choser.setCurrentIndex(
+                    8 + list(VISCO_TYPES).index(shared.exp.results_type))

@@ -32,8 +32,15 @@
 """Main vtk layer."""
 
 import vtk
+import numpy
 from ... import shared
 from ... import widgets_list
+from ...tools import planefit
+from ..utils.common import use_app_font
+
+
+# Titles of the axes (the values are in um)
+AXES_TITLES = ("X [\u03bcm]", "Y [\u03bcm]", "Z [\u03bcm]")
 
 
 class Layer:
@@ -95,6 +102,9 @@ class Layer:
         self.lut_invert = False
         self.lut_min_color = [0.0, 0.0, 0.0, 1.0]  # Black RGBA
         self.lut_max_color = [1.0, 1.0, 1.0, 1.0]  # White RGBA
+        # Name of the LUT (see LUTS in menu_options), custom colors in the
+        # layers saved before
+        self.lut_name = "Custom"
 
         # Thresholding
         self.use_binary_thresholding = False
@@ -115,7 +125,8 @@ class Layer:
         # Display or hide the z scale
         self.display_z_scale = True
 
-        # Smoothing (0 = No smoothing)
+        # Gaussian smoothing of the images, standard deviation in pixels
+        # (0 = No smoothing)
         self.smooth_gaussian = 0
 
         # Isosurface
@@ -144,6 +155,22 @@ class Layer:
         # z on the left or the right
         self.actor_axes.SetFlyModeToOuterEdges()
 
+        # Text along the axes, drawn at a large font size and scaled down
+        # (sharp; the default vector text is coarse), titles apart from
+        # the labels
+        self.actor_axes.SetUseTextActor3D(1)
+        self.actor_axes.SetScreenSize(6)
+        self.actor_axes.SetTitleOffset((30, 30))
+        self.actor_axes.SetLabelOffset(15)
+        self.actor_axes.SetXTitle(AXES_TITLES[0])
+        self.actor_axes.SetYTitle(AXES_TITLES[1])
+        self.actor_axes.SetZTitle(AXES_TITLES[2])
+        for i in range(3):
+            self.actor_axes.GetTitleTextProperty(i).SetFontSize(56)
+            self.actor_axes.GetLabelTextProperty(i).SetFontSize(48)
+            use_app_font(self.actor_axes.GetTitleTextProperty(i))
+            use_app_font(self.actor_axes.GetLabelTextProperty(i))
+
         # The the size of the axes
         self.set_axes_bounds()
 
@@ -161,7 +188,14 @@ class Layer:
         else:
             # Disable z axis if asked
             if self.display_z_scale:
-                self.actor_axes.SetZAxisRange(0, self.data.max_topo / 1000.0)
+                top = numpy.nanmax(planefit.topo_map(self.data))
+                self.actor_axes.SetZAxisRange(0, top / 1000.0)
+                # Only the bottom and the top (the axis is short, the
+                # automatic labels overlap)
+                labels = vtk.vtkStringArray()
+                labels.InsertNextValue("0")
+                labels.InsertNextValue("%.3g" % (top / 1000.0))
+                self.actor_axes.SetAxisLabels(2, labels)
             else:
                 self.actor_axes.SetZAxisRange(0, 0)
             self.actor_axes.SetZAxisVisibility(self.display_z_scale)
@@ -259,7 +293,7 @@ class Layer:
         # Needed to refresh title color, force a refresh of the titles
         # (Waiting for patch in vtk library, normally not needed)
         self.actor_axes.SetXTitle("")
-        self.actor_axes.SetXTitle("X-Axis")
+        self.actor_axes.SetXTitle(AXES_TITLES[0])
 
         # Update the rendering
         if shared.VTK_first is False:
@@ -383,6 +417,7 @@ class Layer:
         lut = {
             "use": self.use_lut,
             "invert": self.lut_invert,
+            "name": self.lut_name,
             "threshold": self.lut_threshold,
             "min_color": self.lut_min_color,
             "max_color": self.lut_max_color}
@@ -470,7 +505,7 @@ class Fiducials:
                 actor.GetProperty().SetColor([1.0, 1.0, 1.0])
             else:
                 # Set the defined color for the other fiducials
-                actor.GetProperty().SetColor(self.color)
+                actor.GetProperty().SetColor(self.color[:3])
 
             self.actors_list.append(actor)
 

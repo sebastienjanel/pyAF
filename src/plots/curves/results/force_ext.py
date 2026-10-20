@@ -32,6 +32,7 @@
 """Plots the force - extension curve"""
 
 from ..plot_curve import PlotCurve
+from ....tools import misc_tools
 
 
 class ResultsForceExt(PlotCurve):
@@ -55,9 +56,9 @@ class ResultsForceExt(PlotCurve):
 
         # Labels
         if self.data.curve_distance_units == "nm":
-            self.xlabel = "Scanner Extension [nm]"
+            self.xlabel = misc_tools.z_label(self.data)
         elif self.data.curve_distance_units == "um":
-            self.xlabel = "Scanner Extension [\u03bcm]"
+            self.xlabel = misc_tools.z_label(self.data, "\u03bcm")
         self.ylabel = "Force [" + self.data.curve_force_units + "]"
 
         fac = self.spring_constant * self.force_factor

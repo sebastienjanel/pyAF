@@ -62,19 +62,19 @@ class FetchStderr:
 
 import multiprocessing
 
-from PyQt5 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 
 if multiprocessing.current_process().name == "MainProcess":
     # Import only once (for performance issue with multiprocessing on windows)
     import sys
     import os
     import logging
-    from PyQt5 import QtCore
+    from qtpy import QtCore
 
-    if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
+    import qtpy
+    if qtpy.QT5:
+        # Always enabled (and deprecated) in Qt6
         QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
-
-    if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
         QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 
     # Import matplotlib the first time to define the backend (You won't be able
@@ -83,34 +83,13 @@ if multiprocessing.current_process().name == "MainProcess":
     # The backend change is conditional because Sphinx (documentation system)
     # will display an error message if we want to apply the backend two times.
     import matplotlib
-    matplotlib.use("Qt5Agg")
+    matplotlib.use("QtAgg")
 
     # Check for the versions. See PEP 386 for the check
     # [AD: deprecated under PEP 386 (!)]
     from packaging.version import Version
-    import tables
-    import platform
     from src.tools.utils import module_exists
 
-    """if Version(tables.__version__) < Version("3.0"):
-        message = "PyTables version is " + tables.__version__ + "." \
-                  " Version 3.0.x is needed."
-        sys.exit(message)"""
-    """if Version(matplotlib.__version__) < Version("1.4.0"):
-        message = "Matplotlib's version is " + matplotlib.__version__ + "." \
-            " Version 1.4.0 is needed."
-        sys.exit(message)"""
-    qt_version = Version(QtCore.QT_VERSION_STR)
-    if platform.uname()[0] == "Darwin" and qt_version < Version("4.8.6"):
-        # For mac we need 4.8.6
-        message = "Qt's version is " + QtCore.QT_VERSION_STR + "." \
-            " Version 4.8.6 is needed."
-        sys.exit(message)
-    else:
-        if qt_version < Version("4.8.5"):
-            message = "Qt's version is " + QtCore.QT_VERSION_STR + "." \
-                " Version 4.8.5 is needed."
-            sys.exit(message)
     if module_exists("vtk"):
         import vtk
         if vtk.VTK_MAJOR_VERSION <= 5:
@@ -150,6 +129,7 @@ if multiprocessing.current_process().name == "MainProcess":
     from src.widgets.about import AboutWidget
     from src.tools import apply_to_all
     from src.tools import misc_tools
+    from src.tools import gui_tools
     from src.tools import math_tools as mt
     from src.tools import temp_file
     from src.widgets.progressbar import Progressbar
@@ -163,7 +143,7 @@ if multiprocessing.current_process().name == "MainProcess":
     from src.widgets.plugins import PluginsWidget
     from src.widgets.preferences import PreferencesWidget
     from src.utils import discarding
-    from src.gui_styles.theme_handler import theme_handler
+    from src.gui_styles.theme_handler import theme_handler, saved_theme
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -218,6 +198,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Tabs
         self.tabs = QtWidgets.QTabWidget()
+        # Styled as a segmented control by the stylesheets
+        self.tabs.setObjectName("mainTabs")
 
         # Create the 5 main widgets (will automatically be registered in wl)
         DataWidget(self)
@@ -231,8 +213,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(wl.widget_compute, "Compute")
         self.tabs.addTab(wl.widget_results, "Results")
         self.tabs.addTab(wl.widget_results_single, "Plots")
-        self.tabs.addTab(wl.widget_results_groups, "Grouped Plots")
-        self.tabs.addTab(wl.widget_results_experiment, "Experiment Plots")
+        self.tabs.addTab(wl.widget_results_groups, "Replicates")
+        self.tabs.addTab(wl.widget_results_experiment, "SuperPlots")
 
         # Create the main menu of pyAF
         self.list_actions = menu.create_menu(self)
@@ -285,9 +267,16 @@ class MainWindow(QtWidgets.QMainWindow):
         # Close progressbar and display message + beep
         if wl.widget_progressbar is not None:
             wl.widget_progressbar.close()
+        # Place the window before displaying the message, which is centered
+        # on it
+        self.center_on_screen()
+
         if consts.AUTOLOAD is False and consts.UNIT_TESTING is False:
             QtWidgets.QApplication.beep()
-            QtWidgets.QMessageBox.warning(self, "Information", "Loading done.")
+            nbr = len(shared.exp.list)
+            gui_tools.show_success(
+                self, "Loading complete",
+                str(nbr) + " file" + ("s" if nbr > 1 else "") + " loaded.")
 
         self.logger.debug("Opening done")
 
@@ -325,6 +314,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.timer4 = QtCore.QTimer.singleShot(
                     0, mesh.refresh_blitting)
 
+
+    def center_on_screen(self):
+        """Centers the window on the screen, keeping it inside the screen."""
+        screen = QtGui.QGuiApplication.primaryScreen().availableGeometry()
+        self.adjustSize()
+        self.resize(self.size().boundedTo(screen.size()))
+        geometry = QtCore.QRect(QtCore.QPoint(0, 0), self.size())
+        geometry.moveCenter(screen.center())
+        self.move(geometry.topLeft())
+
     def display_message(self):
         """Displays a message telling the user he needs to save.
 
@@ -336,21 +335,24 @@ class MainWindow(QtWidgets.QMainWindow):
         isavailable = QtWidgets.QSystemTrayIcon.isSystemTrayAvailable()
 
         if isavailable and self.tray_enabled and enabled:
-            tray = QtWidgets.QSystemTrayIcon(self)
-            icon = QtGui.QIcon("images/icon.png")
-            tray.setIcon(icon)
+            # Create the tray icon once, and reuse it for the next messages
+            # (a new icon each time would pile them up in the menu bar)
+            if getattr(self, "tray", None) is None:
+                self.tray = QtWidgets.QSystemTrayIcon(self)
+                path = misc_tools.get_app_path() + "/images/icon.png"
+                self.tray.setIcon(QtGui.QIcon(path))
 
-            # On Windows, allow the creation of a new tray only if the user
-            # has clicked on the old one and removed it.
-            # Will not be triggered on OS X
-            tray.messageClicked.connect(self.enable_tray)
+                # On Windows, display a new message only if the user has
+                # clicked on the old one. Will not be triggered on OS X
+                self.tray.messageClicked.connect(self.enable_tray)
 
-            tray.show()
-            tray.showMessage(
+            # Hidden when the message is disabled in the preferences
+            self.tray.show()
+            self.tray.showMessage(
                 "pyAF", "Do not forget to save your file !",
                 QtWidgets.QSystemTrayIcon.Information, msecs=1000 * 10)
 
-            # Disable the creation of a new tray on Windows and Linux
+            # Disable the next messages on Windows and Linux
             if sys.platform != "darwin":
                 self.tray_enabled = False
 
@@ -584,11 +586,13 @@ class MainWindow(QtWidgets.QMainWindow):
                     if len(list_curves) == nbr_of_curves_total:
                         shared.exp.parsed_random_curves = []
                         self.change_curve(1, 1)
+                        return
 
                     elif len(list_curves) > nbr_of_curves_total - limit:
-                        # Find a curve not already seen
-                        for i in range(nbr_pixels_x):
-                            for j in range(nbr_pixels_y):
+                        # Find a curve not already seen (user coordinates,
+                        # from 1)
+                        for i in range(1, nbr_pixels_x + 1):
+                            for j in range(1, nbr_pixels_y + 1):
                                 if mt.in_list(list_curves, [i, j]) is False:
                                     self.change_curve(i, j, save_rand=True)
                                     return
@@ -604,6 +608,12 @@ class MainWindow(QtWidgets.QMainWindow):
                                 notfound = False
 
                         self.change_curve(xpos, ypos, rand="rand")
+
+        # Keep the position inside the map of the current file (a position
+        # can come from a file with a larger map)
+        if xpos is not None and ypos is not None:
+            xpos = min(max(int(xpos), 1), data.nbr_pixels_x)
+            ypos = min(max(int(ypos), 1), data.nbr_pixels_y)
 
         if rand == "rand" or save_rand and random_control:
             shared.exp.parsed_random_curves.append([xpos, ypos])
@@ -663,10 +673,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Update the curves
         if self.tabs.currentIndex() == 0:
-            wl.widget_data.curve.update_plot()
-            if data.file_type in ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)"):
-                wl.widget_data.curve_1.update_plot()
-                wl.widget_data.curve_2.update_plot()
+            wl.widget_data.update_curves()
         if self.tabs.currentIndex() == 1:
             wl.widget_compute.update_MPL("MPL_canvas")
         if self.tabs.currentIndex() == 2:
@@ -749,7 +756,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Reset the last ten curves list, it could happen that the user wants
         # to go back to a curve out of bounds if scan sizes are different
-        shared.exp.last_ten_curves = [[0, 0]]
+        # (starts with the current position, in user coordinates)
+        shared.exp.last_ten_curves = [[shared.exp.meshgrid_click_xpos + 1,
+                                       shared.exp.meshgrid_click_ypos + 1]]
         shared.exp.pos_in_last_ten_curves = 0
 
         self.update_GUI("single_or_forcevolume")
@@ -776,6 +785,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         elif data.display_curve_type == "results_force_events":
             if data.events_calculated is False:
+                data.display_curve_type = "defl_ext"
+
+        elif data.display_curve_type == "visco":
+            if not data.visco_calculated:
                 data.display_curve_type = "defl_ext"
 
         # Uncheck some options if they are not aviable
@@ -815,12 +828,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # when there is only one slice ...)
         if data.stiffness_calculated:
             cond1 = data.meshgrid_type == "stiffness_slice"
-            cond2 = data.indentation_step == 0
+            cond2 = data.get_used_indentation()[1] == 0
             if cond1 and cond2:
                 data.meshgrid_type = "stiffness"
         if data.stiffness_corrected:
             cond1 = data.meshgrid_type == "stiffness_slice_corr"
-            cond2 = data.indentation_step == 0
+            cond2 = data.get_used_indentation()[1] == 0
             if cond1 and cond2:
                 data.meshgrid_type = "stiffness_corr"
 
@@ -917,6 +930,7 @@ class MainWindow(QtWidgets.QMainWindow):
         figures. The menu actions are stored in self.list_actions
         """
         self.logger.debug("Going to tab: %s", str(self.tabs.currentIndex()))
+        previous_tab = getattr(self, "current_tab", None)
         self.current_tab = self.tabs.currentIndex()
 
         if self.tabs.currentIndex() == 0:
@@ -925,8 +939,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.list_actions["open_curve"].setEnabled(True)
             self.list_actions["open_results"].setEnabled(False)
             self.list_actions["row_color"].setEnabled(False)
-            self.list_actions["export_selected"].setEnabled(False)
-            self.list_actions["export_selected_r"].setEnabled(False)
             self.list_actions["rename_row"].setEnabled(False)
             self.list_actions["duplicate_row"].setEnabled(False)
             self.list_actions["remove_row"].setEnabled(False)
@@ -939,8 +951,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.list_actions["open_meshgrid"].setEnabled(False)
             self.list_actions["open_curve"].setEnabled(True)
             self.list_actions["open_results"].setEnabled(False)
-            self.list_actions["export_selected"].setEnabled(False)
-            self.list_actions["export_selected_r"].setEnabled(False)
             self.list_actions["rename_row"].setEnabled(False)
             self.list_actions["duplicate_row"].setEnabled(False)
             self.list_actions["remove_row"].setEnabled(False)
@@ -953,8 +963,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.list_actions["open_meshgrid"].setEnabled(True)
             self.list_actions["open_curve"].setEnabled(True)
             self.list_actions["open_results"].setEnabled(False)
-            self.list_actions["export_selected"].setEnabled(False)
-            self.list_actions["export_selected_r"].setEnabled(False)
             self.list_actions["rename_row"].setEnabled(False)
             self.list_actions["duplicate_row"].setEnabled(False)
             self.list_actions["remove_row"].setEnabled(False)
@@ -967,8 +975,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.list_actions["open_meshgrid"].setEnabled(False)
             self.list_actions["open_curve"].setEnabled(False)
             self.list_actions["open_results"].setEnabled(True)
-            self.list_actions["export_selected"].setEnabled(True)
-            self.list_actions["export_selected_r"].setEnabled(True)
             self.list_actions["rename_row"].setEnabled(True)
             self.list_actions["duplicate_row"].setEnabled(True)
             self.list_actions["remove_row"].setEnabled(True)
@@ -981,21 +987,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.list_actions["open_meshgrid"].setEnabled(False)
             self.list_actions["open_curve"].setEnabled(False)
             self.list_actions["open_results"].setEnabled(True)
-            self.list_actions["export_selected"].setEnabled(True)
-            self.list_actions["export_selected_r"].setEnabled(False)
             self.list_actions["rename_row"].setEnabled(False)
             self.list_actions["duplicate_row"].setEnabled(False)
             self.list_actions["remove_row"].setEnabled(False)
             self.list_actions["row_color"].setEnabled(True)
-            text = "Change color of row (Groups)"
+            text = "Change color of row (Replicates)"
             self.list_actions["row_color"].setText(text)
 
-        # Results update. Called from ROI manager
-        if self.tabs.currentIndex() == 3 or self.tabs.currentIndex() == 4:
-            if self.update_results:
-                wl.widget_results_single.update_widget()
-                wl.widget_results_groups.update_widget()
-                self.update_results = False
+        # Plots tabs, coming from the other tabs: recompute the values (the
+        # curves, the ROIs or the computations may have changed)
+        if self.tabs.currentIndex() in (3, 4, 5) and \
+                previous_tab is not None and previous_tab < 3:
+            wl.widget_results_single.button_clicked("refresh_hist")
+            self.update_results = False
 
         self.setFocus()
 
@@ -1174,7 +1178,8 @@ def main(app=None, files=None):
     # Init the GUI for the main window
     if app is None:
         app = QtWidgets.QApplication(["pyAF"])
-        theme_handler("Dark")
+        # Theme of the preferences (dark at the first launch)
+        theme_handler(saved_theme())
 
     if not consts.AUTOLOAD:
         value = True
@@ -1233,7 +1238,6 @@ def main(app=None, files=None):
 
     # Create main window once the loading window is closed
     main_window = MainWindow(files_info)
-    main_window.move(0, 0)
     main_window.show()
     if sys.platform == "darwin":
         main_window.raise_()

@@ -31,18 +31,18 @@
 
 """Functions used in the results_single tab.
 
-You can duplicate, rename or remove a result in the results table.
-You can export your results to a folder.
+You can duplicate, rename or remove a result in the results table (the
+exports are in the Export menu, see export_menu).
 """
 
 import copy
-import os
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from .. import consts
+from .. import experiment
 from .. import shared
 from .. import widgets_list
-from ..tools import export, misc_tools, stat_tools
+from ..tools import misc_tools, palettes, stat_tools
 
 
 def duplicate_results():
@@ -63,9 +63,12 @@ def duplicate_results():
 
         # Change the name
         newresult.name = result.name + " (Copy)"
+        newresult.short_name = experiment.get_short_name(result) + " (Copy)"
 
         # Append to the results list
         shared.exp.results_list.append(newresult)
+
+    experiment.apply_palette(shared.exp)
 
     # Update the table and the values
     widget.reset_table()
@@ -101,7 +104,10 @@ def rename_result():
         shared.exp.results_list[result_id].name = newname
 
         # Update the GUI
-        widget.tableWidget.cellWidget(result_id, 0).item.setText(newname)
+        column = widget.columns.get_column("File")
+        if column.visibility:
+            widget.tableWidget.cellWidget(
+                result_id, column.position).item.setText(newname)
         widget.update_MPL()
 
 
@@ -137,6 +143,7 @@ def remove_result():
             # Shift indices
             for i in range(len(shared.exp.results_list)):
                 shared.exp.results_list[i].result_id = i
+            experiment.apply_palette(shared.exp)
 
             # Update GUI
             widget.reset_table()
@@ -147,49 +154,6 @@ def remove_result():
                 + "it's the last one linked to the "\
                 + shared.exp.list[data_id].filename + " file."
             QtWidgets.QMessageBox.warning(widget, "Error", text)
-
-
-def export_results(mode):
-    """Exports the data as text files.
-
-    Is called from the menu. Will ask the user where to save the files.
-
-    Warn the user that if he checked the log scale mode in the
-    histograms, the data will not be exported as log(E) but as E. He
-    can do the log computation himself on his data.
-    """
-    widget = widgets_list.widget_results_single
-
-    # Get the save path from the settings
-    save_path = misc_tools.get_user_path(widget.settings)
-
-    # Check for log mode
-    if shared.exp.hist_log:
-        text = "You have checked the log scale checkbox for the stiffness "\
-               "results. Your data will not be exported as log(E), but you "\
-               "can still do this computation yourself afterwards."
-        QtWidgets.QMessageBox.warning(widget, "Exporting with log scale", text)
-
-    # Open dialog the save the file
-    text = "Export checked"
-    folder, _ = QtWidgets.QFileDialog.getSaveFileName(widget, text, save_path)
-
-    if folder:
-        widgets_list.widget_results_single.save_hist_prefs()
-        folder = str(folder)
-
-        # Save current path
-        misc_tools.set_user_path(widget.settings, os.path.dirname(folder))
-
-        # Export the data
-        if mode == "classic_format":
-            export.export_results(folder)
-
-        elif mode == "r_format":
-            export.export_results_r(folder)
-
-        QtWidgets.QApplication.beep()
-        QtWidgets.QMessageBox.warning(widget, "Information", "Exporting done.")
 
 
 def change_color():
@@ -228,9 +192,17 @@ def change_color():
             if color is not False:
                 if tab == 3:
                     shared.exp.results_list[row_id].color = color
+                    # The colors do not follow a palette anymore
+                    experiment.get_violin_options(shared.exp)["palette"] = \
+                        palettes.CUSTOM
+                    widgets_list.widget_violin_options_single.update_widget()
                 elif tab == 4:
                     # Skip group 0 == None group
                     shared.exp.groups_list[row_id + 1].color = color
+                    # The colors do not follow a palette anymore
+                    experiment.get_violin_options(
+                        shared.exp, "groups")["palette"] = palettes.CUSTOM
+                    widgets_list.widget_violin_options_groups.update_widget()
 
         # Update the plot
         if tab == 3:

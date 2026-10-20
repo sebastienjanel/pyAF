@@ -37,7 +37,7 @@ from .. import widgets_list
 from .. import shared
 import logging
 from .. import consts
-from PyQt5 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 from ..tools import math_tools
 from ..tools import apply_to_all
 from ..tools import misc_tools
@@ -45,6 +45,7 @@ from ..utils import meshgrid_menu
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFCheckBox
+from ..tools.gui_tools import PYAFToggle
 from ..tools.gui_tools import PYAFButtonGroup
 from ..widgets_main.subwidgets.curve_selector import ResultsSelectorWidget
 from ..widgets.multi_meshgrids import MultiMeshgridsWidget
@@ -55,7 +56,7 @@ from ..widgets.roi_manager import RoiManagerWidget
 from ..widgets.events_filters import ChangeFilterWidget
 from ..widgets.used_parameters import UsedParametersWidget
 from ..plots.plot_main import MainPlot
-from ..plots.PYAFPlot import PYAFPlot
+from ..plots.PYAFPlot import PYAFPlot, curve_type_available
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools import events_refresher
 
@@ -75,7 +76,8 @@ class ResultsWidget(PYAFWidget):
         self.logger = logging.getLogger()
 
         # Fixed height for the 2 top boxes, to keep them aligned
-        self.options_boxes_height = 160
+        # Room for the title and the rows of options
+        self.options_boxes_height = 185
 
         self.cursor_mode = "select"
         self.parent = parent
@@ -84,6 +86,8 @@ class ResultsWidget(PYAFWidget):
         self.settings = QtCore.QSettings()
 
         self.current_profile_erase = None
+        # A profile is being drawn (the last one of the profile list)
+        self.drawing_profile = False
 
         self.canvas_resolution = self.parent.canvas_resolution
         self.meshgrid_canvas_size = [300, 340]
@@ -134,7 +138,7 @@ class ResultsWidget(PYAFWidget):
 
         widgets_list.widget_progressbar.update()
 
-        self.CB_app_to_all = PYAFCheckBox(self, "apply_to_all", "Apply to all")
+        self.TG_app_to_all = PYAFToggle(self, "apply_to_all", "Apply to all")
 
         name = "widget_curve_selector_results"
         self.curve_selector = ResultsSelectorWidget(self, name)
@@ -147,12 +151,12 @@ class ResultsWidget(PYAFWidget):
         self.box_meshgrid = QtWidgets.QGroupBox()
         self.GL_meshgrid = QtWidgets.QGridLayout()
         # Options (meshgrid)
-        self.box_meshgrid_options = QtWidgets.QGroupBox()
+        self.box_meshgrid_options = QtWidgets.QGroupBox("Maps")
         self.box_meshgrid_options.setFixedHeight(self.options_boxes_height)
 
         self.GRP_mesh_type = PYAFButtonGroup(self, "BTG_meshgrid_type")
         self.RBT_mesh_piezo = QtWidgets.QRadioButton("Piezo height")
-        self.RBT_mesh_topography = QtWidgets.QRadioButton("Topography")
+        self.RBT_mesh_topography = QtWidgets.QRadioButton("Topography (zero force)")
         self.RBT_mesh_stiffness = QtWidgets.QRadioButton()
         self.RBT_mesh_stiffness_slice = QtWidgets.QRadioButton()
         self.RBT_mesh_stiffness_corr = QtWidgets.QRadioButton(
@@ -174,25 +178,116 @@ class ResultsWidget(PYAFWidget):
         self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force1, 7)
         self.GRP_mesh_type.addButton(self.RBT_mesh_events_per_curve, 8)
         self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force2, 9)
+        # Viscoelasticity (Ting fit)
+        self.RBT_mesh_visco_e0 = QtWidgets.QRadioButton("E\u2080")
+        self.RBT_mesh_visco_fluidity = QtWidgets.QRadioButton("Fluidity")
+        self.RBT_mesh_visco_tan_delta = QtWidgets.QRadioButton(
+            "Loss tangent")
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_e0, 10)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_fluidity, 11)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_tan_delta, 12)
+        # Quality of the elasticity fit
+        self.RBT_mesh_fit_r2 = QtWidgets.QRadioButton("Fit R\u00b2")
+        self.RBT_mesh_fit_poc_fixed = QtWidgets.QRadioButton(
+            "Fit: fixed point of contact")
+        self.RBT_mesh_fit_r2.setToolTip(
+            "R\u00b2 of the elasticity fit, on the fitted points after the "
+            "point of contact")
+        self.RBT_mesh_fit_poc_fixed.setToolTip(
+            "Pixels where the point of contact could not be fitted (too "
+            "stiff sample, failed fit, or point of contact moved too far): "
+            "elasticity fitted with the detected point of contact (1)")
+        self.GRP_mesh_type.addButton(self.RBT_mesh_fit_r2, 13)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_fit_poc_fixed, 14)
+        # Storage and loss moduli, derived from E0 and the fluidity
+        self.RBT_mesh_visco_storage = QtWidgets.QRadioButton(
+            "Storage modulus E\u2032")
+        self.RBT_mesh_visco_loss = QtWidgets.QRadioButton(
+            "Loss modulus E\u2033")
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_storage, 15)
+        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_loss, 16)
+
+        # Nature of each map (elastic, viscoelastic, adhesion) and limits
+        derived = (
+            "\nDerived from E\u2080 and the fluidity (power-law model), not "
+            "measured at this frequency: valid only if the sample follows a "
+            "single power law,\nand within the time scales of the curves "
+            "(about 1 / contact time to 1 / time between two points); "
+            "outside, it is an extrapolation.")
+        tips = {
+            self.RBT_mesh_piezo: "Height of the piezo at the end of the "
+            "approach (includes the indentation).",
+            self.RBT_mesh_topography: "Height of the sample at the point of "
+            "contact (zero force): topography without the indentation.",
+            self.RBT_mesh_stiffness: "Elastic: Young's modulus fitted on the "
+            "approach (contact model of the Compute tab).\nOn a "
+            "viscoelastic sample it depends on the indentation speed.",
+            self.RBT_mesh_stiffness_slice: "Elastic: elasticity of one "
+            "indentation segment (depth).",
+            self.RBT_mesh_stiffness_corr: "Elastic: elasticity corrected for "
+            "the stiff substrate under thin samples (bottom effect, Garcia "
+            "& Garcia).",
+            self.RBT_mesh_stiffness_slice_corr: "Elastic: elasticity of one "
+            "indentation segment, corrected for the substrate.",
+            self.RBT_mesh_visco_e0: "Viscoelastic: modulus at 1 s of the "
+            "power-law relaxation E(t) = E\u2080 (t / 1 s)^-\u03b2\n(Ting fit "
+            "of the approach and the retraction).",
+            self.RBT_mesh_visco_fluidity: "Viscoelastic: exponent \u03b2 of "
+            "the power law, 0 elastic solid, 1 viscous liquid (cells: about "
+            "0.1-0.3).",
+            self.RBT_mesh_visco_tan_delta: "Viscoelastic: loss tangent "
+            "E\u2033 / E\u2032 = tan(\u03c0 \u03b2 / 2), the fluidity "
+            "in rheology terms:\nbelow 1 solid-like, above 1 liquid-like; "
+            "the same at all frequencies for a power law.",
+            self.RBT_mesh_visco_storage: "Viscoelastic: storage (elastic) "
+            "modulus E\u2032 at the frequency of the Viscoelasticity tab."
+            + derived,
+            self.RBT_mesh_visco_loss: "Viscoelastic: loss (dissipative) "
+            "modulus E\u2033 at the frequency of the Viscoelasticity tab."
+            + derived,
+            self.RBT_mesh_work: "Adhesion: work to detach the tip (area "
+            "of the retraction curve below zero force).",
+            self.RBT_mesh_rupture_force1: "Adhesion: maximum force of "
+            "detachment.",
+            self.RBT_mesh_events_per_curve: "Adhesion: number of unbinding "
+            "events of each curve.",
+            self.RBT_mesh_rupture_force2: "Adhesion: largest force of the "
+            "unbinding events of each curve."}
+        for button, tip in tips.items():
+            button.setToolTip(tip)
 
         self.GL_mesh_options = QtWidgets.QGridLayout()
+        # Same spacing between all the rows (the style's default spacing
+        # depends on the neighbouring widgets)
+        self.GL_mesh_options.setVerticalSpacing(4)
         self.VL_meshgrid_options = QtWidgets.QVBoxLayout()
         self.VL_meshgrid_options.setContentsMargins(0, 0, 0, 0)
 
+        # Heights, and the elasticity below them
         self.GL_mesh_options.addWidget(self.RBT_mesh_piezo, 0, 0)
         self.GL_mesh_options.addWidget(self.RBT_mesh_topography, 1, 0)
-
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness, 0, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_slice, 1, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_corr, 2, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness, 2, 0)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_slice, 3, 0)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_corr, 4, 0)
         self.GL_mesh_options.addWidget(
-            self.RBT_mesh_stiffness_slice_corr, 3, 1)
+            self.RBT_mesh_stiffness_slice_corr, 5, 0)
 
         self.GL_mesh_options.addWidget(self.RBT_mesh_work, 0, 2)
         self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force1, 1, 2)
 
         self.GL_mesh_options.addWidget(self.RBT_mesh_events_per_curve, 2, 2)
         self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force2, 3, 2)
+
+        # Quality of the elasticity fit, below the adhesion
+        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_r2, 4, 2)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_poc_fixed, 5, 2)
+
+        # Viscoelasticity
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_e0, 0, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_fluidity, 1, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_tan_delta, 2, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_storage, 3, 1)
+        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_loss, 4, 1)
 
         self.VL_meshgrid_options.addLayout(self.GL_mesh_options)
         self.VL_meshgrid_options.addStretch(1)
@@ -220,28 +315,30 @@ class ResultsWidget(PYAFWidget):
         # --- Curves ----------------------------------------------------------
 
         # Options curves
-        self.box_curves_options = QtWidgets.QGroupBox()
+        self.box_curves_options = QtWidgets.QGroupBox("Force curves")
         self.box_curves_options.setFixedHeight(self.options_boxes_height)
 
         self.BT_group_type_of_curve = PYAFButtonGroup(
             self, "button_group_type_of_curve")
-        self.RB_defl_ext = QtWidgets.QRadioButton("Deflection - Extension curve")
-        self.RB_force_ext = QtWidgets.QRadioButton("Force - Extension curve")
+        self.RB_defl_ext = QtWidgets.QRadioButton("Deflection - Z curve")
+        self.RB_force_ext = QtWidgets.QRadioButton("Force - Z curve")
         self.RB_force = QtWidgets.QRadioButton("Force - Distance curve")
         self.RB_force_events = QtWidgets.QRadioButton("Force curve (events)")
         self.RB_indentation_curve = QtWidgets.QRadioButton("Indentation curve")
         self.RB_residuals = QtWidgets.QRadioButton("Residuals plot")
+        self.RB_visco = QtWidgets.QRadioButton("Viscoelastic fit")
         self.BT_group_type_of_curve.addButton(self.RB_defl_ext, 0)
         self.BT_group_type_of_curve.addButton(self.RB_force_ext, 1)
         self.BT_group_type_of_curve.addButton(self.RB_force, 2)
         self.BT_group_type_of_curve.addButton(self.RB_force_events, 3)
         self.BT_group_type_of_curve.addButton(self.RB_indentation_curve, 4)
         self.BT_group_type_of_curve.addButton(self.RB_residuals, 5)
+        self.BT_group_type_of_curve.addButton(self.RB_visco, 6)
 
         self.BT_group_trace_or_retrace = PYAFButtonGroup(
             self, "button_group_trace_or_retrace")
         self.radiobutton_trace = QtWidgets.QRadioButton("Approach curve")
-        self.radiobutton_retrace = QtWidgets.QRadioButton("Retraction curve")
+        self.radiobutton_retrace = QtWidgets.QRadioButton("Retract curve")
         self.radiobutton_both = QtWidgets.QRadioButton("Both")
         self.BT_group_trace_or_retrace.addButton(self.radiobutton_trace, 0)
         self.BT_group_trace_or_retrace.addButton(self.radiobutton_retrace, 1)
@@ -269,12 +366,19 @@ class ResultsWidget(PYAFWidget):
         self.BT_group_events.addButton(self.RBT_events_annotations, 1)
         self.CB_events_filter_dist = PYAFCheckBox(
             self, "checkbox_events_filter_dist", "Distance filter")
+        self.CB_events_filter_dist.setToolTip(
+            "Shades in grey the events removed by the distance filter of "
+            "this file.\nTo set up the filter, right-click on the curve "
+            "and choose \"Change distance filter\".")
         self.CB_events_display_joc = PYAFCheckBox(
             self, "checkbox_events_display_joc", "Display Joc")
         self.CB_events_display_fit_joc = PYAFCheckBox(
             self, "checkbox_events_display_fit_joc", "Display Joc fit")
 
         self.GL_curves_options = QtWidgets.QGridLayout()
+        # Same spacing between all the rows (the style's default spacing
+        # depends on the neighbouring widgets)
+        self.GL_curves_options.setVerticalSpacing(4)
         self.VL_curves_options = QtWidgets.QVBoxLayout()
         widgets_list.widget_progressbar.update()
 
@@ -285,6 +389,7 @@ class ResultsWidget(PYAFWidget):
         self.GL_curves_options.addWidget(self.RB_force_events, 3, 0)
         self.GL_curves_options.addWidget(self.RB_indentation_curve, 4, 0)
         self.GL_curves_options.addWidget(self.RB_residuals, 5, 0)
+        self.GL_curves_options.addWidget(self.RB_visco, 6, 0)
         # Col 2
         self.GL_curves_options.addWidget(self.radiobutton_both, 0, 1)
         self.GL_curves_options.addWidget(self.radiobutton_trace, 1, 1)
@@ -323,14 +428,14 @@ class ResultsWidget(PYAFWidget):
 
         self.GL_choser = QtWidgets.QGridLayout()
         self.GL_choser.addWidget(self.list_exp, 0, 0)
-        self.GL_choser.addWidget(self.CB_app_to_all, 0, 2)
+        self.GL_choser.addWidget(self.TG_app_to_all, 0, 2)
         self.GL_choser.addLayout(HL_empty, 0, 3)
 
         self.HL_buttons = QtWidgets.QHBoxLayout()
         self.HL_buttons.addWidget(self.BT_multi_meshgrids)
+        self.HL_buttons.addWidget(self.BT_roi_manager)
         self.HL_buttons.addWidget(self.BT_profiles)
         self.HL_buttons.addWidget(self.BT_slices)
-        self.HL_buttons.addWidget(self.BT_roi_manager)
         self.HL_buttons.addWidget(self.BT_display_in_3D)
         self.HL_buttons.addWidget(self.BT_used_parameters)
         self.HL_buttons.addStretch(1)
@@ -369,6 +474,63 @@ class ResultsWidget(PYAFWidget):
         self.update_MPL("MPL_canvas1")
         self.update_MPL("MPL_canvas2")
 
+    @staticmethod
+    def match_curve_to_map(data):
+        """Displays the curve corresponding to the map type, with its
+        options: the approach force curve with the point of contact and the
+        fits for the elasticity, the retraction force curve with the jump of
+        contact, the work and the force for the detachment, the force curve
+        of the events with their annotations, distance filter and jumps of
+        contact for the events, and the default deflection curve for the
+        heights. Returns True if the curve changed."""
+        mt = data.meshgrid_type
+        if mt in ("stiffness", "stiffness_slice", "stiffness_corr",
+                  "stiffness_corr_slice", "fit_r2", "fit_poc_fixed") and \
+                data.stiffness_calculated:
+            data.display_curve_type = "force"
+            data.display_trace_retrace = 0
+            data.display_poc = True
+            data.display_fit_poc = True
+            data.display_segments = True
+            data.display_fits_stiffness = True
+        elif mt in ("work", "rupture_force") and \
+                data.work_and_rupture_force1_calculated:
+            data.display_curve_type = "force"
+            data.display_trace_retrace = 1
+            data.display_joc = True
+            data.display_fit_joc = True
+            data.display_surface = True
+            data.display_force = True
+        elif mt in ("events_per_curve", "events_rupture_force") and \
+                data.events_calculated:
+            data.display_curve_type = "results_force_events"
+            data.display_trace_retrace = 1
+            data.events_results_display_annotations = 1
+            data.events_display_results_filter_dist = True
+            data.events_results_display_joc = True
+            data.events_results_display_fit_joc = True
+        elif mt.startswith("visco_") and data.visco_calculated:
+            data.display_curve_type = "visco"
+        elif mt in ("piezo", "topo"):
+            # Default display of the curves, without the results
+            data.display_curve_type = "defl_ext"
+            data.display_trace_retrace = 2
+            data.display_poc = False
+            data.display_fit_poc = False
+            data.display_segments = False
+            data.display_fits_stiffness = False
+            data.display_joc = False
+            data.display_fit_joc = False
+            data.display_surface = False
+            data.display_force = False
+            data.events_results_display_annotations = 0
+            data.events_display_results_filter_dist = False
+            data.events_results_display_joc = False
+            data.events_results_display_fit_joc = False
+        else:
+            return False
+        return True
+
     def update_GUI(self, element):
         """Method to update different GUI elements."""
         data = shared.exp.list[shared.exp.id_selected]
@@ -380,7 +542,7 @@ class ResultsWidget(PYAFWidget):
             self.RBT_mesh_topography.setEnabled(val)
             self.RBT_mesh_stiffness.setEnabled(val)
             if val:
-                if data.indentation_step == 0:
+                if data.get_used_indentation()[1] == 0:
                     self.RBT_mesh_stiffness_slice.setEnabled(False)
                 else:
                     self.RBT_mesh_stiffness_slice.setEnabled(True)
@@ -389,7 +551,7 @@ class ResultsWidget(PYAFWidget):
             val = data.stiffness_corrected
             self.RBT_mesh_stiffness_corr.setEnabled(val)
             if val:
-                if data.indentation_step == 0:
+                if data.get_used_indentation()[1] == 0:
                     self.RBT_mesh_stiffness_slice_corr.setEnabled(False)
                 else:
                     self.RBT_mesh_stiffness_slice_corr.setEnabled(True)
@@ -401,13 +563,22 @@ class ResultsWidget(PYAFWidget):
             val = data.events_calculated
             self.RBT_mesh_events_per_curve.setEnabled(val)
             self.RBT_mesh_rupture_force2.setEnabled(val)
+            val = data.visco_calculated
+            self.RBT_mesh_visco_e0.setEnabled(val)
+            self.RBT_mesh_visco_fluidity.setEnabled(val)
+            self.RBT_mesh_visco_tan_delta.setEnabled(val)
+            self.RBT_mesh_visco_storage.setEnabled(val)
+            self.RBT_mesh_visco_loss.setEnabled(val)
+            val = data.has_fit_quality()
+            self.RBT_mesh_fit_r2.setEnabled(val)
+            self.RBT_mesh_fit_poc_fixed.setEnabled(val)
 
             # Check the button
             index = misc_tools.get_meshgrid_type_by_id(data.meshgrid_type)
             self.GRP_mesh_type.button(index).setChecked(True)
 
         if element == "apply_to_all" or element == "all":
-            self.CB_app_to_all.setChecked(shared.exp.apply_to_all_data)
+            self.TG_app_to_all.setChecked(shared.exp.apply_to_all_data)
 
         if element == "radio_buttons" or element == "all":
             if data.used_stiffness_model_selected == 3:
@@ -434,10 +605,17 @@ class ResultsWidget(PYAFWidget):
                     self.BT_profiles.setEnabled(True)
                 else:
                     self.BT_profiles.setEnabled(False)
-                if data.stiffness_array is not None:
-                    self.BT_slices.setEnabled(True)
-                else:
-                    self.BT_slices.setEnabled(False)
+                # Slices of the elasticity in depth: only with segments
+                # (Tomography, or files computed with segments before)
+                _, step, tomography = data.get_used_indentation()
+                depth = data.stiffness_calculated and (
+                    not data.used_perform_fit or (tomography and step))
+                self.BT_slices.setEnabled(bool(depth))
+                self.BT_slices.setToolTip(
+                    "" if depth else "Slices of the elasticity in depth: "
+                    "available when the elasticity is computed with "
+                    "Tomography\n(one value per indentation segment; "
+                    "Fitting gives one value per curve)")
 
             else:
                 self.BT_profiles.setEnabled(False)
@@ -458,7 +636,17 @@ class ResultsWidget(PYAFWidget):
             self.RB_indentation_curve.setEnabled(data.stiffness_calculated)
 
             # Enable residuals option
-            self.RB_residuals.setEnabled(data.perform_fit)
+            # Residuals of the fits: only for a stiffness computed by
+            # fitting
+            self.RB_residuals.setEnabled(
+                data.stiffness_calculated and data.used_perform_fit)
+
+            # Viscoelastic fit
+            self.RB_visco.setEnabled(data.visco_calculated)
+
+            # A curve type applied from another file can be missing here
+            if not curve_type_available(data, data.display_curve_type):
+                data.display_curve_type = "defl_ext"
 
             # Check
             if data.display_curve_type == "defl_ext":
@@ -473,6 +661,8 @@ class ResultsWidget(PYAFWidget):
                 self.RB_indentation_curve.setChecked(True)
             elif data.display_curve_type == "residuals":
                 self.RB_residuals.setChecked(True)
+            elif data.display_curve_type == "visco":
+                self.RB_visco.setChecked(True)
 
             # Enable or disable radiobuttons for approach or retraction
             if data.display_curve_type == "force":
@@ -503,6 +693,12 @@ class ResultsWidget(PYAFWidget):
 
             elif data.display_curve_type == "residuals":
                 self.radiobutton_trace.setEnabled(True)
+                self.radiobutton_retrace.setEnabled(False)
+                self.radiobutton_both.setEnabled(False)
+
+            elif data.display_curve_type == "visco":
+                # Approach and retraction, in time
+                self.radiobutton_trace.setEnabled(False)
                 self.radiobutton_retrace.setEnabled(False)
                 self.radiobutton_both.setEnabled(False)
 
@@ -685,14 +881,22 @@ class ResultsWidget(PYAFWidget):
             value = self.GRP_mesh_type.checkedId()
             data.meshgrid_type = misc_tools.get_meshgrid_type_as_string(value)
             self.logger.debug("Changing meshgrid type, %s", data.meshgrid_type)
+            # The curve corresponding to the map
+            curve_changed = self.match_curve_to_map(data)
             apply_to_all.apply_to_all("display_options")
             # Update the GUI elements
             self.update_MPL("MPL_canvas1")
+            if curve_changed:
+                self.update_GUI("buttons_options_curves")
+                self.update_MPL("MPL_canvas2")
             # Update the list of colortables and the min/max values
             if widgets_list.widget_meshgrid_options is not None:
                 widgets_list.widget_meshgrid_options.update_widget()
             if widgets_list.widget_multimeshgrids is not None:
                 widgets_list.widget_multimeshgrids.update_widget()
+            # Profiles of the values of the new map
+            if widgets_list.widget_profiles is not None:
+                widgets_list.widget_profiles.update_widget()
 
         elif button == "button_multi_meshgrids":
             if widgets_list.widget_multimeshgrids is None:
@@ -764,6 +968,8 @@ class ResultsWidget(PYAFWidget):
                 data.display_curve_type = "indentation"
             elif curve_type == 5:
                 data.display_curve_type = "residuals"
+            elif curve_type == 6:
+                data.display_curve_type = "visco"
 
             tp = data.display_curve_type
             self.logger.debug("Changing curve type, %s", tp)
@@ -848,7 +1054,7 @@ class ResultsWidget(PYAFWidget):
         data = shared.exp.current_data
 
         if name == "apply_to_all":
-            shared.exp.apply_to_all_data = self.CB_app_to_all.isChecked()
+            shared.exp.apply_to_all_data = self.TG_app_to_all.isChecked()
             apply_to_all.apply_to_all("display_options")
             if shared.exp.apply_to_all_data:
                 # Update the events array (with a progressbar)
@@ -941,31 +1147,33 @@ class ResultsWidget(PYAFWidget):
                 widgets_list.widget_main.change_curve(xpos, ypos)
 
             elif mode == "profile_add":
+                # New profile, at the end of the list until the release
                 data.profile_starts.append([xpos - 1, ypos - 1])
-                data.profile_list.append([xpos - 1, ypos - 1])
+                data.profile_list.append([[xpos - 1], [ypos - 1]])
+                data.profile_count = len(data.profile_list) - 1
+                self.drawing_profile = True
 
             elif mode == "roi_add" or mode == "roi_erase":
                 self.draw_roi(xpos, ypos)
 
             elif mode == "profile_erase":
-                # Search in profile_list if there is a profile to delete
-                if data.profile_list:
-                    count = 0
-                    for profile in data.profile_list:
-                        for i in range(len(profile[0])):
-                            pos = [profile[0][i], profile[1][i]]
-                            if pos == [xpos - 1, ypos - 1]:
-                                del data.profile_list[count]
-                                del data.profile_starts[count]
-                                data.profile_count -= 1
-                                # We have found the profile, so we stop
-                                break
-                        count += 1
+                # Delete the first profile passing by this pixel
+                for count, profile in enumerate(data.profile_list):
+                    if [xpos - 1, ypos - 1] in \
+                            [list(p) for p in zip(profile[0], profile[1])]:
+                        del data.profile_list[count]
+                        if count < len(data.profile_starts):
+                            del data.profile_starts[count]
+                        break
+                data.profile_count = len(data.profile_list)
+                self.current_profile_erase = None
 
-                # Close profile widget if needed
+                # Close profile widget if needed, else remove the profile
                 w_profiles = widgets_list.widget_profiles
                 if data.profile_count == 0 and w_profiles is not None:
                     widgets_list.widget_profiles.close()
+                elif w_profiles is not None:
+                    w_profiles.update_widget()
 
                 # Reset profiles in slices widget if there is no more profile
                 # (and a custome profile was selected)
@@ -991,44 +1199,37 @@ class ResultsWidget(PYAFWidget):
         elif (ev.button == 3 and
               isinstance(self.MPL_canvas1.canvas, MainPlot) and
               ev.inaxes == self.MPL_canvas1.canvas.axes):
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.MPL_canvas1.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + ev.x
-            y = globalpos.y() + (self.meshgrid_canvas_size[1] - ev.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             meshgrid_menu.create_meshgrid_menu(self, "results", pos)
 
     def canvas_release(self, event):
         """The canvas_release is called whenever the mouse click is released."""
         data = shared.exp.list[shared.exp.id_selected]
 
-        inaxes = event.inaxes
         button = event.button
 
         if not isinstance(widgets_list.widget_results.MPL_canvas1.canvas,
                           MainPlot):
             return  # Nothing to do if no real canvas
 
-        # Release for profile, only inside canvas
-        axes = widgets_list.widget_results.MPL_canvas1.canvas.axes
-        mode = self.cursor_mode
-        if inaxes == axes and button == 1:
+        # End of a profile (also when the mouse is released outside of the
+        # map): kept if it has at least 3 pixels
+        if self.drawing_profile and button == 1:
+            self.drawing_profile = False
             ls = data.profile_list
-            if mode == "profile_add":
-                length = len(ls[data.profile_count][0])
-
-            if mode == "profile_add" and length >= 3:
-                data.profile_count = data.profile_count + 1
-                self.update_GUI("button_profiles_and_slices")
-
-                # Finalize plotting
-                self.MPL_canvas1.canvas.update_blit("all")
-
-            elif mode == "profile_add" and length < 3 and ls:
-                # Nothing has happened
-                del data.profile_starts[data.profile_count]
-                del data.profile_list[data.profile_count]
+            if ls and len(ls[-1][0]) < 3:
+                del ls[-1]
+                if data.profile_starts:
+                    del data.profile_starts[-1]
+            data.profile_count = len(ls)
+            self.update_GUI("button_profiles_and_slices")
+            # Finalize plotting
+            self.MPL_canvas1.canvas.update_blit("all")
+            # New profile in the profiles window
+            if widgets_list.widget_profiles is not None and ls:
+                widgets_list.widget_profiles.update_widget()
 
         # Releasing for the ROI can be done outside the canvas
         if self.cursor_mode == "roi_add" or self.cursor_mode == "roi_erase":
@@ -1068,21 +1269,16 @@ class ResultsWidget(PYAFWidget):
 
             mode = self.cursor_mode
 
-            if mode == "profile_add":
-                # Delete current profile
-                if data.profile_list:
-                    del data.profile_list[data.profile_count]
-
-                # Add profile to list
-                data.profile_list.append(
-                    misc_tools.make_path(
-                        data.profile_starts[data.profile_count],
-                        [xpos - 1, ypos - 1]))
+            if mode == "profile_add" and self.drawing_profile:
+                # The profile being drawn is the last one: from its start to
+                # the mouse
+                data.profile_list[-1] = misc_tools.make_path(
+                    list(data.profile_starts[-1]), [xpos - 1, ypos - 1])
 
                 # Draw profile
                 cv = self.MPL_canvas1.canvas
-                prof = data.profile_list[data.profile_count]
-                cv.update_blit("profile_preview", profile=prof)
+                cv.update_blit("profile_preview",
+                               profile=data.profile_list[-1])
 
             elif mode == "roi_add" or mode == "roi_erase":
                 # Draw a ROI
@@ -1201,12 +1397,9 @@ class ResultsWidget(PYAFWidget):
     def curves_canvas_press(self, event):
         """Called when there is a click on the curve."""
         if event.button == 3 and event.inaxes == self.MPL_canvas2.canvas.axes:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.MPL_canvas2.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.curves_canvas_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             self.popUpMenu(pos, "curve_results")
 
     def change_cursor_mode(self, mode):
@@ -1268,7 +1461,7 @@ class ResultsWidget(PYAFWidget):
 
             if data.events_calculated:
                 menu.addSeparator()
-                action = QtWidgets.QAction("Change dist filter", self)
+                action = QtWidgets.QAction("Change distance filter", self)
                 action.triggered.connect(lambda: self.change_filter("dist"))
                 menu.addAction(action)
 
@@ -1341,13 +1534,7 @@ class ResultsWidget(PYAFWidget):
     def change_filter(self, filter_value):
         """Update the value of the filter for the events."""
         widget = ChangeFilterWidget(self, filter_value)
-        if filter_value == "slope":
-            widget.setWindowTitle("Change slope filter")
-        elif filter_value == "dist":
-            widget.setWindowTitle("Change dist filter")
-        widget.resize(200, 100)
-        widget.activateWindow()
-        widget.show()
+        widget.exec()
 
 
 def prepare_roi(xpos, ypos):

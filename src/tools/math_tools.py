@@ -265,6 +265,11 @@ def fit_linear(curve_x, curve_y):
     if len(curve_x) != len(curve_y):
         raise ValueError("Error in fit_linear: curve_x and curve_y must have the same length.")
 
+    if len(curve_x) == 1:
+        # A single point gives no slope: horizontal line through the point.
+        # (numpy.polyfit returns an arbitrary slope, or fails when x = 0.)
+        return [numpy.array([0.0, float(curve_y[0])]), None]
+
     # Fit, get the coefficients and some info
     fit = numpy.polyfit(curve_x, curve_y, 1, full=True)
     coefficients = fit[0]
@@ -274,17 +279,6 @@ def fit_linear(curve_x, curve_y):
 
     return [coefficients, r_squared]
 
-
-
-def find_non_flat(curve):
-    """Find non flat part of a curve."""
-    indice = 0
-    prev_val = curve[indice]
-    next_val = curve[indice + 1]
-    while prev_val == next_val and indice + 1 <= len(curve):
-        indice += 1
-        next_val, prev_val = curve[indice], next_val
-    return indice
 
 
 def find_intersection(line1, line2):
