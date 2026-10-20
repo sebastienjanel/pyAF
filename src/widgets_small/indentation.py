@@ -65,11 +65,7 @@ class WidgetIndentation(PYAFWidget):
 
     def list_updated(self, name):
         """Called when the list is updated by the user."""
-        settings_name = "refreshBackgroundInOpenGL"
-        refresh = self.settings.value(settings_name, True)
-
         w_mesh = widgets_list.widget_multimeshgrids
-        w_opengl = widgets_list.widget_vtk
 
         if name == "indentation":
             if self.data_id is None:
@@ -81,12 +77,10 @@ class WidgetIndentation(PYAFWidget):
             apply_to_all.apply_to_all("display_options", oldid=self.data_id)
 
             # Refresh meshgrid
-            if w_opengl is None or (w_opengl is not None and refresh):
-                widgets_list.widget_results.update_MPL("MPL_canvas1")
+            widgets_list.widget_results.update_MPL("MPL_canvas1")
 
             # Refresh multimeshgrids
-            cond1 = (w_mesh is not None and refresh and w_opengl is not None)
-            if cond1 or (w_mesh is not None and w_opengl is None):
+            if w_mesh is not None:
                 widgets_list.widget_multimeshgrids.update_widget()
 
             # Refresh vtk

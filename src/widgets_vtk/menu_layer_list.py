@@ -39,15 +39,15 @@ from ..tools import misc_tools
 from .utils.create_layer import create_layer
 from .utils.glass_choser import VTKGlassChoserWidget
 from ..tools.gui_tools import PYAFButton
-from ..tools.gui_tools import PYAFCheckBox
-from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFToggle
 from .fiducials import FiducialsWidget
 from .. import widgets_list
 from .. import shared
 
-if consts.ALLOW_ITK:
-    from .utils.itk_resample import resample_images
+from .utils.resample import resample_images
+
+# Space between the two buttons of a line
+PAIR_SPACING = 6
 
 
 class MenuLayerListWidget(QtWidgets.QWidget):
@@ -94,85 +94,132 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         self.tableWidget.selectRow(0)
         self.tableWidget.cellClicked.connect(self.tableWidget_clicked)
 
-        self.HL_checkboxes = QtWidgets.QHBoxLayout()
-        self.CB_disp_all = PYAFCheckBox(self, "disp_all", "")
-        self.CB_disp_scales_all = PYAFCheckBox(self, "disp_scales_all", "")
-        self.HL_checkboxes.insertSpacing(0, 12)
-        self.HL_checkboxes.addWidget(self.CB_disp_all)
-        self.HL_checkboxes.insertSpacing(2, 20)
-        self.HL_checkboxes.addWidget(self.CB_disp_scales_all)
-        self.HL_checkboxes.addStretch(0)
-        self.CB_disp_all.setChecked(True)
-        self.CB_disp_scales_all.setChecked(True)
-
         self.VL.addWidget(self.tableWidget)
-        self.VL.addLayout(self.HL_checkboxes)
 
-        self.VL_screenshot = QtWidgets.QVBoxLayout()
-        self.BT_screenshot = PYAFButton(self, "screenshot", "Screenshot")
-        label = "Magnification"
-        self.input_magn = PYAFInput(self, "magn", label, width=50)
-        self.input_magn.changeValue(str(shared.exp.opengl_screenshot_magn))
-        self.VL_screenshot.addWidget(self.BT_screenshot)
-        self.VL_screenshot.addWidget(self.input_magn)
-
-        # --- Colors ---------------------------------------------------
-        self.VL_colors = QtWidgets.QVBoxLayout()
-        self.HL_scales = QtWidgets.QHBoxLayout()
-        label = "Background color"
-        name = "background_color"
-        self.BT_background_color = PYAFButton(self, name, label, 200)
-        label = "White scales"
-        self.BT_scales_white = PYAFButton(self, "scales_white", label, 110)
-        label = "Black scales"
-        self.BT_scales_black = PYAFButton(self, "scales_black", label, 110)
-        self.HL_scales.addWidget(self.BT_scales_white)
-        self.HL_scales.addWidget(self.BT_scales_black)
-        self.VL_colors.addLayout(self.HL_scales)
-        self.VL_colors.addWidget(self.BT_background_color)
-
-        # --------------------------------------------------------------
-
+        # --- Switches, aligned (same width of the labels) -------------
+        self.TG_colorscale = PYAFToggle(self, "colorscale", "Color scale")
+        self.TG_colorscale.setToolTip("Displays the color scale of the map "
+                                      "of the selected file")
+        self.TG_colorscale.toggle.setChecked(
+            shared.exp.list[0].opengl_display_colorbar)
         self.TG_autospin = PYAFToggle(self, "autospin", "Let it spin !")
+        self.TG_autospin.setToolTip("Turns the camera around the scene")
+        self.TG_profiles = PYAFToggle(self, "profiles", "Display Profiles")
+        self.TG_profiles.setToolTip(
+            "Draws the profiles of the maps on the AFM surfaces")
+        for toggle in (self.TG_colorscale, self.TG_autospin,
+                       self.TG_profiles):
+            toggle.label.setFixedWidth(110)
+
+        self.BT_screenshot = PYAFButton(self, "screenshot", "Screenshot")
+        self.BT_screenshot.setToolTip("Saves the 3D view as a PNG image")
+
+        # Scales and background: buttons switching between black and white,
+        # their label is the next color
+        self.BT_scales = PYAFButton(self, "scales", "")
+        self.BT_scales.setToolTip("Scales and color scale in black or white")
+        self.BT_background = PYAFButton(self, "background", "")
+        self.BT_background.setToolTip("Black or white background")
+        self.update_color_buttons()
+
         self.BT_load = PYAFButton(self, "load", "Load tiffs")
+        self.BT_load.setToolTip(
+            "Adds 2D images (tiff, e.g. optical microscopy) as layers, to "
+            "be aligned with the AFM maps")
         self.BT_load_stack = PYAFButton(self, "load_stack", "Load Stack")
+        self.BT_load_stack.setToolTip(
+            "Adds a 3D stack of images (tiff, e.g. confocal microscopy) as "
+            "a volume layer (needs ITK)")
         # Only allowed if itk is imported
         if consts.ALLOW_ITK is False:
             self.BT_load_stack.setEnabled(False)
         self.BT_add_glass = PYAFButton(self, "add_glass", "Add substrate")
+        self.BT_add_glass.setToolTip(
+            "Adds the plane of a substrate ROI (ROI manager) of an AFM map "
+            "as a layer")
         self.BT_fiducials = PYAFButton(self, "fiducials", "Fiducials")
+        self.BT_fiducials.setToolTip(
+            "Aligns a layer on another with pairs of points picked on both "
+            "(fiducial markers)")
         self.BT_lock_top = PYAFButton(self, "lock_top", "View from top")
-        self.BT_draw_square = PYAFButton(self, "draw_square", "Draw square")
-        self.BT_resample = PYAFButton(self, "resample", "ITK resample")
+        self.BT_lock_top.setToolTip("Camera above the scene, looking down")
+        self.BT_resample = PYAFButton(self, "resample", "Resample to map")
+        self.BT_resample.setToolTip(
+            "Cuts the selected tiff image on the area of an AFM map (with "
+            "the positions and angles of the layers) and saves it; it can "
+            "then be loaded on the map")
+        # Can only be enabled for 2D images
         self.BT_resample.setEnabled(False)
-        # Can be only enabled when drawing the rectangle
         self.BT_isosurface = PYAFButton(self, "isosurface", "New Isosurface")
+        self.BT_isosurface.setToolTip(
+            "Surface of the selected stack at a threshold of intensity "
+            "(binary threshold), as a new layer")
         # Can only be enabled for stacks
         self.BT_isosurface.setEnabled(False)
-        label = "Display/Hide Color Scale"
-        self.BT_display_colorscale = PYAFButton(self, "colorscale", label, 200)
 
-        name = "Display Profiles"
-        self.CB_display_profiles = PYAFCheckBox(self, "profiles", name)
-
-        self.VL.addLayout(self.VL_screenshot)
-        self.VL.addLayout(self.VL_colors)
+        self.VL.addWidget(self.TG_colorscale)
         self.VL.addWidget(self.TG_autospin)
-        self.VL.addWidget(self.BT_load)
+        self.VL.addWidget(self.TG_profiles)
+        self.add_pair(self.BT_screenshot, self.BT_lock_top)
+        self.add_pair(self.BT_scales, self.BT_background)
+        self.add_pair(self.BT_load,
+                      self.BT_load_stack if consts.ADVANCED else None)
+        self.add_pair(self.BT_add_glass, self.BT_fiducials)
         if consts.ADVANCED:
-            self.VL.addWidget(self.BT_load_stack)
-        self.VL.addWidget(self.BT_add_glass)
-        self.VL.addWidget(self.BT_fiducials)
-        self.VL.addWidget(self.BT_lock_top)
-        self.VL.addWidget(self.BT_display_colorscale)
-        if consts.ADVANCED:
-            self.VL.addWidget(self.BT_draw_square)
-            self.VL.addWidget(self.BT_resample)
-            self.VL.addWidget(self.BT_isosurface)
-        self.VL.addWidget(self.CB_display_profiles)
+            self.add_pair(self.BT_resample, self.BT_isosurface)
         self.VL.addStretch(1)
 
+        # All the buttons with the width of the largest text (with the two
+        # labels of the color buttons), the list as wide as two buttons
+        texts = ["Black scales", "White scales", "Black background",
+                 "White background"]
+        buttons = [self.BT_screenshot, self.BT_lock_top, self.BT_scales,
+                   self.BT_background, self.BT_load, self.BT_load_stack,
+                   self.BT_add_glass, self.BT_fiducials, self.BT_resample,
+                   self.BT_isosurface]
+        metrics = self.BT_scales.fontMetrics()
+        width = max(metrics.horizontalAdvance(text) + 3 * metrics.xHeight()
+                    for text in texts + [b.text() for b in buttons]) + 16
+        for button in buttons:
+            button.setFixedWidth(width)
+        self.tableWidget.setColumnWidth(2, 2 * width + PAIR_SPACING - 60)
+        self.resize_table()
+
         self.setLayout(self.VL)
+
+    def add_pair(self, left, right):
+        """Two buttons on a line."""
+        HL = QtWidgets.QHBoxLayout()
+        HL.setContentsMargins(0, 0, 0, 0)
+        HL.setSpacing(PAIR_SPACING)
+        HL.addWidget(left)
+        if right is not None:
+            HL.addWidget(right)
+        HL.addStretch(1)
+        self.VL.addLayout(HL)
+
+    def add_position_box(self, box):
+        """Position box (of the options menu) below the list, as wide."""
+        box.setFixedWidth(self.tableWidget.maximumWidth())
+        self.VL.insertWidget(1, box)
+
+    def resize_table(self):
+        """Height of the table: adapted to the layers, from 4 to 12
+        rows."""
+        rows = min(max(self.tableWidget.rowCount(), 4), 12)
+        table_width = self.tableWidget.horizontalHeader().length()
+        self.tableWidget.setFixedSize(table_width, rows * 25 + 25)
+
+    def update_color_buttons(self):
+        """Labels of the scales and background buttons: the color they
+        switch to."""
+        widget = widgets_list.widget_vtk
+        white_scales = widget is None or widget.scales_color[0] != 0.0
+        self.BT_scales.setText(
+            "Black scales" if white_scales else "White scales")
+        white_background = shared.exp.opengl_background_color[0] == 1.0
+        self.BT_background.setText(
+            "Black background" if white_background else "White background")
 
     def reset_table(self):
         """Recreates a new tableWidget."""
@@ -223,13 +270,7 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         cw = gui_tools.CenteredCellwidget(label_name)
         self.tableWidget.setCellWidget(i, 2, cw)
 
-        # Define the size of the table to hide the white space at the bottom
-        if self.tableWidget.verticalHeader().length() >= 200:
-            table_height = 200
-        else:
-            table_height = self.tableWidget.verticalHeader().length()
-        table_width = self.tableWidget.horizontalHeader().length()
-        self.tableWidget.setFixedSize(table_width, table_height + 23)
+        self.resize_table()
 
     def checkbox_clicked(self, name, row=None):
         """Called when a checkbox is clicked."""
@@ -241,63 +282,14 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             shared.layer_list[row].axes_visible = val
             shared.layer_list[row].hide_or_display_layer()
 
-            # Uncheck main if all are unchecked
-            found_checked = False
-            for i in range(len(shared.layer_list)):
-                if self.tableWidget.cellWidget(i, 0).checkbox.isChecked():
-                    found_checked = True
-                    break
-
-            self.CB_disp_all.setChecked(found_checked)
-
         elif name == "axes":
             row = int(row)
             val = self.tableWidget.cellWidget(row, 1).checkbox.isChecked()
             shared.layer_list[row].axes_visible = val
             shared.layer_list[row].hide_or_display_layer()
 
-            # Uncheck main if all are unchecked
-            found_checked = False
-            for i in range(len(shared.layer_list)):
-                if self.tableWidget.cellWidget(i, 1).checkbox.isChecked():
-                    found_checked = True
-                    break
-
-            self.CB_disp_scales_all.setChecked(found_checked)
-
-        elif name == "disp_all":
-            value = self.CB_disp_all.isChecked()
-
-            for i in range(len(shared.layer_list)):
-                shared.layer_list[i].visible = value
-                val = self.tableWidget.cellWidget(i, 1).checkbox.isChecked()
-                shared.layer_list[i].axes_visible = val
-                shared.layer_list[i].hide_or_display_layer()
-                self.tableWidget.cellWidget(i, 0).checkbox.setChecked(value)
-
-        elif name == "disp_scales_all":
-            value = self.CB_disp_scales_all.isChecked()
-
-            for i in range(len(shared.layer_list)):
-                shared.layer_list[i].axes_visible = value
-                shared.layer_list[i].hide_or_display_layer()
-                self.tableWidget.cellWidget(i, 1).checkbox.setChecked(value)
-
-        elif name == "profiles":
-            val = self.CB_display_profiles.isChecked()
-            widgets_list.widget_vtk.display_profiles = val
-
-            # Check all displayed tomogrpahies for profiles and refresh them
-            # if needed
-            for layer in shared.layer_list:
-                if layer.type == "afm":
-                    layer.update_profiles()
-
     def input_updated(self, name):
-        """Called when an input is updated."""
-
-        if name == "magn":
-            shared.exp.opengl_screenshot_magn = self.input_magn.get_int_value()
+        """Called when an input is updated (no input)."""
 
     def tableWidget_clicked(self, row, _):
         """Update GUI and 3D when clicking on a row in the layer list."""
@@ -324,19 +316,14 @@ class MenuLayerListWidget(QtWidgets.QWidget):
 
         layer = shared.layer_list[index]
 
-        if consts.ALLOW_ITK is False:
-            self.BT_resample.setEnabled(False)
-
-        if layer.type == "stack":
-            self.BT_isosurface.setEnabled(True)
-        else:
-            self.BT_isosurface.setEnabled(False)
+        self.BT_resample.setEnabled(layer.type == "single_image")
+        self.BT_isosurface.setEnabled(layer.type == "stack")
 
         if widgets_list.widget_vtk_binary_threshold is not None:
             widgets_list.widget_vtk_binary_threshold.update_widget()
 
         val = widgets_list.widget_vtk.display_profiles
-        self.CB_display_profiles.setChecked(val)
+        self.TG_profiles.toggle.setChecked(val)
 
     def button_clicked(self, button):
         """Called when a button is clicked."""
@@ -360,26 +347,28 @@ class MenuLayerListWidget(QtWidgets.QWidget):
 
                 widgets_list.widget_vtk.canvas.TakeScreenshot(name)
 
-        elif button == "background_color":
-            widg = widgets_list.widget_vtk
-            current_color = shared.exp.opengl_background_color
-            val = misc_tools.ask_user_for_color(current_color)
-            if val is not False:
-                shared.exp.opengl_background_color = val
-                widg.canvas.renderer.SetBackground(val[0], val[1], val[2])
-
-                if shared.VTK_first is False:
-                    widg.canvas.interactor.GetRenderWindow().Render()
-
-        elif button == "scales_white":
-            widgets_list.widget_vtk.scales_color = [1.0, 1.0, 1.0, 1.0]
+        elif button == "scales":
+            # Black <-> white scales
+            wl = widgets_list.widget_vtk
+            black = wl.scales_color[0] != 0.0
+            wl.scales_color = [0.0, 0.0, 0.0, 1.0] if black else \
+                [1.0, 1.0, 1.0, 1.0]
             for layer in shared.layer_list:
                 layer.updateAxesColors()
+            # Text of the color scale
+            wl.update_scalar_bar()
+            self.update_color_buttons()
 
-        elif button == "scales_black":
-            widgets_list.widget_vtk.scales_color = [0.0, 0.0, 0.0, 1.0]
-            for layer in shared.layer_list:
-                layer.updateAxesColors()
+        elif button == "background":
+            # Black <-> white background
+            wl = widgets_list.widget_vtk
+            value = 0.0 if shared.exp.opengl_background_color[0] == 1.0 \
+                else 1.0
+            shared.exp.opengl_background_color = [value, value, value, 1.0]
+            wl.canvas.renderer.SetBackground(value, value, value)
+            if shared.VTK_first is False:
+                wl.canvas.interactor.GetRenderWindow().Render()
+            self.update_color_buttons()
 
         elif button == "autospin":
             if widgets_list.widget_vtk.canvas.anim.running is False:
@@ -406,14 +395,6 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         elif button == "lock_top":
             widgets_list.widget_vtk.canvas.lock_top()
 
-        elif button == "colorscale":
-            # Display or hide the color scale for all the files
-            display = not shared.exp.list[0].opengl_display_colorbar
-            for data in shared.exp.list:
-                data.opengl_display_colorbar = display
-
-            widgets_list.widget_vtk.update_scalar_bar()
-
         elif button == "fiducials":
             if widgets_list.widget_fiducials is None:
                 # Create new widget
@@ -425,22 +406,6 @@ class MenuLayerListWidget(QtWidgets.QWidget):
                 widgets_list.widget_fiducials.activateWindow()
                 widgets_list.widget_fiducials.raise_()
 
-        elif button == "draw_square":
-            wl = widgets_list.widget_vtk
-
-            if wl.rectangle_actor is None:
-                wl.canvas.lock_top()
-                wl.action_mode = "draw_square"
-                self.BT_draw_square.setText("Hide square")
-                # self.BT_resample will be enabled after the drawing
-            else:
-                wl.canvas.renderer.RemoveActor(wl.rectangle_actor)
-                wl.rectangle_actor = None
-                wl.rectangle_pos = [0, 0, 0, 0]
-                self.BT_draw_square.setText("Draw square")
-                wl.canvas.interactor.GetRenderWindow().Render()
-                self.BT_resample.setEnabled(False)
-
         elif button == "resample":
             self.resample(index)
 
@@ -448,15 +413,29 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             create_layer("isosurface")
 
     def resample(self, index):
-        """Cuts the selected image along the drawn square, saves it where the
-        user wants and proposes to load it."""
+        """Cuts the selected image on the area of an AFM map, saves it
+        where the user wants and proposes to load it on the map."""
         if index is None or shared.layer_list[index].type != "single_image":
             QtWidgets.QMessageBox.warning(
-                self, "ITK resample",
+                self, "Resample to map",
                 "Select the image (tiff) layer to resample.")
             return
-
         layer = shared.layer_list[index]
+
+        # AFM map: asked if there are several
+        afm_layers = [lay for lay in shared.layer_list if lay.type == "afm"]
+        if not afm_layers:
+            return
+        afm = afm_layers[0]
+        if len(afm_layers) > 1:
+            names = [shared.exp.list[lay.afm_id].filename
+                     for lay in afm_layers]
+            name, ok = QtWidgets.QInputDialog.getItem(
+                self, "Resample to map", "AFM map:", names, 0, False)
+            if not ok:
+                return
+            afm = afm_layers[names.index(name)]
+
         settings_path = misc_tools.get_user_path(self.settings)
         name = os.path.splitext(layer.filename)[0] + "_resampled.tiff"
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -468,22 +447,41 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             path += ".tiff"
         misc_tools.set_user_path(self.settings, os.path.dirname(path))
 
-        resample_images(index, path)
+        x, y, angle = resample_images(layer, afm, path)
 
         answer = QtWidgets.QMessageBox.question(
-            self, "ITK resample",
+            self, "Resample to map",
             "The resampled image was saved to:\n" + path +
-            "\n\nLoad it in the 3D view?",
+            "\n\nLoad it on the map in the 3D view?",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         if answer == QtWidgets.QMessageBox.Yes:
+            count = len(shared.layer_list)
             create_layer("single_image", path)
+            if len(shared.layer_list) > count:
+                # On the map: same center and angle
+                new = shared.layer_list[-1]
+                new.rotate(None, None, new_angle=angle)
+                new.translate(x - new.pos_x, y - new.pos_y, 0)
 
     def toggle_clicked(self, toogle):
         """Called when a toogle is clicked."""
-        index = widgets_list.widget_vtk.get_current_layer()
-
+        wl = widgets_list.widget_vtk
         if toogle == "autospin":
             if widgets_list.widget_vtk.canvas.anim.running is False:
                 widgets_list.widget_vtk.canvas.anim.play()
             else:
                 widgets_list.widget_vtk.canvas.anim.stop()
+
+        elif toogle == "colorscale":
+            # Display or hide the color scale for all the files
+            display = self.TG_colorscale.toggle.isChecked()
+            for data in shared.exp.list:
+                data.opengl_display_colorbar = display
+            wl.update_scalar_bar()
+
+        elif toogle == "profiles":
+            wl.display_profiles = self.TG_profiles.toggle.isChecked()
+            # Refresh the profiles of the AFM layers
+            for layer in shared.layer_list:
+                if layer.type == "afm":
+                    layer.update_profiles()

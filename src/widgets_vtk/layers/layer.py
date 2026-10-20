@@ -97,6 +97,9 @@ class Layer:
         self.lut_invert = False
         self.lut_min_color = [0.0, 0.0, 0.0, 1.0]  # Black RGBA
         self.lut_max_color = [1.0, 1.0, 1.0, 1.0]  # White RGBA
+        # Name of the LUT (see LUTS in menu_options), custom colors in the
+        # layers saved before
+        self.lut_name = "Custom"
 
         # Thresholding
         self.use_binary_thresholding = False
@@ -117,7 +120,8 @@ class Layer:
         # Display or hide the z scale
         self.display_z_scale = True
 
-        # Smoothing (0 = No smoothing)
+        # Gaussian smoothing of the images, standard deviation in pixels
+        # (0 = No smoothing)
         self.smooth_gaussian = 0
 
         # Isosurface
@@ -386,6 +390,7 @@ class Layer:
         lut = {
             "use": self.use_lut,
             "invert": self.lut_invert,
+            "name": self.lut_name,
             "threshold": self.lut_threshold,
             "min_color": self.lut_min_color,
             "max_color": self.lut_max_color}

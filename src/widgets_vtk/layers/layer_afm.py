@@ -32,10 +32,13 @@
 """Layer for the AFM tomography."""
 
 from .layer import Layer
+import numpy
 import vtk
+from vtkmodules.util import numpy_support
 from ... import widgets_list
 from ... import shared
 from ..utils import vtk_afm
+from ...tools import map_values
 from ...widgets.progressbar import Progressbar
 
 
@@ -53,16 +56,10 @@ class LayerAFM(Layer):
         self.append_filter = None
         self.surface_polydata = None
 
-        # Type of surface to display (set different meshgrid type for color)
-        # Changing the meshgrid type for this is not very clean ...
-        # Doing this here in init, is managed by the opengl_menu afterwards
-        if self.data.opengl_surf_type == "Stiffness":
-            widgets_list.widget_results.RBT_mesh_stiffness.setChecked(True)
-        elif self.data.opengl_surf_type == "Topo_dots":
-            widgets_list.widget_results.RBT_mesh_topography.setChecked(True)
-        elif self.data.opengl_surf_type == "Topo_surf":
-            widgets_list.widget_results.RBT_mesh_topography.setChecked(True)
-        widgets_list.widget_results.button_clicked("BTG_meshgrid_type")
+        # Map drawn: one of the computed maps (elasticity by default)
+        if self.data.opengl_map_type not in \
+                map_values.available_maps(self.data):
+            self.data.opengl_map_type = "stiffness"
 
         # The tomography actor
         self.actor = None
@@ -101,44 +98,36 @@ class LayerAFM(Layer):
         if shared.VTK_first is False:
             self.parent.renderer.RemoveActor(self.actor)
 
-        # Create new actors
-        if dt.opengl_surf_type == "Stiffness_squares":
-            off = [-self.res_x / 2.0, -self.res_y / 2.0]
-            poly_data_top, z_max = vtk_afm.get_surface_as_squares(dt, off)
-        elif dt.opengl_surf_type == "Topo_dots":
-            poly_data_top, z_max = vtk_afm.get_surface_as_points(
-                self, dt, "top")
-        else:
-            poly_data_top, z_max = vtk_afm.get_surface(self, dt, "top")
+        # Create new actors: surface of the selected map, and the bottom and
+        # sides of the elasticity volume (Tomography)
+        poly_data_top, z_max = vtk_afm.get_surface(self, dt, "top")
 
-        if dt.opengl_afm_flat_view is False\
-                and dt.opengl_surf_type == "Stiffness":
+        if vtk_afm.is_volume(dt):
             poly_data_bottom, z_min = vtk_afm.get_surface(self, dt, "bottom")
-            poly_data_sidebottom = vtk_afm.get_side(dt, "bottom")
-            poly_data_sidetop = vtk_afm.get_side(dt, "top")
-            poly_data_sideleft = vtk_afm.get_side(dt, "left")
-            poly_data_sideright = vtk_afm.get_side(dt, "right")
+            sides = [vtk_afm.get_side(dt, side)
+                     for side in ("bottom", "top", "left", "right")]
+            if dt.vtk_smoothing_type is None:
+                # Colors per triangle, as the surface without smoothing (the
+                # appended polydata keep only the arrays common to all)
+                sides = [point_to_cell_colors(side) for side in sides]
+            poly_data_sidebottom, poly_data_sidetop, poly_data_sideleft, \
+                poly_data_sideright = sides
 
         self.append_filter = vtk.vtkAppendPolyData()
         self.append_filter.AddInputData(poly_data_top)
         if poly_data_bottom is not None:
-            self.append_filter.AddInputData(poly_data_bottom)
-            self.append_filter.AddInputData(poly_data_sidebottom)
-            self.append_filter.AddInputData(poly_data_sidetop)
-            self.append_filter.AddInputData(poly_data_sideleft)
-            self.append_filter.AddInputData(poly_data_sideright)
+            # Not the empty sides (e.g. along a substrate without
+            # indentation: no colors, which disturbs the append)
+            for part in (poly_data_bottom, poly_data_sidebottom,
+                         poly_data_sidetop, poly_data_sideleft,
+                         poly_data_sideright):
+                if part.GetNumberOfCells() > 0:
+                    self.append_filter.AddInputData(part)
 
         self.append_filter.Update()
         self.poly_data_tomo = self.append_filter
 
-        if dt.opengl_afm_flat_view is False:
-            self.actor = self.get_smoothed_actor()
-        else:
-            # For flat surfaces, don't use smoothing
-            mapper = vtk.vtkPolyDataMapper()
-            mapper.SetInputConnection(self.poly_data_tomo.GetOutputPort())
-            self.actor = vtk.vtkActor()
-            self.actor.SetMapper(mapper)
+        self.actor = self.get_smoothed_actor()
 
         self.z_scale = [z_min, z_max]
 
@@ -172,12 +161,11 @@ class LayerAFM(Layer):
 
     def get_smoothed_actor(self):
         """Smooth the tomography actor."""
-        # Use a filter to smooth the data (will add triangles and smooth)
+        # Use a filter to smooth the data (will add triangles and smooth),
+        # off by default
         smooth = None
-        if self.data.vtk_smoothing_type == "loop":
+        if self.data.vtk_smoothing_type is not None:
             smooth = vtk.vtkLoopSubdivisionFilter()
-        elif self.data.vtk_smoothing_type == "butterfly":
-            smooth = vtk.vtkButterflySubdivisionFilter()
 
         if smooth is not None:
             # Clean the polydata so that the edges are shared !
@@ -287,3 +275,23 @@ class LayerAFM(Layer):
 
         # Update the rendering
         self.draw_at_position()
+
+
+def point_to_cell_colors(polydata):
+    """Polydata with the colors of its points moved to its triangles (mean of
+    the three points of each triangle)."""
+    colors = polydata.GetPointData().GetScalars()
+    if colors is None or polydata.GetNumberOfCells() == 0:
+        return polydata
+    point_colors = numpy_support.vtk_to_numpy(colors).astype(float)
+    # Connectivity of the triangles: 3 point ids per cell
+    ids = numpy_support.vtk_to_numpy(
+        polydata.GetPolys().GetConnectivityArray()).reshape(-1, 3)
+    cell_colors = numpy.round(point_colors[ids].mean(axis=1)).astype(
+        numpy.uint8)
+    array = numpy_support.numpy_to_vtk(cell_colors, deep=True)
+    output = vtk.vtkPolyData()
+    output.ShallowCopy(polydata)
+    output.GetPointData().Initialize()
+    output.GetCellData().SetScalars(array)
+    return output

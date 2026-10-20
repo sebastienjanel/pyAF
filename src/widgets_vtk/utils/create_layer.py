@@ -77,20 +77,17 @@ def create_layer(layer_type, path=None, isosurf_stack_id=None, iso_file=None):
             layer = shared.layer_list[newid]
             layer.layer_id = newid
 
-            # Change values
+            # Sizes of the image in the Image box
             if layer_type == "single_image" or layer_type == "stack":
-                tab = wg.menu_options.tab_Optics
-                tab.IN_x_size.changeValue(layer.size_x / 1000.0)
-                tab.IN_y_size.changeValue(layer.size_y / 1000.0)
-                tab.IN_x_res.changeValue(layer.res_x / 1000.0)
-                tab.IN_y_res.changeValue(layer.res_y / 1000.0)
+                wg.menu_options.tab_Optics.update_widget()
         else:
             # The loading failed, tell the user
             name = os.path.basename(path)
 
             if layer_type == "single_image":
-                txt = ("The file {name} did not load... Only 2D 8 "
-                       "bit tiff files are accepted !".format(name=name))
+                txt = ("The file {name} did not load... Only 2D images "
+                       "(tiff, 8 or 16 bits, gray or color) are accepted !"
+                       "".format(name=name))
             elif layer_type == "stack":
                 txt = ("The file {name} is not an image stack..."
                        "".format(name=name))

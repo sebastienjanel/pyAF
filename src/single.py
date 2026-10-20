@@ -527,10 +527,16 @@ class SingleFile:
 
         self.opengl_display_colorbar = False
         self.opengl_afm_flat_view = False
+        # Not used anymore (Stiffness, squares, topography as points or
+        # surface): replaced by opengl_map_type
         self.opengl_surf_type = "Stiffness"
+        # 3D view: map drawn on the surface (see tools/map_values), height of
+        # the surface ("topo" or "piezo")
+        self.opengl_map_type = "stiffness"
+        self.opengl_height = "topo"
 
-        # Smoothing of vtk tomographies
-        # Type : None, "loop", "butterfly"
+        # Smoothing of vtk tomographies (off by default)
+        # Type : None, "loop" ("butterfly" in files saved before)
         self.vtk_smoothing_type = None
         self.vtk_smoothing_iterations = 1
         self.vtk_decimate_target_reduction = 0.2

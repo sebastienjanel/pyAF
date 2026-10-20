@@ -69,6 +69,8 @@ def load_layers(parent, path=None):
         camera.SetPosition(global_params["camera_pos"])
         widgets_list.widget_vtk.canvas.renderer.ResetCameraClippingRange()
         widgets_list.widget_vtk.scales_color = global_params["scales_color"]
+        # Label of the scales button
+        widgets_list.widget_vtk.menu_layer_list.update_color_buttons()
 
         # The saved AFM layers are applied to the AFM layers of the window,
         # in the same order; the other layers are created

@@ -35,14 +35,10 @@ import pickle
 import shutil
 from qtpy import QtCore, QtWidgets
 
-from ... import consts
 from ... import shared
 from ... import widgets_list
 from ...tools import misc_tools
 from ...widgets.progressbar import Progressbar
-
-if consts.ALLOW_ITK:
-    import itk
 
 
 def save_layers(parent):
@@ -92,18 +88,12 @@ def save_layers(parent):
             text = "Saving " + str(layer.filename) + "..."
             widgets_list.widget_progressbar.set_label(text)
 
-            if layer.type == "single_image":
+            if layer.type in ("single_image", "stack"):
+                # The file (the filters of the stacks are saved below and
+                # applied again at loading)
                 shutil.copy(
                     layer.filepath,
                     folder + "/layer_" + str(i) + ".tiff")
-
-            if layer.type == "stack":
-                image_type = itk.Image[itk.UC, 3]
-                writer = itk.ImageFileWriter[image_type].New()
-                fname = str(folder + "/layer_" + str(i) + ".tiff")
-                writer.SetFileName(fname)
-                writer.SetInput(layer.input_image)
-                writer.Update()
 
             to_save = {}
 
@@ -133,6 +123,7 @@ def save_layers(parent):
 
             to_save["lut_min_color"] = layer.lut_min_color
             to_save["lut_max_color"] = layer.lut_max_color
+            to_save["lut_name"] = layer.lut_name
             to_save["bind"] = layer.bind
 
             # Smoothing of images

@@ -40,7 +40,8 @@ from ..tools.PYAFWidget import PYAFWidget
 from .. import widgets_list
 from .. import shared
 import vtk
-from ..tools.colortables import ColorTables
+from ..tools import map_values
+from .utils import vtk_afm
 from .. import consts
 
 
@@ -66,8 +67,6 @@ class OpenglWidget(PYAFWidget):
         shared.layer_list = []
         self.action_mode = "camera"
         self.last_pos = QtCore.QPoint(0, 0)
-        self.rectangle_pos = [0, 0, 0, 0]  # x1, y1, x2, y2
-        self.rectangle_actor = None
         self.scales_color = [1.0, 1.0, 1.0, 1.0]
         self.display_profiles = False
 
@@ -77,6 +76,7 @@ class OpenglWidget(PYAFWidget):
 
         self.menu_layer_list = MenuLayerListWidget(self, load_list)
         self.menu_options = MenuOptionsWidget()
+        self.menu_layer_list.add_position_box(self.menu_options.tab_options)
         self.menu_layer_list.update_widget(index=0)
 
         HL.addWidget(self.menu_layer_list)
@@ -94,6 +94,10 @@ class OpenglWidget(PYAFWidget):
         self.canvas.style.HighlightProp(shared.layer_list[0].actor)
 
         self.menu_options.tab_afm.update_widget()
+
+        # Background of the experiment (black or white)
+        color = shared.exp.opengl_background_color
+        self.canvas.renderer.SetBackground(color[0], color[1], color[2])
 
         # Add colorbar to the renderer
         self.scalar_bar = get_color_bar()
@@ -126,8 +130,10 @@ class OpenglWidget(PYAFWidget):
         Reset also VTK_first to True for the next opening
         """
         shared.VTK_first = True
-        widgets_list.widget_meshgrid_options.close()
-        widgets_list.widget_indentation.close()
+        for widget in (widgets_list.widget_meshgrid_options,
+                       widgets_list.widget_indentation):
+            if widget is not None:
+                widget.close()
         super().closeEvent(event)
 
     def update_AFM_colors(self):
@@ -197,27 +203,22 @@ def get_color_bar():
     layer of the window)
     """
     data = colorbar_data()
+    mt = vtk_afm.map_type(data)
+    opts = data.get_color_opts(mt)
+    fac = map_values.factor(data, mt)
 
     lut = vtk.vtkLookupTable()
     lut.SetNumberOfColors(4)
     lut.SetNumberOfTableValues(512)
-    tp = data.opengl_surf_type
-    # Same range as the colors of the tomography: from the min value, except
-    # for Rainbow 1 and Cool-Warm which start at 0 (as in the 2D meshgrids)
-    themin = 0 if data.colortableid in (1, 6) else data.colortable_min_value
-    themax = data.colortable_max_value
-    if tp == "Stiffness" or tp == "Stiffness_squares":
-        lut.SetTableRange(themin / 1000.0, themax / 1000.0)
-    elif tp == "Topo_dots" or tp == "Topo_surf":
-        lut.SetTableRange(themin, themax)
-    colortable = ColorTables(data.colortableid,
-                             data.color_saturation,
-                             data.color_negative,
-                             data.colortable_max_value,
-                             data.colortable_middle_value,
-                             mode="scalarMap",
-                             color_nan=data.color_nan,
-                             min_value=themin)
+    # Same range as the colors of the surface (color options of the map):
+    # from the min value, except for Rainbow 1 and Cool-Warm which start at 0
+    # (as in the 2D meshgrids)
+    themin = 0 if opts[0] in (1, 6) else opts[1]
+    themax = opts[2]
+    if themax <= themin:
+        themax = themin + 1
+    lut.SetTableRange(themin * fac, themax * fac)
+    colortable = vtk_afm.get_colortable(data, mt)
     step = (themax - themin) / 512.0
 
     for i in range(512):
@@ -233,19 +234,21 @@ def get_color_bar():
     # Some cosmetic options
     scalar_bar.SetTextPosition(0)  # Labels on the left
     scalar_bar.GetLabelTextProperty().SetFontSize(10)
-    scalar_bar.SetLabelFormat("%.0f")
+    scalar_bar.SetLabelFormat("%.3g")
     scalar_bar.SetPosition(0.9, 0.1)
     scalar_bar.SetOrientationToVertical()
     scalar_bar.SetWidth(0.07)
     scalar_bar.SetHeight(0.9)
     scalar_bar.GetTitleTextProperty().ItalicOff()
     scalar_bar.GetLabelTextProperty().ItalicOff()
+    # Text in the color of the scales (black or white)
+    widget = widgets_list.widget_vtk
+    color = widget.scales_color[:3] if widget is not None else [1, 1, 1]
+    scalar_bar.GetTitleTextProperty().SetColor(*color)
+    scalar_bar.GetLabelTextProperty().SetColor(*color)
 
-    # Add the title
-    if tp == "Stiffness":
-        scalar_bar.SetTitle("")
-    elif tp == "Topo_dots" or tp == "Topo_surf":
-        scalar_bar.SetTitle("Height [nm]  ")
+    # Title: label of the map
+    scalar_bar.SetTitle(map_values.label(data, mt) + "  ")
 
     # Default value is 64, we want a smooth scalarbar
     scalar_bar.SetMaximumNumberOfColors(512)

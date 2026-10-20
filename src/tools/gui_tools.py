@@ -576,7 +576,7 @@ class PYAFComboBox(QtWidgets.QComboBox):
 class ToggleSwitch(QtWidgets.QCheckBox):
     """A checkbox drawn as an on/off switch."""
 
-    def __init__(self, checked_color="#00FF44", parent=None):
+    def __init__(self, checked_color="#3b8eea", parent=None):
         super().__init__(parent)
         self.checked_color = QtGui.QColor(checked_color)
         self.setCursor(QtCore.Qt.PointingHandCursor)
@@ -642,7 +642,7 @@ class PYAFToggle(QtWidgets.QWidget):
         if size is None:
             size = 100
 
-        self.toggle = ToggleSwitch(checked_color="#00FF44")
+        self.toggle = ToggleSwitch(checked_color="#3b8eea")
         self.toggle.setFixedWidth(70)
         self.toggle.clicked.connect(self.toggle_clicked)
 

@@ -385,7 +385,10 @@ class PYAFPlot(FigureCanvasQTAgg):
                        "meshgrid_data", "meshgrid_tilt_check")
                 and self.timer_is_running is False and
                 self.is_not_first and cond):
-            self.update_plot("no_blit")
+            # Not while the data file is closed (computations): the timer
+            # plots later
+            if data_file_open():
+                self.update_plot("no_blit")
             self.resize_timer.start(self.timeout)
             self.timer_is_running = True
 
@@ -413,7 +416,20 @@ class PYAFPlot(FigureCanvasQTAgg):
         """
         self.timer_is_running = False
         self.resize_timer.stop()
+        # The data file is closed during the computations: plot later
+        if not data_file_open():
+            self.resize_timer.start(self.timeout)
+            self.timer_is_running = True
+            return
         self.update_plot()
+
+
+def data_file_open():
+    """False while the HDF5 file of the data is closed (it is closed by the
+    computations, the plots can not read it)."""
+    temp_file = getattr(shared.exp, "temp_file", None)
+    h5_file = getattr(temp_file, "file", None)
+    return h5_file is None or bool(h5_file.isopen)
 
 
 def curve_type_available(data, curve_type):

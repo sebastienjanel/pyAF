@@ -514,31 +514,19 @@ class PlotOptionsWidget(PYAFWidget):
         """This method is called to update some elements from the parents widget.
 
         Recalculate only the color for the 3D (which is lighter than
-        reinitializing the whole 3D scenery)
-
-        Do not refresh the matplotlib canvas if the user has uncheked the
-        option in the 3D VTK menu.
+        reinitializing the whole 3D scenery).
         """
-        ref = self.settings.value("refreshBackgroundInOpenGL", True)
-
-        widg_slices = widgets_list.widget_slices
-        widg_mesh = widgets_list.widget_multimeshgrids
-        widg_opengl = widgets_list.widget_vtk
-
         # Update the plots in the main GUI
-        if widg_opengl is None or (widg_opengl is not None and ref):
-            widgets_list.widget_data.meshgrid.update_plot()
-            widgets_list.widget_results.update_MPL("MPL_canvas1")
+        widgets_list.widget_data.meshgrid.update_plot()
+        widgets_list.widget_results.update_MPL("MPL_canvas1")
         # Update the slices widget if needed
-        if (widg_slices is not None and ref and widg_opengl is not None) or \
-                (widg_slices is not None and widg_opengl is None):
+        if widgets_list.widget_slices is not None:
             widgets_list.widget_slices.update_MPL()
         # Update the 3D colors if needed
         if widgets_list.widget_vtk is not None:
             widgets_list.widget_vtk.update_AFM_colors()
         # Update the multiple meshgrids widget if needed
-        if (widg_mesh is not None and ref and widg_opengl is not None) or \
-                (widg_mesh is not None and widg_opengl is None):
+        if widgets_list.widget_multimeshgrids is not None:
             widgets_list.widget_multimeshgrids.update_widget()
 
 

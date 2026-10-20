@@ -31,7 +31,98 @@
 
 """Plane with image"""
 
+import matplotlib
+import numpy
 import vtk
+from PIL import Image
+from vtkmodules.util import numpy_support
+
+# LUTs made from matplotlib colormaps (the others go from the min to the
+# max color)
+COLORMAPS = {"Fire": "afmhot", "Viridis": "viridis"}
+
+
+def frame_values(im):
+    """Values of a frame of an image: 8 bits gray (rows, cols) or RGB
+    (rows, cols, 3), or float for more bits (gray). None if not
+    supported."""
+    if im.mode in ("1", "L", "LA"):
+        return numpy.array(im.convert("L"))
+    if im.mode in ("P", "PA", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV"):
+        return numpy.array(im.convert("RGB"))
+    if im.mode.startswith(("I", "F")):
+        return numpy.array(im, dtype=float)
+    return None
+
+
+def to_8bits(values):
+    """Values on 8 bits: more bits from the min to the max of all the
+    frames."""
+    if values.dtype == numpy.uint8:
+        return values
+    low, high = numpy.nanmin(values), numpy.nanmax(values)
+    scale = 255.0 / (high - low) if high > low else 0.0
+    return numpy.nan_to_num((values - low) * scale).astype(numpy.uint8)
+
+
+def read_frames(path):
+    """Pixels of all the frames of an image (tiff, 8 or 16 bits, gray or
+    color), the row 0 being the first row of the file (as read by the
+    vtkTIFFReader).
+
+    Returns the pixels to display (8 bits, gray or RGB, (frames, rows,
+    cols[, 3])) and their gray levels for the LUTs (8 bits; brightest
+    channel of the color images, e.g. a green fluorescence keeps its
+    intensity). None if the file is not an image."""
+    try:
+        im = Image.open(path)
+        frames = []
+        for index in range(getattr(im, "n_frames", 1)):
+            im.seek(index)
+            values = frame_values(im)
+            if values is None:
+                return None
+            frames.append(values)
+        values = numpy.stack(frames)
+    except (IOError, ValueError):
+        return None
+
+    values = to_8bits(values)
+    color = values.ndim == 4
+    if color and (values[..., 0] == values[..., 1]).all() and \
+            (values[..., 0] == values[..., 2]).all():
+        # Gray levels (e.g. palette of grays)
+        values, color = values[..., 0], False
+    gray = values.max(axis=-1) if color else values
+    return numpy.ascontiguousarray(values), numpy.ascontiguousarray(gray)
+
+
+def read_image(path):
+    """Pixels and gray levels (see read_frames) of a 2D image, (rows,
+    cols[, 3]). None if the file is not a 2D image (or a stack)."""
+    try:
+        if getattr(Image.open(path), "n_frames", 1) > 1:
+            return None
+    except (IOError, ValueError):
+        return None
+    images = read_frames(path)
+    if images is None or images[0].shape[0] > 1:
+        return None
+    return images[0][0], images[1][0]
+
+
+def image_source(pixels):
+    """VTK source (output port) of the pixels (8 bits, gray or RGB)."""
+    rows, cols = pixels.shape[:2]
+    data = vtk.vtkImageData()
+    data.SetDimensions(cols, rows, 1)
+    scalars = numpy_support.numpy_to_vtk(
+        pixels.reshape(rows * cols, -1), deep=True,
+        array_type=vtk.VTK_UNSIGNED_CHAR)
+    data.GetPointData().SetScalars(scalars)
+    source = vtk.vtkTrivialProducer()
+    source.SetOutput(data)
+    return source
 
 
 def get_actor_plane(image, sizes, pos_z, lut_options, flip_options):
@@ -65,32 +156,28 @@ def get_actor_plane(image, sizes, pos_z, lut_options, flip_options):
         lut.SetNumberOfTableValues(256)
         lut.SetTableRange(0, 255)
 
-        dx = 255 - 0
-
-        dy = lut_options["max_color"][0] - lut_options["min_color"][0]
-        slope1 = dy/dx
-        dy = lut_options["max_color"][1] - lut_options["min_color"][1]
-        slope2 = dy/dx
-        dy = lut_options["max_color"][2] - lut_options["min_color"][2]
-        slope3 = dy/dx
-
-        # Define the linear LUT
+        # Linear ramp from the min to the max color, or colormap (reversed
+        # if inverted). The background is transparent: the gray
+        # levels below the threshold (above 255 - threshold if inverted,
+        # for a bright background)
+        low = lut_options["min_color"]
+        high = lut_options["max_color"]
+        threshold = int(lut_options["threshold"])
+        colormap = COLORMAPS.get(lut_options.get("name"))
+        if colormap is not None:
+            colormap = matplotlib.colormaps[colormap]
         for i in range(256):
-            lut.SetTableValue(i, i*slope1, i*slope2, i*slope3, 1.0)
-
-        # Set values to transparent (depending on threshold value and
-        # if LUT is inverted or not)
-        if lut_options["invert"]:
-            start = 255
-            end = 255 - lut_options["threshold"]
-            step = -1
-        else:
-            start = 0
-            end = lut_options["threshold"]
-            step = 1
-
-        for i in range(start, end, step):
-            lut.SetTableValue(i, 0, 0, 0, 0)
+            t = i / 255.0
+            if lut_options["invert"]:
+                t = 1.0 - t
+                transparent = i > 255 - threshold
+            else:
+                transparent = i < threshold
+            if colormap is not None:
+                rgb = colormap(t)[:3]
+            else:
+                rgb = [low[k] + (high[k] - low[k]) * t for k in range(3)]
+            lut.SetTableValue(i, *rgb, 0.0 if transparent else 1.0)
 
         # Lut build() has to be called
         lut.Build()
