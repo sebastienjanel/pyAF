@@ -38,6 +38,7 @@ from ..widgets_small.slices_axes import SlicesAxesWidget
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.PYAFWidget import PYAFWidget
 from ..widgets.progressbar import Progressbar
+from ..tools import params_export
 from .. import widgets_list
 from .. import shared
 import tables
@@ -211,15 +212,13 @@ class SlicesWidget(PYAFWidget):
 
         if not filename:
             return
-        else:
-            # Add extension (for Linux, on OS X it will work out of the box)
-            ends1 = filename.endswith(".tif")
-            ends2 = filename.endswith(".tiff")
-            if ends1 and ends2 is False:
-                filename += ".tif"
-
-            orig_save_path = str(filename).split(".")[0]
-            ext = str(filename).split(".")[1]
+        # Extension added if missing (Linux); name of the slices:
+        # name_0.tif... (no split at the dots of the folders)
+        filename = str(filename)
+        if not filename.lower().endswith((".tif", ".tiff")):
+            filename += ".tif"
+        orig_save_path, ext = os.path.splitext(filename)
+        ext = ext[1:]
 
         # Save the oldposition to reset it afterwards
         old_pos = self.list_position.currentIndex()
@@ -270,6 +269,11 @@ class SlicesWidget(PYAFWidget):
 
         # Close the progressbar
         widgets_list.widget_progressbar.close()
+
+        # Parameters of the file, next to the images
+        params_export.write_sidecar(
+            orig_save_path + "." + ext, "Slices of the elasticity (images)",
+            data_ids=[shared.exp.list.index(self.data)])
 
     def update_MPL(self):
         """Update the plots."""

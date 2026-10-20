@@ -31,11 +31,15 @@
 
 """Displays the used parameters for the computation."""
 
+import os
+
 from qtpy import QtWidgets
+from ..tools.gui_tools import PYAFButton
 from ..tools.PYAFWidget import PYAFWidget
 from .. import shared
 from .. import widgets_list
 from ..tools import misc_tools
+from ..tools import params_export
 
 
 class UsedParametersWidget(PYAFWidget):
@@ -177,9 +181,39 @@ class UsedParametersWidget(PYAFWidget):
         HL.addWidget(box_work_and_rupture_force)
         HL.addWidget(box_events)
 
-        self.setLayout(HL)
+        # Parameters of the file as JSON (all the parameters, also in the
+        # Export menu for all the files)
+        self.BT_save = PYAFButton(self, "save_json", "Save as JSON...")
+        self.BT_save.setToolTip(
+            "Saves all the parameters of this file (calibration, "
+            "acquisition, computations) in a JSON file")
+        HL_buttons = QtWidgets.QHBoxLayout()
+        HL_buttons.addStretch(1)
+        HL_buttons.addWidget(self.BT_save)
+        VL_main = QtWidgets.QVBoxLayout()
+        VL_main.addLayout(HL)
+        VL_main.addLayout(HL_buttons)
+
+        self.setLayout(VL_main)
 
         self.update_widget()
+
+    def button_clicked(self, name):
+        """Saves the parameters of the file as JSON."""
+        if name != "save_json":
+            return
+        from ..utils import export_menu
+        data = shared.exp.current_data
+        base = os.path.splitext(os.path.basename(str(data.filename)))[0]
+        path = export_menu.ask_path(self, "Save the parameters",
+                                    base + ".params.json", "JSON (*.json)")
+        if not path:
+            return
+        if not path.lower().endswith(".json"):
+            path += ".json"
+        params_export.write(path, params_export.build(
+            "Parameters of a file", path, data_ids=[shared.exp.id_selected]))
+        export_menu.done(self, [path])
 
     def update_widget(self):
         """Update the GUI."""

@@ -366,6 +366,9 @@ class PYAFPlot(FigureCanvasQTAgg):
         GUI to be refreshed. If you don't do this the wrong data is buffered
         when saving the clean backgrounds. (especially when changing tabs).
         """
+        if self.save_path is not None:
+            # Plot made to save a file (not displayed): nothing to blit
+            return
         if not shared.exp.current_data.is_single:
             self.timer2 = QtCore.QTimer.singleShot(100, self.delayed_blit)
             if self.is_not_first is False:

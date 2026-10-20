@@ -30,26 +30,34 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-"""Exports the results as text files (txt files, or a csv table for R)."""
+"""Exports of the results (see the Export menu): CSV tables (one row per
+curve or event, summary per row), SuperPlot values and tests, DFS fits,
+maps (TIFF of the values) and the parameters (JSON).
 
+Every data export writes its parameters next to it (name.params.json, see
+tools.params_export). The values are in SI units (elasticity in Pa, or the
+stiffness in N/m for the slope model, work in J, forces in N, loading rates
+in N/s, distances in m, indentation in nm).
+"""
+
+import csv
 import os
-import shutil
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+from PIL import Image
 
 from .. import shared
-from .. import widgets_list as wl
+from ..tools import dfs_tools
+from ..tools import map_values
+from ..tools import params_export
 from ..tools import results_sorting
-from ..widgets.progressbar import Progressbar
+from ..tools import superplot_tools
 
 
-def write_file(path, header, lines):
-    """Writes a tab separated text file."""
-    with open(path, "wb") as newfile:
-        newfile.write((header + "\r\n").encode(encoding="UTF-8"))
-        for line in lines:
-            newfile.write((line + "\r\n").encode(encoding="UTF-8"))
+def csv_path(path):
+    """Path with the .csv extension."""
+    return path if path.lower().endswith(".csv") else path + ".csv"
 
 
 def exported_rows():
@@ -68,233 +76,11 @@ def group_and_condition(result):
     return group, condition
 
 
-def elasticity_title(data):
-    """Title of the elasticity column (the slope model gives a stiffness)."""
-    if data.used_stiffness_model_selected == 3:
-        return "Stiffness (N/m)"
-    return "Elasticity (Pa)"
-
-
-def slice_label(data, i, j, k):
-    """Indentation segment [nm] of the slice k of the curve [i, j]."""
-    start, step, tomography = data.get_used_indentation()
-    if step == 0:
-        # A single segment, up to the indentation reached by the curve
-        return str(start) + " - " + str(round(float(data.indentation[i][j]), 1))
-    low = start + k * step if tomography else start
-    return str(low) + " - " + str(start + (k + 1) * step)
-
-
-def export_results(folder):
-    """Exports the results as text files.
-
-    The results are saved as filtered (results displayed in the plots) and
-    unfiltered (raw results). The results of the replicates (the groups) are
-    also saved, with a file listing the replicates, their condition and their
-    files.
-    """
-    rows = exported_rows()
-    Progressbar()
-    wl.widget_progressbar.set_label("Exporting")
-    wl.widget_progressbar.set_range(0, 2 * len(rows) + 8)
-
-    # Create folders
-    if os.path.exists(folder):
-        shutil.rmtree(folder)
-    os.mkdir(folder)
-    os.mkdir(folder + "/filtered")
-    os.mkdir(folder + "/unfiltered")
-    os.mkdir(folder + "/replicates")
-
-    # Unfiltered data (all the curves, one file per checked row)
-    for _, result, data in rows:
-        write_unfiltered(folder + "/unfiltered/" + data.filename, data)
-        wl.widget_progressbar.update()
-
-    # Events per scan (unfiltered)
-    if any(data.events_calculated for _, _, data in rows):
-        lines = []
-        for index, (_, result, data) in enumerate(rows):
-            if data.events_calculated:
-                val = sum(len(data.events_forces[i][j])
-                          for i in range(data.nbr_pixels_x)
-                          for j in range(data.nbr_pixels_y))
-                lines.append(str(index + 1) + "\t" + result.name + "\t" +
-                             str(val))
-        write_file(folder + "/unfiltered/Events_per_scan.txt",
-                   "Index\tName\tNumber of events", lines)
-
-    # Filtered data (as in the plots: ROI, slice, filters of the row)
-    per_scan = []
-    for index, (row, result, data) in enumerate(rows):
-        pre = folder + "/filtered/" + result.name
-        nbr = write_filtered(pre, row, data)
-        if nbr is not None:
-            per_scan.append(str(index + 1) + "\t" + result.name + "\t" +
-                            str(nbr))
-        wl.widget_progressbar.update()
-
-    if per_scan:
-        write_file(folder + "/filtered/Events_per_scan.txt",
-                   "Index\tName\tNumber of events", per_scan)
-
-    # Replicates
-    for res_type in ("stiffness", "work", "rupture_force", "events_forces",
-                     "events_per_curve", "events_rupture_force",
-                     "loading_rates", "events_distance") + \
-            tuple(results_sorting.VISCO_TYPES):
-        write_group_file(res_type, folder)
-        wl.widget_progressbar.update()
-
-    # Infos
-    write_info_file(folder)
-
-    wl.widget_progressbar.close()
-
-    return True
-
-
-def write_unfiltered(pre, data):
-    """Writes the raw results of a file (all the curves)."""
-    nx, ny = data.nbr_pixels_x, data.nbr_pixels_y
-
-    def pixels():
-        index = 0
-        for i in range(nx):
-            for j in range(ny):
-                yield index, i, j
-                index += 1
-
-    def start(index, i, j):
-        return str(index + 1) + "\t" + str(i + 1) + "\t" + str(j + 1) + "\t"
-
-    if data.stiffness_calculated:
-        lines = [start(index, i, j) + slice_label(data, i, j, k) + "\t" +
-                 str(data.stiffness_array[i][j][k])
-                 for index, i, j in pixels()
-                 for k in range(len(data.stiffness_array[i][j]))]
-        write_file(pre + "_elasticity.txt",
-                   "Index\tXpos\tYpos\tSlice (nm)\t" + elasticity_title(data),
-                   lines)
-
-    if data.work_and_rupture_force1_calculated:
-        write_file(pre + "_work.txt", "Index\tXpos\tYpos\tWork (J)",
-                   [start(index, i, j) + str(data.work[i][j])
-                    for index, i, j in pixels()])
-        write_file(pre + "_rupture_force1.txt",
-                   "Index\tXpos\tYpos\tRupture force (N)",
-                   [start(index, i, j) + str(data.rupture_force1[i][j])
-                    for index, i, j in pixels()])
-
-    if data.events_calculated:
-        write_file(pre + "_events_forces.txt",
-                   "Index\tXpos\tYpos\tEvent Force (N)",
-                   [start(index, i, j) + str(force)
-                    for index, i, j in pixels()
-                    for force in data.events_forces[i][j]])
-        write_file(pre + "_event_distance.txt",
-                   "Index\tXpos\tYpos\tDistance (m)",
-                   [start(index, i, j) + str(dist)
-                    for index, i, j in pixels()
-                    for dist in data.events_forces_distance[i][j]])
-
-    if data.loading_rates_calculated:
-        write_file(pre + "_loading_rates.txt",
-                   "Index\tXpos\tYpos\tLoading rate (N/s)",
-                   [start(index, i, j) + str(lr)
-                    for index, i, j in pixels()
-                    for lr in data.loading_rates[i][j]])
-
-    if data.visco_calculated:
-        # All the parameters of the Ting fit (nan: not fitted)
-        maps = [data.visco_e0, data.visco_fluidity, data.visco_tan_delta,
-                data.visco_storage, data.visco_loss,
-                data.get_visco_result("tc"), data.get_visco_result("f0"),
-                data.get_visco_result("r2"), data.get_visco_result("height")]
-        freq = "%g Hz" % data.visco_frequency
-        write_file(pre + "_viscoelasticity.txt",
-                   "Index\tXpos\tYpos\tE0 (Pa)\tFluidity\t"
-                   "Loss tangent (tan delta)\tStorage modulus E' at " +
-                   freq + " (Pa)\tLoss modulus E'' at " + freq + " (Pa)\t"
-                   "Time of contact (s)\t"
-                   "F0 (N)\tR2\tB.E.C. height (nm)",
-                   [start(index, i, j) +
-                    "\t".join(str(float(m[i][j])) for m in maps)
-                    for index, i, j in pixels()])
-
-
-def write_filtered(pre, row, data):
-    """Writes the results of a row as in the plots. Returns the number of
-    kept events (None without events)."""
-    def get(force_type):
-        util = results_sorting.GetResults(export="single")
-        return util.get_results_single(result_id=row, force_type=force_type)
-
-    def lines(array, value_col=3):
-        return [str(line[0] + 1) + "\t" + str(line[1] + 1) + "\t" +
-                str(line[2] + 1) + "\t" + str(line[value_col])
-                for line in array]
-
-    if data.stiffness_calculated:
-        array = get("stiffness")
-        write_file(pre + "_elasticity.txt",
-                   "Index\tXpos\tYpos\tSlice (nm)\t" + elasticity_title(data),
-                   [str(line[0] + 1) + "\t" + str(line[1] + 1) + "\t" +
-                    str(line[2] + 1) + "\t" +
-                    slice_label(data, line[1], line[2], line[3]) + "\t" +
-                    str(line[4])
-                    for line in array])
-
-    if data.work_and_rupture_force1_calculated:
-        write_file(pre + "_work.txt", "Index\tXpos\tYpos\tWork (J)",
-                   lines(get("work")))
-        write_file(pre + "_rupture_force1.txt",
-                   "Index\tXpos\tYpos\tRupture force (N)",
-                   lines(get("rupture_force")))
-
-    nbr_events = None
-    if data.events_calculated:
-        write_file(pre + "_events_forces.txt",
-                   "Index\tXpos\tYpos\tEvent Force (N)",
-                   lines(get("events_forces")))
-        per_curve = get("events_per_curve")
-        nbr_events = int(sum(line[3] for line in per_curve))
-        write_file(pre + "_events_per_curve.txt",
-                   "Index\tXpos\tYpos\tEvents per curve", lines(per_curve))
-        write_file(pre + "_event_max_force.txt",
-                   "Index\tXpos\tYpos\tEvent max. force (N)",
-                   lines(get("events_rupture_force")))
-        write_file(pre + "_event_distance.txt",
-                   "Index\tXpos\tYpos\tDistance (m)",
-                   lines(get("events_distance")))
-
-    if data.loading_rates_calculated:
-        write_file(pre + "_loading_rates.txt",
-                   "Index\tXpos\tYpos\tLoading rate (N/s)",
-                   lines(get("loading_rates")))
-
-    if data.visco_calculated:
-        for res_type, values in results_sorting.VISCO_TYPES.items():
-            write_file(pre + "_" + values["column"] + ".txt",
-                       "Index\tXpos\tYpos\t" + values["export"],
-                       lines(get(res_type)))
-
-    return nbr_events
-
-
-def export_results_r(path, stats_flag=True):
-    """Export the results of the checked rows as a csv table for R.
-
-    One line per curve, or per event for the curves with events (the values
-    of the curve are repeated on the lines of its events). The values are
-    filtered as in the plots and are in SI units (elasticity in Pa, or the
-    stiffness in N/m for the slope model, work in J, forces in N, loading
-    rates in N/s, distances in m, indentation in nm). The descriptive
-    statistics of each row are saved in a second file (_stats).
-    """
-    if not path.lower().endswith(".csv"):
-        path += ".csv"
-
+def data_tables():
+    """Tables of the checked rows of the Plots tab: values (one line per
+    curve, or per event for the curves with events, the values of the
+    curve being repeated on the lines of its events; filtered as in the
+    plots) and descriptive statistics of each row."""
     tables = []
     stats = []
     for row, result, data in exported_rows():
@@ -324,12 +110,36 @@ def export_results_r(path, stats_flag=True):
 
     data_df = pd.concat(tables, ignore_index=True) if tables \
         else pd.DataFrame()
-    data_df.to_csv(path, index=False)
+    stats_df = pd.concat(stats, ignore_index=True) if stats \
+        else pd.DataFrame()
+    return data_df, stats_df
 
-    if stats_flag:
-        stats_df = pd.concat(stats, ignore_index=True) if stats \
-            else pd.DataFrame()
-        stats_df.to_csv(path[:-4] + "_stats.csv", index=False)
+
+def checked_rows():
+    """Indices of the checked rows of the Plots tab."""
+    return [row for row, _, _ in exported_rows()]
+
+
+def export_data_table(path):
+    """Values of the checked rows, one line per curve (or event). Returns
+    the written files."""
+    path = csv_path(path)
+    data_df, _ = data_tables()
+    data_df.to_csv(path, index=False)
+    json_path = params_export.write_sidecar(
+        path, "Data table (one row per curve or event)", rows=checked_rows())
+    return [path, json_path]
+
+
+def export_summary(path):
+    """Descriptive statistics of each checked row. Returns the written
+    files."""
+    path = csv_path(path)
+    _, stats_df = data_tables()
+    stats_df.to_csv(path, index=False)
+    json_path = params_export.write_sidecar(
+        path, "Summary per row", rows=checked_rows())
+    return [path, json_path]
 
 
 CURVE_KEYS = ["curve_index", "x_pos", "y_pos"]
@@ -441,75 +251,165 @@ def describe(df, name):
                           for stat in values.index}])
 
 
-def write_group_file(res_type, folder):
-    """Write file containing the results of the replicates (the groups).
-
-    Each replicate is written in a column. The columns are separated by
-    semi-colons; a replicate with less values has empty cells.
-
-    NOTE: The results_sorting.py file provides the values used here.
-    All the values have been scaled to be displayed directly in the sotware.
-    We need to scale them back for exporting in m, Pa, N, N/s or J.
-    """
-    if res_type == "stiffness":
-        model3 = any(shared.exp.list[res.data_id].used_stiffness_model_selected
-                     == 3 for res in shared.exp.results_list)
-        if shared.exp.hist_log:
-            # log10(E [Pa]) in the plots
-            convert = lambda v: 10 ** v  # noqa: E731
-        elif model3:
-            convert = lambda v: v  # noqa: E731
-        else:
-            convert = lambda v: v * 1e3  # noqa: E731
-        title = "Stiffness (N/m)" if model3 else "Elasticity (Pa)"
-    else:
-        factor, title = {
-            "work": (1e-15, "Detachment work (J)"),
-            "rupture_force": (1e-12, "Detachment force (N)"),
-            "events_forces": (1e-12, "Events forces (N)"),
-            "events_per_curve": (1, "Events per curve"),
-            "events_rupture_force": (1e-12, "Event max. force (N)"),
-            "loading_rates": (1e-12, "Loading rates (N/s)"),
-            "events_distance": (1e-9, "Event's distance (m)"),
-            **{name: (1 / values["factor"], values["export"])
-               for name, values in results_sorting.VISCO_TYPES.items()},
-        }[res_type]
-        convert = lambda v: v * factor  # noqa: E731
-
-    results_util = results_sorting.GetResults(export="groups")
-    [groups, _] = results_util.get_results_groups(force_type=res_type)
-
-    # Values of the groups (group 0 is the None group)
-    columns = []
-    for group_id in range(1, len(shared.exp.groups_list)):
-        values = groups[group_id]
-        if res_type == "loading_rates" and len(values) > 0:
-            # Forces and loading rates
-            values = values[1]
-        if len(values) > 0:
-            name = shared.exp.groups_list[group_id].name
-            columns.append((name, [str(convert(v)) for v in values]))
-
-    if not columns:
-        return
-
-    max_len = max(len(values) for _, values in columns)
-    lines = [";".join(values[line_id] if line_id < len(values) else ""
-                      for _, values in columns)
-             for line_id in range(max_len)]
-    write_file(folder + "/replicates/Replicates_" + res_type + ".txt",
-               title + "\r\n" + ";".join(name for name, _ in columns), lines)
+def superplot_rows():
+    """Rows of the Plots table in the SuperPlots: in a displayed replicate
+    of a displayed condition."""
+    groups = {g.group_id for g in shared.exp.groups_list[1:]
+              if g.display and g.condition and
+              shared.exp.conditions_list[g.condition].display}
+    return [row for row, result in enumerate(shared.exp.results_list)
+            if result.group in groups]
 
 
-def write_info_file(folder):
-    """Writes a file containing the list of replicates (with their condition)
-    and of their rows."""
-    lines = []
-    for group in shared.exp.groups_list[1:]:
-        condition = shared.exp.conditions_list[group.condition]
-        lines.append(group.name + " (condition: " + condition.name + ")")
-        for result in shared.exp.results_list:
-            if result.group == group.group_id:
-                lines.append(result.name)
-        lines.append("------------------------------------------")
-    write_file(folder + "/info.txt", "Replicates and their files", lines)
+def write_rows(path, rows):
+    """Write a list of dictionaries as a CSV table."""
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def export_superplot(path):
+    """Values of the files of the SuperPlot (with their replicate and
+    condition) and the tests (_tests.csv). Returns the written files, empty
+    without SuperPlot."""
+    conditions = superplot_tools.get_data()
+    rows = superplot_tools.export_rows(conditions)
+    if not rows:
+        return []
+    path = csv_path(path)
+    files = [path]
+    write_rows(path, rows)
+    options = superplot_tools.get_options()
+    tests = superplot_tools.test_rows(conditions, options)
+    if tests:
+        tests_path = path[:-4] + "_tests.csv"
+        write_rows(tests_path, tests)
+        files.append(tests_path)
+    control = next((c.name for c in shared.exp.conditions_list[1:]
+                    if c.condition_id == options["control"]), None)
+    files.append(params_export.write_sidecar(
+        path, "SuperPlot values and tests", rows=superplot_rows(),
+        options={"superplot": {
+            "control": "all pairs"
+            if options["control"] == superplot_tools.ALL_PAIRS else control,
+            "replicates": "paired" if options["paired"] else "unpaired",
+            "test": "mixed model" if options["test"] == "mixed"
+            else "replicate means",
+            "log_scale": bool(options["log"])}}))
+    return files
+
+
+def dfs_rows(mode):
+    """Rows of the Plots table of the DFS fits: the displayed files, or the
+    files of the displayed replicates (speeds)."""
+    if mode == "groups":
+        groups = {g.group_id for g in shared.exp.groups_list[1:]
+                  if g.display}
+        return [row for row, result in enumerate(shared.exp.results_list)
+                if result.group in groups]
+    return checked_rows()
+
+
+def export_dfs_fits(path, mode=None):
+    """DFS fits of the Plots tab (mode "single") or of the Replicates tab
+    ("groups"): model, parameters with their standard errors, R2, and their
+    points (_points.csv). Returns the written files, empty without fit."""
+    mode = mode or shared.exp.dfs_mode
+    fits = [f for f in dfs_tools.get_fits(mode) if f.get("method") != "old"]
+    if not fits:
+        return []
+    path = csv_path(path)
+    lines, points = [], []
+    for number, fit in enumerate(fits, start=1):
+        model = fit.get("model", "bell")
+        lines.append({
+            "fit": number, "model": dfs_tools.MODELS[model][0],
+            "points_from": "files" if mode == "single" else "speeds",
+            "method": fit["method"], "bins": fit.get("nbr_bins")
+            if fit["method"] == "binned" else "",
+            "statistic": fit.get("statistic", "median"),
+            "nbr_points": fit["nbr_points"], "nbr_events": fit["nbr_events"],
+            "x_m": fit["x"], "x_se_m": fit["sx"],
+            "koff_s-1": fit["koff"], "koff_se_s-1": fit["skoff"],
+            "dG_kBT": fit.get("dG", ""), "dG_se_kBT": fit.get("sdG", ""),
+            "feq_N": fit["feq"] * 1e-12 if "feq" in fit else "",
+            "feq_se_N": fit["sfeq"] * 1e-12 if "sfeq" in fit else "",
+            "reduces_to_bell_evans": bool(fit.get("bell_limit", False)),
+            "r2": fit["r2"], "temperature_K": fit["temperature"]})
+        quartiles = fit.get("points_f_q", [])
+        for k, (r, f) in enumerate(zip(fit["points_r"], fit["points_f"])):
+            point = {"fit": number, "loading_rate_N_s": r * 1e-12,
+                     "force_N": f * 1e-12}
+            if k < len(quartiles):
+                point["force_q25_N"] = quartiles[k][0] * 1e-12
+                point["force_q75_N"] = quartiles[k][1] * 1e-12
+            points.append(point)
+    write_rows(path, lines)
+    points_path = path[:-4] + "_points.csv"
+    keys = max(points, key=len).keys()
+    write_rows(points_path, [{k: p.get(k, "") for k in keys} for p in points])
+    json_path = params_export.write_sidecar(
+        path, "DFS fits", rows=dfs_rows(mode),
+        options={"dfs": {"points_from": "files" if mode == "single"
+                         else "speeds"}})
+    return [path, points_path, json_path]
+
+
+def map_type_name(map_type):
+    """Short name of a map for the file names."""
+    return map_type.replace("stiffness_corr", "elasticity_bec").replace(
+        "stiffness", "elasticity")
+
+
+def export_map(path, data_id, map_type):
+    """Values of a map of a file as a 32-bit TIFF (NaN where there is no
+    value; in the units of the colour bar, see map_values), with the
+    parameters in its description. Returns the written file."""
+    data = shared.exp.list[data_id]
+    values = map_values.values(data, map_type) * map_values.factor(
+        data, map_type)
+    # Rows of the image: y, from the top
+    image = Image.fromarray(np.flipud(values.T).astype(np.float32), mode="F")
+    description = params_export.tiff_description(
+        "Map " + map_values.label(data, map_type), path, [data_id],
+        options={"map": map_type, "unit": map_values.label(data, map_type)})
+    image.save(path, tiffinfo={270: description})
+    return [path]
+
+
+def export_parameters(path):
+    """Parameters of all the files. Returns the written file."""
+    if not path.lower().endswith(".json"):
+        path += ".json"
+    params_export.write(path, params_export.build(
+        "Parameters", path, data_ids=list(range(len(shared.exp.list))),
+        rows=list(range(len(shared.exp.results_list)))))
+    return [path]
+
+
+def export_all(folder):
+    """Everything in a folder: data table, summary, SuperPlot, DFS fits,
+    maps of the files (the map displayed in the Results tab for each file)
+    and the parameters. Returns the written files."""
+    os.makedirs(folder, exist_ok=True)
+    files = []
+    if shared.single_data is not None and checked_rows():
+        files += export_data_table(os.path.join(folder, "data_table.csv"))
+        files += export_summary(os.path.join(folder, "summary.csv"))
+    files += export_superplot(os.path.join(folder, "superplot.csv"))
+    for mode, name in (("single", "dfs_fits_files.csv"),
+                       ("groups", "dfs_fits_speeds.csv")):
+        files += export_dfs_fits(os.path.join(folder, name), mode)
+    maps = os.path.join(folder, "maps")
+    for data_id, data in enumerate(shared.exp.list):
+        available = map_values.available_maps(data)
+        map_type = data.meshgrid_type if data.meshgrid_type in available \
+            else "piezo"
+        os.makedirs(maps, exist_ok=True)
+        name = os.path.splitext(os.path.basename(str(data.filename)))[0]
+        files += export_map(os.path.join(
+            maps, name + "_" + map_type_name(map_type) + ".tif"),
+            data_id, map_type)
+    files += export_parameters(os.path.join(folder, "parameters.json"))
+    return files

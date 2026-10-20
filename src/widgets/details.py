@@ -37,6 +37,7 @@ from ..tools.gui_tools import PYAFButton as PYAFButton
 from ..tools.gui_tools import ClearWidgetsFromLayout as ClearWidgetsFromLayout
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools import curve_tools
+from ..tools import params_export
 from .. import shared
 
 
@@ -165,6 +166,12 @@ class DetailsWidget(PYAFWidget):
                     newfile.write(get_one_line(i, j, ind, values[ind], True))
 
                 newfile.close()
+
+                # Parameters of the file, next to it
+                params_export.write_sidecar(
+                    str(filename), "Elasticity of a curve",
+                    data_ids=[shared.exp.id_selected],
+                    options={"curve": {"x_pos": i + 1, "y_pos": j + 1}})
 
 
 def get_one_line(i, j, ind, value, export=False):

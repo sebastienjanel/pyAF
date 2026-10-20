@@ -48,6 +48,7 @@ from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFToggle
+from ..widgets.load_parameters import load_parameters
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFButtonGroup
 from ..widgets.clean_up import CleanUpWidget
@@ -194,7 +195,19 @@ class ComputeWidget(PYAFWidget):
 
         # Options of the computation
         # Right aligned, above the compute buttons of the tabs
+        # Load parameters on the left, below the maps, as high as the toggles
+        # (no margin and vertical padding of the theme)
+        self.BT_load_params = PYAFButton(
+            self, "load_parameters", "Load parameters", size=120)
+        self.BT_load_params.setToolTip(
+            "Load parameters from previously exported JSON parameter file")
+        self.BT_load_params.setStyleSheet(
+            "QPushButton { margin: 0px; padding: 0px 1.2ex; }")
+        metrics = self.BT_load_params.fontMetrics()
+        self.BT_load_params.setFixedHeight(max(
+            self.TG_apply_to_all.sizeHint().height(), metrics.height() + 8))
         self.HL_options = QtWidgets.QHBoxLayout()
+        self.HL_options.addWidget(self.BT_load_params)
         self.HL_options.addStretch(1)
         self.HL_options.addWidget(self.TG_apply_to_all)
         self.HL_options.addWidget(self.TG_compute_all)
@@ -1310,7 +1323,13 @@ class ComputeWidget(PYAFWidget):
 
         data = shared.exp.list[shared.exp.id_selected]
 
-        if button == "button_rand":
+        if button == "load_parameters":
+            # Settings of an exported parameters file (see
+            # widgets.load_parameters), shown in the inputs
+            if load_parameters(self):
+                self.update_widget()
+
+        elif button == "button_rand":
             widgets_list.widget_main.change_curve(0, 0, "rand")
 
         elif button == "back":

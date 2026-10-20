@@ -34,9 +34,7 @@
 image or single curve), the replicate means and the tests on the replicates
 (Lord et al., J Cell Biol 2020)."""
 
-import csv
 import logging
-import os
 
 import numpy
 from qtpy import QtCore, QtWidgets
@@ -46,7 +44,6 @@ from .. import widgets_list
 from ..experiment import ConditionGroup
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools import gui_tools
-from ..tools import misc_tools
 from ..tools import superplot_tools
 from ..tools.gui_tools import PYAFButton, PYAFCheckBox, PYAFComboBox
 from ..tools.gui_tools import PYAFTableWidget
@@ -382,36 +379,12 @@ class ResultsExperimentWidget(PYAFWidget):
             self.export_csv()
 
     def export_csv(self):
-        """Saves the values of the files and of the replicates."""
-        rows = superplot_tools.export_rows(superplot_tools.get_data())
-        if not rows:
-            return
-        path = misc_tools.get_user_path(self.settings)
-        name = "superplot_" + str(shared.exp.results_type) + ".csv"
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Export the SuperPlot values", os.path.join(path, name),
-            "CSV (*.csv)")
-        if not filename:
-            return
-        if not filename.lower().endswith(".csv"):
-            filename += ".csv"
-        misc_tools.set_user_path(self.settings, os.path.dirname(filename))
-        with open(filename, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=list(rows[0]))
-            writer.writeheader()
-            writer.writerows(rows)
-        text = "Values exported to " + filename
-        # Tests: p-values and fold changes with their confidence intervals
-        tests = superplot_tools.test_rows(superplot_tools.get_data(),
-                                          superplot_tools.get_options())
-        if tests:
-            tests_name = filename[:-4] + "_tests.csv"
-            with open(tests_name, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=list(tests[0]))
-                writer.writeheader()
-                writer.writerows(tests)
-            text += "\nTests exported to " + tests_name
-        gui_tools.show_success(self, "Export complete", text)
+        """Saves the values of the files and the tests (same as the Export
+        menu, with the parameters)."""
+        from ..utils import export_menu
+        files = export_menu.export_superplot(self)
+        if files:
+            export_menu.done(self, files)
 
     def add_condition(self):
         """Add a new condition."""
