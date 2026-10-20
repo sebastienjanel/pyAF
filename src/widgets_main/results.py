@@ -45,6 +45,7 @@ from ..utils import meshgrid_menu
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFCheckBox
+from ..tools.gui_tools import PYAFToggle
 from ..tools.gui_tools import PYAFButtonGroup
 from ..widgets_main.subwidgets.curve_selector import ResultsSelectorWidget
 from ..widgets.multi_meshgrids import MultiMeshgridsWidget
@@ -137,7 +138,7 @@ class ResultsWidget(PYAFWidget):
 
         widgets_list.widget_progressbar.update()
 
-        self.CB_app_to_all = PYAFCheckBox(self, "apply_to_all", "Apply to all")
+        self.TG_app_to_all = PYAFToggle(self, "apply_to_all", "Apply to all")
 
         name = "widget_curve_selector_results"
         self.curve_selector = ResultsSelectorWidget(self, name)
@@ -427,7 +428,7 @@ class ResultsWidget(PYAFWidget):
 
         self.GL_choser = QtWidgets.QGridLayout()
         self.GL_choser.addWidget(self.list_exp, 0, 0)
-        self.GL_choser.addWidget(self.CB_app_to_all, 0, 2)
+        self.GL_choser.addWidget(self.TG_app_to_all, 0, 2)
         self.GL_choser.addLayout(HL_empty, 0, 3)
 
         self.HL_buttons = QtWidgets.QHBoxLayout()
@@ -577,7 +578,7 @@ class ResultsWidget(PYAFWidget):
             self.GRP_mesh_type.button(index).setChecked(True)
 
         if element == "apply_to_all" or element == "all":
-            self.CB_app_to_all.setChecked(shared.exp.apply_to_all_data)
+            self.TG_app_to_all.setChecked(shared.exp.apply_to_all_data)
 
         if element == "radio_buttons" or element == "all":
             if data.used_stiffness_model_selected == 3:
@@ -1053,7 +1054,7 @@ class ResultsWidget(PYAFWidget):
         data = shared.exp.current_data
 
         if name == "apply_to_all":
-            shared.exp.apply_to_all_data = self.CB_app_to_all.isChecked()
+            shared.exp.apply_to_all_data = self.TG_app_to_all.isChecked()
             apply_to_all.apply_to_all("display_options")
             if shared.exp.apply_to_all_data:
                 # Update the events array (with a progressbar)

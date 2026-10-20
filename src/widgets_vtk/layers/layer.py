@@ -36,6 +36,11 @@ import numpy
 from ... import shared
 from ... import widgets_list
 from ...tools import planefit
+from ..utils.common import use_app_font
+
+
+# Titles of the axes (the values are in um)
+AXES_TITLES = ("X [\u03bcm]", "Y [\u03bcm]", "Z [\u03bcm]")
 
 
 class Layer:
@@ -150,6 +155,22 @@ class Layer:
         # z on the left or the right
         self.actor_axes.SetFlyModeToOuterEdges()
 
+        # Text along the axes, drawn at a large font size and scaled down
+        # (sharp; the default vector text is coarse), titles apart from
+        # the labels
+        self.actor_axes.SetUseTextActor3D(1)
+        self.actor_axes.SetScreenSize(6)
+        self.actor_axes.SetTitleOffset((30, 30))
+        self.actor_axes.SetLabelOffset(15)
+        self.actor_axes.SetXTitle(AXES_TITLES[0])
+        self.actor_axes.SetYTitle(AXES_TITLES[1])
+        self.actor_axes.SetZTitle(AXES_TITLES[2])
+        for i in range(3):
+            self.actor_axes.GetTitleTextProperty(i).SetFontSize(56)
+            self.actor_axes.GetLabelTextProperty(i).SetFontSize(48)
+            use_app_font(self.actor_axes.GetTitleTextProperty(i))
+            use_app_font(self.actor_axes.GetLabelTextProperty(i))
+
         # The the size of the axes
         self.set_axes_bounds()
 
@@ -169,6 +190,12 @@ class Layer:
             if self.display_z_scale:
                 top = numpy.nanmax(planefit.topo_map(self.data))
                 self.actor_axes.SetZAxisRange(0, top / 1000.0)
+                # Only the bottom and the top (the axis is short, the
+                # automatic labels overlap)
+                labels = vtk.vtkStringArray()
+                labels.InsertNextValue("0")
+                labels.InsertNextValue("%.3g" % (top / 1000.0))
+                self.actor_axes.SetAxisLabels(2, labels)
             else:
                 self.actor_axes.SetZAxisRange(0, 0)
             self.actor_axes.SetZAxisVisibility(self.display_z_scale)
@@ -266,7 +293,7 @@ class Layer:
         # Needed to refresh title color, force a refresh of the titles
         # (Waiting for patch in vtk library, normally not needed)
         self.actor_axes.SetXTitle("")
-        self.actor_axes.SetXTitle("X-Axis")
+        self.actor_axes.SetXTitle(AXES_TITLES[0])
 
         # Update the rendering
         if shared.VTK_first is False:

@@ -36,6 +36,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from ... import widgets_list
 from ...tools.gui_tools import PYAFButton
 from ...tools.gui_tools import PYAFComboBox
+from ...tools.gui_tools import PYAFToggle
 from ...tools.PYAFWidget import PYAFWidget
 
 
@@ -71,14 +72,13 @@ class PlotSelectorWidget(PYAFWidget):
         self.list_plot_types.activated.connect(lambda: self.list_updated("plot_types"))
 
         # Zoom on the contact of the force vs distance plot
-        self.CB_zoom = QtWidgets.QCheckBox("Zoom on contact")
-        self.CB_zoom.setToolTip(
+        self.TG_zoom = PYAFToggle(self, "zoom", "Zoom on contact")
+        self.TG_zoom.setToolTip(
             "Force vs distance: zoom on the contact of the approach curve, to "
             "see if it is vertical\non a hard substrate (deflection "
             "sensitivity).")
         zoom = QtCore.QSettings().value("ForceDistanceZoom", False)
-        self.CB_zoom.setChecked(zoom not in ("false", False, None))
-        self.CB_zoom.clicked.connect(self.zoom_clicked)
+        self.TG_zoom.setChecked(zoom not in ("false", False, None))
 
         self.HL_select_curve = QtWidgets.QHBoxLayout()
         self.HL_select_curve.addStretch(1)
@@ -89,7 +89,7 @@ class PlotSelectorWidget(PYAFWidget):
 
         HL_zoom = QtWidgets.QHBoxLayout()
         HL_zoom.addStretch(1)
-        HL_zoom.addWidget(self.CB_zoom)
+        HL_zoom.addWidget(self.TG_zoom)
         HL_zoom.addStretch(1)
         VL = QtWidgets.QVBoxLayout()
         VL.setContentsMargins(0, 0, 0, 0)
@@ -99,10 +99,10 @@ class PlotSelectorWidget(PYAFWidget):
 
         self.update_widget()
 
-    def zoom_clicked(self):
+    def toggle_clicked(self, _name):
         """Zoom on the contact of the force vs distance plot (or not)."""
         QtCore.QSettings().setValue("ForceDistanceZoom",
-                                    self.CB_zoom.isChecked())
+                                    self.TG_zoom.isChecked())
         self.parent_widget.curve_3.update_plot()
 
     def available(self):
@@ -125,7 +125,7 @@ class PlotSelectorWidget(PYAFWidget):
         available = self.available()
         index = self.list_plot_types.currentIndex()
         # The zoom is only for the force vs distance plot
-        self.CB_zoom.setEnabled(index == 1)
+        self.TG_zoom.setEnabled(index == 1)
         self.BT_back.setEnabled(any(i < index for i in available))
         self.BT_forward.setEnabled(any(i > index for i in available))
 

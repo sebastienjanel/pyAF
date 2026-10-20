@@ -42,6 +42,7 @@ from .. import shared
 import vtk
 from ..tools import map_values
 from .utils import vtk_afm
+from .utils.common import use_app_font
 from .. import consts
 
 
@@ -114,12 +115,16 @@ class OpenglWidget(PYAFWidget):
         shared.VTK_first = False
 
     def get_current_layer(self):
-        """Get the index of the currently selected layer."""
+        """Get the index of the currently selected layer (the current row,
+        or the first one, if none is selected)."""
+        table = self.menu_layer_list.tableWidget
         index = None
-        rows = self.menu_layer_list.tableWidget.selectionModel().selectedRows()
+        rows = table.selectionModel().selectedRows()
         for item in rows:
             index = item.row()
 
+        if index is None and table.rowCount() > 0:
+            index = max(table.currentRow(), 0)
         return index
 
     def closeEvent(self, event):
@@ -241,6 +246,8 @@ def get_color_bar():
     scalar_bar.SetHeight(0.9)
     scalar_bar.GetTitleTextProperty().ItalicOff()
     scalar_bar.GetLabelTextProperty().ItalicOff()
+    use_app_font(scalar_bar.GetTitleTextProperty())
+    use_app_font(scalar_bar.GetLabelTextProperty())
     # Text in the color of the scales (black or white)
     widget = widgets_list.widget_vtk
     color = widget.scales_color[:3] if widget is not None else [1, 1, 1]

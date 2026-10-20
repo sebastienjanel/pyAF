@@ -33,10 +33,10 @@
 
 from qtpy import QtCore, QtGui, QtWidgets
 from ..tools.gui_tools import PYAFButton
-from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFButtonGroup
 from ..tools.gui_tools import PYAFComboBox
+from ..tools.gui_tools import PYAFToggle
 from ..tools import map_values
 from .utils import vtk_afm
 from .utils.vtk_image import COLORMAPS
@@ -157,8 +157,7 @@ class WidgetOptions(QtWidgets.QGroupBox):
         self.IN_opacity = PYAFInput(self, "opacity", "Opacity [%]", width=60)
         self.IN_opacity.input.setValidator(
             misc_tools.validator("RI", bottom=0, top=100))
-        self.CB_display_zscale = PYAFCheckBox(self, "disp_zscale",
-                                              "Z scale")
+        self.TG_display_zscale = PYAFToggle(self, "disp_zscale", "Z scale")
 
         GL.addLayout(HL_actions, 0, 0, 1, 2)
         GL.addWidget(self.IN_pos_x, 1, 0)
@@ -166,7 +165,7 @@ class WidgetOptions(QtWidgets.QGroupBox):
         GL.addWidget(self.IN_pos_z, 2, 0)
         GL.addWidget(self.IN_angle, 2, 1)
         GL.addWidget(self.IN_opacity, 3, 0)
-        GL.addWidget(self.CB_display_zscale, 3, 1)
+        GL.addWidget(self.TG_display_zscale, 3, 1)
         self.setLayout(GL)
 
         self.show_position(shared.layer_list[0])
@@ -201,7 +200,7 @@ class WidgetOptions(QtWidgets.QGroupBox):
         self.IN_opacity.changeValue(str(layer.opacity))
 
         # Display or hide the z scale
-        self.CB_display_zscale.setChecked(layer.display_z_scale)
+        self.TG_display_zscale.setChecked(layer.display_z_scale)
 
     def input_updated(self, name):
         """Called when an input field is updated."""
@@ -230,13 +229,13 @@ class WidgetOptions(QtWidgets.QGroupBox):
             value = self.IN_opacity.get_int_value()
             shared.layer_list[index].set_opacity(value)
 
-    def checkbox_clicked(self, name):
-        """Called whenever a checkbox is clicked."""
+    def toggle_clicked(self, name):
+        """Called when a toggle is clicked."""
         index = widgets_list.widget_vtk.get_current_layer()
         layer = shared.layer_list[index]
 
         if name == "disp_zscale":
-            layer.display_z_scale = self.CB_display_zscale.isChecked()
+            layer.display_z_scale = self.TG_display_zscale.isChecked()
             # Reinitialize the axes
             layer.init_axes()
 
@@ -302,8 +301,8 @@ class WidgetOptics(QtWidgets.QWidget):
             GL.setColumnStretch(len(fields[0]) + 1, 1)
             self.VL.addLayout(GL)
 
-            self.CB_bind = PYAFCheckBox(self, "bind", "Maintain Aspect Ratio")
-            self.VL.addWidget(self.CB_bind)
+            self.TG_bind = PYAFToggle(self, "bind", "Maintain aspect ratio")
+            self.VL.addWidget(self.TG_bind)
             HL = QtWidgets.QHBoxLayout()
             self.BT_apply = PYAFButton(self, "apply", "Apply changes", 125)
             self.BT_reset = PYAFButton(self, "reset", "Reset", 125)
@@ -322,15 +321,15 @@ class WidgetOptics(QtWidgets.QWidget):
             self.list_LUT.setToolTip(
                 "Colors of the gray levels of the image (None: original "
                 "image). Custom: from the min to the max color.")
-            self.CB_invert_LUT = PYAFCheckBox(self, "invert_lut", "Invert")
-            self.CB_invert_LUT.setToolTip(
+            self.TG_invert_LUT = PYAFToggle(self, "invert_lut", "Invert")
+            self.TG_invert_LUT.setToolTip(
                 "Colors reversed (bright pixels in the min color); the "
                 "threshold makes the bright pixels transparent (e.g. bright "
                 "background)")
             HL = QtWidgets.QHBoxLayout()
             HL.addWidget(QtWidgets.QLabel("LUT"))
             HL.addWidget(self.list_LUT)
-            HL.addWidget(self.CB_invert_LUT)
+            HL.addWidget(self.TG_invert_LUT)
             HL.addStretch(1)
             self.VL.addLayout(HL)
             HL = QtWidgets.QHBoxLayout()
@@ -387,11 +386,11 @@ class WidgetOptics(QtWidgets.QWidget):
         # Options to flip the images (X or Y, mirrored flip)
         VL_flip = QtWidgets.QVBoxLayout()
 
-        self.CB_flip_x = PYAFCheckBox(self, "flip_x", "Flip around X axis")
-        self.CB_flip_y = PYAFCheckBox(self, "flip_y", "Flip around Y axis")
+        self.TG_flip_x = PYAFToggle(self, "flip_x", "Flip around X axis")
+        self.TG_flip_y = PYAFToggle(self, "flip_y", "Flip around Y axis")
 
-        VL_flip.addWidget(self.CB_flip_x)
-        VL_flip.addWidget(self.CB_flip_y)
+        VL_flip.addWidget(self.TG_flip_x)
+        VL_flip.addWidget(self.TG_flip_y)
 
         if consts.ADVANCED:
             self.VL.addLayout(VL_flip)
@@ -486,18 +485,18 @@ class WidgetOptics(QtWidgets.QWidget):
         layer = shared.layer_list[index]
 
         if name == "bind":
-            layer.bind = self.CB_bind.isChecked()
+            layer.bind = self.TG_bind.isChecked()
 
         elif name == "invert_lut":
-            layer.lut_invert = self.CB_invert_LUT.isChecked()
+            layer.lut_invert = self.TG_invert_LUT.isChecked()
             layer.update_actor()
 
         elif name == "flip_x":
-            layer.flip_x = self.CB_flip_x.isChecked()
+            layer.flip_x = self.TG_flip_x.isChecked()
             layer.update_actor()
 
         elif name == "flip_y":
-            layer.flip_y = self.CB_flip_y.isChecked()
+            layer.flip_y = self.TG_flip_y.isChecked()
             layer.update_actor()
 
     def input_updated(self, name):
@@ -589,16 +588,16 @@ class WidgetOptics(QtWidgets.QWidget):
             if layer.type == "stack":
                 self.IN_z_size.changeValue("%.2f" % (layer.size_z / 1000.0))
                 self.IN_z_res.changeValue("%.3g" % (layer.res_z / 1000.0))
-            self.CB_bind.setChecked(layer.bind)
+            self.TG_bind.setChecked(layer.bind)
 
             self.list_LUT.setCurrentText(
                 layer.lut_name if layer.use_lut else "None")
-            self.CB_invert_LUT.setChecked(layer.lut_invert)
+            self.TG_invert_LUT.setChecked(layer.lut_invert)
             self.IN_threshold.changeValue(layer.lut_threshold)
             for button, color in ((self.BT_LUT_min_col, layer.lut_min_color),
                                   (self.BT_LUT_max_col, layer.lut_max_color)):
                 button.setIcon(color_icon(color))
-            for widget in (self.CB_invert_LUT, self.IN_threshold):
+            for widget in (self.TG_invert_LUT, self.IN_threshold):
                 widget.setEnabled(layer.use_lut)
             # Colors chosen only for the custom LUT
             custom = layer.use_lut and layer.lut_name == "Custom"
@@ -613,8 +612,8 @@ class WidgetOptics(QtWidgets.QWidget):
             self.IN_slide_op_others.changeValue(layer.others_opacity)
             self.slider.setValue(layer.slide_pos)
 
-        self.CB_flip_x.setChecked(layer.flip_x)
-        self.CB_flip_y.setChecked(layer.flip_y)
+        self.TG_flip_x.setChecked(layer.flip_x)
+        self.TG_flip_y.setChecked(layer.flip_y)
 
 
 class WidgetGlass(QtWidgets.QWidget):
@@ -637,11 +636,11 @@ class WidgetGlass(QtWidgets.QWidget):
         label = "Y size (um) : "
         self.IN_y_size = PYAFInput(self, "size_y", label, width=100)
         self.IN_y_size.input.setValidator(misc_tools.validator("UF"))
-        self.CB_bind = PYAFCheckBox(self, "bind", "Maintain Aspect Ratio")
+        self.TG_bind = PYAFToggle(self, "bind", "Maintain aspect ratio")
         self.BT_reset = PYAFButton(self, "reset", "Reset to default", 200)
         self.vl_box.addWidget(self.IN_x_size)
         self.vl_box.addWidget(self.IN_y_size)
-        self.vl_box.addWidget(self.CB_bind)
+        self.vl_box.addWidget(self.TG_bind)
         self.vl_box.addWidget(self.BT_reset)
         self.box.setLayout(self.vl_box)
 
@@ -656,7 +655,7 @@ class WidgetGlass(QtWidgets.QWidget):
         layer_id = widgets_list.widget_vtk.get_current_layer()
         layer = shared.layer_list[layer_id]
 
-        layer.bind = self.CB_bind.isChecked()
+        layer.bind = self.TG_bind.isChecked()
 
     def button_clicked(self, button):
         """Called when a button is clicked."""
@@ -699,7 +698,7 @@ class WidgetGlass(QtWidgets.QWidget):
         self.IN_x_size.changeValue(layer.size_x / 1000.0)
         self.IN_y_size.changeValue(layer.size_y / 1000.0)
 
-        self.CB_bind.setChecked(layer.bind)
+        self.TG_bind.setChecked(layer.bind)
 
 
 class WidgetAFM(QtWidgets.QWidget):
@@ -746,13 +745,13 @@ class WidgetAFM(QtWidgets.QWidget):
         HL_mode.addWidget(self.RBT_3D)
         HL_mode.addWidget(self.RBT_2D)
 
-        self.CB_smoothing = PYAFCheckBox(self, "smoothing", "Smoothing")
-        self.CB_smoothing.setToolTip(
+        self.TG_smoothing = PYAFToggle(self, "smoothing", "Smoothing")
+        self.TG_smoothing.setToolTip(
             "Colors interpolated between the pixels and smoother surface "
             "(subdivision of the triangles), slower.\nOff: one color per "
             "pixel, as in the maps.")
         # Smoothing, then 3D or flat, on a line
-        HL_mode.insertWidget(0, self.CB_smoothing)
+        HL_mode.insertWidget(0, self.TG_smoothing)
         HL_mode.addStretch(1)
         self.BT_slicing = PYAFButton(self, "slicing", "Slicing")
         self.BT_slicing.setToolTip("Part of the map displayed (in x and y)")
@@ -774,16 +773,16 @@ class WidgetAFM(QtWidgets.QWidget):
         self.BT_colors.setToolTip(
             "Color scale of the map (same options as the map of the "
             "results tab)")
-        self.CB_apply_to_all = PYAFCheckBox(self, "apply_to_all",
-                                            "Apply to all")
-        self.CB_apply_to_all.setToolTip(
+        self.TG_apply_to_all = PYAFToggle(self, "apply_to_all",
+                                          "Apply to all")
+        self.TG_apply_to_all.setToolTip(
             "The map, the colors and the indentation segment are changed "
             "for all the files of the 3D view")
         # Indentation segment of the elasticity (Tomography)
         self.afm_indentation_widget = WidgetIndentation(self)
         HL_colors = QtWidgets.QHBoxLayout()
         HL_colors.addWidget(self.BT_colors)
-        HL_colors.addWidget(self.CB_apply_to_all)
+        HL_colors.addWidget(self.TG_apply_to_all)
         HL_colors.addStretch(1)
         VL_colors.addLayout(HL_colors)
         VL_colors.addWidget(self.afm_indentation_widget)
@@ -882,20 +881,20 @@ class WidgetAFM(QtWidgets.QWidget):
                 widgets_list.widget_slicing.activateWindow()
                 widgets_list.widget_slicing.raise_()
 
-    def checkbox_clicked(self, name):
-        """Called when a checkbox is clicked."""
+    def toggle_clicked(self, name):
+        """Called when a toggle is clicked."""
         layer, data = self.current()
 
         if name == "smoothing":
             for lay in self.afm_layers(layer):
                 dt = shared.exp.list[lay.afm_id]
                 dt.vtk_smoothing_type = "loop" \
-                    if self.CB_smoothing.isChecked() else None
+                    if self.TG_smoothing.isChecked() else None
                 # Colors per pixel or interpolated: new surface
                 lay.update_tomography()
 
         elif name == "apply_to_all":
-            shared.exp.apply_to_all_data = self.CB_apply_to_all.isChecked()
+            shared.exp.apply_to_all_data = self.TG_apply_to_all.isChecked()
             widgets_list.widget_results.update_GUI("apply_to_all")
             self.afm_indentation_widget.update_widget(data_id=layer.afm_id)
 
@@ -926,8 +925,8 @@ class WidgetAFM(QtWidgets.QWidget):
 
         flat = data.opengl_afm_flat_view
         (self.RBT_2D if flat else self.RBT_3D).setChecked(True)
-        self.CB_smoothing.setChecked(data.vtk_smoothing_type is not None)
-        self.CB_apply_to_all.setChecked(shared.exp.apply_to_all_data)
+        self.TG_smoothing.setChecked(data.vtk_smoothing_type is not None)
+        self.TG_apply_to_all.setChecked(shared.exp.apply_to_all_data)
 
         # Indentation segment: only for the elasticity volume (Tomography)
         self.afm_indentation_widget.update_widget(data_id=layer.afm_id)

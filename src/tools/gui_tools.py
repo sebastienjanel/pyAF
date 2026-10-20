@@ -576,14 +576,17 @@ class PYAFComboBox(QtWidgets.QComboBox):
 class ToggleSwitch(QtWidgets.QCheckBox):
     """A checkbox drawn as an on/off switch."""
 
+    # Height of the switch [px], twice as wide
+    HEIGHT = 17
+
     def __init__(self, checked_color="#3b8eea", parent=None):
         super().__init__(parent)
         self.checked_color = QtGui.QColor(checked_color)
         self.setCursor(QtCore.Qt.PointingHandCursor)
-        self.setFixedHeight(24)
+        self.setFixedHeight(self.HEIGHT)
 
     def sizeHint(self):
-        return QtCore.QSize(58, 24)
+        return QtCore.QSize(2 * self.HEIGHT + 6, self.HEIGHT)
 
     def hitButton(self, pos):
         # The whole widget is clickable
@@ -591,13 +594,16 @@ class ToggleSwitch(QtWidgets.QCheckBox):
 
     def paintEvent(self, event):
         rect = self.contentsRect()
-        height = min(rect.height(), 24)
+        height = min(rect.height(), self.HEIGHT)
         width = min(rect.width(), 2 * height)
         radius = height / 2.0
 
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.NoPen)
+        if not self.isEnabled():
+            # Disabled: faded
+            painter.setOpacity(0.4)
 
         # Bar
         bar = QtCore.QRectF(rect.x(), rect.y() + (rect.height() - height) / 2,
@@ -643,7 +649,7 @@ class PYAFToggle(QtWidgets.QWidget):
             size = 100
 
         self.toggle = ToggleSwitch(checked_color="#3b8eea")
-        self.toggle.setFixedWidth(70)
+        self.toggle.setFixedWidth(2 * ToggleSwitch.HEIGHT + 6)
         self.toggle.clicked.connect(self.toggle_clicked)
 
         self.label = QtWidgets.QLabel()
@@ -652,18 +658,31 @@ class PYAFToggle(QtWidgets.QWidget):
 
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.toggle)
-        self.layout.addStretch(1)
         self.setLayout(self.layout)
+        # Width of the label and the switch (like a checkbox)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Maximum,
+                           QtWidgets.QSizePolicy.Fixed)
+
+    def isChecked(self):
+        """State of the toggle."""
+        return self.toggle.isChecked()
+
+    def setChecked(self, value):
+        """Changes the state of the toggle (without calling the parent)."""
+        self.toggle.setChecked(value)
 
     def toggle_clicked(self):
         """Called when the toggle is clicked.
 
-        Calls the parent toggle_clicked method and logs the toggle which was
-        clicked.
+        Calls the parent toggle_clicked method (or checkbox_clicked, the
+        toggles replacing checkboxes) and logs the toggle which was clicked.
         """
         self.logger.debug("Toggle clicked : %s", self.name)
 
-        self.parent.toggle_clicked(self.name)
+        if hasattr(self.parent, "toggle_clicked"):
+            self.parent.toggle_clicked(self.name)
+        else:
+            self.parent.checkbox_clicked(self.name)
 
 
 class ClearWidgetsFromLayout:

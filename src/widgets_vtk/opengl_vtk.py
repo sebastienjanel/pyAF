@@ -72,6 +72,11 @@ class VTKWidget(QtWidgets.QWidget):
 
         self.renderer = vtk.vtkRenderer()
         self.interactor.GetRenderWindow().AddRenderer(self.renderer)
+        # Text at the resolution of the screen (larger on HiDPI/Retina
+        # screens, 72 dpi by default) and smooth edges (antialiasing)
+        self.interactor.GetRenderWindow().SetDPI(
+            int(round(72 * self.devicePixelRatioF())))
+        self.renderer.UseFXAAOn()
 
         self.style = vtk.vtkInteractorStyleTrackballCamera()
         self.interactor._Iren.SetInteractorStyle(self.style)

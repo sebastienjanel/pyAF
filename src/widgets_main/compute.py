@@ -47,6 +47,7 @@ from ..tools import stat_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFCheckBox
+from ..tools.gui_tools import PYAFToggle
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFButtonGroup
 from ..widgets.clean_up import CleanUpWidget
@@ -126,7 +127,7 @@ class ComputeWidget(PYAFWidget):
 
         widgets_list.widget_progressbar.update()
 
-        self.CB_zoom_in = PYAFCheckBox(self, "zoom_in", "Zoom in")
+        self.TG_zoom_in = PYAFToggle(self, "zoom_in", "Zoom in")
         self.IN_zoom_in_factor = PYAFInput(
             self, "zoom_in_factor", "factor", 40)
         self.BT_next_zoom_element = PYAFButton(
@@ -158,9 +159,9 @@ class ComputeWidget(PYAFWidget):
         widgets_list.widget_progressbar.update()
 
         # Calc All
-        self.CB_compute_all = PYAFCheckBox(self, "compute_all", "Compute all")
+        self.TG_compute_all = PYAFToggle(self, "compute_all", "Compute all")
         label = "Apply to all"
-        self.CB_apply_to_all = PYAFCheckBox(self, "apply_to_all", label)
+        self.TG_apply_to_all = PYAFToggle(self, "apply_to_all", label)
 
         self.BT_flatten = PYAFButton(self, "flatten", "Flatten", size=80)
         self.BT_curve_mod = PYAFButton(
@@ -179,7 +180,7 @@ class ComputeWidget(PYAFWidget):
         self.HL_curves.addWidget(self.BT_clean_up)
         self.HL_curves.addWidget(self.BT_curve_mod)
         self.HL_curves.addSpacing(4)
-        self.HL_curves.addWidget(self.CB_zoom_in)
+        self.HL_curves.addWidget(self.TG_zoom_in)
         self.HL_curves.addWidget(self.IN_zoom_in_factor)
         self.HL_curves.addWidget(self.BT_next_zoom_element)
         self.box_curves = QtWidgets.QGroupBox("Curves")
@@ -195,8 +196,8 @@ class ComputeWidget(PYAFWidget):
         # Right aligned, above the compute buttons of the tabs
         self.HL_options = QtWidgets.QHBoxLayout()
         self.HL_options.addStretch(1)
-        self.HL_options.addWidget(self.CB_apply_to_all)
-        self.HL_options.addWidget(self.CB_compute_all)
+        self.HL_options.addWidget(self.TG_apply_to_all)
+        self.HL_options.addWidget(self.TG_compute_all)
 
         widgets_list.widget_progressbar.update()
 
@@ -793,7 +794,7 @@ class ComputeWidget(PYAFWidget):
                 self.BT_clean_up.setEnabled(True)
 
         if element == "apply_to_all" or element == "all":
-            self.CB_apply_to_all.setChecked(shared.exp.apply_to_all_compute)
+            self.TG_apply_to_all.setChecked(shared.exp.apply_to_all_compute)
 
         if element == "stiffness_model_selected" or element == "all":
             # Tomography: Slope model only. Fitting: the other models (files
@@ -917,13 +918,13 @@ class ComputeWidget(PYAFWidget):
             # self.IN_step.input.setText(str(data.indentation_step))
 
         if element == "zoom_in" or element == "all":
-            self.CB_zoom_in.setChecked(data.auto_zoom_in)
+            self.TG_zoom_in.setChecked(data.auto_zoom_in)
 
         if element == "zoom_fit_preview_factor" or element == "all":
             self.IN_zoom_in_factor.changeValue(data.zoom_fit_preview_factor)
 
         if element == "compute_all" or element == "all":
-            self.CB_compute_all.setChecked(shared.exp.calc_all)
+            self.TG_compute_all.setChecked(shared.exp.calc_all)
 
         if element == "flatten" or element == "all":
             if data.scan_size_x != 0:
@@ -1668,12 +1669,12 @@ class ComputeWidget(PYAFWidget):
         data = shared.exp.list[shared.exp.id_selected]
 
         if checkbox == "compute_all":
-            shared.exp.calc_all = self.CB_compute_all.isChecked()
+            shared.exp.calc_all = self.TG_compute_all.isChecked()
 
         elif checkbox == "apply_to_all":
             # Ask the user if he is sure he wants to overwrite his parameters
             do = True
-            value = self.CB_apply_to_all.isChecked()
+            value = self.TG_apply_to_all.isChecked()
             if value:
                 text = "Are you sure you want to overwrite all the parameters \
                         with the current ones ?"
@@ -1686,7 +1687,7 @@ class ComputeWidget(PYAFWidget):
                 ret = msg.exec_()
 
                 if ret == QtWidgets.QMessageBox.No:
-                    self.CB_apply_to_all.setChecked(False)
+                    self.TG_apply_to_all.setChecked(False)
                     do = False
 
             if do:
@@ -1717,7 +1718,7 @@ class ComputeWidget(PYAFWidget):
             self.update_GUI("visco")
 
         elif checkbox == "zoom_in":
-            data.auto_zoom_in = self.CB_zoom_in.isChecked()
+            data.auto_zoom_in = self.TG_zoom_in.isChecked()
             tp = shared.exp.compute_type
             if tp in ("events", "work_and_rupture_force", "loading_rates"):
                 self.BT_next_zoom_element.setEnabled(True)

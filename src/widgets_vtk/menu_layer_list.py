@@ -93,6 +93,7 @@ class MenuLayerListWidget(QtWidgets.QWidget):
 
         self.tableWidget.selectRow(0)
         self.tableWidget.cellClicked.connect(self.tableWidget_clicked)
+        self.tableWidget.itemSelectionChanged.connect(self.keep_selection)
 
         self.VL.addWidget(self.tableWidget)
 
@@ -197,6 +198,14 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             HL.addWidget(right)
         HL.addStretch(1)
         self.VL.addLayout(HL)
+
+    def keep_selection(self):
+        """A layer is always selected (the options act on it): the current
+        row is selected again if the selection was emptied (click on the
+        empty part of the list, or Cmd-click on the selected row)."""
+        table = self.tableWidget
+        if table.rowCount() and not table.selectionModel().selectedRows():
+            table.selectRow(max(table.currentRow(), 0))
 
     def add_position_box(self, box):
         """Position box (of the options menu) below the list, as wide."""
