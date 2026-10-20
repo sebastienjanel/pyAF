@@ -134,13 +134,28 @@ class ResultsExperimentWidget(PYAFWidget):
             "(several) or Tukey's test (all pairs).\nPaired: the "
             "replicates with the same Experiment number (Replicates tab)\n"
             "are compared with paired t-tests (Holm correction for "
-            "several).")
+            "several).\nMixed model: paired adds a random offset per "
+            "experiment.")
+        self.list_test = PYAFComboBox(self, "test")
+        self.list_test.addItem("Replicate means")
+        self.list_test.addItem("Mixed model")
+        self.list_test.setToolTip(
+            "Replicate means: the tests compare the means of the replicates "
+            "(n = number of replicates), as in the SuperPlots.\nMixed "
+            "model: linear mixed-effects model on all the curves, with a "
+            "random offset per replicate and per file\n(and per experiment "
+            "if paired), so that the curves are not counted as independent "
+            "samples.\nIt weighs the replicates by their files and curves, "
+            "and gives the shares of the variance\n(tooltip of the tests). "
+            "Log scale: on the log of the values. With few replicates it is "
+            "not more significant\nthan the replicate means.")
         self.list_error = PYAFComboBox(self, "error")
         self.list_error.addItem("SD")
         self.list_error.addItem("95% CI")
         self.list_error.setToolTip(
             "Error bars of the mean of the replicates")
         self.list_paired.fit_to_contents()
+        self.list_test.fit_to_contents()
         self.list_error.fit_to_contents()
         self.CB_log = PYAFCheckBox(self, "log", "Log scale (plot and tests)")
         self.CB_curves = PYAFCheckBox(self, "curves", "All the curves")
@@ -149,6 +164,7 @@ class ResultsExperimentWidget(PYAFWidget):
         self.CB_white = PYAFCheckBox(self, "white", "White background")
         form.addRow("Control", self.list_control)
         form.addRow("Replicates", self.list_paired)
+        form.addRow("Test", self.list_test)
         form.addRow("Error bars", self.list_error)
         form.addRow(self.CB_log)
         form.addRow(self.CB_curves)
@@ -188,13 +204,14 @@ class ResultsExperimentWidget(PYAFWidget):
             0, QtWidgets.QHeaderView.Stretch)
         # Widths of the columns after Comparison (it takes the remaining
         # space, at least 120 px: minimum width of the table)
-        widths = (130, 40, 80, 40, 145)
+        widths = (155, 40, 80, 40, 145)
         for column, width in enumerate(widths, start=1):
             self.TW_tests.setColumnWidth(column, width)
         self.TW_tests.setMinimumWidth(sum(widths) + 120 + 20)
         self.TW_tests.horizontalHeaderItem(5).setToolTip(
             "Ratio of the means of the replicates vs the control (geometric "
-            "means with the log scale), with its 95 % confidence interval\n"
+            "means with the log scale; means of the mixed model with this "
+            "test),\nwith its 95 % confidence interval\n"
             "from the same test as the p-value: the interval excludes 1 when "
             "the difference is significant.\nWith few replicates, the "
             "interval shows how large the effect can be, which the p-value "
@@ -267,6 +284,8 @@ class ResultsExperimentWidget(PYAFWidget):
         self.list_control.fit_to_contents()
         self.list_control.blockSignals(False)
         self.list_paired.setCurrentIndex(1 if options["paired"] else 0)
+        self.list_test.setCurrentIndex(
+            1 if options["test"] == "mixed" else 0)
         self.list_error.setCurrentIndex(
             1 if options["error"] == "95% CI" else 0)
         self.CB_log.setChecked(options["log"])
@@ -332,6 +351,9 @@ class ResultsExperimentWidget(PYAFWidget):
                 options["control"] = superplot_tools.ALL_PAIRS
         elif name == "paired":
             options["paired"] = self.list_paired.currentIndex() == 1
+        elif name == "test":
+            options["test"] = "mixed" if self.list_test.currentIndex() == 1 \
+                else "replicates"
         elif name == "error":
             options["error"] = self.list_error.currentText()
         self.update_tables()

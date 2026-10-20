@@ -40,6 +40,9 @@ Hierarchy: condition > replicate (the groups) > file > curves (the "maps"
 of the data: one per file, a single curve being a file of one curve).
 """
 
+import hashlib
+import warnings
+
 import numpy
 from scipy import stats
 
@@ -53,6 +56,9 @@ DEFAULT_OPTIONS = {
     "control": 1,           # Condition used as control for the tests
                             # (ALL_PAIRS: all pairwise comparisons)
     "paired": False,        # Replicates paired by experiment number
+    "test": "replicates",   # Tests on the replicate means ("replicates")
+                            # or mixed-effects model on the curves
+                            # ("mixed")
     "log": False,           # Log scale (plot and tests)
     "error": "SD",          # Error bars of the conditions: SD or 95% CI
     "curves": False,        # Violin of all the curves in the background
@@ -147,7 +153,8 @@ def get_data():
 
     Returns a list of conditions:
     {"id", "name", "replicates": [{"id", "name", "experiment", "value",
-    "maps": [{"name", "value", "nbr_curves"}]}], "curves": all the values}
+    "maps": [{"name", "value", "nbr_curves", "values"}]}], "curves": all
+    the values}
     The replicates without values are not listed.
     """
     from ..experiment import get_short_name
@@ -178,7 +185,8 @@ def get_data():
                     continue
                 maps.append({"name": get_short_name(result),
                              "value": map_value(values),
-                             "nbr_curves": int(values.size)})
+                             "nbr_curves": int(values.size),
+                             "values": values})
                 curves.append(values)
             if maps:
                 replicates.append({
@@ -265,6 +273,8 @@ def compare(conditions, options):
     Returns a list of {"name", "test", "n", "p", "note", "fc", "fc_low",
     "fc_high", "fc_note"}.
     """
+    if options["test"] == "mixed":
+        return compare_mixed(conditions, options)
     if options["control"] == ALL_PAIRS:
         return compare_all_pairs(conditions, options)
     control = next((c for c in conditions if c["id"] == options["control"]),
@@ -466,6 +476,205 @@ def compare_all_pairs(conditions, options):
     return finish_fold_changes(results)
 
 
+# Last mixed model: data and options, results (the tests are asked at each
+# drawing of the plot and of the tables)
+_MIXED_CACHE = {"key": None, "results": None}
+
+
+def mixed_key(conditions, options):
+    """Fingerprint of the data and options of the mixed model."""
+    digest = hashlib.sha1()
+    digest.update(repr((options["control"], options["paired"],
+                        options["log"])).encode())
+    for condition in conditions:
+        for rep in condition["replicates"]:
+            digest.update(repr((condition["id"], rep["id"],
+                                rep["experiment"])).encode())
+            for item in rep["maps"]:
+                digest.update(item["values"].tobytes())
+    return digest.hexdigest()
+
+
+def compare_mixed(conditions, options):
+    """Tests with a linear mixed-effects model on all the curves (log10 of
+    the values with the log scale), cached.
+
+    value of a curve = mean of its condition + offset of its replicate +
+    offset of its file + residual (offsets: random, normal). Paired: also an
+    offset of the experiment (replicates with the same experiment number),
+    the replicates being nested in the experiments. Fitted by REML
+    (statsmodels).
+
+    The conditions are compared to the control (or all the pairs) with t
+    tests of the differences of their means; degrees of freedom: number of
+    replicates - number of conditions (- number of experiments + 1 if
+    paired), the level at which the conditions vary. Several comparisons:
+    Holm correction, Bonferroni intervals. Fold change: ratio of the means
+    (Fieller interval), ratio of the geometric means with the log scale.
+    The shares of the variance (experiments, replicates, files, curves) are
+    given in the note of each test, and in the entries ("shares").
+    """
+    key = mixed_key(conditions, options)
+    if _MIXED_CACHE["key"] != key:
+        _MIXED_CACHE["results"] = fit_mixed(conditions, options)
+        _MIXED_CACHE["key"] = key
+    return [dict(item) for item in _MIXED_CACHE["results"]]
+
+
+def fit_mixed(conditions, options):
+    """Fit of the mixed model and tests (see compare_mixed)."""
+    import pandas
+    import statsmodels.formula.api as smf
+
+    log = options["log"]
+    all_pairs = options["control"] == ALL_PAIRS
+    if all_pairs:
+        pairs = [(i, j) for i in range(len(conditions))
+                 for j in range(i + 1, len(conditions))]
+    else:
+        ref = next((k for k, c in enumerate(conditions)
+                    if c["id"] == options["control"]), None)
+        if ref is None:
+            return []
+        pairs = [(ref, j) for j in range(len(conditions)) if j != ref]
+    if not pairs:
+        return []
+
+    results = []
+    for i, j in pairs:
+        item = {"name": conditions[j]["name"] + " vs " +
+                conditions[i]["name"], "test": "Mixed model",
+                "n": len(conditions[j]["replicates"]), "p": numpy.nan,
+                "note": "", "fc": numpy.nan, "fc_low": numpy.nan,
+                "fc_high": numpy.nan, "fc_note": "", "shares": {}}
+        if all_pairs:
+            item["pair"] = (i, j)
+        results.append(item)
+
+    # One row per curve
+    columns = {"y": [], "cond": [], "rep": [], "map": [], "exp": []}
+    for k, condition in enumerate(conditions):
+        for rep in condition["replicates"]:
+            for m, item in enumerate(rep["maps"]):
+                values = item["values"]
+                if log:
+                    values = numpy.log10(values[values > 0])
+                n = values.size
+                columns["y"].append(values)
+                columns["cond"].append(numpy.full(n, k))
+                columns["rep"].append(numpy.full(n, "%d_%d" % (k, rep["id"])))
+                columns["map"].append(numpy.full(n, "%d_%d_%d" % (
+                    k, rep["id"], m)))
+                columns["exp"].append(numpy.full(n, str(rep["experiment"])))
+    frame = pandas.DataFrame({name: numpy.concatenate(parts)
+                              for name, parts in columns.items()})
+
+    paired = options["paired"]
+    n_reps = frame["rep"].nunique()
+    n_conds = frame["cond"].nunique()
+    dof = n_reps - n_conds
+    if paired:
+        dof -= frame["exp"].nunique() - 1
+    if n_conds < len(conditions) or dof < 1:
+        for item in results:
+            item["note"] = "Not enough replicates for the mixed model"
+        return results
+
+    # Files of single curves: no variance between files
+    vc = {}
+    if frame.groupby("map").size().max() > 1:
+        vc["file"] = "0 + C(map)"
+    reference = 0 if all_pairs else pairs[0][0]
+    formula = "y ~ C(cond, Treatment(%d))" % reference
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if paired:
+                vc["replicate"] = "0 + C(rep)"
+                model = smf.mixedlm(formula, frame, groups="exp",
+                                    re_formula="1", vc_formula=vc)
+            else:
+                model = smf.mixedlm(formula, frame, groups="rep",
+                                    re_formula="1",
+                                    vc_formula=vc or None)
+            fit = model.fit(reml=True)
+    except (ValueError, numpy.linalg.LinAlgError) as error:
+        for item in results:
+            item["note"] = "The mixed model could not be fitted (%s)" % error
+        return results
+
+    # Means of the conditions and their covariance (fixed effects)
+    names = list(fit.fe_params.index)
+    beta = fit.fe_params.values
+    cov = fit.cov_params().loc[names, names].values
+    contrasts = numpy.zeros((len(conditions), len(names)))
+    contrasts[:, 0] = 1.0
+    for k in range(len(conditions)):
+        if k != reference:
+            name = "C(cond, Treatment(%d))[T.%d]" % (reference, k)
+            contrasts[k, names.index(name)] = 1.0
+    means = contrasts @ beta
+    cov_means = contrasts @ cov @ contrasts.T
+
+    # Shares of the variance
+    parts = {}
+    if paired:
+        parts["experiments"] = float(fit.cov_re.values[0, 0])
+    else:
+        parts["replicates"] = float(fit.cov_re.values[0, 0])
+    vc_names = model.exog_vc.names if vc else []
+    for name, value in zip(vc_names, fit.vcomp):
+        parts["replicates" if name == "replicate" else "files"] = \
+            float(value)
+    parts["curves"] = float(fit.scale)
+    # Order of the hierarchy
+    parts = {name: parts[name] for name in
+             ("experiments", "replicates", "files", "curves")
+             if name in parts}
+    total = sum(parts.values())
+    shares = {name: value / total for name, value in parts.items()} \
+        if total > 0 else {}
+    share_text = "Share of the variance: " + ", ".join(
+        "%s %.0f %%" % (name, 100 * value) for name, value in shares.items())
+    if not fit.converged:
+        share_text += " (the fit did not fully converge)"
+
+    m = len(pairs)
+    crit = stats.t.ppf(1 - 0.025 / m, dof)
+    pvalues = []
+    for item, (i, j) in zip(results, pairs):
+        diff = means[j] - means[i]
+        var = cov_means[j, j] + cov_means[i, i] - 2 * cov_means[i, j]
+        se = numpy.sqrt(var) if var > 0 else numpy.nan
+        item["p"] = float(2 * stats.t.sf(abs(diff / se), dof)) \
+            if numpy.isfinite(se) else numpy.nan
+        if log:
+            with numpy.errstate(over="ignore"):
+                item["fc"] = 10 ** diff
+                item["fc_low"] = 10 ** (diff - crit * se)
+                item["fc_high"] = 10 ** (diff + crit * se)
+        else:
+            item["fc"] = float(means[j] / means[i]) if means[i] else numpy.nan
+            item["fc_low"], item["fc_high"] = fieller(
+                means[j], means[i], cov_means[j, j], cov_means[i, i],
+                cov_means[i, j], crit)
+        item["note"] = share_text + "\nDegrees of freedom: %d" % dof
+        item["shares"] = shares
+        if m > 1:
+            item["fc_note"] = "Simultaneous 95 % CI (Bonferroni)"
+        pvalues.append(item["p"])
+    if m > 1:
+        # Holm correction
+        finite = [k for k, p in enumerate(pvalues) if numpy.isfinite(p)]
+        order = sorted(finite, key=lambda k: pvalues[k])
+        running = 0.0
+        for rank, k in enumerate(order):
+            running = max(running, min(1.0, (len(order) - rank) * pvalues[k]))
+            results[k]["p"] = running
+            results[k]["test"] = "Mixed model, Holm"
+    return finish_fold_changes(results)
+
+
 def finish_fold_changes(results):
     """Fold changes are positive (ratio of elasticities, forces...): lower
     bound at 0; note for the unbounded intervals."""
@@ -496,12 +705,18 @@ def export_rows(conditions):
     return rows
 
 
+def percent(share):
+    """Share as a percentage (empty if there is none)."""
+    return "" if share is None else round(100 * share, 1)
+
+
 def test_rows(conditions, options):
     """Rows of the csv export of the tests: one per comparison, with the
     p-value and the fold change vs the control with its 95 % confidence
     interval."""
     rows = []
     for test in compare(conditions, options):
+        shares = test.get("shares", {})
         rows.append({"comparison": test["name"], "test": test["test"],
                      "n": test["n"], "p_value": test["p"],
                      "significance": stars(test["p"]),
@@ -510,6 +725,14 @@ def test_rows(conditions, options):
                      "fold_change_ci95_high": test["fc_high"],
                      "scale": "log (geometric means)" if options["log"]
                      else "linear (means)",
-                     "note": "; ".join(n for n in (test["note"],
-                                                   test["fc_note"]) if n)})
+                     # Mixed model: shares of the variance [%]
+                     "variance_experiments_pct": percent(
+                         shares.get("experiments")),
+                     "variance_replicates_pct": percent(
+                         shares.get("replicates")),
+                     "variance_files_pct": percent(shares.get("files")),
+                     "variance_curves_pct": percent(shares.get("curves")),
+                     "note": "; ".join(n.replace("\n", "; ")
+                                       for n in (test["note"],
+                                                 test["fc_note"]) if n)})
     return rows
