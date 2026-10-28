@@ -93,6 +93,11 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.meshgrid_type = mt
             elif mt.startswith("visco_") and dt.visco_calculated:
                 dt.meshgrid_type = mt
+            elif mt.startswith("breakthrough_") and \
+                    dt.breakthrough_calculated:
+                dt.meshgrid_type = mt
+            elif mt.startswith("brush_") and dt.brush_calculated:
+                dt.meshgrid_type = mt
             elif mt.startswith("fit_") and dt.has_fit_quality():
                 dt.meshgrid_type = mt
             elif mt == "piezo":
@@ -224,6 +229,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.tip_angle = cur.tip_angle
                 dt.tip_angles = dict(cur.tip_angles)
                 dt.poisson_ratio = cur.poisson_ratio
+                dt.brush_model = cur.brush_model
+                dt.brush_threshold_pct = cur.brush_threshold_pct
                 # Tomography or Fitting (perform_fit follows)
                 dt.stiffness_mode = cur.stiffness_mode
                 dt.fit_range_type = cur.fit_range_type

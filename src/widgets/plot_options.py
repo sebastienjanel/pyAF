@@ -343,7 +343,7 @@ class PlotOptionsWidget(PYAFWidget):
                 high = float(max(numpy.nanmax(data.breakthrough_count), 1))
                 data.colortable_max_value = high
                 data.colortable_middle_value = high / 2.0
-            elif mt.startswith("breakthrough_"):
+            elif mt.startswith("breakthrough_") or mt.startswith("brush_"):
                 # From the 2nd to the 98th percentile
                 values = numpy.asarray(getattr(data, mt), dtype=float)
                 values = values[numpy.isfinite(values)]
@@ -475,6 +475,16 @@ class PlotOptionsWidget(PYAFWidget):
                                            1),
                 "breakthrough_count": ("Max. breakthroughs per curve", "",
                                        1)}[mt]
+            values = numpy.asarray(getattr(data, mt), dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(values.max()) if values.size else 0.0
+            val_all = None
+        elif mt.startswith("brush_"):
+            name, unit, factor = {
+                "brush_modulus": ("Max. E (brush model)", "kPa", 1e-3),
+                "brush_length": ("Max. brush length", "nm", 1),
+                "brush_density": ("Max. grafting density",
+                                  "\u00b5m\u207b\u00b2", 1)}[mt]
             values = numpy.asarray(getattr(data, mt), dtype=float)
             values = values[numpy.isfinite(values)]
             val = float(values.max()) if values.size else 0.0

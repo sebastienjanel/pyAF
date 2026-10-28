@@ -31,7 +31,10 @@
 
 """Plots the stiffness fit preview."""
 
+import numpy
+
 from ..plot_curve import PlotCurve
+from ....compute_tools.stiffness import brush
 from ....tools import misc_tools
 from ....tools import search_poc
 
@@ -62,6 +65,15 @@ class ComputeStiffness(PlotCurve):
 
             # Segment used for the fit
             self.fit_segment = slice(fit_segment[0], fit_segment[1] + 1)
+
+            # Brush model: threshold, a percentage of the maximum force
+            # above the point of contact
+            if self.data.brush_model and brush.available(self.data) and \
+                    self.data.perform_fit:
+                top = numpy.nanmax(self.curve_approach[1][
+                    self.app_pos[0]:self.app_pos[1]])
+                self.threshold_deflection = poc[1] + \
+                    self.data.brush_threshold_pct / 100.0 * (top - poc[1])
 
         else:
             self.no_fit_found = True

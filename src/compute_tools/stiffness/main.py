@@ -42,6 +42,7 @@ Young modulus (depending on the model).
 import multiprocessing
 import numpy
 from ...compute_tools import multiproc
+from . import brush
 
 if multiprocessing.current_process().name == "MainProcess":
     # Do not reimport this in the child processes.
@@ -83,6 +84,8 @@ class Stiffness:
         self.max_indentation_index = 0
         self.list_of_smoothing_errors = []
         self.error = False
+        # The refit of the point of contact was set to 0 (brush model)
+        self.refit_disabled = False
         # [stop, pixels where the stop was not attained, computed pixels]
         self.range_not_attained = None
 
@@ -106,6 +109,17 @@ class Stiffness:
             data.tomography = 1
         elif data.stiffness_model_selected == 3:
             data.stiffness_model_selected = 0
+
+        # Brush model: no refit of the baseline of the point of contact (it
+        # would move the baseline, the zero of the force, into the brush)
+        self.refit_disabled = False
+        if data.brush_model and data.perform_fit and \
+                brush.available(data) and \
+                (data.fitparam_poc_refit_option or
+                 data.fitparam_poc_refit_times):
+            data.fitparam_poc_refit_option = 0
+            data.fitparam_poc_refit_times = 0
+            self.refit_disabled = True
 
         misc_tools.save_used_params(data, "stiffness")
 
@@ -309,6 +323,16 @@ class Stiffness:
             if data.meshgrid_type.startswith("visco_"):
                 data.meshgrid_type = "stiffness"
             if data.display_curve_type == "visco":
+                data.display_curve_type = "defl_ext"
+
+        # The brush model uses the points of contact of the elasticity: to
+        # be computed again (after this computation, see the compute tab)
+        if data.brush_calculated:
+            data.brush_calculated = False
+            data.brush_results = None
+            if data.meshgrid_type.startswith("brush_"):
+                data.meshgrid_type = "stiffness"
+            if data.display_curve_type == "brush":
                 data.display_curve_type = "defl_ext"
 
         # Close the progressbar and return

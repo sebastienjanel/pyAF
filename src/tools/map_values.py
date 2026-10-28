@@ -56,6 +56,9 @@ MAPS = {
     "breakthrough_thickness": ("Breakthrough jump", "Jump [nm]", 1.0),
     "breakthrough_count": ("Breakthroughs per curve",
                            "Breakthroughs per curve", 1.0),
+    "brush_modulus": ("Elasticity (brush model)", "E [kPa]", 1e-3),
+    "brush_length": ("Brush length", "Brush length [nm]", 1.0),
+    "brush_density": ("Grafting density", "Grafting density [µm⁻²]", 1.0),
     "fit_r2": ("Fit R²", "R² of the fit", 1.0),
     "fit_poc_fixed": ("Fit: fixed point of contact",
                       "Point of contact fixed (1)", 1.0),
@@ -79,6 +82,9 @@ def available_maps(data):
         "breakthrough_force": data.breakthrough_calculated,
         "breakthrough_thickness": data.breakthrough_calculated,
         "breakthrough_count": data.breakthrough_calculated,
+        "brush_modulus": data.brush_calculated,
+        "brush_length": data.brush_calculated,
+        "brush_density": data.brush_calculated,
         "fit_r2": data.has_fit_quality(),
         "fit_poc_fixed": data.has_fit_quality()}
     return [mt for mt in MAPS

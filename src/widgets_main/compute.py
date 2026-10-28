@@ -60,6 +60,7 @@ from ..widgets_main.subwidgets.fit_parameters import FitParamsWidget
 from ..widgets.curve_modify import CurveModWidget
 from ..plots.PYAFPlot import PYAFPlot
 from ..compute_tools import breakthrough
+from ..compute_tools.stiffness import brush
 from ..compute_tools.stiffness.main import Stiffness
 from ..compute_tools.work_and_rupture_force.main import WorkAndRuptureForce
 from ..compute_tools.stiffness_correction import StiffnessCorrection
@@ -70,6 +71,12 @@ from ..widgets import plot_options
 from ..compute_tools.loading_rates import GetLoadingRate
 from ..compute_tools.events import GetEvents
 from ..tools.PYAFWidget import PYAFWidget
+
+
+def file_label(data):
+    """Short name of a file in the messages (without the end added by the
+    AFM software, as in the plots)."""
+    return experiment.auto_short_name(os.path.basename(str(data.filename)))
 
 
 class ComputeWidget(PYAFWidget):
@@ -285,7 +292,29 @@ class ComputeWidget(PYAFWidget):
         self.GL_stiffness_params.addLayout(self.HL_list_stiff, 0, 0)
         self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
         # Position 2, defined in update_widget
-        self.GL_stiffness_params.addLayout(VL_empty1, 4, 0)
+        # Brush model (paraboloid and sphere), rows 4 and 5, defined in
+        # update_GUI
+        self.TG_brush = PYAFToggle(self, "brush_model", "Brush model")
+        self.TG_brush.setToolTip(
+            "Brush model of the cells (Sokolov et al. 2007, Makarova et al. "
+            "2023), with a spherical probe:\nthe cell body is fitted near "
+            "the maximum load (brush squeezed), then the force of the brush "
+            "below it,\nF = 100 kT R N^1.5 L exp(-2\u03c0 h / L) for 0.1 < "
+            "h / L < 0.8: length L and grafting density N of the brush\n"
+            "(effective chains per \u00b5m\u00b2). Computed with the "
+            "elasticity (Fitting), "
+            "maps in the Results tab. Zero of the force: baseline of the "
+            "point of contact,\nwhose refit is set to 0 (it would move the "
+            "baseline into the brush).")
+        self.IN_brush_threshold_pct = PYAFInput(
+            self, "brush_threshold_pct", "Body fit above [% max force]", 60)
+        self.IN_brush_threshold_pct.setToolTip(
+            "The brush is squeezed near the maximum load: the cell body is "
+            "fitted above this percentage of the maximum force of each "
+            "curve,\nthe brush below it (dotted line on the curve)")
+        self.IN_brush_threshold_pct.input.setValidator(
+            misc_tools.validator("RF", bottom=1, top=99, decimal=1))
+        self.GL_stiffness_params.addLayout(VL_empty1, 6, 0)
 
         self.Box_stiff_exp_params.setLayout(self.GL_stiffness_params)
         VL_stiff_exp_params = QtWidgets.QVBoxLayout()
@@ -1023,6 +1052,18 @@ class ComputeWidget(PYAFWidget):
                 self.IN_tip_angle.input.setText(str(data.tip_angle))
                 self.GL_stiffness_params.addWidget(self.IN_tip_angle, row, 0)
 
+            # Brush model: models of a sphere
+            self.TG_brush.setParent(None)
+            self.IN_brush_threshold_pct.setParent(None)
+            if brush.available(data):
+                self.TG_brush.setChecked(data.brush_model)
+                self.IN_brush_threshold_pct.input.setText(
+                    misc_tools.format_number(data.brush_threshold_pct))
+                self.IN_brush_threshold_pct.setEnabled(data.brush_model)
+                self.GL_stiffness_params.addWidget(self.TG_brush, 4, 0)
+                self.GL_stiffness_params.addWidget(
+                    self.IN_brush_threshold_pct, 5, 0)
+
             self.IN_poisson.input.setText(str(data.poisson_ratio))
 
             # Display the mode of the file (the slope model may have changed it)
@@ -1179,6 +1220,10 @@ class ComputeWidget(PYAFWidget):
         elif field == "visco_contact_offset":
             data.visco_contact_offset = self.IN_visco_offset.get_float_value()
 
+        elif field == "brush_threshold_pct":
+            data.brush_threshold_pct = \
+                self.IN_brush_threshold_pct.get_float_value()
+
         elif field == "breakthrough_n_sigma":
             data.breakthrough_n_sigma = self.IN_bt_n_sigma.get_float_value()
 
@@ -1243,7 +1288,7 @@ class ComputeWidget(PYAFWidget):
             depth = depth[numpy.isfinite(depth)]
             nbr = int(numpy.sum(depth > data.used_tip_radius))
             if nbr:
-                lines += "<li>" + os.path.basename(data.filename) + " : " + \
+                lines += "<li>" + file_label(data) + " : " + \
                     str(nbr) + " pixels out of " + str(depth.size) + \
                     " (median indentation " + \
                     str(int(round(float(numpy.median(depth))))) + " nm, tip " \
@@ -1481,6 +1526,8 @@ class ComputeWidget(PYAFWidget):
             stop_size_errors = []
             no_segment_errors = []
             one_computed = False
+            brush_info = []
+            refit_disabled = []
 
             # Make a list of data to treat
             calc_list = []
@@ -1499,6 +1546,9 @@ class ComputeWidget(PYAFWidget):
                 self.logger.debug("Computing %s", data.filename)
 
                 self.compute_stiffness.get_stiffness(calc_id)
+                if self.compute_stiffness.refit_disabled:
+                    refit_disabled.append(
+                        os.path.basename(str(data.filename)))
 
                 if self.compute_stiffness.error == "Error: Stop size":
                     val = str(int(self.compute_stiffness.error_value))
@@ -1547,6 +1597,16 @@ class ComputeWidget(PYAFWidget):
                     misc_tools.update_indentation_list(calc_id)
                     misc_tools.update_slice_position(calc_id)
 
+                    # Brush model, with the points of contact of this fit
+                    if data.brush_model and data.used_perform_fit and \
+                            brush.available(data, used=True):
+                        found = brush.compute(calc_id)
+                        brush_info.append(
+                            file_label(data) + " : " +
+                            str(found) + " of " +
+                            str(data.nbr_pixels_x * data.nbr_pixels_y) +
+                            " curves with a brush")
+
                 # Reset the error
                 self.compute_stiffness.error = False
 
@@ -1559,8 +1619,19 @@ class ComputeWidget(PYAFWidget):
                         smoothing_warnings,
                         range_warnings]
 
+            if refit_disabled:
+                # Settings changed for the brush model
+                widgets_list.widget_fit_param_pocs.update_widget()
+                brush_info.append(
+                    "Refit of the point of contact set to 0 for the brush "
+                    "model")
+
             self.finish_computation(warnings,
-                                    notes=self.radius_notes(calc_list))
+                                    notes=self.radius_notes(calc_list),
+                                    info="<ul>" + "".join(
+                                        "<li>" + text + "</li>"
+                                        for text in brush_info) + "</ul>"
+                                    if brush_info else None)
 
         elif button == "get_work_and_rupture_force":
             # Update all the parameters if needed
@@ -1667,7 +1738,7 @@ class ComputeWidget(PYAFWidget):
                 data = shared.exp.list[calc_id]
                 reason = visco_main.check_file(data)
                 if reason is not None:
-                    skipped.append(os.path.basename(data.filename) + " : " +
+                    skipped.append(file_label(data) + " : " +
                                    reason)
                     continue
                 self.logger.debug("Viscoelasticity %s", data.filename)
@@ -1678,7 +1749,7 @@ class ComputeWidget(PYAFWidget):
                     shared.exp.results_type = "visco_e0"
                 if self.compute_visco.nbr_failed:
                     skipped.append(
-                        os.path.basename(data.filename) + " : the fit failed "
+                        file_label(data) + " : the fit failed "
                         "for " + str(self.compute_visco.nbr_failed) +
                         " curves (NaN)")
 
@@ -1710,7 +1781,7 @@ class ComputeWidget(PYAFWidget):
                     shared.exp.results_type = "breakthrough_force"
                 total = int(numpy.sum(numpy.asarray(
                     data.discarded_curves) == 0))
-                lines.append(os.path.basename(data.filename) + " : " +
+                lines.append(file_label(data) + " : " +
                              str(found) + " of " + str(total) +
                              " curves with a breakthrough")
 
@@ -1847,6 +1918,18 @@ class ComputeWidget(PYAFWidget):
 
         if checkbox == "compute_all":
             shared.exp.calc_all = self.TG_compute_all.isChecked()
+
+        elif checkbox == "brush_model":
+            data.brush_model = self.TG_brush.isChecked()
+            self.IN_brush_threshold_pct.setEnabled(data.brush_model)
+            # No refit of the baseline of the point of contact (it would
+            # move the baseline, the zero of the force, into the brush)
+            if data.brush_model:
+                data.fitparam_poc_refit_option = 0
+                data.fitparam_poc_refit_times = 0
+                widgets_list.widget_fit_param_pocs.update_widget()
+            # Threshold on the preview
+            self.update_MPL("MPL_canvas")
 
         elif checkbox == "apply_to_all":
             # Ask the user if he is sure he wants to overwrite his parameters

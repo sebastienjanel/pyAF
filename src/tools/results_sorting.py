@@ -65,11 +65,29 @@ BREAKTHROUGH_TYPES = {
                                "column": "breakthrough_jump"},
 }
 
+# Brush model of the cells (with the elasticity)
+BRUSH_TYPES = {
+    "brush_modulus": {"name": "Elasticity (brush model)",
+                      "label": "E [kPa]", "factor": 1e-3,
+                      "export": "Elasticity of the body (Pa)",
+                      "column": "brush_modulus"},
+    "brush_length": {"name": "Brush length", "label": "Brush length [nm]",
+                     "factor": 1.0, "export": "Brush length (nm)",
+                     "column": "brush_length"},
+    "brush_density": {"name": "Grafting density",
+                      "label": "Grafting density [\u00b5m\u207b\u00b2]",
+                      "factor": 1.0,
+                      "export": "Grafting density (1/um2)",
+                      "column": "grafting_density"},
+}
+
 # Results with one value per pixel (map), with the computation they need
 PIXEL_TYPES = {**{name: dict(values, calculated="visco_calculated")
                   for name, values in VISCO_TYPES.items()},
                **{name: dict(values, calculated="breakthrough_calculated")
-                  for name, values in BREAKTHROUGH_TYPES.items()}}
+                  for name, values in BREAKTHROUGH_TYPES.items()},
+               **{name: dict(values, calculated="brush_calculated")
+                  for name, values in BRUSH_TYPES.items()}}
 
 
 class GetResults:

@@ -33,9 +33,11 @@
 
 import logging
 import copy
+import os
 from qtpy import QtWidgets
 from ..tools.temp_file import TempFile
 from ..widgets.progressbar import Progressbar
+from ..tools import gui_tools
 from ..tools import misc_tools
 from ..tools import stat_tools
 from ..load_and_save.file_loader.pyaf import LoaderPYAF
@@ -148,24 +150,21 @@ class Load:
             if files_info[i]["checked"] and ftype != "pyAF":
                 data = shared.exp.list[offset + count]
                 if data.corrupted_curves is not None:
-                    name = str(shared.exp.list[offset + count].filename)
+                    # Short name (as in the plots)
+                    from ..experiment import auto_short_name
+                    name = auto_short_name(os.path.basename(
+                        str(shared.exp.list[offset + count].filename)))
                     str_corrupted = str_corrupted + "<li> " + name + "</li>"
                     count += 1
 
         if str_corrupted != "" and consts.UNIT_TESTING is False:
             text = "The following files have corrupted curves: <ul>"\
                 + str_corrupted + "</ul>Please use the clean up widget to "\
-                "see which curves are corrupted.<br><br>"\
-                "You should also contact your AFM reseller for more "\
-                "informations."
+                "see which curves are corrupted."
 
-            # Create a message box
-            msg_corr = QtWidgets.QMessageBox()
-            msg_corr.setText("Error (Corrupted curves)")
-            msg_corr.setInformativeText(text)
-            msg_corr.setIcon(QtWidgets.QMessageBox.Critical)
-            msg_corr.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
-            msg_corr.exec_()
+            # Warning (orange sign, as the other messages)
+            gui_tools.show_success(None, "Corrupted curves", details=text,
+                                   warning=True)
 
         # Check files with missmatch in the number of segments described in the header and the segments found
         # while loading the file.

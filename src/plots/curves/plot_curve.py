@@ -118,6 +118,9 @@ class PlotCurve(MainPlot, CommonCurveTools):
         self.events_force_slopes = None
         self.events_fit_vert = None
 
+        # Deflection of the threshold of the brush model (preview)
+        self.threshold_deflection = None
+
         # Breakthroughs to display on the approach: (index of the force
         # peak, index of the end of the jump, force [nN], jump [nm]); None:
         # the computed ones
@@ -221,6 +224,12 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
             self.axes.plot(curve_x, curve_y, color=curve_color("approach"),
                            label="Approach", **self.curve_style())
+
+            # Threshold of the brush model: the cell body is fitted above it
+            if self.threshold_deflection is not None:
+                self.axes.axhline(self.threshold_deflection, ls=":",
+                                  color=curve_color("breakthrough"), lw=1,
+                                  label="Brush threshold")
 
             # Breakthroughs of the bilayer: force peak and end of the jump,
             # on the plotted approach (computed ones on the results curves,

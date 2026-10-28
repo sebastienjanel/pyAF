@@ -102,6 +102,7 @@ from .curves.results.indentation import ResultsIndentation
 # Residuals
 from .curves.results.residuals import ResultsResiduals
 from .curves.results.visco import ResultsVisco
+from .curves.results.brush import ResultsBrush
 
 # Events
 from .curves.results.force_events import ResultsForceEvents
@@ -257,6 +258,9 @@ class PYAFPlot(FigureCanvasQTAgg):
             elif mesh.startswith("breakthrough_") and \
                     dt.breakthrough_calculated:
                 self.canvas = PlotBreakthroughMeshGrid(self)
+            elif mesh.startswith("brush_") and dt.brush_calculated:
+                # Same map (one value per curve, nan when not fitted)
+                self.canvas = PlotBreakthroughMeshGrid(self)
             elif mesh.startswith("fit_") and dt.has_fit_quality():
                 self.canvas = PlotFitQualityMeshGrid(self)
             else:
@@ -305,6 +309,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ResultsResiduals(self)
                 elif c_type == "visco":
                     self.canvas = ResultsVisco(self)
+                elif c_type == "brush":
+                    self.canvas = ResultsBrush(self)
             elif p_type == "fit_preview":
                 if ct == "stiffness":
                     self.canvas = ComputeStiffness(self)
@@ -490,4 +496,6 @@ def curve_type_available(data, curve_type):
         return data.stiffness_calculated and data.used_perform_fit
     if curve_type == "visco":
         return data.visco_calculated
+    if curve_type == "brush":
+        return data.brush_calculated
     return True

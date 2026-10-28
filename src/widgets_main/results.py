@@ -211,6 +211,13 @@ class ResultsWidget(PYAFWidget):
             "bilayer).",
             "breakthrough_count": "Breakthrough: number of breakthroughs of "
             "each curve (stacked bilayers).",
+            "brush_modulus": "Elastic: modulus of the cell body of the "
+            "brush model, fitted above the threshold (brush compressed).",
+            "brush_length": "Elastic: length L of the pericellular brush "
+            "(brush model): its force decays as exp(-2\u03c0 h / L).",
+            "brush_density": "Elastic: grafting density N of the brush "
+            "(brush model): effective number of chains per \u00b5m\u00b2, "
+            "from the amplitude of its force.",
             "fit_r2": "R\u00b2 of the elasticity fit, on the fitted points "
             "after the point of contact.",
             "fit_poc_fixed": "Pixels where the point of contact could not be "
@@ -226,7 +233,10 @@ class ResultsWidget(PYAFWidget):
                             ("stiffness_corr_slice",
                              "Elasticity (Slice) (BEC)"),
                             ("fit_r2", "Fit R\u00b2"),
-                            ("fit_poc_fixed", "Fit: fixed point of contact"))),
+                            ("fit_poc_fixed", "Fit: fixed point of contact"),
+                            ("brush_modulus", "Elasticity (brush model)"),
+                            ("brush_length", "Brush length"),
+                            ("brush_density", "Grafting density"))),
             ("Viscoelasticity", (("visco_e0", "E\u2080"),
                                  ("visco_fluidity", "Fluidity"),
                                  ("visco_tan_delta", "Loss tangent"),
@@ -242,7 +252,8 @@ class ResultsWidget(PYAFWidget):
                 ("breakthrough_count", "Breakthroughs per curve"))))
         self.list_maps = PYAFComboBox(self, "list_maps")
         self.list_maps.setMaxVisibleItems(40)
-        self.list_maps.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+        # As wide as its longest map (and its list, open over the map)
+        self.list_maps.setSizePolicy(QtWidgets.QSizePolicy.Fixed,
                                      QtWidgets.QSizePolicy.Fixed)
         model = self.list_maps.model()
         # Index of each map in the list
@@ -263,6 +274,7 @@ class ResultsWidget(PYAFWidget):
                 self.list_maps.setItemData(self.list_maps.count() - 1,
                                            tips[name],
                                            QtCore.Qt.ToolTipRole)
+        self.list_maps.fit_to_contents()
         self.label_maps = QtWidgets.QLabel("Map")
         widgets_list.widget_progressbar.update()
         widgets_list.widget_progressbar.update()
@@ -287,22 +299,26 @@ class ResultsWidget(PYAFWidget):
         self.box_curves_options = QtWidgets.QGroupBox("Force curves")
         self.box_curves_options.setFixedHeight(self.options_boxes_height)
 
-        self.BT_group_type_of_curve = PYAFButtonGroup(
-            self, "button_group_type_of_curve")
-        self.RB_defl_ext = QtWidgets.QRadioButton("Deflection - Z curve")
-        self.RB_force_ext = QtWidgets.QRadioButton("Force - Z curve")
-        self.RB_force = QtWidgets.QRadioButton("Force - Distance curve")
-        self.RB_force_events = QtWidgets.QRadioButton("Force curve (events)")
-        self.RB_indentation_curve = QtWidgets.QRadioButton("Indentation curve")
-        self.RB_residuals = QtWidgets.QRadioButton("Residuals plot")
-        self.RB_visco = QtWidgets.QRadioButton("Viscoelastic fit")
-        self.BT_group_type_of_curve.addButton(self.RB_defl_ext, 0)
-        self.BT_group_type_of_curve.addButton(self.RB_force_ext, 1)
-        self.BT_group_type_of_curve.addButton(self.RB_force, 2)
-        self.BT_group_type_of_curve.addButton(self.RB_force_events, 3)
-        self.BT_group_type_of_curve.addButton(self.RB_indentation_curve, 4)
-        self.BT_group_type_of_curve.addButton(self.RB_residuals, 5)
-        self.BT_group_type_of_curve.addButton(self.RB_visco, 6)
+        # Type of curve: one list (the curves not available for the file
+        # are greyed out)
+        self.curve_types = (
+            ("defl_ext", "Deflection - Z curve", None),
+            ("force_ext", "Force - Z curve", None),
+            ("force", "Force - Distance curve", None),
+            ("indentation", "Indentation curve", None),
+            ("residuals", "Residuals plot", None),
+            ("visco", "Viscoelastic fit", None),
+            ("brush", "Brush fit", "Brush model: force - distance curve of "
+             "the approach with the fits of the cell body and of the brush"),
+            ("results_force_events", "Force curve (events)", None))
+        self.list_curves = PYAFComboBox(self, "list_curves")
+        for name, label, tip in self.curve_types:
+            self.list_curves.addItem(label, name)
+            if tip:
+                self.list_curves.setItemData(self.list_curves.count() - 1,
+                                             tip, QtCore.Qt.ToolTipRole)
+        # As wide as the longest type (same width for all the types)
+        self.list_curves.fit_to_contents()
 
         self.BT_group_trace_or_retrace = PYAFButtonGroup(
             self, "button_group_trace_or_retrace")
@@ -358,38 +374,31 @@ class ResultsWidget(PYAFWidget):
         self.VL_curves_options = QtWidgets.QVBoxLayout()
         widgets_list.widget_progressbar.update()
 
-        # Col 1
-        self.GL_curves_options.addWidget(self.RB_defl_ext, 0, 0)
-        self.GL_curves_options.addWidget(self.RB_force_ext, 1, 0)
-        self.GL_curves_options.addWidget(self.RB_force, 2, 0)
-        self.GL_curves_options.addWidget(self.RB_force_events, 3, 0)
-        self.GL_curves_options.addWidget(self.RB_indentation_curve, 4, 0)
-        self.GL_curves_options.addWidget(self.RB_residuals, 5, 0)
-        self.GL_curves_options.addWidget(self.RB_visco, 6, 0)
+        # Col 1: type of curve, and the parts of the curve below
+        self.GL_curves_options.addWidget(self.list_curves, 0, 0)
+        self.GL_curves_options.addWidget(self.radiobutton_both, 1, 0)
+        self.GL_curves_options.addWidget(self.radiobutton_trace, 2, 0)
+        self.GL_curves_options.addWidget(self.radiobutton_retrace, 3, 0)
         # Col 2
-        self.GL_curves_options.addWidget(self.radiobutton_both, 0, 1)
-        self.GL_curves_options.addWidget(self.radiobutton_trace, 1, 1)
-        self.GL_curves_options.addWidget(self.radiobutton_retrace, 2, 1)
+        self.GL_curves_options.addWidget(self.CB_poc, 0, 1)
+        self.GL_curves_options.addWidget(self.CB_fit_poc, 1, 1)
+        self.GL_curves_options.addWidget(self.CB_segments, 2, 1)
+        self.GL_curves_options.addWidget(self.CB_display_fits, 3, 1)
+        self.GL_curves_options.addWidget(self.CB_breakthrough, 4, 1)
         # Col 3
-        self.GL_curves_options.addWidget(self.CB_poc, 0, 2)
-        self.GL_curves_options.addWidget(self.CB_fit_poc, 1, 2)
-        self.GL_curves_options.addWidget(self.CB_segments, 2, 2)
-        self.GL_curves_options.addWidget(self.CB_display_fits, 3, 2)
-        self.GL_curves_options.addWidget(self.CB_breakthrough, 4, 2)
+        self.GL_curves_options.addWidget(self.CB_joc, 0, 2)
+        self.GL_curves_options.addWidget(self.CB_fit_joc, 1, 2)
+        self.GL_curves_options.addWidget(self.CB_surface, 2, 2)
+        self.GL_curves_options.addWidget(self.CB_force, 3, 2)
         # Col 4
-        self.GL_curves_options.addWidget(self.CB_joc, 0, 3)
-        self.GL_curves_options.addWidget(self.CB_fit_joc, 1, 3)
-        self.GL_curves_options.addWidget(self.CB_surface, 2, 3)
-        self.GL_curves_options.addWidget(self.CB_force, 3, 3)
-        # Col 5
-        self.GL_curves_options.addWidget(self.RBT_events_none, 0, 4)
-        self.GL_curves_options.addWidget(self.RBT_events_annotations, 1, 4)
-        self.GL_curves_options.addWidget(self.CB_events_filter_dist, 2, 4)
-        self.GL_curves_options.addWidget(self.CB_events_display_joc, 3, 4)
-        self.GL_curves_options.addWidget(self.CB_events_display_fit_joc, 4, 4)
+        self.GL_curves_options.addWidget(self.RBT_events_none, 0, 3)
+        self.GL_curves_options.addWidget(self.RBT_events_annotations, 1, 3)
+        self.GL_curves_options.addWidget(self.CB_events_filter_dist, 2, 3)
+        self.GL_curves_options.addWidget(self.CB_events_display_joc, 3, 3)
+        self.GL_curves_options.addWidget(self.CB_events_display_fit_joc, 4, 3)
         # Apply to all (display options of the maps and the curves), in the
         # lower right corner, aligned with the checkboxes above
-        self.GL_curves_options.addWidget(self.TG_app_to_all, 6, 4,
+        self.GL_curves_options.addWidget(self.TG_app_to_all, 6, 3,
                                          QtCore.Qt.AlignLeft)
 
         self.VL_curves_options.addLayout(self.GL_curves_options)
@@ -411,7 +420,7 @@ class ResultsWidget(PYAFWidget):
         self.GL_choser.addWidget(QtWidgets.QLabel("File"), 0, 0)
         self.GL_choser.addWidget(self.list_exp, 0, 1)
         self.GL_choser.addWidget(self.label_maps, 1, 0)
-        self.GL_choser.addWidget(self.list_maps, 1, 1)
+        self.GL_choser.addWidget(self.list_maps, 1, 1, QtCore.Qt.AlignLeft)
         self.GL_choser.setColumnStretch(1, 1)
         self.HL_navigation = QtWidgets.QHBoxLayout()
         self.HL_navigation.addStretch(1)
@@ -506,6 +515,8 @@ class ResultsWidget(PYAFWidget):
             data.events_results_display_fit_joc = True
         elif mt.startswith("visco_") and data.visco_calculated:
             data.display_curve_type = "visco"
+        elif mt.startswith("brush_") and data.brush_calculated:
+            data.display_curve_type = "brush"
         elif mt.startswith("breakthrough_") and data.breakthrough_calculated:
             # Approach in force vs distance, with the breakthroughs
             data.display_curve_type = "force"
@@ -557,6 +568,8 @@ class ResultsWidget(PYAFWidget):
                     enabled = data.visco_calculated
                 elif name.startswith("breakthrough_"):
                     enabled = data.breakthrough_calculated
+                elif name.startswith("brush_"):
+                    enabled = data.brush_calculated
                 else:
                     enabled = available[name]
                 model.item(index).setEnabled(bool(enabled))
@@ -575,6 +588,7 @@ class ResultsWidget(PYAFWidget):
                 labels = ("Elasticity", "Elasticity (Slice)")
             for name, text in zip(("stiffness", "stiffness_slice"), labels):
                 self.list_maps.setItemText(self.map_items[name], "    " + text)
+            self.list_maps.fit_to_contents()
 
         if element == "button_display_in_3D" or element == "all":
             # 3D is only allowed if vtk is imported
@@ -610,43 +624,17 @@ class ResultsWidget(PYAFWidget):
                 self.BT_slices.setEnabled(False)
 
         if element == "buttons_options_curves" or element == "all":
-            # Enable force curve option
-            self.RB_force.setEnabled(curve_type_available(data, "force"))
-
-            # Enable force curve option (events)
-            self.RB_force_events.setEnabled(data.events_calculated)
-
-            # Enable indentation option
-            self.RB_indentation_curve.setEnabled(data.stiffness_calculated)
-
-            # Enable residuals option
-            # Residuals of the fits: only for a stiffness computed by
-            # fitting
-            self.RB_residuals.setEnabled(
-                data.stiffness_calculated and data.used_perform_fit)
-
-            # Viscoelastic fit
-            self.RB_visco.setEnabled(data.visco_calculated)
-
             # A curve type applied from another file can be missing here
             if not curve_type_available(data, data.display_curve_type):
                 data.display_curve_type = "defl_ext"
 
-            # Check
-            if data.display_curve_type == "defl_ext":
-                self.RB_defl_ext.setChecked(True)
-            elif data.display_curve_type == "force_ext":
-                self.RB_force_ext.setChecked(True)
-            elif data.display_curve_type == "force":
-                self.RB_force.setChecked(True)
-            elif data.display_curve_type == "results_force_events":
-                self.RB_force_events.setChecked(True)
-            elif data.display_curve_type == "indentation":
-                self.RB_indentation_curve.setChecked(True)
-            elif data.display_curve_type == "residuals":
-                self.RB_residuals.setChecked(True)
-            elif data.display_curve_type == "visco":
-                self.RB_visco.setChecked(True)
+            # Curves available for the file, and the displayed one
+            model = self.list_curves.model()
+            for index, (name, _, _) in enumerate(self.curve_types):
+                model.item(index).setEnabled(
+                    curve_type_available(data, name))
+            self.list_curves.setCurrentIndex(
+                self.list_curves.findData(data.display_curve_type))
 
             # Enable or disable radiobuttons for approach or retraction
             if data.display_curve_type == "force":
@@ -681,8 +669,8 @@ class ResultsWidget(PYAFWidget):
                 self.radiobutton_retrace.setEnabled(False)
                 self.radiobutton_both.setEnabled(False)
 
-            elif data.display_curve_type == "visco":
-                # Approach and retraction, in time
+            elif data.display_curve_type in ("visco", "brush"):
+                # Approach and retraction in time, approach of the brush
                 self.radiobutton_trace.setEnabled(False)
                 self.radiobutton_retrace.setEnabled(False)
                 self.radiobutton_both.setEnabled(False)
@@ -946,21 +934,7 @@ class ResultsWidget(PYAFWidget):
 
         elif button == "button_group_type_of_curve":
             # Save the curve type
-            curve_type = self.BT_group_type_of_curve.checkedId()
-            if curve_type == 0:
-                data.display_curve_type = "defl_ext"
-            elif curve_type == 1:
-                data.display_curve_type = "force_ext"
-            elif curve_type == 2:
-                data.display_curve_type = "force"
-            elif curve_type == 3:
-                data.display_curve_type = "results_force_events"
-            elif curve_type == 4:
-                data.display_curve_type = "indentation"
-            elif curve_type == 5:
-                data.display_curve_type = "residuals"
-            elif curve_type == 6:
-                data.display_curve_type = "visco"
+            data.display_curve_type = self.list_curves.currentData()
 
             tp = data.display_curve_type
             self.logger.debug("Changing curve type, %s", tp)
@@ -969,7 +943,10 @@ class ResultsWidget(PYAFWidget):
 
             # Check if we can display trace or retrace
             if data.display_curve_type == "force":
-                if not data.stiffness_calculated and (dtr == 0 or dtr == 2):
+                # Approach without the elasticity: breakthroughs
+                if not (data.stiffness_calculated or
+                        data.breakthrough_calculated) and \
+                        (dtr == 0 or dtr == 2):
                     data.display_trace_retrace = 1
                 elif not data.work_and_rupture_force1_calculated and \
                         (dtr == 1 or dtr == 2):
@@ -1038,6 +1015,8 @@ class ResultsWidget(PYAFWidget):
         """Called when a list is updated."""
         if name == "list1":
             self.parent.file_changed("list1")
+        elif name == "list_curves":
+            self.button_clicked("button_group_type_of_curve")
         elif name == "list_maps":
             if self.list_maps.currentData() is None:
                 # Title of a group (keyboard): back to the displayed map

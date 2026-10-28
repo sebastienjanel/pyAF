@@ -134,6 +134,9 @@ class MultiMeshgridsWidget(PYAFWidget):
         self.list_choser.addItem("Breakthrough force")
         self.list_choser.addItem("Breakthrough jump")
         self.list_choser.addItem("Breakthroughs per curve")
+        self.list_choser.addItem("Elasticity (brush model)")
+        self.list_choser.addItem("Brush length")
+        self.list_choser.addItem("Grafting density")
         self.list_choser.fit_to_contents()
 
         self.CB_display_roi = PYAFCheckBox(self, "display_roi", "Display ROIs")

@@ -33,6 +33,7 @@
 
 import logging
 import os
+import re
 from .. import shared
 from .. import widgets_list
 from qtpy import QtCore, QtGui, QtWidgets
@@ -706,12 +707,19 @@ def show_success(parent, text, details=None, warning=False):
     msg.setWindowTitle("pyAF")
     msg.setText("<b>" + text + "</b>")
     if details:
-        msg.setInformativeText(details)
+        msg.setInformativeText(no_wrap_items(details))
     name = "warning.svg" if warning else "success.svg"
     icon = QtGui.QIcon(os.path.join(get_icons_path(), name))
     msg.setIconPixmap(icon.pixmap(48, 48))
     msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
     msg.exec_()
+
+
+def no_wrap_items(details):
+    """The items of the lists of a message (a file name and its result)
+    on one row: the message box takes their width when it sizes itself
+    (within its limits, about 1000 px)."""
+    return re.sub(r"<li>", '<li style="white-space:pre">', details)
 
 
 def font_of_size(size):

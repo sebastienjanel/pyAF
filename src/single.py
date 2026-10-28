@@ -167,6 +167,8 @@ class SingleFile:
         self.visco_calculated = False
         # Breakthroughs of supported lipid bilayers (approach curves)
         self.breakthrough_calculated = False
+        # Brush model of the cells (with the elasticity)
+        self.brush_calculated = False
 
         # --- Header informations ---------------------------------------------
         self.file_type = None
@@ -254,6 +256,11 @@ class SingleFile:
         self.color_opts_breakthrough_force = [12, 0, 0, 0, 0]
         self.color_opts_breakthrough_thickness = [12, 0, 0, 0, 0]
         self.color_opts_breakthrough_count = [6, 0, 0, 0, 0]
+        # Brush model: modulus of the body (Viridis, as the elasticity),
+        # length and grafting density of the brush (Gray: black to white)
+        self.color_opts_brush_modulus = [2, 0, 0, 0, 0]
+        self.color_opts_brush_length = [12, 0, 0, 0, 0]
+        self.color_opts_brush_density = [12, 0, 0, 0, 0]
         # Quality of the elasticity fit: R^2 from 0.9 (white to red: the
         # bad fits in red, the good ones light), and the pixels with the
         # point of contact fixed (Reds: fixed in red)
@@ -487,6 +494,16 @@ class SingleFile:
         self.used_breakthrough_min_thickness = None
         self.used_breakthrough_min_force = None
         self.used_breakthrough_max_events = None
+        # Brush model (see compute_tools.stiffness.brush): computed with the
+        # elasticity (paraboloid or sphere), the brush being squeezed near
+        # the maximum load: cell body fitted above this percentage of the
+        # maximum force of each curve
+        self.brush_model = False
+        self.brush_threshold_pct = 80.0
+        # Results [i, j, k], k: brush.VALUES (nan when not fitted)
+        self.brush_results = None
+        self.used_brush_model = None
+        self.used_brush_threshold_pct = None
 
         # Display options
         self.meshgrid_type = "piezo"
@@ -1192,6 +1209,19 @@ class SingleFile:
             opts[1], opts[2] = 0, float(max(count, 1))
             opts[3] = opts[2] / 2.0
 
+        # Brush model: from the 2nd to the 98th percentile
+        if self.brush_calculated and color:
+            for name in ("brush_modulus", "brush_length", "brush_density"):
+                values = getattr(self, name)
+                values = values[numpy.isfinite(values)]
+                if values.size:
+                    low, high = numpy.percentile(values, [2, 98])
+                    if high <= low:
+                        high = low + 1e-12
+                    opts = getattr(self, "color_opts_" + name)
+                    opts[1], opts[2] = float(low), float(high)
+                    opts[3] = float(low + high) / 2.0
+
         # Events
         if self.events_calculated:
             # Note that here, unlike the conditions above, the
@@ -1479,6 +1509,33 @@ class SingleFile:
         return numpy.array(results[:, :, event, EVENT_VALUES.index(name)],
                            dtype=float)
 
+    def get_brush_result(self, name):
+        """Map of a value of the brush model of the curves (nan when not
+        fitted)."""
+        # Not imported at the top (the module imports the computations)
+        from .compute_tools.stiffness import brush
+        if not self.brush_calculated or self.brush_results is None:
+            return numpy.full((self.nbr_pixels_x, self.nbr_pixels_y),
+                              numpy.nan)
+        return numpy.array(self.brush_results[:, :,
+                                              brush.VALUES.index(name)],
+                           dtype=float)
+
+    @property
+    def brush_modulus(self):
+        """Modulus of the cell body of the brush model [Pa]."""
+        return self.get_brush_result("modulus")
+
+    @property
+    def brush_length(self):
+        """Length of the brush [nm]."""
+        return self.get_brush_result("length")
+
+    @property
+    def brush_density(self):
+        """Grafting density of the brush [1/um^2]."""
+        return self.get_brush_result("density")
+
     @property
     def breakthrough_force(self):
         """Force of the first breakthrough of the curves [N]."""
@@ -1576,6 +1633,9 @@ class SingleFile:
                  "breakthrough_thickness":
                  "color_opts_breakthrough_thickness",
                  "breakthrough_count": "color_opts_breakthrough_count",
+                 "brush_modulus": "color_opts_brush_modulus",
+                 "brush_length": "color_opts_brush_length",
+                 "brush_density": "color_opts_brush_density",
                  "fit_r2": "color_opts_fit_r2",
                  "fit_poc_fixed": "color_opts_fit_poc_fixed"}
         return getattr(self, names[mt])

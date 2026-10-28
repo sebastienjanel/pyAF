@@ -490,7 +490,10 @@ RESULT_TYPES = (("stiffness", "stiffness_calculated"),
                 ("visco_fluidity", "visco_calculated"),
                 ("visco_tan_delta", "visco_calculated"),
                 ("breakthrough_force", "breakthrough_calculated"),
-                ("breakthrough_thickness", "breakthrough_calculated"))
+                ("breakthrough_thickness", "breakthrough_calculated"),
+                ("brush_modulus", "brush_calculated"),
+                ("brush_length", "brush_calculated"),
+                ("brush_density", "brush_calculated"))
 
 
 def computed_result_types():

@@ -179,7 +179,10 @@ def elasticity(data):
         "point_of_contact_window_pct": data.used_fit_poc_window,
         "min_indentation_pct": data.used_fit_min_indentation,
         "point_of_contact": fit_of_contact("poc", data),
-        "bottom_effect_correction": bool(data.stiffness_corrected)}
+        "bottom_effect_correction": bool(data.stiffness_corrected),
+        "brush_model": {"body_fit_above_pct_of_max_force":
+                        data.used_brush_threshold_pct}
+        if data.brush_calculated else None}
 
 
 def viscoelasticity(data):
@@ -254,6 +257,7 @@ def breakthrough(data):
 SETTINGS = {
     "elasticity": (
         "stiffness_model_selected", "stiffness_mode", "fit_range_type",
+        "brush_model", "brush_threshold_pct",
         "tip_radius", "tip_angle", "poisson_ratio", "indentation_start",
         "indentation_stop", "indentation_step", "force_start", "force_stop",
         "fit_min_indentation", "fit_poc_window", "tomography",

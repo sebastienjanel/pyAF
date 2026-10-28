@@ -219,6 +219,10 @@ def save_used_params(data, mode):
             data.fitparam_poc_noise_multiplicator
         data.used_fitparam_poc_refit_times = data.fitparam_poc_refit_times
 
+    if mode == "brush" or mode == "all":
+        data.used_brush_model = data.brush_model
+        data.used_brush_threshold_pct = data.brush_threshold_pct
+
     if mode == "work_and_rupture_force" or mode == "all":
         data.used_fitparam_joc_skip_start = data.fitparam_joc_skip_start
         data.used_fitparam_joc_fit_length = data.fitparam_joc_fit_length
@@ -380,7 +384,8 @@ MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
                   "events_rupture_force", "visco_e0", "visco_fluidity",
                   "visco_tan_delta", "fit_r2", "fit_poc_fixed",
                   "visco_storage", "visco_loss", "breakthrough_force",
-                  "breakthrough_thickness", "breakthrough_count")
+                  "breakthrough_thickness", "breakthrough_count",
+                  "brush_modulus", "brush_length", "brush_density")
 
 
 def get_meshgrid_type_as_string(mesh_id):
@@ -396,38 +401,6 @@ def get_meshgrid_type_by_id(meshgrid_type):
 def get_color_opts_by_meshgrid_type(data, meshgrid_type):
     """Return the colorscale depending on the meshgrid type."""
     return data.get_color_opts(meshgrid_type)
-
-
-def get_results_type_from_id(results_type):
-    """Return the results type as an id, given a string."""
-    if results_type == 0:
-        result_id = "stiffness"
-    elif results_type == 1:
-        result_id = "work"
-    elif results_type == 2:
-        result_id = "rupture_force"
-    elif results_type == 3:
-        result_id = "events_forces"
-    elif results_type == 4:
-        result_id = "events_per_curve"
-    elif results_type == 5:
-        result_id = "events_rupture_force"
-    elif results_type == 6:
-        result_id = "loading_rates"
-    elif results_type == 7:
-        result_id = "events_distance"
-    elif results_type == 8:
-        result_id = "visco_e0"
-    elif results_type == 9:
-        result_id = "visco_fluidity"
-    elif results_type == 10:
-        result_id = "visco_tan_delta"
-    elif results_type == 11:
-        result_id = "breakthrough_force"
-    elif results_type == 12:
-        result_id = "breakthrough_thickness"
-
-    return result_id
 
 
 def get_cores():
