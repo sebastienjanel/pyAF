@@ -54,6 +54,24 @@ VISCO_TYPES = {
 }
 
 
+# Breakthroughs of supported lipid bilayers (first one of each curve)
+BREAKTHROUGH_TYPES = {
+    "breakthrough_force": {"name": "Breakthrough force", "label": "Fb [nN]",
+                           "factor": 1e9, "export": "Breakthrough force (N)",
+                           "column": "breakthrough_force"},
+    "breakthrough_thickness": {"name": "Breakthrough jump",
+                               "label": "Jump [nm]", "factor": 1.0,
+                               "export": "Breakthrough jump (nm)",
+                               "column": "breakthrough_jump"},
+}
+
+# Results with one value per pixel (map), with the computation they need
+PIXEL_TYPES = {**{name: dict(values, calculated="visco_calculated")
+                  for name, values in VISCO_TYPES.items()},
+               **{name: dict(values, calculated="breakthrough_calculated")
+                  for name, values in BREAKTHROUGH_TYPES.items()}}
+
+
 class GetResults:
     """Results fetching class."""
 
@@ -158,8 +176,8 @@ class GetResults:
                 result = [forces, lr]
         elif self.type == "events_distance":
             result = self.prepare_events_distance()
-        elif self.type in VISCO_TYPES:
-            result = self.prepare_visco()
+        elif self.type in PIXEL_TYPES:
+            result = self.prepare_pixel_values()
 
         result = self.remove_zeros(result)
 
@@ -390,19 +408,22 @@ class GetResults:
         else:
             return numpy.array(array) * 1e15  # in fJ
 
-    def prepare_visco(self):
-        """Results of the viscoelasticity (E0, fluidity or loss tangent).
+    def prepare_pixel_values(self):
+        """Results with one value per curve: viscoelasticity (E0, fluidity
+        or loss tangent) or breakthrough (force or jump of the first
+        breakthrough).
 
-        The curves which could not be fitted (nan) are not in the values
-        of the plots; they are exported as nan.
+        The curves without value (fit failed, no breakthrough: nan) are not
+        in the values of the plots; they are exported as nan.
         """
         dt = self.data
+        settings = PIXEL_TYPES[self.type]
 
-        if not dt.visco_calculated:
+        if not getattr(dt, settings["calculated"]):
             return []
 
         values = getattr(dt, self.type)
-        factor = VISCO_TYPES[self.type]["factor"]
+        factor = settings["factor"]
         export = self.export in ("single", "r_format")
         if self.roi_id != 0:
             roi_vals = dt.roi_list[self.roi_id - 1].values

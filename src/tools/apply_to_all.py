@@ -109,7 +109,9 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.display_curve_type = dct
 
             if cur.display_trace_retrace == 0 and \
-                    (dct == "force" or dct == "indentation") and st_calc:
+                    (dct == "force" or dct == "indentation") and \
+                    (st_calc or (dct == "force" and
+                                 dt.breakthrough_calculated)):
                 dt.display_trace_retrace = cur.display_trace_retrace
             elif cur.display_trace_retrace == 1 and dct == "force" and wf_calc:
                 dt.display_trace_retrace = cur.display_trace_retrace
@@ -126,6 +128,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.display_fits_stiffness = cur.display_fits_stiffness
                 dt.stiffness_depth_view = cur.stiffness_depth_view
                 dt.stiffness_slice_depth = cur.stiffness_slice_depth
+            if dt.breakthrough_calculated:
+                dt.display_breakthrough = cur.display_breakthrough
             if dt.work_and_rupture_force1_calculated:
                 dt.display_joc = cur.display_joc
                 dt.display_fit_joc = cur.display_fit_joc
@@ -262,6 +266,14 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                              "beta_auto", "beta_init", "drag_correction"):
                     setattr(dt, "visco_" + name,
                             getattr(cur, "visco_" + name))
+
+        if exp.compute_type == "breakthrough" or mode == "all":
+            cur = exp.list[oldid]
+            for dt in exp.list:
+                for name in ("n_sigma", "min_thickness", "min_force",
+                             "max_events"):
+                    setattr(dt, "breakthrough_" + name,
+                            getattr(cur, "breakthrough_" + name))
 
         if exp.compute_type == "work_and_rupture_force" or mode == "all":
             for i in range(len(exp.list)):

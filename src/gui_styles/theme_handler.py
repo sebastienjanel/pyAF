@@ -19,14 +19,16 @@ current_theme = "Dark"
 # plot background
 CURVE_COLORS = {
     "Dark": {"approach": "#00FFFF", "retraction": "#FFA500",
-             "pause": "#FF0000", "modulation": "#00FF80"},
+             "pause": "#FF0000", "modulation": "#00FF80",
+             "breakthrough": "#FF6B6B"},
     "Light": {"approach": "#007C99", "retraction": "#C25E00",
-              "pause": "#B00000", "modulation": "#00884A"}}
+              "pause": "#B00000", "modulation": "#00884A",
+              "breakthrough": "#D00000"}}
 
 
 def curve_color(name):
-    """Colour of a curve (approach, retraction, pause or modulation) for
-    the current theme."""
+    """Colour of a curve (approach, retraction, pause or modulation) or of
+    the breakthroughs for the current theme."""
     return CURVE_COLORS.get(current_theme, CURVE_COLORS["Dark"])[name]
 
 

@@ -35,6 +35,7 @@ import numpy
 import copy
 from ..plot_curve import PlotCurve
 from ....tools import math_tools
+from ....tools import breakthrough_tools
 from ....tools import curve_tools
 
 
@@ -78,6 +79,15 @@ class ResultsForceDist(PlotCurve):
                 self.data.pocs_real[self.xpos][self.ypos],
                 self.spring_constant)
 
+        elif (disp == 0 or disp == 2) and self.approach is not None and \
+                self.data.breakthrough_calculated:
+            # Without the elasticity (no point of contact): distance from
+            # the support, force from the baseline (breakthroughs)
+            self.curve_approach = list(breakthrough_tools.force_distance(
+                self.approach[0], self.approach[1], self.spring_constant))
+            self.xlabel = self.xlabel.replace("Distance", "Distance to "
+                                              "support")
+
         if (disp == 1 or disp == 2) and \
                 self.retraction is not None and ret_calc:
             self.curve_retraction = curve_tools.get_force_curves(
@@ -86,7 +96,7 @@ class ResultsForceDist(PlotCurve):
                 self.data.jocs1_real[self.xpos][self.ypos],
                 self.spring_constant)
 
-        if self.curve_approach is not None:
+        if self.curve_approach is not None and app_calc:
             # The real fit is done on the curve without the corrupted part,
             # so we have to remove it from the curve to display the fit
             tr = [None, None]
@@ -202,7 +212,7 @@ class ResultsForceDist(PlotCurve):
                         segy * self.force_factor,
                         y * self.force_factor]
 
-        if self.curve_approach is not None and \
+        if app_calc and self.curve_approach is not None and \
                 self.curve_retraction is not None:
             # Both curves are displayed: use the same origin for both (the
             # point of contact), else the retraction curve (centered on the

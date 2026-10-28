@@ -47,6 +47,7 @@ from .meshgrids.stiffness_slice_corr_meshgrid import \
     PlotStiffnessSliceCorrMeshGrid
 from .meshgrids.work_meshgrid import PlotWorkMeshGrid
 from .meshgrids.visco_meshgrid import PlotViscoMeshGrid
+from .meshgrids.breakthrough_meshgrid import PlotBreakthroughMeshGrid
 from .meshgrids.fit_quality_meshgrid import PlotFitQualityMeshGrid
 from .meshgrids.rupture_force1_meshgrid import PlotRuptureForce1MeshGrid
 from .meshgrids.rupture_force2_meshgrid import PlotRuptureForce2MeshGrid
@@ -86,6 +87,7 @@ from .curves.compute.events_detection_msf import ComputeEventsDetectionMSF
 
 # Loading rates
 from .curves.compute.loading_rates import ComputeLoadingRates
+from .curves.compute.breakthrough import ComputeBreakthrough
 
 # Results tab =================================================================
 
@@ -252,6 +254,9 @@ class PYAFPlot(FigureCanvasQTAgg):
                 self.canvas = PlotStiffnessSliceCorrMeshGrid(self)
             elif mesh.startswith("visco_") and dt.visco_calculated:
                 self.canvas = PlotViscoMeshGrid(self)
+            elif mesh.startswith("breakthrough_") and \
+                    dt.breakthrough_calculated:
+                self.canvas = PlotBreakthroughMeshGrid(self)
             elif mesh.startswith("fit_") and dt.has_fit_quality():
                 self.canvas = PlotFitQualityMeshGrid(self)
             else:
@@ -320,6 +325,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ComputeLoadingRates(self)
                 elif ct == "viscoelasticity":
                     self.canvas = ResultsVisco(self)
+                elif ct == "breakthrough":
+                    self.canvas = ComputeBreakthrough(self)
         elif p_type == "results_single":
                 self.canvas = PlotSingleResults(self)
         elif p_type == "results_groups":
@@ -473,7 +480,8 @@ def curve_type_available(data, curve_type):
     """True if the results needed for the curve type are computed."""
     if curve_type == "force":
         return (data.stiffness_calculated or
-                data.work_and_rupture_force1_calculated)
+                data.work_and_rupture_force1_calculated or
+                data.breakthrough_calculated)
     if curve_type == "indentation":
         return data.stiffness_calculated
     if curve_type == "results_force_events":

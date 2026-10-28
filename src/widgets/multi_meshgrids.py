@@ -131,6 +131,9 @@ class MultiMeshgridsWidget(PYAFWidget):
         self.list_choser.addItem("Fit: fixed point of contact")
         self.list_choser.addItem("Storage modulus E\u2032")
         self.list_choser.addItem("Loss modulus E\u2033")
+        self.list_choser.addItem("Breakthrough force")
+        self.list_choser.addItem("Breakthrough jump")
+        self.list_choser.addItem("Breakthroughs per curve")
         self.list_choser.fit_to_contents()
 
         self.CB_display_roi = PYAFCheckBox(self, "display_roi", "Display ROIs")

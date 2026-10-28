@@ -58,6 +58,7 @@ import numpy
 from scipy import special
 from . import widgets_list
 from .tools import results_sorting
+from .tools.breakthrough_tools import EVENT_VALUES
 
 
 
@@ -164,6 +165,8 @@ class SingleFile:
         self.loading_rates_calculated = False
         self.events_calculated = False
         self.visco_calculated = False
+        # Breakthroughs of supported lipid bilayers (approach curves)
+        self.breakthrough_calculated = False
 
         # --- Header informations ---------------------------------------------
         self.file_type = None
@@ -246,6 +249,11 @@ class SingleFile:
         # Storage (Viridis, as E0) and loss (Magma) moduli
         self.color_opts_visco_storage = [2, 0, 0, 0, 0]
         self.color_opts_visco_loss = [4, 0, 0, 0, 0]
+        # Breakthroughs: force and jump (Gray: black to white), number per
+        # curve (Cool-Warm, discrete, as the events per curve)
+        self.color_opts_breakthrough_force = [12, 0, 0, 0, 0]
+        self.color_opts_breakthrough_thickness = [12, 0, 0, 0, 0]
+        self.color_opts_breakthrough_count = [6, 0, 0, 0, 0]
         # Quality of the elasticity fit: R^2 from 0.9 (white to red: the
         # bad fits in red, the good ones light), and the pixels with the
         # point of contact fixed (Reds: fixed in red)
@@ -465,6 +473,21 @@ class SingleFile:
         self.used_visco_beta_init = None
         self.used_visco_drag_correction = None
 
+        # Breakthroughs (see tools.breakthrough_tools): jump of the
+        # separation of at least n_sigma noise and min_thickness [nm], at a
+        # force of at least min_force [nN], max_events per curve
+        self.breakthrough_n_sigma = 6.0
+        self.breakthrough_min_thickness = 1.0
+        self.breakthrough_min_force = 0.2
+        self.breakthrough_max_events = 5
+        # Results [i, j, event, k], k: breakthrough_tools.EVENT_VALUES (nan
+        # without event)
+        self.breakthrough_results = None
+        self.used_breakthrough_n_sigma = None
+        self.used_breakthrough_min_thickness = None
+        self.used_breakthrough_min_force = None
+        self.used_breakthrough_max_events = None
+
         # Display options
         self.meshgrid_type = "piezo"
         self.display_curve_type = "defl_ext"
@@ -487,6 +510,8 @@ class SingleFile:
         self.display_fit_joc = False
         self.display_surface = False
         self.display_force = False
+        # Display the breakthroughs of the bilayers on the approach
+        self.display_breakthrough = True
         # Display the joc determined by the events algorithm
         self.display_joc_events = False
 
@@ -1149,6 +1174,24 @@ class SingleFile:
                     opts[1], opts[2] = limits
                     opts[3] = sum(limits) / 2.0
 
+        # Breakthroughs: force and thickness from the 2nd to the 98th
+        # percentile, number from 0 to the maximum
+        if self.breakthrough_calculated and color:
+            for name in ("breakthrough_force", "breakthrough_thickness"):
+                values = getattr(self, name)
+                values = values[numpy.isfinite(values)]
+                if values.size:
+                    low, high = numpy.percentile(values, [2, 98])
+                    if high <= low:
+                        high = low + 1e-12
+                    opts = getattr(self, "color_opts_" + name)
+                    opts[1], opts[2] = float(low), float(high)
+                    opts[3] = float(low + high) / 2.0
+            count = numpy.nanmax(self.breakthrough_count)
+            opts = self.color_opts_breakthrough_count
+            opts[1], opts[2] = 0, float(max(count, 1))
+            opts[3] = opts[2] / 2.0
+
         # Events
         if self.events_calculated:
             # Note that here, unlike the conditions above, the
@@ -1425,6 +1468,39 @@ class SingleFile:
         return self.visco_modulus() * \
             numpy.sin(numpy.pi * self.visco_fluidity / 2)
 
+    def get_breakthrough_result(self, name, event=0):
+        """Map of a value of a breakthrough (the first one by default) of
+        the curves (nan without breakthrough)."""
+        nx, ny = self.nbr_pixels_x, self.nbr_pixels_y
+        results = self.breakthrough_results
+        if not self.breakthrough_calculated or results is None or \
+                event >= results.shape[2]:
+            return numpy.full((nx, ny), numpy.nan)
+        return numpy.array(results[:, :, event, EVENT_VALUES.index(name)],
+                           dtype=float)
+
+    @property
+    def breakthrough_force(self):
+        """Force of the first breakthrough of the curves [N]."""
+        return self.get_breakthrough_result("force")
+
+    @property
+    def breakthrough_thickness(self):
+        """Jump of the separation at the first breakthrough of the curves
+        [nm] (thickness of the compressed bilayer)."""
+        return self.get_breakthrough_result("thickness")
+
+    @property
+    def breakthrough_count(self):
+        """Number of breakthroughs of the curves (nan if not computed)."""
+        if not self.breakthrough_calculated or \
+                self.breakthrough_results is None:
+            return numpy.full((self.nbr_pixels_x, self.nbr_pixels_y),
+                              numpy.nan)
+        forces = self.breakthrough_results[:, :, :,
+                                           EVENT_VALUES.index("force")]
+        return numpy.isfinite(forces).sum(axis=2).astype(float)
+
     def sample_elasticity_values(self, corrected=False):
         """Elasticity values of the sample, for the automatic color scale:
         without the substrate, i.e. the pixels where the point of contact
@@ -1496,6 +1572,10 @@ class SingleFile:
                  "visco_tan_delta": "color_opts_visco_tan_delta",
                  "visco_storage": "color_opts_visco_storage",
                  "visco_loss": "color_opts_visco_loss",
+                 "breakthrough_force": "color_opts_breakthrough_force",
+                 "breakthrough_thickness":
+                 "color_opts_breakthrough_thickness",
+                 "breakthrough_count": "color_opts_breakthrough_count",
                  "fit_r2": "color_opts_fit_r2",
                  "fit_poc_fixed": "color_opts_fit_poc_fixed"}
         return getattr(self, names[mt])

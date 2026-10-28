@@ -203,7 +203,7 @@ class PlotMeshGrid(MainPlot):
                 self.colormap = self.colormap.with_extremes(
                     bad=self.color_nan)
 
-            if self.mesh_type == "events_per_curve":
+            if self.mesh_type in ("events_per_curve", "breakthrough_count"):
                 self.colormap, norm = self.get_events_colorscale(self.colormap)
             elif log_norm is not None:
                 norm = log_norm
@@ -238,7 +238,7 @@ class PlotMeshGrid(MainPlot):
                 color_nan=self.color_nan)
 
             self.colormap, norm = self.colortable.get_color_as_cdict()
-            if self.mesh_type == "events_per_curve":
+            if self.mesh_type in ("events_per_curve", "breakthrough_count"):
                 self.colormap, norm = self.get_events_colorscale(self.colormap)
             elif log_norm is not None:
                 norm = log_norm
@@ -272,7 +272,7 @@ class PlotMeshGrid(MainPlot):
                     cax=cax,
                     cmap=self.colormap,
                     norm=norm)
-            if self.mesh_type == "events_per_curve":
+            if self.mesh_type in ("events_per_curve", "breakthrough_count"):
                 # Integer ticks, at the center of their color
                 vmin, vmax = norm.boundaries[0] + 0.5, norm.boundaries[-1] - 0.5
                 ticks = MaxNLocator(integer=True).tick_values(vmin, vmax)

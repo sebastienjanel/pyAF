@@ -339,6 +339,19 @@ class PlotOptionsWidget(PYAFWidget):
                 data.colortable_min_value = 0.0
                 data.colortable_max_value = 1.0
                 data.colortable_middle_value = 0.5
+            elif mt == "breakthrough_count":
+                high = float(max(numpy.nanmax(data.breakthrough_count), 1))
+                data.colortable_max_value = high
+                data.colortable_middle_value = high / 2.0
+            elif mt.startswith("breakthrough_"):
+                # From the 2nd to the 98th percentile
+                values = numpy.asarray(getattr(data, mt), dtype=float)
+                values = values[numpy.isfinite(values)]
+                if values.size:
+                    low, high = numpy.percentile(values, [2, 98])
+                    data.colortable_min_value = float(low)
+                    data.colortable_max_value = float(max(high, low + 1e-12))
+                    data.colortable_middle_value = float(low + high) / 2.0
             elif mt == "piezo":
                 data.colortable_max_value = data.max_piezo
                 data.colortable_middle_value = data.max_piezo / 2.0
@@ -455,6 +468,17 @@ class PlotOptionsWidget(PYAFWidget):
             values = values[numpy.isfinite(values)]
             val = float(values.max()) if values.size else 0.0
             val_all = None
+        elif mt.startswith("breakthrough_"):
+            name, unit, factor = {
+                "breakthrough_force": ("Max. breakthrough force", "nN", 1e9),
+                "breakthrough_thickness": ("Max. breakthrough jump", "nm",
+                                           1),
+                "breakthrough_count": ("Max. breakthroughs per curve", "",
+                                       1)}[mt]
+            values = numpy.asarray(getattr(data, mt), dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(values.max()) if values.size else 0.0
+            val_all = None
         elif mt == "fit_r2":
             name, unit, factor = "Median R\u00b2", "", 1
             values = numpy.asarray(data.fit_r2, dtype=float)
@@ -470,7 +494,7 @@ class PlotOptionsWidget(PYAFWidget):
             val_all = None
 
         def fmt(value):
-            if mt == "events_per_curve":
+            if mt in ("events_per_curve", "breakthrough_count"):
                 return str(int(value))
             if mt in ("visco_fluidity", "visco_tan_delta", "fit_r2"):
                 return str(round(float(value) * factor, 3))

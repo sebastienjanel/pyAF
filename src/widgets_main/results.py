@@ -131,7 +131,11 @@ class ResultsWidget(PYAFWidget):
         # List (has to be in a layout to adjust to content)
         self.HL_choser = QtWidgets.QHBoxLayout()
         self.list_exp = PYAFComboBox(self, "list1")
-        self.list_exp.setFixedSize(350, 26)
+        # As wide as the map
+        self.list_exp.setSizeAdjustPolicy(
+            QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.list_exp.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                    QtWidgets.QSizePolicy.Fixed)
         for fv_data in shared.exp.list:
             self.list_exp.addItem(os.path.basename(str(fv_data.filename)))
         self.HL_choser.addWidget(self.list_exp)
@@ -139,6 +143,9 @@ class ResultsWidget(PYAFWidget):
         widgets_list.widget_progressbar.update()
 
         self.TG_app_to_all = PYAFToggle(self, "apply_to_all", "Apply to all")
+        self.TG_app_to_all.setToolTip(
+            "Same display options for all the files: map, curve and its "
+            "options, filters of the events, units and colour scales")
 
         name = "widget_curve_selector_results"
         self.curve_selector = ResultsSelectorWidget(self, name)
@@ -148,65 +155,8 @@ class ResultsWidget(PYAFWidget):
 
         # --- Meshgrid --------------------------------------------------------
 
-        self.box_meshgrid = QtWidgets.QGroupBox()
-        self.GL_meshgrid = QtWidgets.QGridLayout()
-        # Options (meshgrid)
-        self.box_meshgrid_options = QtWidgets.QGroupBox("Maps")
-        self.box_meshgrid_options.setFixedHeight(self.options_boxes_height)
-
-        self.GRP_mesh_type = PYAFButtonGroup(self, "BTG_meshgrid_type")
-        self.RBT_mesh_piezo = QtWidgets.QRadioButton("Piezo height")
-        self.RBT_mesh_topography = QtWidgets.QRadioButton("Topography (zero force)")
-        self.RBT_mesh_stiffness = QtWidgets.QRadioButton()
-        self.RBT_mesh_stiffness_slice = QtWidgets.QRadioButton()
-        self.RBT_mesh_stiffness_corr = QtWidgets.QRadioButton(
-            "Elasticity (BEC)")
-        self.RBT_mesh_stiffness_slice_corr = QtWidgets.QRadioButton(
-            "Elasticity (Slice) (BEC)")
-        self.RBT_mesh_work = QtWidgets.QRadioButton("Detachment work")
-        self.RBT_mesh_rupture_force1 = QtWidgets.QRadioButton("Detachment force")
-        self.RBT_mesh_events_per_curve = QtWidgets.QRadioButton("Events per curve")
-        self.RBT_mesh_rupture_force2 = QtWidgets.QRadioButton(
-            "Event max. force")
-        self.GRP_mesh_type.addButton(self.RBT_mesh_piezo, 0)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_topography, 1)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_stiffness, 2)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_stiffness_slice, 3)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_stiffness_corr, 4)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_stiffness_slice_corr, 5)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_work, 6)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force1, 7)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_events_per_curve, 8)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_rupture_force2, 9)
-        # Viscoelasticity (Ting fit)
-        self.RBT_mesh_visco_e0 = QtWidgets.QRadioButton("E\u2080")
-        self.RBT_mesh_visco_fluidity = QtWidgets.QRadioButton("Fluidity")
-        self.RBT_mesh_visco_tan_delta = QtWidgets.QRadioButton(
-            "Loss tangent")
-        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_e0, 10)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_fluidity, 11)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_tan_delta, 12)
-        # Quality of the elasticity fit
-        self.RBT_mesh_fit_r2 = QtWidgets.QRadioButton("Fit R\u00b2")
-        self.RBT_mesh_fit_poc_fixed = QtWidgets.QRadioButton(
-            "Fit: fixed point of contact")
-        self.RBT_mesh_fit_r2.setToolTip(
-            "R\u00b2 of the elasticity fit, on the fitted points after the "
-            "point of contact")
-        self.RBT_mesh_fit_poc_fixed.setToolTip(
-            "Pixels where the point of contact could not be fitted (too "
-            "stiff sample, failed fit, or point of contact moved too far): "
-            "elasticity fitted with the detected point of contact (1)")
-        self.GRP_mesh_type.addButton(self.RBT_mesh_fit_r2, 13)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_fit_poc_fixed, 14)
-        # Storage and loss moduli, derived from E0 and the fluidity
-        self.RBT_mesh_visco_storage = QtWidgets.QRadioButton(
-            "Storage modulus E\u2032")
-        self.RBT_mesh_visco_loss = QtWidgets.QRadioButton(
-            "Loss modulus E\u2033")
-        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_storage, 15)
-        self.GRP_mesh_type.addButton(self.RBT_mesh_visco_loss, 16)
-
+        # Maps: one list, by nature of the map; the maps not computed for
+        # the file are greyed out
         # Nature of each map (elastic, viscoelastic, adhesion) and limits
         derived = (
             "\nDerived from E\u2080 and the fluidity (power-law model), not "
@@ -215,87 +165,106 @@ class ResultsWidget(PYAFWidget):
             "(about 1 / contact time to 1 / time between two points); "
             "outside, it is an extrapolation.")
         tips = {
-            self.RBT_mesh_piezo: "Height of the piezo at the end of the "
+            "piezo": "Height of the piezo at the end of the "
             "approach (includes the indentation).",
-            self.RBT_mesh_topography: "Height of the sample at the point of "
+            "topo": "Height of the sample at the point of "
             "contact (zero force): topography without the indentation.",
-            self.RBT_mesh_stiffness: "Elastic: Young's modulus fitted on the "
+            "stiffness": "Elastic: Young's modulus fitted on the "
             "approach (contact model of the Compute tab).\nOn a "
             "viscoelastic sample it depends on the indentation speed.",
-            self.RBT_mesh_stiffness_slice: "Elastic: elasticity of one "
+            "stiffness_slice": "Elastic: elasticity of one "
             "indentation segment (depth).",
-            self.RBT_mesh_stiffness_corr: "Elastic: elasticity corrected for "
+            "stiffness_corr": "Elastic: elasticity corrected for "
             "the stiff substrate under thin samples (bottom effect, Garcia "
             "& Garcia).",
-            self.RBT_mesh_stiffness_slice_corr: "Elastic: elasticity of one "
+            "stiffness_corr_slice": "Elastic: elasticity of one "
             "indentation segment, corrected for the substrate.",
-            self.RBT_mesh_visco_e0: "Viscoelastic: modulus at 1 s of the "
+            "visco_e0": "Viscoelastic: modulus at 1 s of the "
             "power-law relaxation E(t) = E\u2080 (t / 1 s)^-\u03b2\n(Ting fit "
             "of the approach and the retraction).",
-            self.RBT_mesh_visco_fluidity: "Viscoelastic: exponent \u03b2 of "
+            "visco_fluidity": "Viscoelastic: exponent \u03b2 of "
             "the power law, 0 elastic solid, 1 viscous liquid (cells: about "
             "0.1-0.3).",
-            self.RBT_mesh_visco_tan_delta: "Viscoelastic: loss tangent "
+            "visco_tan_delta": "Viscoelastic: loss tangent "
             "E\u2033 / E\u2032 = tan(\u03c0 \u03b2 / 2), the fluidity "
             "in rheology terms:\nbelow 1 solid-like, above 1 liquid-like; "
             "the same at all frequencies for a power law.",
-            self.RBT_mesh_visco_storage: "Viscoelastic: storage (elastic) "
+            "visco_storage": "Viscoelastic: storage (elastic) "
             "modulus E\u2032 at the frequency of the Viscoelasticity tab."
             + derived,
-            self.RBT_mesh_visco_loss: "Viscoelastic: loss (dissipative) "
+            "visco_loss": "Viscoelastic: loss (dissipative) "
             "modulus E\u2033 at the frequency of the Viscoelasticity tab."
             + derived,
-            self.RBT_mesh_work: "Adhesion: work to detach the tip (area "
+            "work": "Adhesion: work to detach the tip (area "
             "of the retraction curve below zero force).",
-            self.RBT_mesh_rupture_force1: "Adhesion: maximum force of "
+            "rupture_force": "Adhesion: maximum force of "
             "detachment.",
-            self.RBT_mesh_events_per_curve: "Adhesion: number of unbinding "
+            "events_per_curve": "Adhesion: number of unbinding "
             "events of each curve.",
-            self.RBT_mesh_rupture_force2: "Adhesion: largest force of the "
-            "unbinding events of each curve."}
-        for button, tip in tips.items():
-            button.setToolTip(tip)
-
-        self.GL_mesh_options = QtWidgets.QGridLayout()
-        # Same spacing between all the rows (the style's default spacing
-        # depends on the neighbouring widgets)
-        self.GL_mesh_options.setVerticalSpacing(4)
-        self.VL_meshgrid_options = QtWidgets.QVBoxLayout()
-        self.VL_meshgrid_options.setContentsMargins(0, 0, 0, 0)
-
-        # Heights, and the elasticity below them
-        self.GL_mesh_options.addWidget(self.RBT_mesh_piezo, 0, 0)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_topography, 1, 0)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness, 2, 0)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_slice, 3, 0)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_stiffness_corr, 4, 0)
-        self.GL_mesh_options.addWidget(
-            self.RBT_mesh_stiffness_slice_corr, 5, 0)
-
-        self.GL_mesh_options.addWidget(self.RBT_mesh_work, 0, 2)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force1, 1, 2)
-
-        self.GL_mesh_options.addWidget(self.RBT_mesh_events_per_curve, 2, 2)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_rupture_force2, 3, 2)
-
-        # Quality of the elasticity fit, below the adhesion
-        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_r2, 4, 2)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_fit_poc_fixed, 5, 2)
-
-        # Viscoelasticity
-        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_e0, 0, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_fluidity, 1, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_tan_delta, 2, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_storage, 3, 1)
-        self.GL_mesh_options.addWidget(self.RBT_mesh_visco_loss, 4, 1)
-
-        self.VL_meshgrid_options.addLayout(self.GL_mesh_options)
-        self.VL_meshgrid_options.addStretch(1)
-
-        self.HL_meshgrid_options = QtWidgets.QHBoxLayout()
-        self.HL_meshgrid_options.addLayout(self.VL_meshgrid_options)
-
-        self.box_meshgrid_options.setLayout(self.HL_meshgrid_options)
+            "events_rupture_force": "Adhesion: largest force of the "
+            "unbinding events of each curve.",
+            "breakthrough_force": "Breakthrough: force Fb at the rupture of "
+            "the supported lipid bilayer (first breakthrough of the "
+            "approach).",
+            "breakthrough_thickness": "Breakthrough: jump of the separation "
+            "at the first breakthrough (thickness of the compressed "
+            "bilayer).",
+            "breakthrough_count": "Breakthrough: number of breakthroughs of "
+            "each curve (stacked bilayers).",
+            "fit_r2": "R\u00b2 of the elasticity fit, on the fitted points "
+            "after the point of contact.",
+            "fit_poc_fixed": "Pixels where the point of contact could not be "
+            "fitted (too stiff sample, failed fit, or point of contact "
+            "moved too far):\nelasticity fitted with the detected point of "
+            "contact (1)."}
+        groups = (
+            ("Heights", (("piezo", "Piezo height"),
+                         ("topo", "Topography (zero force)"))),
+            ("Elasticity", (("stiffness", "Elasticity"),
+                            ("stiffness_slice", "Elasticity (Slice)"),
+                            ("stiffness_corr", "Elasticity (BEC)"),
+                            ("stiffness_corr_slice",
+                             "Elasticity (Slice) (BEC)"),
+                            ("fit_r2", "Fit R\u00b2"),
+                            ("fit_poc_fixed", "Fit: fixed point of contact"))),
+            ("Viscoelasticity", (("visco_e0", "E\u2080"),
+                                 ("visco_fluidity", "Fluidity"),
+                                 ("visco_tan_delta", "Loss tangent"),
+                                 ("visco_storage", "Storage modulus E\u2032"),
+                                 ("visco_loss", "Loss modulus E\u2033"))),
+            ("Adhesion", (("work", "Detachment work"),
+                          ("rupture_force", "Detachment force"),
+                          ("events_per_curve", "Events per curve"),
+                          ("events_rupture_force", "Event max. force"))),
+            ("Breakthrough", (
+                ("breakthrough_force", "Breakthrough force"),
+                ("breakthrough_thickness", "Breakthrough jump"),
+                ("breakthrough_count", "Breakthroughs per curve"))))
+        self.list_maps = PYAFComboBox(self, "list_maps")
+        self.list_maps.setMaxVisibleItems(40)
+        self.list_maps.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                     QtWidgets.QSizePolicy.Fixed)
+        model = self.list_maps.model()
+        # Index of each map in the list
+        self.map_items = {}
+        for group, maps in groups:
+            # Title of the group: not selectable, but enabled to have the
+            # text colour of the theme (the disabled items are the maps not
+            # computed)
+            self.list_maps.addItem(group)
+            item = model.item(self.list_maps.count() - 1)
+            item.setFlags(QtCore.Qt.ItemIsEnabled)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            for name, label in maps:
+                self.map_items[name] = self.list_maps.count()
+                self.list_maps.addItem("    " + label, name)
+                self.list_maps.setItemData(self.list_maps.count() - 1,
+                                           tips[name],
+                                           QtCore.Qt.ToolTipRole)
+        self.label_maps = QtWidgets.QLabel("Map")
+        widgets_list.widget_progressbar.update()
         widgets_list.widget_progressbar.update()
 
         # Some tools
@@ -357,6 +326,12 @@ class ResultsWidget(PYAFWidget):
         self.CB_surface = PYAFCheckBox(
             self, "checkbox_surface", "Detach. work")
         self.CB_force = PYAFCheckBox(self, "force", "Detach. force")
+        self.CB_breakthrough = PYAFCheckBox(
+            self, "checkbox_breakthrough", "Breakthroughs")
+        self.CB_breakthrough.setToolTip(
+            "Breakthroughs of the bilayer on the approach: force peak and "
+            "end of the jump, with Fb and the jump (Breakthrough tab of the "
+            "Compute tab)")
 
         # Events
         self.BT_group_events = PYAFButtonGroup(self, "button_group_events")
@@ -379,6 +354,7 @@ class ResultsWidget(PYAFWidget):
         # Same spacing between all the rows (the style's default spacing
         # depends on the neighbouring widgets)
         self.GL_curves_options.setVerticalSpacing(4)
+        self.GL_curves_options.setHorizontalSpacing(24)
         self.VL_curves_options = QtWidgets.QVBoxLayout()
         widgets_list.widget_progressbar.update()
 
@@ -399,6 +375,7 @@ class ResultsWidget(PYAFWidget):
         self.GL_curves_options.addWidget(self.CB_fit_poc, 1, 2)
         self.GL_curves_options.addWidget(self.CB_segments, 2, 2)
         self.GL_curves_options.addWidget(self.CB_display_fits, 3, 2)
+        self.GL_curves_options.addWidget(self.CB_breakthrough, 4, 2)
         # Col 4
         self.GL_curves_options.addWidget(self.CB_joc, 0, 3)
         self.GL_curves_options.addWidget(self.CB_fit_joc, 1, 3)
@@ -410,6 +387,10 @@ class ResultsWidget(PYAFWidget):
         self.GL_curves_options.addWidget(self.CB_events_filter_dist, 2, 4)
         self.GL_curves_options.addWidget(self.CB_events_display_joc, 3, 4)
         self.GL_curves_options.addWidget(self.CB_events_display_fit_joc, 4, 4)
+        # Apply to all (display options of the maps and the curves), in the
+        # lower right corner, aligned with the checkboxes above
+        self.GL_curves_options.addWidget(self.TG_app_to_all, 6, 4,
+                                         QtCore.Qt.AlignLeft)
 
         self.VL_curves_options.addLayout(self.GL_curves_options)
         self.VL_curves_options.addStretch(1)
@@ -423,13 +404,25 @@ class ResultsWidget(PYAFWidget):
         # --- Set up page -----------------------------------------------------
         self.GL = QtWidgets.QGridLayout()
 
-        HL_empty = QtWidgets.QHBoxLayout()
-        HL_empty.addStretch(1)
-
+        # Above the map: file, map, and the navigation between the curves
+        # (centered on the map)
         self.GL_choser = QtWidgets.QGridLayout()
-        self.GL_choser.addWidget(self.list_exp, 0, 0)
-        self.GL_choser.addWidget(self.TG_app_to_all, 0, 2)
-        self.GL_choser.addLayout(HL_empty, 0, 3)
+        self.GL_choser.setVerticalSpacing(8)
+        self.GL_choser.addWidget(QtWidgets.QLabel("File"), 0, 0)
+        self.GL_choser.addWidget(self.list_exp, 0, 1)
+        self.GL_choser.addWidget(self.label_maps, 1, 0)
+        self.GL_choser.addWidget(self.list_maps, 1, 1)
+        self.GL_choser.setColumnStretch(1, 1)
+        self.HL_navigation = QtWidgets.QHBoxLayout()
+        self.HL_navigation.addStretch(1)
+        # self.curve_selector is added here in update_widget()
+        self.HL_navigation.addStretch(1)
+        self.box_maps = QtWidgets.QGroupBox("Maps")
+        self.box_maps.setLayout(self.GL_choser)
+        VL_choser = QtWidgets.QVBoxLayout()
+        VL_choser.addWidget(self.box_maps)
+        VL_choser.addStretch(1)
+        VL_choser.addLayout(self.HL_navigation)
 
         self.HL_buttons = QtWidgets.QHBoxLayout()
         self.HL_buttons.addWidget(self.BT_multi_meshgrids)
@@ -440,12 +433,13 @@ class ResultsWidget(PYAFWidget):
         self.HL_buttons.addWidget(self.BT_used_parameters)
         self.HL_buttons.addStretch(1)
 
-        self.GL.addWidget(self.box_meshgrid_options, 0, 0)
+        self.GL.addLayout(VL_choser, 0, 0)
         self.GL.addWidget(self.box_curves_options, 0, 1)
-        self.GL.addLayout(self.GL_choser, 1, 0, 1, 0)
-        self.GL.addWidget(self.MPL_canvas1, 2, 0)
-        self.GL.addWidget(self.MPL_canvas2, 2, 1)
-        self.GL.addLayout(self.HL_buttons, 3, 0, 1, 0)
+        self.GL.addWidget(self.MPL_canvas1, 1, 0)
+        self.GL.addWidget(self.MPL_canvas2, 1, 1)
+        self.GL.addLayout(self.HL_buttons, 2, 0, 1, 0)
+        # The plots take the height of the window
+        self.GL.setRowStretch(1, 1)
 
         widgets_list.widget_progressbar.update()
 
@@ -456,7 +450,7 @@ class ResultsWidget(PYAFWidget):
 
         widgets_list.widget_progressbar.update()
 
-        self.box_meshgrid_options.setFont(self.parent.smallfont)
+        self.box_maps.setFont(self.parent.smallfont)
         self.box_curves_options.setFont(self.parent.smallfont)
 
     def update_widget(self):
@@ -467,7 +461,8 @@ class ResultsWidget(PYAFWidget):
         if data.is_single:
             self.curve_selector.setParent(None)
         else:
-            self.GL_choser.addWidget(self.curve_selector, 0, 1)
+            if self.HL_navigation.indexOf(self.curve_selector) == -1:
+                self.HL_navigation.insertWidget(1, self.curve_selector)
             self.curve_selector.update_widget()
 
         self.update_GUI("all")
@@ -511,6 +506,11 @@ class ResultsWidget(PYAFWidget):
             data.events_results_display_fit_joc = True
         elif mt.startswith("visco_") and data.visco_calculated:
             data.display_curve_type = "visco"
+        elif mt.startswith("breakthrough_") and data.breakthrough_calculated:
+            # Approach in force vs distance, with the breakthroughs
+            data.display_curve_type = "force"
+            data.display_trace_retrace = 0
+            data.display_breakthrough = True
         elif mt in ("piezo", "topo"):
             # Default display of the curves, without the results
             data.display_curve_type = "defl_ext"
@@ -536,57 +536,45 @@ class ResultsWidget(PYAFWidget):
         data = shared.exp.list[shared.exp.id_selected]
 
         if element == "BTG_meshgrid_type" or element == "all":
-            # Refresh the radiobuttons for the choice of the meshgrid
-            # Enable or disable buttons
-            val = data.stiffness_calculated
-            self.RBT_mesh_topography.setEnabled(val)
-            self.RBT_mesh_stiffness.setEnabled(val)
-            if val:
-                if data.get_used_indentation()[1] == 0:
-                    self.RBT_mesh_stiffness_slice.setEnabled(False)
+            # Maps computed for the file (the others are greyed out)
+            stiff = data.stiffness_calculated
+            corr = data.stiffness_corrected
+            slices = (stiff or corr) and data.get_used_indentation()[1] != 0
+            adhesion = data.work_and_rupture_force1_calculated
+            available = {
+                "piezo": True, "topo": stiff, "stiffness": stiff,
+                "stiffness_slice": stiff and slices,
+                "stiffness_corr": corr,
+                "stiffness_corr_slice": corr and slices,
+                "fit_r2": data.has_fit_quality(),
+                "fit_poc_fixed": data.has_fit_quality(),
+                "work": adhesion, "rupture_force": adhesion,
+                "events_per_curve": data.events_calculated,
+                "events_rupture_force": data.events_calculated}
+            model = self.list_maps.model()
+            for name, index in self.map_items.items():
+                if name.startswith("visco_"):
+                    enabled = data.visco_calculated
+                elif name.startswith("breakthrough_"):
+                    enabled = data.breakthrough_calculated
                 else:
-                    self.RBT_mesh_stiffness_slice.setEnabled(True)
-            else:
-                self.RBT_mesh_stiffness_slice.setEnabled(val)
-            val = data.stiffness_corrected
-            self.RBT_mesh_stiffness_corr.setEnabled(val)
-            if val:
-                if data.get_used_indentation()[1] == 0:
-                    self.RBT_mesh_stiffness_slice_corr.setEnabled(False)
-                else:
-                    self.RBT_mesh_stiffness_slice_corr.setEnabled(True)
-            else:
-                self.RBT_mesh_stiffness_slice_corr.setEnabled(val)
-            val = data.work_and_rupture_force1_calculated
-            self.RBT_mesh_work.setEnabled(val)
-            self.RBT_mesh_rupture_force1.setEnabled(val)
-            val = data.events_calculated
-            self.RBT_mesh_events_per_curve.setEnabled(val)
-            self.RBT_mesh_rupture_force2.setEnabled(val)
-            val = data.visco_calculated
-            self.RBT_mesh_visco_e0.setEnabled(val)
-            self.RBT_mesh_visco_fluidity.setEnabled(val)
-            self.RBT_mesh_visco_tan_delta.setEnabled(val)
-            self.RBT_mesh_visco_storage.setEnabled(val)
-            self.RBT_mesh_visco_loss.setEnabled(val)
-            val = data.has_fit_quality()
-            self.RBT_mesh_fit_r2.setEnabled(val)
-            self.RBT_mesh_fit_poc_fixed.setEnabled(val)
+                    enabled = available[name]
+                model.item(index).setEnabled(bool(enabled))
 
-            # Check the button
-            index = misc_tools.get_meshgrid_type_by_id(data.meshgrid_type)
-            self.GRP_mesh_type.button(index).setChecked(True)
+            # Select the map
+            self.list_maps.setCurrentIndex(
+                self.map_items[data.meshgrid_type])
 
         if element == "apply_to_all" or element == "all":
             self.TG_app_to_all.setChecked(shared.exp.apply_to_all_data)
 
         if element == "radio_buttons" or element == "all":
             if data.used_stiffness_model_selected == 3:
-                self.RBT_mesh_stiffness.setText("Apparent stiffness")
-                self.RBT_mesh_stiffness_slice.setText("Apparent stiffness (Z-slice)")
+                labels = ("Apparent stiffness", "Apparent stiffness (Z-slice)")
             else:
-                self.RBT_mesh_stiffness.setText("Elasticity")
-                self.RBT_mesh_stiffness_slice.setText("Elasticity (Slice)")
+                labels = ("Elasticity", "Elasticity (Slice)")
+            for name, text in zip(("stiffness", "stiffness_slice"), labels):
+                self.list_maps.setItemText(self.map_items[name], "    " + text)
 
         if element == "button_display_in_3D" or element == "all":
             # 3D is only allowed if vtk is imported
@@ -623,11 +611,7 @@ class ResultsWidget(PYAFWidget):
 
         if element == "buttons_options_curves" or element == "all":
             # Enable force curve option
-            if data.stiffness_calculated or \
-                    data.work_and_rupture_force1_calculated:
-                self.RB_force.setEnabled(True)
-            else:
-                self.RB_force.setEnabled(False)
+            self.RB_force.setEnabled(curve_type_available(data, "force"))
 
             # Enable force curve option (events)
             self.RB_force_events.setEnabled(data.events_calculated)
@@ -666,7 +650,8 @@ class ResultsWidget(PYAFWidget):
 
             # Enable or disable radiobuttons for approach or retraction
             if data.display_curve_type == "force":
-                self.radiobutton_trace.setEnabled(data.stiffness_calculated)
+                self.radiobutton_trace.setEnabled(
+                    data.stiffness_calculated or data.breakthrough_calculated)
 
                 val = data.work_and_rupture_force1_calculated
                 self.radiobutton_retrace.setEnabled(val)
@@ -745,6 +730,13 @@ class ResultsWidget(PYAFWidget):
 
             tp = data.display_curve_type
             dtr = data.display_trace_retrace
+
+            # Breakthroughs, on the approach of the deflection and force
+            # curves
+            self.CB_breakthrough.setChecked(data.display_breakthrough)
+            self.CB_breakthrough.setEnabled(
+                data.breakthrough_calculated and dtr != 1 and
+                tp in ("defl_ext", "force_ext", "force"))
 
             # Approach curve box
             if data.stiffness_calculated:
@@ -878,8 +870,7 @@ class ResultsWidget(PYAFWidget):
 
         elif button == "BTG_meshgrid_type":
             # Get the data :
-            value = self.GRP_mesh_type.checkedId()
-            data.meshgrid_type = misc_tools.get_meshgrid_type_as_string(value)
+            data.meshgrid_type = self.list_maps.currentData()
             self.logger.debug("Changing meshgrid type, %s", data.meshgrid_type)
             # The curve corresponding to the map
             curve_changed = self.match_curve_to_map(data)
@@ -1012,8 +1003,7 @@ class ResultsWidget(PYAFWidget):
 
         elif button == "button_display_in_3D":
             # Go to stiffness meshgrid
-            self.RBT_mesh_stiffness.setChecked(True)
-            self.button_clicked("BTG_meshgrid_type")
+            self.select_map("stiffness")
 
             if widgets_list.widget_vtk is not None:
                 widgets_list.widget_vtk.activateWindow()
@@ -1048,6 +1038,17 @@ class ResultsWidget(PYAFWidget):
         """Called when a list is updated."""
         if name == "list1":
             self.parent.file_changed("list1")
+        elif name == "list_maps":
+            if self.list_maps.currentData() is None:
+                # Title of a group (keyboard): back to the displayed map
+                self.update_GUI("BTG_meshgrid_type")
+                return
+            self.button_clicked("BTG_meshgrid_type")
+
+    def select_map(self, map_type):
+        """Displays a map (as chosen in the list of the maps)."""
+        self.list_maps.setCurrentIndex(self.map_items[map_type])
+        self.button_clicked("BTG_meshgrid_type")
 
     def checkbox_clicked(self, name):
         """Called when clicking on a checkbox."""
@@ -1090,6 +1091,10 @@ class ResultsWidget(PYAFWidget):
 
         elif name == "force":
             data.display_force = self.CB_force.isChecked()
+            self.update_MPL("MPL_canvas2")
+
+        elif name == "checkbox_breakthrough":
+            data.display_breakthrough = self.CB_breakthrough.isChecked()
             self.update_MPL("MPL_canvas2")
 
         elif name == "checkbox_events_filter_dist":

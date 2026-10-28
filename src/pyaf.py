@@ -905,7 +905,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 cond1 = item.stiffness_calculated
                 cond2 = item.work_and_rupture_force1_calculated
                 cond3 = item.events_calculated
-                cond4 = item.events_calculated
+                cond4 = item.breakthrough_calculated
 
                 if cond1 or cond2 or cond3 or cond4:
                     found = True

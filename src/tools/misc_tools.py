@@ -260,6 +260,11 @@ def save_used_params(data, mode):
         data.used_events_kernel_adaptive_threshold = \
             data.events_kernel_adaptive_threshold
 
+    if mode == "breakthrough" or mode == "all":
+        for name in ("n_sigma", "min_thickness", "min_force", "max_events"):
+            setattr(data, "used_breakthrough_" + name,
+                    getattr(data, "breakthrough_" + name))
+
     # Values saved for all three types
     # Spring constant is given in N/nm, convert it back to N/m to save it
     data.used_spring_constant = data.spring_constant * 1e9
@@ -374,7 +379,8 @@ MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
                   "rupture_force", "events_per_curve",
                   "events_rupture_force", "visco_e0", "visco_fluidity",
                   "visco_tan_delta", "fit_r2", "fit_poc_fixed",
-                  "visco_storage", "visco_loss")
+                  "visco_storage", "visco_loss", "breakthrough_force",
+                  "breakthrough_thickness", "breakthrough_count")
 
 
 def get_meshgrid_type_as_string(mesh_id):
@@ -416,6 +422,10 @@ def get_results_type_from_id(results_type):
         result_id = "visco_fluidity"
     elif results_type == 10:
         result_id = "visco_tan_delta"
+    elif results_type == 11:
+        result_id = "breakthrough_force"
+    elif results_type == 12:
+        result_id = "breakthrough_thickness"
 
     return result_id
 

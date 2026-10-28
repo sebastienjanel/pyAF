@@ -817,11 +817,7 @@ class WidgetAFM(QtWidgets.QWidget):
         options are the ones of the displayed map)."""
         data.meshgrid_type = data.opengl_map_type
         if data is shared.exp.current_data:
-            results = widgets_list.widget_results
-            button = results.GRP_mesh_type.button(
-                misc_tools.get_meshgrid_type_by_id(data.opengl_map_type))
-            button.setChecked(True)
-            results.button_clicked("BTG_meshgrid_type")
+            widgets_list.widget_results.select_map(data.opengl_map_type)
         if widgets_list.widget_meshgrid_options is not None:
             widgets_list.widget_meshgrid_options.update_widget()
 

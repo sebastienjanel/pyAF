@@ -55,6 +55,7 @@ from ..tools import map_values
 from ..tools import params_export
 from ..tools import results_sorting
 from ..tools import superplot_tools
+from ..tools.breakthrough_tools import EVENT_VALUES
 from ..tools.colortables import ColorTables
 
 
@@ -216,11 +217,32 @@ def get_r_tables(row, data):
             stats.append(describe(df, name))
             curve_tables.append(df)
 
-    if data.visco_calculated:
-        for force_type, values in results_sorting.VISCO_TYPES.items():
+    for force_type, values in results_sorting.PIXEL_TYPES.items():
+        if getattr(data, values["calculated"]):
             df = table(get(force_type), values["column"])
             stats.append(describe(df, values["column"]))
             curve_tables.append(df)
+
+    if data.breakthrough_calculated:
+        # Number of breakthroughs per curve, and all the breakthroughs
+        count = data.breakthrough_count
+        curves = get("breakthrough_force")
+        df = table([[index, i, j, count[i][j]] for index, i, j, _ in curves],
+                   "breakthroughs_per_curve")
+        stats.append(describe(df, "breakthroughs_per_curve"))
+        curve_tables.append(df)
+        force = EVENT_VALUES.index("force")
+        thickness = EVENT_VALUES.index("thickness")
+        lines = [[index, i, j, float(event[force]), float(event[thickness]),
+                  k] for index, i, j, _ in curves
+                 for k, event in enumerate(data.breakthrough_results[i, j])
+                 if np.isfinite(event[force])]
+        columns = CURVE_KEYS + ["breakthrough_forces", "breakthrough_jumps",
+                                "event"]
+        df = pd.DataFrame(lines, columns=columns)
+        for key in CURVE_KEYS + ["event"]:
+            df[key] = df[key].astype(int) + 1
+        event_tables.append(df)
 
     if data.events_calculated:
         for force_type, name in (("events_per_curve", "events_per_curve"),
@@ -466,7 +488,9 @@ RESULT_TYPES = (("stiffness", "stiffness_calculated"),
                 ("events_distance", "events_calculated"),
                 ("visco_e0", "visco_calculated"),
                 ("visco_fluidity", "visco_calculated"),
-                ("visco_tan_delta", "visco_calculated"))
+                ("visco_tan_delta", "visco_calculated"),
+                ("breakthrough_force", "breakthrough_calculated"),
+                ("breakthrough_thickness", "breakthrough_calculated"))
 
 
 def computed_result_types():

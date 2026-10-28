@@ -40,7 +40,7 @@ from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools import misc_tools
 from ...tools import gui_tools
-from ...tools.results_sorting import VISCO_TYPES
+from ...tools.results_sorting import BREAKTHROUGH_TYPES, VISCO_TYPES
 
 
 class ResultsChooserWidget(PYAFWidget):
@@ -64,6 +64,8 @@ class ResultsChooserWidget(PYAFWidget):
         self.list_choser.addItem("Loading rates")
         self.list_choser.addItem("Distance to Joc")
         for values in VISCO_TYPES.values():
+            self.list_choser.addItem(values["name"])
+        for values in BREAKTHROUGH_TYPES.values():
             self.list_choser.addItem(values["name"])
 
         # Wide enough for the longest result type
@@ -149,6 +151,14 @@ class ResultsChooserWidget(PYAFWidget):
                 else:
                     gui_tools.disable_combobox_item(self.list_choser, index)
 
+            found_breakthrough = any(item.breakthrough_calculated
+                                     for item in shared.exp.list)
+            for index in (11, 12):
+                if found_breakthrough:
+                    gui_tools.enable_combobox_item(self.list_choser, index)
+                else:
+                    gui_tools.disable_combobox_item(self.list_choser, index)
+
             if shared.exp.results_type == "stiffness":
                 self.list_choser.setCurrentIndex(0)
             elif shared.exp.results_type == "work":
@@ -168,3 +178,7 @@ class ResultsChooserWidget(PYAFWidget):
             elif shared.exp.results_type in VISCO_TYPES:
                 self.list_choser.setCurrentIndex(
                     8 + list(VISCO_TYPES).index(shared.exp.results_type))
+            elif shared.exp.results_type in BREAKTHROUGH_TYPES:
+                self.list_choser.setCurrentIndex(
+                    11 + list(BREAKTHROUGH_TYPES).index(
+                        shared.exp.results_type))

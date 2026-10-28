@@ -59,6 +59,7 @@ from ..widgets_main.subwidgets.curve_selector import ResultsSelectorWidget
 from ..widgets_main.subwidgets.fit_parameters import FitParamsWidget
 from ..widgets.curve_modify import CurveModWidget
 from ..plots.PYAFPlot import PYAFPlot
+from ..compute_tools import breakthrough
 from ..compute_tools.stiffness.main import Stiffness
 from ..compute_tools.work_and_rupture_force.main import WorkAndRuptureForce
 from ..compute_tools.stiffness_correction import StiffnessCorrection
@@ -134,7 +135,8 @@ class ComputeWidget(PYAFWidget):
         self.BT_next_zoom_element = PYAFButton(
             self, "next_zoom_element", ">", size=40)
         self.BT_next_zoom_element.setToolTip(
-            "Zoom on the next element of the curve (jump of contact, events)")
+            "Zoom on the next element of the curve (jump of contact, events, "
+            "breakthroughs)")
 
         widgets_list.widget_progressbar.update()
 
@@ -672,6 +674,82 @@ class ComputeWidget(PYAFWidget):
         HL_visco.addLayout(VL_visco)
         self.widget_visco.setLayout(HL_visco)
 
+        # --- Breakthroughs of supported lipid bilayers -----------------------
+
+        self.widget_breakthrough = QtWidgets.QWidget()
+        self.Box_breakthrough = QtWidgets.QGroupBox(
+            "Breakthroughs (approach curves)")
+        self.IN_bt_n_sigma = PYAFInput(
+            self, "breakthrough_n_sigma", "Threshold (\u00d7 noise)", 60)
+        self.IN_bt_n_sigma.setToolTip(
+            "A breakthrough is a sudden jump of the separation (tip-sample "
+            "distance) on the approach, with a drop of the force: the jump "
+            "must exceed this number of times the noise of the separation "
+            "of the curve")
+        self.IN_bt_n_sigma.input.setValidator(misc_tools.validator("PF"))
+        self.IN_bt_min_thickness = PYAFInput(
+            self, "breakthrough_min_thickness", "Minimum jump [nm]", 60)
+        self.IN_bt_min_thickness.setToolTip(
+            "Minimum jump of the separation: the thickness of the bilayer "
+            "compressed at the rupture (about 4-5 nm for a bilayer)")
+        self.IN_bt_min_thickness.input.setValidator(
+            misc_tools.validator("PF"))
+        self.IN_bt_min_force = PYAFInput(
+            self, "breakthrough_min_force", "Minimum force [nN]", 60)
+        self.IN_bt_min_force.setToolTip(
+            "Minimum breakthrough force (Fb): higher to skip the jumps at "
+            "the contact")
+        self.IN_bt_min_force.input.setValidator(misc_tools.validator("UF"))
+        self.IN_bt_max_events = PYAFInput(
+            self, "breakthrough_max_events", "Maximum per curve", 60)
+        self.IN_bt_max_events.setToolTip(
+            "Maximum number of breakthroughs per curve (stacked bilayers); "
+            "the maps and plots use the first one")
+        self.IN_bt_max_events.input.setValidator(
+            misc_tools.validator("RI", bottom=1, top=20))
+        GL_bt = QtWidgets.QGridLayout()
+        GL_bt.addWidget(self.IN_bt_n_sigma, 0, 0)
+        GL_bt.addWidget(self.IN_bt_min_thickness, 1, 0)
+        GL_bt.addWidget(self.IN_bt_min_force, 0, 1)
+        GL_bt.addWidget(self.IN_bt_max_events, 1, 1)
+        GL_bt.setColumnStretch(2, 1)
+        self.Box_breakthrough.setLayout(GL_bt)
+        label_bt = QtWidgets.QLabel(
+            "Breakthrough force Fb (force at the rupture of the bilayer) and "
+            "jump of the separation (thickness of the compressed bilayer).\n"
+            "Preview: approach force vs distance to the support, with the "
+            "breakthroughs found with these settings.\n"
+            "Nominal loading rate: spring constant \u00d7 approach velocity "
+            "(Gum\u00ed-Audenis & Giannotti 2019).\n"
+            "Correct the baseline tilt first (Tilting/Smoothing): a tilted "
+            "baseline biases Fb and can hide the low breakthroughs.")
+        label_bt.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        # Small text, below the parameters, as in the viscoelasticity tab
+        label_bt.setFont(gui_tools.font_of_size(
+            max(label_bt.font().pointSize() - 2, 8)))
+        VL_bt_opts = QtWidgets.QVBoxLayout()
+        VL_bt_opts.addWidget(self.Box_breakthrough)
+        VL_bt_opts.addWidget(label_bt)
+        VL_bt_opts.addStretch(1)
+
+        self.BT_breakthrough = PYAFButton(
+            self, "compute_breakthrough", "Compute")
+        self.BT_breakthrough.setFixedSize(100, 100)
+        self.BT_breakthrough.setObjectName("primaryButton")
+        VL_bt = QtWidgets.QVBoxLayout()
+        VL_bt.addStretch(1)
+        VL_bt.addWidget(self.BT_breakthrough)
+        VL_bt.addStretch(1)
+
+        # Options centered in the tab, as in the other tabs
+        HL_bt = QtWidgets.QHBoxLayout()
+        HL_bt.addSpacing(self.BT_breakthrough.width())
+        HL_bt.addStretch(1)
+        HL_bt.addLayout(VL_bt_opts)
+        HL_bt.addStretch(1)
+        HL_bt.addLayout(VL_bt)
+        self.widget_breakthrough.setLayout(HL_bt)
+
         # --- Set up page -----------------------------------------------------
 
         self.tabs.addTab(self.widget_app, "Elasticity")
@@ -680,6 +758,7 @@ class ComputeWidget(PYAFWidget):
         self.tabs.addTab(self.widget_ret, "Work, Rupture force")
         self.tabs.addTab(self.widget_events, "Unbinding events")
         self.tabs.addTab(self.widget_loading_rates, "Loading rates")
+        self.tabs.addTab(self.widget_breakthrough, "Breakthrough")
 
         # Margins of the pages, with the padding of the pane (no padding in
         # the stylesheet, see QTabWidget#subTabs::pane)
@@ -771,6 +850,9 @@ class ComputeWidget(PYAFWidget):
         elif widget is self.widget_visco:
             shared.exp.compute_type = "viscoelasticity"
             self.BT_next_zoom_element.setEnabled(False)
+        elif widget is self.widget_breakthrough:
+            shared.exp.compute_type = "breakthrough"
+            self.BT_next_zoom_element.setEnabled(True)
         elif widget is self.widget_ret:
             shared.exp.compute_type = "work_and_rupture_force"
             self.BT_next_zoom_element.setEnabled(True)
@@ -835,6 +917,16 @@ class ComputeWidget(PYAFWidget):
             self.BT_height_corr.setEnabled(reason is None)
             self.BT_height_corr.setToolTip(
                 "" if reason is None else "Not available: " + reason)
+
+        if element == "breakthrough" or element == "all":
+            self.IN_bt_n_sigma.changeValue(
+                misc_tools.format_number(data.breakthrough_n_sigma))
+            self.IN_bt_min_thickness.changeValue(
+                misc_tools.format_number(data.breakthrough_min_thickness))
+            self.IN_bt_min_force.changeValue(
+                misc_tools.format_number(data.breakthrough_min_force))
+            self.IN_bt_max_events.changeValue(
+                int(data.breakthrough_max_events))
 
         if element == "visco" or element == "all":
             self.list_visco_solver.setCurrentIndex(
@@ -1087,6 +1179,21 @@ class ComputeWidget(PYAFWidget):
         elif field == "visco_contact_offset":
             data.visco_contact_offset = self.IN_visco_offset.get_float_value()
 
+        elif field == "breakthrough_n_sigma":
+            data.breakthrough_n_sigma = self.IN_bt_n_sigma.get_float_value()
+
+        elif field == "breakthrough_min_thickness":
+            data.breakthrough_min_thickness = \
+                self.IN_bt_min_thickness.get_float_value()
+
+        elif field == "breakthrough_min_force":
+            data.breakthrough_min_force = \
+                self.IN_bt_min_force.get_float_value()
+
+        elif field == "breakthrough_max_events":
+            data.breakthrough_max_events = \
+                self.IN_bt_max_events.get_int_value()
+
         elif field == "visco_nbr_points":
             data.visco_nbr_points = self.IN_visco_points.get_int_value()
 
@@ -1148,10 +1255,11 @@ class ComputeWidget(PYAFWidget):
             "than the radius. Use the Sneddon (Sphere) model for a bead, or " \
             "a blunted cone or pyramid for a sharp tip.<ul>" + lines + "</ul>"
 
-    def finish_computation(self, warnings=None, notes=None):
+    def finish_computation(self, warnings=None, notes=None, info=None):
         """At the end of the computation, display the errors and refresh the GUI.
 
         notes: text added to the final message (displayed as a warning).
+        info: text of the final message without warning.
         """
         # Indentation range not attained on some pixels (final message)
         range_text = None
@@ -1322,8 +1430,11 @@ class ComputeWidget(PYAFWidget):
 
             if not consts.UNIT_TESTING and not consts.AUTOCALC_STIFFNESS:
                 QtWidgets.QApplication.beep()
+                details = range_text
+                if info:
+                    details = info if details is None else details + info
                 gui_tools.show_success(self, "Calculation complete",
-                                       range_text,
+                                       details,
                                        warning=range_text is not None)
 
     def button_clicked(self, button):
@@ -1577,6 +1688,38 @@ class ComputeWidget(PYAFWidget):
                                          for text in skipped) + "</ul>"
             self.finish_computation(notes=notes)
 
+        elif button == "compute_breakthrough":
+            # Update all the parameters if needed
+            apply_to_all.apply_to_all("calc_options")
+
+            calc_list = list(range(len(shared.exp.list))) \
+                if shared.exp.calc_all else [shared.exp.id_selected]
+            # Overwrite calc_list with a list defined externally
+            if shared.force_calc_list is not None:
+                calc_list = shared.force_calc_list
+
+            lines = []
+            for calc_id in calc_list:
+                data = shared.exp.list[calc_id]
+                if data.is_single:
+                    continue
+                self.logger.debug("Breakthroughs %s", data.filename)
+                found = breakthrough.compute(calc_id)
+                experiment.add_result(calc_id, data.filename)
+                if shared.exp.results_type is None:
+                    shared.exp.results_type = "breakthrough_force"
+                total = int(numpy.sum(numpy.asarray(
+                    data.discarded_curves) == 0))
+                lines.append(os.path.basename(data.filename) + " : " +
+                             str(found) + " of " + str(total) +
+                             " curves with a breakthrough")
+
+            info = None
+            if lines:
+                info = "<ul>" + "".join("<li>" + text + "</li>"
+                                        for text in lines) + "</ul>"
+            self.finish_computation(info=info)
+
         elif button == "get_lr":
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
@@ -1683,6 +1826,10 @@ class ComputeWidget(PYAFWidget):
                 # The events and the joc
                 points = self.MPL_curve.canvas.loading_rates_zoom_points
                 val = len(points) if points else None
+            elif shared.exp.compute_type == "breakthrough":
+                # The breakthroughs
+                events = self.MPL_curve.canvas.breakthrough_events
+                val = len(events) if events else None
 
             if val is not None:
                 if shared.zoomed_in_element + 1 < val:

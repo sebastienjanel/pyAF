@@ -231,6 +231,23 @@ def events(data):
             if data.loading_rates_calculated else None}
 
 
+def breakthrough(data):
+    """Parameters of the breakthroughs, None if not computed. The loading
+    rate is the nominal one (spring constant x approach velocity)."""
+    if not data.breakthrough_calculated:
+        return None
+    # k [N/m] x v [nm/s] = nN/s
+    velocity = data.approach_velocity
+    rate = data.spring_constant * 1e9 * velocity if velocity else None
+    return {"n_sigma": data.used_breakthrough_n_sigma,
+            "min_thickness_nm": data.used_breakthrough_min_thickness,
+            "min_force_nN": data.used_breakthrough_min_force,
+            "max_events_per_curve": data.used_breakthrough_max_events,
+            "nominal_loading_rate_nN_per_s": rate,
+            "thickness": "jump of the separation at the rupture (thickness "
+                         "of the compressed bilayer)"}
+
+
 # Settings of the computations, by part (names of the attributes of the
 # datasets, whose used_* values are the ones used for the computations):
 # reloaded by tools.params_import (Load parameters, Compute tab)
@@ -262,6 +279,9 @@ SETTINGS = {
         "adaptive_threshold_option", "adaptive_smoothing_window",
         "adaptive_smoothing_order"),
     "loading_rates": ("lr_coef",),
+    "breakthrough": (
+        "breakthrough_n_sigma", "breakthrough_min_thickness",
+        "breakthrough_min_force", "breakthrough_max_events"),
     "curves": (
         "sg_smoothing_enabled", "sg_smoothing_order", "sg_smoothing_width",
         "sg_smoothing_uniform", "tilt_applied", "tilt_limit_1",
@@ -276,7 +296,8 @@ COMPUTED = {"elasticity": "stiffness_calculated",
             "viscoelasticity": "visco_calculated",
             "work_and_rupture_force": "work_and_rupture_force1_calculated",
             "events": "events_calculated",
-            "loading_rates": "loading_rates_calculated"}
+            "loading_rates": "loading_rates_calculated",
+            "breakthrough": "breakthrough_calculated"}
 
 
 def settings(data):
@@ -310,6 +331,7 @@ def file_params(data):
             "viscoelasticity": viscoelasticity(data),
             "work_and_rupture_force": work_and_rupture_force(data),
             "events": events(data),
+            "breakthrough": breakthrough(data),
             "settings": settings(data)}
 
 

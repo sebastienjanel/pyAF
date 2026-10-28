@@ -44,6 +44,7 @@ PARTS = (("elasticity", "Elasticity"),
          ("work_and_rupture_force", "Detachment work and force"),
          ("events", "Events"),
          ("loading_rates", "Loading rates"),
+         ("breakthrough", "Breakthroughs"),
          ("curves", "Curves (smoothing, tilt)"),
          ("calibration", "Calibration (spring constant, deflection "
                          "sensitivity)"))
@@ -51,7 +52,7 @@ PARTS = (("elasticity", "Elasticity"),
 
 # Parts of the computations (the curves and calibration are always given)
 COMPUTATIONS = ("elasticity", "viscoelasticity", "work_and_rupture_force",
-                "events", "loading_rates")
+                "events", "loading_rates", "breakthrough")
 
 
 class ParametersError(Exception):

@@ -52,6 +52,10 @@ MAPS = {
     "visco_tan_delta": ("Loss tangent", "tan δ", 1.0),
     "visco_storage": ("Storage modulus E′", "E′ [kPa]", 1e-3),
     "visco_loss": ("Loss modulus E″", "E″ [kPa]", 1e-3),
+    "breakthrough_force": ("Breakthrough force", "Fb [nN]", 1e9),
+    "breakthrough_thickness": ("Breakthrough jump", "Jump [nm]", 1.0),
+    "breakthrough_count": ("Breakthroughs per curve",
+                           "Breakthroughs per curve", 1.0),
     "fit_r2": ("Fit R²", "R² of the fit", 1.0),
     "fit_poc_fixed": ("Fit: fixed point of contact",
                       "Point of contact fixed (1)", 1.0),
@@ -72,6 +76,9 @@ def available_maps(data):
         "rupture_force": data.work_and_rupture_force1_calculated,
         "events_per_curve": data.events_calculated,
         "events_rupture_force": data.events_calculated,
+        "breakthrough_force": data.breakthrough_calculated,
+        "breakthrough_thickness": data.breakthrough_calculated,
+        "breakthrough_count": data.breakthrough_calculated,
         "fit_r2": data.has_fit_quality(),
         "fit_poc_fixed": data.has_fit_quality()}
     return [mt for mt in MAPS

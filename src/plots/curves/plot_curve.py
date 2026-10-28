@@ -118,6 +118,11 @@ class PlotCurve(MainPlot, CommonCurveTools):
         self.events_force_slopes = None
         self.events_fit_vert = None
 
+        # Breakthroughs to display on the approach: (index of the force
+        # peak, index of the end of the jump, force [nN], jump [nm]); None:
+        # the computed ones
+        self.breakthrough_events = None
+
         # If the data is only made of a single curve, there is no need to
         # have a particular position on the meshgrid, and the only curve to be
         # displayed is stored at the position 0,0 in the arrays.
@@ -216,6 +221,50 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
             self.axes.plot(curve_x, curve_y, color=curve_color("approach"),
                            label="Approach", **self.curve_style())
+
+            # Breakthroughs of the bilayer: force peak and end of the jump,
+            # on the plotted approach (computed ones on the results curves,
+            # or the ones of the preview)
+            events = self.breakthrough_events
+            if events is None and pt == "curve_results" and \
+                    self.curve_type in ("defl_ext", "force_ext", "force") \
+                    and dt.breakthrough_calculated and \
+                    dt.display_breakthrough and \
+                    dt.breakthrough_results is not None:
+                events = [(peak, end, force * 1e9, jump) for
+                          force, jump, peak, end in
+                          dt.breakthrough_results[self.xpos, self.ypos]
+                          if numpy.isfinite(force)]
+            n = len(self.curve_approach[0])
+            events = [event for event in events or []
+                      if 0 <= int(event[0]) < n and 0 <= int(event[1]) < n]
+            x, y = self.curve_approach[0], self.curve_approach[1]
+            color = curve_color("breakthrough")
+            lines = []
+            for k, (peak, end, force, jump) in enumerate(events):
+                peak, end = int(peak), int(end)
+                # Fb and jump in the legend
+                text = ("%d: " % (k + 1) if len(events) > 1 else "") + \
+                    "Fb %.2f nN, jump %.1f nm" % (force, jump)
+                lines.append(text)
+                self.axes.plot([x[peak], x[end]], [y[peak], y[end]], "o-",
+                               color=color, markersize=5, zorder=5,
+                               label=text)
+                # Number of the breakthrough (several per curve), on both
+                # sides for the close breakthroughs
+                if len(events) > 1:
+                    left = k % 2 == 0
+                    self.axes.annotate(
+                        str(k + 1), (x[peak], y[peak]),
+                        xytext=(-5 if left else 5, 3),
+                        textcoords="offset points",
+                        ha="right" if left else "left",
+                        color=color, fontsize=8, zorder=5)
+            # Without the legend: Fb and jump in the upper left corner
+            if lines and not shared.exp.display_curve_legend:
+                self.axes.text(0.02, 0.97, "\n".join(lines), color=color,
+                               fontsize=8, va="top", ha="left",
+                               transform=self.axes.transAxes, zorder=5)
 
             if self.display_raw_data and self.curve_type == "defl_ext" \
                     and pt != "fit_preview" and pt != "tilt_curve_preview":
@@ -611,6 +660,11 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 point = self.poc_pos_indice
                 curve_x = self.curve_approach[0]
                 curve_y = self.curve_approach[1]
+                if shared.exp.compute_type == "breakthrough":
+                    # Zoom on the breakthroughs, one after the other
+                    events = self.breakthrough_events
+                    point = int(events[shared.zoomed_in_element %
+                                       len(events)][0]) if events else None
 
             elif self.curve_retraction is not None:
                 curve_x = self.curve_retraction[0]
@@ -673,7 +727,9 @@ class PlotCurve(MainPlot, CommonCurveTools):
                     # curve, shorter than the force curve): no zoom
                     return
 
-                diff = (abs(max(curve_y[seg]) - min(curve_y[seg])) / 2.0)
+                # nan: corrupted points (breakthrough preview)
+                diff = abs(numpy.nanmax(curve_y[seg]) -
+                           numpy.nanmin(curve_y[seg])) / 2.0
                 ylength = diff * (10.0 / factor)
 
                 if shared.exp.compute_type == "events":
@@ -684,8 +740,10 @@ class PlotCurve(MainPlot, CommonCurveTools):
                     xmax = curve_x[min(point + int(xlength), len(curve_x) - 1)]
                     xmin = curve_x[max(point - int(xlength), 0)]
 
-                    ymin = numpy.mean(curve_y[seg]) - ylength
-                    ymax = numpy.mean(curve_y[seg]) + ylength
+                    ymin = numpy.nanmean(curve_y[seg]) - ylength
+                    ymax = numpy.nanmean(curve_y[seg]) + ylength
+                    if not numpy.isfinite([xmin, xmax, ymin, ymax]).all():
+                        return
                     self.axes.set_xlim([xmin, xmax])
                     self.axes.set_ylim([ymin, ymax])
 
