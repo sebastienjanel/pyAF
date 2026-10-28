@@ -184,27 +184,8 @@ class GetEvents:
                 # Store forces in N
                 forces = numpy.array(forces) * 1e-9
 
-                # pyplot.plot(force_curve[0], force_curve[1])
-
-                slopes = []
-                for fit in fits:
-                    # a = slice(
-                    # fit["seg_left_fit"][0], fit["seg_left_fit"][1] + 1)
-                    # seg_x = force_curve[0][a]
-                    # y = numpy.polyval(
-                    # [fit["coeffs_left"][0], fit["coeffs_left"][1]], seg_x)
-                    # pyplot.plot(seg_x, y, color="r", linewidth=1)
-
-                    slopes.append(fit["coeffs_left"][0])
-
-                    # a = slice(
-                    # fit["seg_right_fit"][0], fit["seg_right_fit"][1] + 1)
-                    # seg_x = force_curve[0][a]
-                    # y = numpy.polyval(
-                    # [fit["coeffs_right"][0], fit["coeffs_right"][1]], seg_x)
-                    # pyplot.plot(seg_x, y, color="r", linewidth=1)
-
-                # pyplot.show()
+                # Slopes of the fits before the events (slope filter)
+                slopes = [fit["coeffs_left"][0] for fit in fits]
 
                 for k in range(len(positions)):
                     # Middle position of the event (indice)

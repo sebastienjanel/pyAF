@@ -31,7 +31,7 @@
 
 """Small widget asking the user which AFM tomographies he wants to display in VTK."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFButton as PYAFButton
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFCheckBox

@@ -34,6 +34,7 @@
 import numpy
 from matplotlib.offsetbox import AnchoredText
 from ... import shared
+from ...gui_styles.theme_handler import curve_color
 from matplotlib.collections import LineCollection
 from matplotlib.patches import Rectangle
 from ...tools import curve_tools
@@ -91,6 +92,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
         # Events (default empty values, will not be plotted if not filled)
         self.loading_rates_fits = None
+        # Elements to zoom on in the loading rates preview (curve indices)
+        self.loading_rates_zoom_points = None
         self.events_filter_dist_square = None
         self.display_events_detection_exclude_square = False
         self.current_jump = None
@@ -114,6 +117,14 @@ class PlotCurve(MainPlot, CommonCurveTools):
         self.events_force_values = None
         self.events_force_slopes = None
         self.events_fit_vert = None
+
+        # Deflection of the threshold of the brush model (preview)
+        self.threshold_deflection = None
+
+        # Breakthroughs to display on the approach: (index of the force
+        # peak, index of the end of the jump, force [nN], jump [nm]); None:
+        # the computed ones
+        self.breakthrough_events = None
 
         # If the data is only made of a single curve, there is no need to
         # have a particular position on the meshgrid, and the only curve to be
@@ -211,7 +222,58 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 curve_x = self.curve_approach[0]
                 curve_y = self.curve_approach[1]
 
-            self.axes.plot(curve_x, curve_y, "#00FFFF", label="Approach")     # Changed for testing. Implement stylesheet.
+            self.axes.plot(curve_x, curve_y, color=curve_color("approach"),
+                           label="Approach", **self.curve_style())
+
+            # Threshold of the brush model: the cell body is fitted above it
+            if self.threshold_deflection is not None:
+                self.axes.axhline(self.threshold_deflection, ls=":",
+                                  color=curve_color("breakthrough"), lw=1,
+                                  label="Brush threshold")
+
+            # Breakthroughs of the bilayer: force peak and end of the jump,
+            # on the plotted approach (computed ones on the results curves,
+            # or the ones of the preview)
+            events = self.breakthrough_events
+            if events is None and pt == "curve_results" and \
+                    self.curve_type in ("defl_ext", "force_ext", "force") \
+                    and dt.breakthrough_calculated and \
+                    dt.display_breakthrough and \
+                    dt.breakthrough_results is not None:
+                events = [(peak, end, force * 1e9, jump) for
+                          force, jump, peak, end in
+                          dt.breakthrough_results[self.xpos, self.ypos]
+                          if numpy.isfinite(force)]
+            n = len(self.curve_approach[0])
+            events = [event for event in events or []
+                      if 0 <= int(event[0]) < n and 0 <= int(event[1]) < n]
+            x, y = self.curve_approach[0], self.curve_approach[1]
+            color = curve_color("breakthrough")
+            lines = []
+            for k, (peak, end, force, jump) in enumerate(events):
+                peak, end = int(peak), int(end)
+                # Fb and jump in the legend
+                text = ("%d: " % (k + 1) if len(events) > 1 else "") + \
+                    "Fb %.2f nN, jump %.1f nm" % (force, jump)
+                lines.append(text)
+                self.axes.plot([x[peak], x[end]], [y[peak], y[end]], "o-",
+                               color=color, markersize=5, zorder=5,
+                               label=text)
+                # Number of the breakthrough (several per curve), on both
+                # sides for the close breakthroughs
+                if len(events) > 1:
+                    left = k % 2 == 0
+                    self.axes.annotate(
+                        str(k + 1), (x[peak], y[peak]),
+                        xytext=(-5 if left else 5, 3),
+                        textcoords="offset points",
+                        ha="right" if left else "left",
+                        color=color, fontsize=8, zorder=5)
+            # Without the legend: Fb and jump in the upper left corner
+            if lines and not shared.exp.display_curve_legend:
+                self.axes.text(0.02, 0.97, "\n".join(lines), color=color,
+                               fontsize=8, va="top", ha="left",
+                               transform=self.axes.transAxes, zorder=5)
 
             if self.display_raw_data and self.curve_type == "defl_ext" \
                     and pt != "fit_preview" and pt != "tilt_curve_preview":
@@ -236,7 +298,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 if self.curve_approach is not None:
                     curve_y += self.curve_approach[0][-1]
 
-            self.axes.plot(curve_x, curve_y, "#FF0000", label="Pause")
+            self.axes.plot(curve_x, curve_y, color=curve_color("pause"),
+                           label="Pause", **self.curve_style())
 
         if self.curve_modulation is not None and (pt == "curve_dataa" or pt == "curve_datab"):
             # Display raw data only if asked, on the curve on the data tab
@@ -260,7 +323,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 else:
                     curve_y += self.curve_approach[0][-1]
 
-            self.axes.plot(curve_x, curve_y, "#00FF80", label="Modulation")
+            self.axes.plot(curve_x, curve_y, color=curve_color("modulation"),
+                           label="Modulation", **self.curve_style())
 
         # Plot the retraction curve
         if self.curve_retraction is not None:
@@ -283,7 +347,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 curve_x = self.curve_retraction[2][positions[0]:positions[1]]
                 curve_y = numpy.flipud(self.curve_retraction[0][positions[0]:positions[1]])
 
-            self.axes.plot(curve_x, curve_y, "#FFA500", label="Retraction")     # Changed for testing. Implement stylesheet.
+            self.axes.plot(curve_x, curve_y, color=curve_color("retraction"),
+                           label="Retract", **self.curve_style())
 
             if self.display_raw_data and self.curve_type == "defl_ext" \
                     and pt != "fit_preview" and pt != "tilt_curve_preview":
@@ -557,47 +622,18 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
             self.axes.add_patch(rect)
 
-        # Plot events dist filter as a grey square
+        # Plot the events removed by the distance filter in grey (None is
+        # the edge of the plot)
         if self.events_filter_dist_square is not None:
-            vals = self.events_filter_dist_square
             size = self.axes.axis()  # (x0, x1, y0, y1)
+            height = size[3] - size[2]
 
-            if vals[1] is not None:
-                seg1 = vals[0]
-                seg2 = vals[1]
-
-                height = abs(size[3] - size[2])
-                width1 = abs(size[0] - seg1[1])
-                width2 = abs(seg2[0])
-
-                # Left rectangle, near beginning of the curve
-                rect1 = Rectangle(
-                    (size[0], size[2]),
-                    width1,
-                    height,
-                    facecolor="grey",
-                    alpha=0.4)
-
-                # Right rectangle, near joc2
-                rect2 = Rectangle(
-                    (seg2[0], size[2]),
-                    width2,
-                    height,
-                    facecolor="grey",
-                    alpha=0.4)
-
-                self.axes.add_patch(rect1)
-                self.axes.add_patch(rect2)
-
-            else:
-                seg1 = vals[0]
-
-                height = size[3] - size[2]
-                width = abs(seg1[1] - seg1[0])
-
+            for x0, x1 in self.events_filter_dist_square:
+                x0 = size[0] if x0 is None else x0
+                x1 = size[1] if x1 is None else x1
                 rect = Rectangle(
-                    (seg1[0], size[2]),
-                    width,
+                    (x0, size[2]),
+                    x1 - x0,
                     height,
                     facecolor="grey",
                     alpha=0.4)
@@ -606,6 +642,14 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
         # Do the actual plotting, is defined in MainPlot class
         self.start_plot()
+
+    def curve_style(self):
+        """Style of the data of the curves: dots (default) or lines
+        (preferences). The fits are drawn with lines."""
+        dots = self.settings.value("CurvesAsDots", True)
+        if dots in ("false", False):
+            return {"linestyle": "-"}
+        return {"linestyle": "none", "marker": ".", "markersize": 3}
 
     def set_lims(self):
         """Set the x, y limits of the plots.
@@ -625,6 +669,11 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 point = self.poc_pos_indice
                 curve_x = self.curve_approach[0]
                 curve_y = self.curve_approach[1]
+                if shared.exp.compute_type == "breakthrough":
+                    # Zoom on the breakthroughs, one after the other
+                    events = self.breakthrough_events
+                    point = int(events[shared.zoomed_in_element %
+                                       len(events)][0]) if events else None
 
             elif self.curve_retraction is not None:
                 curve_x = self.curve_retraction[0]
@@ -649,6 +698,12 @@ class PlotCurve(MainPlot, CommonCurveTools):
                         point = self.joc1_indice
                     else:
                         point = self.joc2_indice
+
+                elif shared.exp.compute_type == "loading_rates":
+                    # Zoom on the events, then on the joc
+                    points = self.loading_rates_zoom_points
+                    if points:
+                        point = points[shared.zoomed_in_element % len(points)]
 
             if self.no_fit_found:
                 # If no fit has been found, do not zoom
@@ -676,7 +731,14 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 if not factor:
                     return  # Cancel if = 0
 
-                diff = (abs(max(curve_y[seg]) - min(curve_y[seg])) / 2.0)
+                if len(curve_y[seg]) == 0 or point >= len(curve_x):
+                    # Point outside of the displayed curve (e.g. the MSF
+                    # curve, shorter than the force curve): no zoom
+                    return
+
+                # nan: corrupted points (breakthrough preview)
+                diff = abs(numpy.nanmax(curve_y[seg]) -
+                           numpy.nanmin(curve_y[seg])) / 2.0
                 ylength = diff * (10.0 / factor)
 
                 if shared.exp.compute_type == "events":
@@ -684,14 +746,13 @@ class PlotCurve(MainPlot, CommonCurveTools):
                     ylength / 8.0
 
                 if self.data.auto_zoom_in and point is not None:
-                    if point + xlength > len(curve_x):
-                        xmax = curve_x[len(curve_x) - 1]
-                    else:
-                        xmax = curve_x[point + int(xlength)]
-                    xmin = curve_x[point - int(xlength)]
+                    xmax = curve_x[min(point + int(xlength), len(curve_x) - 1)]
+                    xmin = curve_x[max(point - int(xlength), 0)]
 
-                    ymin = numpy.mean(curve_y[seg]) - ylength
-                    ymax = numpy.mean(curve_y[seg]) + ylength
+                    ymin = numpy.nanmean(curve_y[seg]) - ylength
+                    ymax = numpy.nanmean(curve_y[seg]) + ylength
+                    if not numpy.isfinite([xmin, xmax, ymin, ymax]).all():
+                        return
                     self.axes.set_xlim([xmin, xmax])
                     self.axes.set_ylim([ymin, ymax])
 

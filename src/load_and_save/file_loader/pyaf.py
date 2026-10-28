@@ -43,6 +43,7 @@ except ImportError:
 from ... import widgets_list
 from ... import shared
 from ...tools import misc_tools
+from ...tools import event_filter_tools
 
 class LoaderPYAF:
     """Class used to load pyAF files."""
@@ -134,7 +135,8 @@ class LoaderPYAF:
         if not self.load_more:
             # Load general prefs (only for the first load)
             # In load more, the preferences from the first .pyAF file are kept.
-            do_not_copy = ["filenames_list", "results_list"]
+            # The theme is a preference of the application, not of the file
+            do_not_copy = ["filenames_list", "results_list", "current_theme"]
             # Some times while decoding general_pref they can be decoded into bytes.
             # This will cause an error.
             for key in list(general_prefs.keys()):
@@ -162,6 +164,7 @@ class LoaderPYAF:
         for i in range(len(new_list)):
 
             misc_tools.add_attributes(new_list[i])
+            event_filter_tools.convert_old_filters(new_list[i])
 
             # Append the result
             shared.exp.results_list.append(new_list[i])
@@ -204,13 +207,8 @@ class LoaderPYAF:
                 nm = " (from " + fname + ")"
                 shared.exp.groups_list[group_max_id + i - 1].name += nm
 
-                # - 2 because : -1 is because we start at 1 (skip None group)
-                # The other -1 is because insertRow needs the position of the
-                # last row.
-                if wl.widget_results_groups is not None:
-                    pos = group_max_id + i - 2
-                    wl.widget_results_groups.tableWidget.insertRow(pos)
-                    wl.widget_results_groups.add_row_in_tablewidget_groups(pos)
+            if wl.widget_results_groups is not None:
+                wl.widget_results_groups.reset_table()
 
         # Create the datasets
         for i in range(more_offset, more_offset + nbr_files, 1):
@@ -274,6 +272,9 @@ class LoaderPYAF:
             # Update the id
             data = shared.exp.list[i]
             data.unique_id = i
+
+            # Distance filter of the files saved before 2026
+            event_filter_tools.convert_old_filters(data)
 
             # COMPATIBILITY MODE 17/01/14 add new vtk values
             try:

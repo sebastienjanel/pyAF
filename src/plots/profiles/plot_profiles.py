@@ -31,7 +31,6 @@
 
 """Plots the profiles as a line."""
 
-import numpy
 from ... import widgets_list
 from ... import shared
 from ..plot_main import MainPlot
@@ -43,59 +42,39 @@ class PlotProfiles(MainPlot):
     def __init__(self, parent):
         super().__init__(parent)
 
-        dist_x = self.data.x_size / 1000.0
-        dist_y = self.data.y_size / 1000.0
-        dist_xy = numpy.sqrt(pow(dist_x, 2) + pow(dist_y, 2))
-
-        self.pr_x = []
-        self.pr_z = []
+        # Profiles of the values of the map displayed (see the profiles
+        # widget)
+        widget = widgets_list.widget_profiles
+        self.pr_x = widget.profiles_x
+        self.pr_z = widget.profiles_z
         pl = self.data.profile_list
-        pocs = self.data.topography
 
-        for pr in range(len(pl)):
-            self.pr_x.append([])
-            self.pr_z.append([])
-            for count in range(len(pl[pr][0])):
-                # X value
-
-                if count != 0:
-                    if pl[pr][0][count - 1] == pl[pr][0][count]:
-                        self.pr_x[pr].append(self.pr_x[pr][-1] + dist_x)
-                    elif pl[pr][1][count - 1] == pl[pr][1][count]:
-                        self.pr_x[pr].append(self.pr_x[pr][-1] + dist_y)
-                    else:
-                        self.pr_x[pr].append(self.pr_x[pr][-1] + dist_xy)
-                else:
-                    self.pr_x[pr].append(count)
-
-                # Z value
-                value = pocs[pl[pr][0][count]][pl[pr][1][count]]
-                self.pr_z[pr].append(value / 1000.0)
-
+        # Displayed profiles, with the color of each profile on the map
+        colors = self.data.profiles_color_names
         profile_list = []
         for profile in range(len(pl)):
             if widgets_list.widget_profiles.checkbox_list[profile].isChecked():
-                profile_list.append([self.pr_x[profile], self.pr_z[profile]])
+                profile_list.append([self.pr_x[profile], self.pr_z[profile],
+                                     colors[profile % len(colors)]])
 
         self.plot_type = "profiles"
         self.xlabel = "[\u03bcm]"
-        self.ylabel = "Height [\u03bcm]"
+        self.ylabel = widget.value_label
         profiles_bar_1 = shared.exp.profiles_bar_1 / 1000.0
         profiles_bar_2 = shared.exp.profiles_bar_2 / 1000.0
         self.show_profiles_bars = shared.exp.show_profiles_bars
 
         if profile_list:
             # Plot the profiles
-            for profile in range(len(profile_list)):
-                self.axes.plot(profile_list[profile][0],
-                               profile_list[profile][1])
+            for x, z, color in profile_list:
+                self.axes.plot(x, z, color=color)
 
             # Plot the bars
             if shared.exp.show_profiles_bars:
                 self.axes.axvline(x=profiles_bar_1, linewidth=2,
-                                  color='r', linestyle='--')
+                                  color='black', linestyle='--')
                 self.axes.axvline(x=profiles_bar_2, linewidth=2,
-                                  color='r', linestyle='--')
+                                  color='black', linestyle='--')
 
         # Plot the labels
         self.plot_labels()

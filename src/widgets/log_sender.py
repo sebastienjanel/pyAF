@@ -34,7 +34,7 @@
 import logging
 import webbrowser
 import traceback
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools import misc_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.PYAFWidget import PYAFWidget

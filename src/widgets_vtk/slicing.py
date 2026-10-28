@@ -31,9 +31,8 @@
 
 """Widget with options for the AFM tomographies."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
-from .. import shared
 from .. import widgets_list
 from ..tools.gui_tools import PYAFButton, PYAFInput
 from ..tools.PYAFWidget import PYAFWidget
@@ -82,9 +81,9 @@ class SlicingWidget(PYAFWidget):
 
     def button_clicked(self, button):
         """Called when a button is clicked."""
-        index = widgets_list.widget_vtk.get_current_layer()
-        layer = shared.layer_list[index]
-        data = shared.exp.list[layer.afm_id]
+        # AFM layer of the options (also when an image or a substrate is
+        # selected)
+        layer, data = widgets_list.widget_vtk.menu_options.tab_afm.current()
 
         if button == "slicing_apply":
             val = self.IN_slicing_top.get_int_value()
@@ -99,9 +98,9 @@ class SlicingWidget(PYAFWidget):
 
     def update_widget(self):
         """Update the GUI."""
-        index = widgets_list.widget_vtk.get_current_layer()
-        layer = shared.layer_list[index]
-        data = shared.exp.list[layer.afm_id]
+        # AFM layer of the options (also when an image or a substrate is
+        # selected)
+        layer, data = widgets_list.widget_vtk.menu_options.tab_afm.current()
 
         # Slicing inputs
         self.IN_slicing_top.changeValue(str(data.opengl_slice_top))

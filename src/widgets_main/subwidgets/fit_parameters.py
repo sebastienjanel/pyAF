@@ -40,7 +40,7 @@ in the inputs. Changing a value will update the plot in the compute tab.
 from ... import shared
 import logging
 from ... import widgets_list
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools.gui_tools import PYAFInput
 from ...tools.gui_tools import PYAFCheckBox
@@ -63,7 +63,7 @@ class FitParamsWidget(PYAFWidget):
         VL = QtWidgets.QVBoxLayout()
 
         if self.name == "fit_param_pocs":
-            title = "Point of contact"
+            title = "Initial point of contact"
         elif self.name == "fit_param_jocs":
             title = "Jump of contact"
         elif self.name == "fit_param_jocs_events":
@@ -81,7 +81,9 @@ class FitParamsWidget(PYAFWidget):
         self.IN_refit_times = PYAFInput(
             self, "refit_times", "Refit [times]")
         self.IN_skip_start.input.setValidator(misc_tools.validator("UI"))
-        self.IN_fit_length.input.setValidator(misc_tools.validator("UI"))
+        # A fit needs a length (0 is refused)
+        self.IN_fit_length.input.setValidator(
+            misc_tools.validator("MI", bottom=1))
         self.IN_noise_multi.input.setValidator(misc_tools.validator("UF"))
         self.IN_refit.input.setValidator(misc_tools.validator("UI"))
         self.IN_refit_times.input.setValidator(misc_tools.validator("UI"))
@@ -93,12 +95,19 @@ class FitParamsWidget(PYAFWidget):
         self.GL.addWidget(self.IN_skip_start, 0, 0)
         self.GL.addWidget(self.IN_fit_length, 1, 0)
         self.GL.addWidget(self.IN_noise_multi, 2, 0)
-        self.GL.addWidget(self.IN_refit, 0, 1)
-        self.GL.addWidget(self.IN_refit_times, 1, 1)
+        if self.name in ("fit_param_pocs", "fit_param_jocs"):
+            # Point of contact (elasticity) and jump of contact (work): the
+            # parameters are stacked in one column. Not for the events, whose
+            # tab would be taller (and the main window with it).
+            self.GL.addWidget(self.IN_refit, 3, 0)
+            self.GL.addWidget(self.IN_refit_times, 4, 0)
+        else:
+            self.GL.addWidget(self.IN_refit, 0, 1)
+            self.GL.addWidget(self.IN_refit_times, 1, 1)
 
         VL_empty = QtWidgets.QVBoxLayout()
         VL_empty.addStretch(1)
-        self.GL.addLayout(VL_empty, 3, 0)
+        self.GL.addLayout(VL_empty, 6, 0)
 
         BOX.setLayout(self.GL)
         VL.addWidget(BOX)

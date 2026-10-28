@@ -35,13 +35,13 @@ import logging
 from .. import shared
 import matplotlib
 from packaging.version import Version
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import misc_tools
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFComboBox
-from ..gui_styles.theme_handler import theme_handler
+from ..gui_styles.theme_handler import set_theme
 from .. import widgets_list
 
 
@@ -64,65 +64,82 @@ class PreferencesWidget(PYAFWidget):
 
         self.VL = QtWidgets.QVBoxLayout()
 
-        text = "Random Curve Control"
+        text = "Random curve control (Data, Compute, Results)"
         tip = "The random button will only display curves once. Can be slow."
         self.CB_rand_ctrl = PYAFCheckBox(self, "rand_ctrl", text)
         self.CB_rand_ctrl.setToolTip(tip)
 
         tip = ("The defl-ext and force-ext curves will have their first values"
                " set to 0 deflection/force.")
-        self.CB_zero_defl = PYAFCheckBox(self, "zero_defl", "Zero deflection")
+        text = "Zero deflection (Data, Results)"
+        self.CB_zero_defl = PYAFCheckBox(self, "zero_defl", text)
         self.CB_zero_defl.setToolTip(tip)
 
-        text = "Display raw data on curves"
-        tip = "Will only be applied to the curve on the data tab."
+        text = "Display raw data on curves (Data, Results)"
+        tip = ("Displays in green the parts of the deflection - Z position"
+               " curves which are not used for the computations.")
         self.CB_raw_data = PYAFCheckBox(self, "raw_data", text)
         self.CB_raw_data.setToolTip(tip)
 
-        text = "Display fit noise on curves"
+        text = "Curves drawn with dots (all curves)"
+        tip = ("Unchecked, the points of the curves are joined by lines. "
+               "The fits are always drawn with lines.")
+        self.CB_curves_dots = PYAFCheckBox(self, "curves_dots", text)
+        self.CB_curves_dots.setToolTip(tip)
+
+        text = "Display fit noise on curves (Compute)"
         tip = "The fit noises are computed on the fitting segments."
         self.CB_fit_noise = PYAFCheckBox(self, "fit_noise", text)
         self.CB_fit_noise.setToolTip(tip)
 
-        text = "Remember to save popup"
+        text = "Remember to save popup (every 5 minutes)"
         tip = "Display or hide the popup with the remember to save message."
         self.CB_remember_to_save = PYAFCheckBox(self, "remember_to_save", text)
         self.CB_remember_to_save.setToolTip(tip)
 
-        text = "Use classical meshgrid style"
-        tip = "Changes the style of the meshgrid"
+        text = "Use classical map style (Data, Results)"
+        tip = ("Unchecked, the maps of the data and results tabs have no"
+               " axes, and a scale bar")
         self.CB_mesh_style = PYAFCheckBox(self, "mesh_style", text)
         self.CB_mesh_style.setToolTip(tip)
         if Version(matplotlib.__version__) < Version("1.4.0"):
             self.CB_mesh_style.setEnabled(False)
 
         self.IN_main_label = \
-            PYAFInput(self, "main_label", "Title label ", width=200)
+            PYAFInput(self, "main_label", "Window title label", width=200)
 
-        text = "Plots font size "
+        text = "Plots font size (all plots)"
         tip = "Is set to 12 by default"
         self.IN_labels_font_size = PYAFInput(self, "labels", text, width=40)
+        self.IN_labels_font_size.setToolTip(tip)
 
-        text = "Tick labels font size "
+        text = "Tick labels font size (all plots)"
         tip = "Set this value to 12 points for printing. Default is 8"
         self.IN_tick_labels_font_size = \
             PYAFInput(self, "tick_labels", text, width=40)
+        self.IN_tick_labels_font_size.setToolTip(tip)
 
         self.list_theme = PYAFComboBox(self, "list_theme")
         self.list_theme.setFixedSize(200, 26)
         for theme in shared.exp.theme_list:
             self.list_theme.addItem(theme)
 
+        self.HL_theme = QtWidgets.QHBoxLayout()
+        self.HL_theme.addWidget(self.list_theme)
+        self.HL_theme.addWidget(QtWidgets.QLabel("Theme"))
+        self.HL_theme.addStretch(1)
+
         self.VL.addWidget(self.CB_rand_ctrl)
         self.VL.addWidget(self.CB_zero_defl)
         self.VL.addWidget(self.CB_raw_data)
+        self.VL.addWidget(self.CB_curves_dots)
         self.VL.addWidget(self.CB_fit_noise)
         self.VL.addWidget(self.CB_remember_to_save)
         self.VL.addWidget(self.CB_mesh_style)
         self.VL.addWidget(self.IN_main_label)
         self.VL.addWidget(self.IN_labels_font_size)
         self.VL.addWidget(self.IN_tick_labels_font_size)
-        self.VL.addWidget(self.list_theme)
+        self.VL.addLayout(self.HL_theme)
 
         self.VL.addStretch(1)
         self.setLayout(self.VL)
@@ -141,6 +158,9 @@ class PreferencesWidget(PYAFWidget):
             "DisplayRawData",
             False)
         self.CB_raw_data.setChecked(display_raw_data)
+
+        dots = self.settings.value("CurvesAsDots", True)
+        self.CB_curves_dots.setChecked(dots not in ("false", False))
 
         remember = self.settings.value("RememberMeToSave", True)
         self.CB_remember_to_save.setChecked(remember)
@@ -187,6 +207,15 @@ class PreferencesWidget(PYAFWidget):
             if widgets_list.widget_curve_mod is not None:
                 widgets_list.widget_curve_mod.update_MPL("MPL_canvas")
 
+        elif name == "curves_dots":
+            self.settings.setValue("CurvesAsDots",
+                                   self.CB_curves_dots.isChecked())
+            widgets_list.widget_data.curve.update_plot()
+            widgets_list.widget_results.update_MPL("MPL_canvas2")
+            widgets_list.widget_compute.update_MPL("MPL_canvas")
+            if widgets_list.widget_curve_mod is not None:
+                widgets_list.widget_curve_mod.update_MPL("MPL_canvas")
+
         elif name == "raw_data":
             # Get the value
             value = self.CB_raw_data.isChecked()
@@ -212,6 +241,11 @@ class PreferencesWidget(PYAFWidget):
 
             # Save the value
             self.settings.setValue("RememberMeToSave", value)
+
+            # Remove the icon of the message from the menu bar
+            tray = getattr(self.parent, "tray", None)
+            if not value and tray is not None:
+                tray.hide()
 
         elif name == "mesh_style":
             # Get the value
@@ -260,8 +294,8 @@ class PreferencesWidget(PYAFWidget):
             selected_theme = shared.exp.theme_list[self.list_theme.currentIndex()]
             # Set selected theme
             shared.exp.current_theme = selected_theme
-            # Apply selected theme
-            theme_handler(selected_theme)
+            # Apply selected theme (kept for the next launches)
+            set_theme(selected_theme)
             # Update plots to apply plot theme
             self.update_plots()
 

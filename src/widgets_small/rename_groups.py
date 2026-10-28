@@ -31,7 +31,7 @@
 
 """Widget used to rename the groups."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFButton
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFInput
@@ -77,29 +77,14 @@ class RenameGroupsWidget(PYAFWidget):
                 name = str(self.input_list[i - 1].get_str_value())
                 shared.exp.groups_list[i].name = name
 
-            # Update the names in the histogram's list
+            # Update the names in the histogram's list (keep the choices of
+            # the table)
+            widgets_list.widget_results_single.save_hist_prefs()
             widgets_list.widget_results_single.reset_table()
             widgets_list.widget_results_single.update_widget()
 
-            tw = widgets_list.widget_results_groups.tableWidget
-
-            # Ensure TableWidget is initialized
-            if tw is None:
-                print("Error: TableWidget is not initialized.")
-                return
-
-            # Ensure table has enough rows
-            if tw.rowCount() < len(shared.exp.groups_list) - 1:
-                tw.setRowCount(len(shared.exp.groups_list) - 1)
-
-            # Update the names in the histogram's group's list
-            for i in range(1, len(shared.exp.groups_list)):
-                name = shared.exp.groups_list[i].name
-                if tw.item(i - 1, 1) is None:
-                    tw.setItem(i - 1, 1, QtWidgets.QTableWidgetItem())  # Create a new item
-                tw.item(i - 1, 1).setText(name)
-
-            # Update the groups plot
+            # Update the names of the table and of the plot of the groups
+            widgets_list.widget_results_groups.reset_table()
             widgets_list.widget_results_groups.update_MPL()
 
             # Close widget

@@ -30,10 +30,13 @@
 # knowledge of the CeCILL license and that you accept its terms.
 
 import multiprocessing
-from platform import system, release
 import sys
 import os
 import logging
+
+# Qt binding used through QtPy: "pyqt5", "pyqt6" or "pyside6".
+# Can be overridden with the QT_API environment variable.
+os.environ.setdefault("QT_API", "pyside6")
 
 if getattr(sys, 'frozen', False):
     # Running in a bundle
@@ -55,11 +58,6 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     logger.debug("Starting main.py")
-
-    # If running macOS catalina use forkserver instead of fork for creating new processes.
-    # See https://bugs.python.org/issue33725
-    if system() == "Darwin" and "19.0" <= release()[:-2] < "20.0":
-        multiprocessing.set_start_method("forkserver")
 
     # Add support for multiprocessing in frozen app
     # See http://docs.python.org/3/library/multiprocessing.html

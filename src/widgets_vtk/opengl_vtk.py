@@ -35,11 +35,14 @@ import vtk
 import math
 from .. import shared
 from .. import consts
-from PyQt5 import QtCore, QtWidgets
-from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+import qtpy
+from qtpy import QtCore, QtWidgets
+import vtkmodules.qt
+# Use the same Qt binding as the rest of the application
+vtkmodules.qt.PyQtImpl = qtpy.API_NAME
+from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 from .layers.layer_afm import LayerAFM
 from .layers.layer_single_image import LayerSingleImage
-from .layers.layer_optics_HR import LayerOpticsHR
 from .layers.layer_glass import LayerGlass
 from .. import widgets_list
 
@@ -69,6 +72,11 @@ class VTKWidget(QtWidgets.QWidget):
 
         self.renderer = vtk.vtkRenderer()
         self.interactor.GetRenderWindow().AddRenderer(self.renderer)
+        # Text at the resolution of the screen (larger on HiDPI/Retina
+        # screens, 72 dpi by default) and smooth edges (antialiasing)
+        self.interactor.GetRenderWindow().SetDPI(
+            int(round(72 * self.devicePixelRatioF())))
+        self.renderer.UseFXAAOn()
 
         self.style = vtk.vtkInteractorStyleTrackballCamera()
         self.interactor._Iren.SetInteractorStyle(self.style)
@@ -175,13 +183,6 @@ class VTKWidget(QtWidgets.QWidget):
         else:
             return False
 
-    def addOpticsHRLayer(self, path):
-        """Adds an high resolution optics layer"""
-        shared.layer_list.append(LayerOpticsHR(self, path))
-        if shared.VTK_first is False:
-            self.renderer.Render()
-        return True
-
     def addGlassLayer(self, layer_id, afm_id, roi_id):
         """Adds glass layers."""
         # Create a new glass layer
@@ -224,11 +225,9 @@ class VTKWidget(QtWidgets.QWidget):
         image without writing it to the disk. This allows some post-treatment
         on the file.
         """
-        # Either use the new magnification or the stored one
+        # Size of the window (the magnification is not used anymore)
         if magn is None:
-            magn = shared.exp.opengl_screenshot_magn
-        else:
-            shared.exp.opengl_screenshot_magn = magn
+            magn = 1
 
         # Save old camera position
         camera = self.renderer.GetActiveCamera()
@@ -282,46 +281,6 @@ class VTKWidget(QtWidgets.QWidget):
         self.renderer.ResetCamera()
         if shared.VTK_first is False:
             self.interactor.GetRenderWindow().Render()
-
-    def update_rectangle_actor(self):
-        """Build a rectangle and draw it."""
-        if widgets_list.widget_vtk.rectangle_actor is not None:
-            self.renderer.RemoveActor(widgets_list.widget_vtk.rectangle_actor)
-
-        pos = widgets_list.widget_vtk.rectangle_pos
-
-        positions = []
-        positions.append([pos[0], pos[1], 0.0])
-        positions.append([pos[2], pos[1], 0.0])
-        positions.append([pos[2], pos[3], 0.0])
-        positions.append([pos[0], pos[3], 0.0])
-
-        points = vtk.vtkPoints()
-        for pos in positions:
-            points.InsertNextPoint(pos)
-
-        lines = vtk.vtkCellArray()
-        lines.InsertNextCell(5)
-        lines.InsertCellPoint(0)
-        lines.InsertCellPoint(1)
-        lines.InsertCellPoint(2)
-        lines.InsertCellPoint(3)
-        lines.InsertCellPoint(0)
-
-        polygon = vtk.vtkPolyData()
-        polygon.SetPoints(points)
-        polygon.SetLines(lines)
-
-        polygonMapper = vtk.vtkPolyDataMapper()
-        polygonMapper.SetInputData(polygon)
-
-        widgets_list.widget_vtk.rectangle_actor = vtk.vtkActor()
-        widgets_list.widget_vtk.rectangle_actor.SetMapper(polygonMapper)
-
-        self.renderer.AddActor(widgets_list.widget_vtk.rectangle_actor)
-
-        self.interactor.GetRenderWindow().Render()
-
 
 class Animation:
     """Used to let the 3D scenery turn."""
@@ -410,7 +369,24 @@ class PYAFInteractor(QVTKRenderWindowInteractor):
     def __init__(self, frame):
         super().__init__(frame)
 
-        self.started_drawing_square = False
+        self.render_pending = False
+
+    def paintEvent(self, event):
+        """Render outside of the paint event.
+
+        With Qt >= 6.10 on macOS, calling Render() inside the paint event
+        (as QVTKRenderWindowInteractor does) freezes the application. The
+        render is deferred to the event loop instead.
+        """
+        if not self.render_pending:
+            self.render_pending = True
+            QtCore.QTimer.singleShot(0, self.deferred_render)
+
+    def deferred_render(self):
+        """Render the window (called from paintEvent)."""
+        self.render_pending = False
+        # Same call as QVTKRenderWindowInteractor.paintEvent
+        self._Iren.Render()
 
     def mousePressEvent(self, event):
         """Fetch mouse press events."""
@@ -420,19 +396,6 @@ class PYAFInteractor(QVTKRenderWindowInteractor):
         elif widgets_list.widget_vtk.action_mode == "rotate":
             widgets_list.widget_vtk.last_pos = event.pos()
 
-        elif widgets_list.widget_vtk.action_mode == "draw_square":
-            # Reset pos
-            widgets_list.widget_vtk.rectangle_pos = [0, 0, 0, 0]
-
-            vals = self.get_world_pos(event.x(), event.y())
-
-            widgets_list.widget_vtk.rectangle_pos[0] = vals[0]
-            widgets_list.widget_vtk.rectangle_pos[1] = vals[1]
-            widgets_list.widget_vtk.canvas.update_rectangle_actor()
-
-            widgets_list.widget_vtk.last_pos = event.pos()
-            self.started_drawing_square = True
-
         else:
             # Normal camera mode, send the event to the parent class.
             super().mousePressEvent(event)
@@ -441,14 +404,6 @@ class PYAFInteractor(QVTKRenderWindowInteractor):
         """Fetch mouse release events."""
         if widgets_list.widget_vtk.action_mode == "translate":
             widgets_list.widget_vtk.last_pos = event.pos()
-
-        elif widgets_list.widget_vtk.action_mode == "draw_square":
-            if self.started_drawing_square:
-                widgets_list.widget_vtk.last_pos = event.pos()
-                self.started_drawing_square = False
-                widg = widgets_list.widget_vtk
-                widg.action_mode = "camera"
-                widg.menu_layer_list.BT_resample.setEnabled(True)
 
         else:
             # Normal camera mode, send the event to the parent class.
@@ -484,36 +439,9 @@ class PYAFInteractor(QVTKRenderWindowInteractor):
                     event,
                     widgets_list.widget_vtk.last_pos)
 
-        elif widgets_list.widget_vtk.action_mode == "draw_square":
-            if self.started_drawing_square:
-                vals = self.get_world_pos(event.x(), event.y())
-
-                widgets_list.widget_vtk.rectangle_pos[2] = vals[0]
-                widgets_list.widget_vtk.rectangle_pos[3] = vals[1]
-
-                widgets_list.widget_vtk.canvas.update_rectangle_actor()
-
         else:
             # Normal camera mode, send the event to the parent class.
             super().mouseMoveEvent(event)
 
         # Update last position
         widgets_list.widget_vtk.last_pos = event.pos()
-
-    def get_world_pos(self, x, y):
-        """Converts mouse position in world coordinates.
-
-        z = 0 near plane
-        z = 1 far plane
-        Perhaps z should be calculated but Z=0.5 seems to work.
-        There is still a small offset depending on the zooming factor ...
-        """
-        z = 0.5
-
-        size = self.GetSize()
-        canvas = widgets_list.widget_vtk.canvas
-        canvas.renderer.SetDisplayPoint([x, size[1] - y, z])
-        canvas.renderer.DisplayToWorld()
-        vals = canvas.renderer.GetWorldPoint()
-
-        return vals

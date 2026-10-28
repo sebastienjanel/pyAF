@@ -34,7 +34,7 @@
 
 from .. import shared
 from .. import widgets_list
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 
 def add_discard_actions_to_menu(parent, menu):

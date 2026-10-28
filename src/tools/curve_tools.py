@@ -51,7 +51,7 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
     i, j = pos[0], pos[1]
 
     valid_modes = ["compute", "fit_preview", "tilt_curve_preview",
-                   "curve_results", "curve_data", "curve_dataa", "curve_datab", "next_event", "save_event",
+                   "curve_results", "curve_data", "curve_dataa", "curve_datab", "curve_datac", "next_event", "save_event",
                    "details_widget", "results_sorting", "compute_no_shared"]
 
     if mode not in valid_modes:
@@ -120,6 +120,13 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
         if get_time_segments_flag:
             curve_x_time_app = data.curves_approach[i][j][2]
             curve_x_time_ret = data.curves_retraction[i][j][2]
+        elif mode in ("curve_dataa", "curve_datab"):
+            # Time plots of the data tab: time computed for the Nanoscope
+            # files
+            times = get_nanoscope_times(data, len(curve_x_app),
+                                        len(curve_x_ret))
+            if times is not None:
+                curve_x_time_app, curve_x_time_ret = times
 
         if data.nbr_points_per_pause_curve is not None:
             curve_x_pause = data.curves_pause[i][j][0]
@@ -215,7 +222,7 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
         sg_smoothing_width = dt["sg_smoothing_width"]
         sg_smoothing_uniform = dt["sg_smoothing_uniform"]
 
-    elif mode == "curve_data" or mode == "curve_dataa" or mode == "curve_datab":
+    elif mode in ("curve_data", "curve_dataa", "curve_datab", "curve_datac"):
         tilt_applied = False
         sg_smoothing_enabled = False
 
@@ -318,6 +325,45 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
                                    ind_offset_ret[0], stretch_length)
 
     return approach, retraction, pause, modulation, zero, smoothing_error
+
+
+def get_nanoscope_times(data, nbr_app, nbr_ret):
+    """Time of the points of the Nanoscope curves [s], as in PyFMReader
+    (DyNaMo): the points are recorded at a constant rate.
+
+    - Ramp: duration = ramp size / velocity, time = linspace(0, duration,
+      n, endpoint=False) for each segment; the retraction follows the
+      approach (and the hold time).
+    - PeakForce: one period of the sinusoidal modulation (1 / frequency)
+      over the 2 n points of the approach and the retraction.
+
+    Returns (t_app, t_ret), in the convention of the JPK files: t_app for the
+    stored approach points, t_ret for the stored retraction points in
+    reverse order (numpy.flipud of the stored curve). None if the time is
+    not known.
+    """
+    if not str(data.file_type).startswith("Nanoscope"):
+        return None
+    if data.file_type == "Nanoscope (Peak Force)":
+        if not data.pft_freq:
+            # Files loaded before the frequency was stored
+            return None
+        # The retraction is stored in the time order, after the approach
+        dt = 0.5 / (data.pft_freq * nbr_app)
+        t_app = numpy.arange(nbr_app) * dt
+        t_ret = (nbr_app + numpy.arange(nbr_ret))[::-1] * dt
+        return t_app, t_ret
+    v_app = data.approach_velocity
+    v_ret = data.retraction_velocity
+    if not v_app or not v_ret or not data.ramp_size:
+        return None
+    dt_app = data.ramp_size / abs(v_app) / nbr_app
+    dt_ret = data.ramp_size / abs(v_ret) / nbr_ret
+    pause = data.pause_duration or 0
+    t_app = numpy.arange(nbr_app) * dt_app
+    # The retraction is stored from its end
+    t_ret = t_app[-1] + pause + dt_ret * (1 + numpy.arange(nbr_ret))
+    return t_app, t_ret
 
 
 def get_force_curves(curve_x, curve_y, center, spring_constant):

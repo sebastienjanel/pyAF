@@ -31,7 +31,7 @@
 
 """Widget used to change the height of the slice for the stiffness meshgrid."""
 
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFInput
 from .. import widgets_list
 from .. import shared

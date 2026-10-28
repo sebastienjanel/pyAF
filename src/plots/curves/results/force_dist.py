@@ -35,6 +35,7 @@ import numpy
 import copy
 from ..plot_curve import PlotCurve
 from ....tools import math_tools
+from ....tools import breakthrough_tools
 from ....tools import curve_tools
 
 
@@ -78,6 +79,15 @@ class ResultsForceDist(PlotCurve):
                 self.data.pocs_real[self.xpos][self.ypos],
                 self.spring_constant)
 
+        elif (disp == 0 or disp == 2) and self.approach is not None and \
+                self.data.breakthrough_calculated:
+            # Without the elasticity (no point of contact): distance from
+            # the support, force from the baseline (breakthroughs)
+            self.curve_approach = list(breakthrough_tools.force_distance(
+                self.approach[0], self.approach[1], self.spring_constant))
+            self.xlabel = self.xlabel.replace("Distance", "Distance to "
+                                              "support")
+
         if (disp == 1 or disp == 2) and \
                 self.retraction is not None and ret_calc:
             self.curve_retraction = curve_tools.get_force_curves(
@@ -86,7 +96,7 @@ class ResultsForceDist(PlotCurve):
                 self.data.jocs1_real[self.xpos][self.ypos],
                 self.spring_constant)
 
-        if self.curve_approach is not None:
+        if self.curve_approach is not None and app_calc:
             # The real fit is done on the curve without the corrupted part,
             # so we have to remove it from the curve to display the fit
             tr = [None, None]
@@ -109,13 +119,13 @@ class ResultsForceDist(PlotCurve):
                 self.setup_lines(params, "app", "force")
 
             # Get the fits for each segment
-            if skip is False and self.data.perform_fit is False:
+            if skip is False and self.data.used_perform_fit is False:
                 self.setup_segments()
 
             # Get the fits for each segment (pass tr[0] in case there is only
             # one segment, we need the size of it)
             if skip is False:
-                if self.data.perform_fit:
+                if self.data.used_perform_fit:
                     self.get_stiffness_lm_fits(tr[0])
                 else:
                     self.get_stiffness_fits(tr[0])
@@ -202,7 +212,57 @@ class ResultsForceDist(PlotCurve):
                         segy * self.force_factor,
                         y * self.force_factor]
 
+        if app_calc and self.curve_approach is not None and \
+                self.curve_retraction is not None:
+            # Both curves are displayed: use the same origin for both (the
+            # point of contact), else the retraction curve (centered on the
+            # jump of contact) is offset from the approach curve
+            self.center_retraction_on_poc()
+
         self.define_x_scale()
         self.define_y_scale()
 
         self.plot_fig()
+
+    def center_retraction_on_poc(self):
+        """Move the retraction curve and its elements to the poc origin.
+
+        The retraction curve and its elements are defined with the jump of
+        contact at 0, 0. Shift them so that the point of contact is at 0, 0,
+        as for the approach curve (the curves are then at the same relative
+        position as on the deflection - Z curve).
+        """
+        poc = self.data.pocs_real[self.xpos][self.ypos]
+        joc = self.data.jocs1_real[self.xpos][self.ypos]
+
+        # Shift in nm and nN (same computation as in get_force_curves)
+        dx = (joc[0] - joc[1]) - (poc[0] - poc[1])
+        dy = (joc[1] - poc[1]) * self.spring_constant
+
+        self.curve_retraction[0] = self.curve_retraction[0] + dx
+        self.curve_retraction[1] = self.curve_retraction[1] + dy
+
+        # The other elements are already in the displayed units
+        dx_disp = dx * self.x_factor
+        dy_disp = dy * self.force_factor
+
+        if self.joc1_pos is not None:
+            self.joc1_pos = [self.joc1_pos[0] + dx_disp,
+                             self.joc1_pos[1] + dy_disp]
+            self.joc2_pos = [self.joc2_pos[0] + dx_disp,
+                             self.joc2_pos[1] + dy_disp]
+
+        if self.fits_lines_joc is not None:
+            # The lines are plotted against the x values of the curve
+            self.fits_lines_joc = [line + dy_disp
+                                   for line in self.fits_lines_joc]
+
+        if self.max_force is not None:
+            linex, liney = self.max_force
+            self.max_force = [[x + dx_disp for x in linex],
+                              [y + dy_disp for y in liney]]
+
+        if self.surface_params is not None:
+            segx, segy, y = self.surface_params
+            self.surface_params = [segx + dx_disp, segy + dy_disp,
+                                   y + dy_disp]

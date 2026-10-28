@@ -620,6 +620,10 @@ class LoaderJPK:
                         self.height_channel_name = "height"
                         break
 
+        # Source of the z values, for the labels of the plots
+        self.data.zsensor_used = self.height_channel_name in (
+            "measuredHeight", "capacitiveSensorHeight")
+
         # vDeflection
         base_defined = False
         pre1 = "lcd-info." + v_deflection_index + ".conversion-set"

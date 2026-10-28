@@ -31,7 +31,7 @@
 
 """Plots a piezo extension meshgrid."""
 
-from ...tools import math_tools
+from ...tools import planefit
 from .plot_meshgrid import PlotMeshGrid
 
 
@@ -45,13 +45,14 @@ class PlotPiezoMeshGrid(PlotMeshGrid):
     def __init__(self, parent):
         super().__init__(parent)
 
-        if self.data.flatten_applied and self.plot_type == "meshgrid":
-            # Only apply the flatten for the meshgrid on the results tab
-            self.temp_array[:] = math_tools.flatten(
-                self.data.piezo_image,
-                self.data.applied_flatten_order)
-        else:
+        if self.plot_type == "meshgrid_data":
+            # Data tab: the piezo height as loaded
             self.temp_array[:] = self.data.piezo_image
+        else:
+            # Results tab: with the flatten of the compute tab and the
+            # planefit of the ROI manager
+            self.temp_array[:] = planefit.piezo_map(
+                self.data, flatten=self.plot_type == "meshgrid")
 
         if self.plot_type == "meshgrid_data":
             # Overwrite colormap to have always a copper colormap

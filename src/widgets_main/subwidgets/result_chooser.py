@@ -35,15 +35,57 @@
 import logging
 from ... import shared
 from ... import widgets_list
-from PyQt5 import QtWidgets
+from qtpy import QtCore, QtWidgets
 from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools import misc_tools
-from ...tools import gui_tools
+from ...tools.results_sorting import BREAKTHROUGH_TYPES, BRUSH_TYPES, \
+    VISCO_TYPES
+
+
+def groups():
+    """Result types by nature, in the order of the maps of the results
+    tab: (title, ((type, name), ...))."""
+    return (
+        ("Elasticity", (("stiffness", "Elasticity"),) + tuple(
+            (name, values["name"]) for name, values in BRUSH_TYPES.items())),
+        ("Viscoelasticity", tuple(
+            (name, values["name"]) for name, values in VISCO_TYPES.items())),
+        ("Adhesion", (("work", "Detachment work"),
+                      ("rupture_force", "Detachment force"),
+                      ("events_forces", "Events force"),
+                      ("events_per_curve", "Events per curve"),
+                      ("events_rupture_force", "Event max. force"),
+                      ("loading_rates", "Loading rates"),
+                      ("events_distance", "Distance to Joc"))),
+        ("Breakthrough", tuple(
+            (name, values["name"])
+            for name, values in BREAKTHROUGH_TYPES.items())))
+
+
+def available(result_type):
+    """True if the result type is computed for at least one file."""
+    datas = shared.exp.list
+    if result_type == "stiffness":
+        return any(item.stiffness_array is not None for item in datas)
+    if result_type in ("work", "rupture_force"):
+        return any(item.jocs1_indices is not None for item in datas)
+    if result_type == "loading_rates":
+        return any(item.loading_rates_calculated for item in datas)
+    if result_type.startswith("events_"):
+        return any(item.events_calculated for item in datas)
+    if result_type in VISCO_TYPES:
+        return any(item.visco_calculated for item in datas)
+    if result_type in BREAKTHROUGH_TYPES:
+        return any(item.breakthrough_calculated for item in datas)
+    if result_type in BRUSH_TYPES:
+        return any(item.brush_calculated for item in datas)
+    return False
 
 
 class ResultsChooserWidget(PYAFWidget):
-    """List of buttons to change the type of result to display."""
+    """List of the types of result to display, by nature (the types not
+    computed are greyed out)."""
 
     def __init__(self, parent, name):
         super().__init__(parent, name)
@@ -54,14 +96,25 @@ class ResultsChooserWidget(PYAFWidget):
         self.VL = QtWidgets.QVBoxLayout()
 
         self.list_choser = PYAFComboBox(self, "list_choser")
-        self.list_choser.addItem("Elasticity")
-        self.list_choser.addItem("Detachment work")
-        self.list_choser.addItem("Detachment force")
-        self.list_choser.addItem("Events force")
-        self.list_choser.addItem("Events per curve")
-        self.list_choser.addItem("Event max. force")
-        self.list_choser.addItem("Loading rates")
-        self.list_choser.addItem("Distance to Joc")
+        self.list_choser.setMaxVisibleItems(30)
+        model = self.list_choser.model()
+        # Index of each result type in the list
+        self.items = {}
+        for title, types in groups():
+            # Title of the group: not selectable, with the text colour of the
+            # theme (the disabled items are the types not computed)
+            self.list_choser.addItem(title)
+            item = model.item(self.list_choser.count() - 1)
+            item.setFlags(QtCore.Qt.ItemIsEnabled)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            for result_type, label in types:
+                self.items[result_type] = self.list_choser.count()
+                self.list_choser.addItem("    " + label, result_type)
+
+        # Wide enough for the longest result type
+        self.list_choser.fit_to_contents()
 
         self.VL.addWidget(self.list_choser)
 
@@ -75,9 +128,12 @@ class ResultsChooserWidget(PYAFWidget):
 
     def list_updated(self, _):
         """Called when a list is updated."""
-        # Update value
-        val = self.list_choser.currentIndex()
-        shared.exp.results_type = misc_tools.get_results_type_from_id(val)
+        result_type = self.list_choser.currentData()
+        if result_type is None:
+            # Title of a group (keyboard): back to the displayed type
+            self.update_GUI("all")
+            return
+        shared.exp.results_type = result_type
         # Reset the columns which are displayed or hidden
         self.parent.tw_labels_is_checked = None
         # Refresh histograms and tables completely (will also refresh groups)
@@ -87,62 +143,16 @@ class ResultsChooserWidget(PYAFWidget):
     def update_GUI(self, what):
         """Update the GUI."""
         if what == "button_type_hist" or what == "all":
-            found_stiffness = False
-            found_work = False
-            found_events = False
-            found_lr = False
+            # Stiffness when computed by Tomography
+            self.list_choser.setItemText(
+                self.items["stiffness"],
+                "    " + misc_tools.elasticity_name())
+            self.list_choser.fit_to_contents()
 
-            for item in shared.exp.list:
-                if item.stiffness_array is not None:
-                    found_stiffness = True
-                if item.jocs1_indices is not None:
-                    found_work = True
-                if item.events_calculated:
-                    found_events = True
-                if item.loading_rates_calculated:
-                    found_lr = True
+            model = self.list_choser.model()
+            for result_type, index in self.items.items():
+                model.item(index).setEnabled(available(result_type))
 
-            if found_stiffness:
-                gui_tools.enable_combobox_item(self.list_choser, 0)
-            else:
-                gui_tools.disable_combobox_item(self.list_choser, 0)
-
-            if found_work:
-                gui_tools.enable_combobox_item(self.list_choser, 1)
-                gui_tools.enable_combobox_item(self.list_choser, 2)
-            else:
-                gui_tools.disable_combobox_item(self.list_choser, 1)
-                gui_tools.disable_combobox_item(self.list_choser, 2)
-
-            if found_events:
-                gui_tools.enable_combobox_item(self.list_choser, 3)
-                gui_tools.enable_combobox_item(self.list_choser, 4)
-                gui_tools.enable_combobox_item(self.list_choser, 5)
-                gui_tools.enable_combobox_item(self.list_choser, 7)
-            else:
-                gui_tools.disable_combobox_item(self.list_choser, 3)
-                gui_tools.disable_combobox_item(self.list_choser, 4)
-                gui_tools.disable_combobox_item(self.list_choser, 5)
-                gui_tools.disable_combobox_item(self.list_choser, 7)
-
-            if found_lr:
-                gui_tools.enable_combobox_item(self.list_choser, 6)
-            else:
-                gui_tools.disable_combobox_item(self.list_choser, 6)
-
-            if shared.exp.results_type == "stiffness":
-                self.list_choser.setCurrentIndex(0)
-            elif shared.exp.results_type == "work":
-                self.list_choser.setCurrentIndex(1)
-            elif shared.exp.results_type == "rupture_force":
-                self.list_choser.setCurrentIndex(2)
-            elif shared.exp.results_type == "events_forces":
-                self.list_choser.setCurrentIndex(3)
-            elif shared.exp.results_type == "events_per_curve":
-                self.list_choser.setCurrentIndex(4)
-            elif shared.exp.results_type == "events_rupture_force":
-                self.list_choser.setCurrentIndex(5)
-            elif shared.exp.results_type == "loading_rates":
-                self.list_choser.setCurrentIndex(6)
-            elif shared.exp.results_type == "events_distance":
-                self.list_choser.setCurrentIndex(7)
+            if shared.exp.results_type in self.items:
+                self.list_choser.setCurrentIndex(
+                    self.items[shared.exp.results_type])

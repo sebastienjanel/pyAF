@@ -32,18 +32,23 @@
 
 """Main compute widget, used to compute elasticity, events, forces, ..."""
 
+import os
+import numpy
 from .. import shared
 from .. import widgets_list
 from .. import experiment
 import logging
 from .. import consts
-from PyQt5 import QtWidgets
+from qtpy import QtCore, QtWidgets
 from ..tools import misc_tools
+from ..tools import gui_tools
 from ..tools import apply_to_all
 from ..tools import stat_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFCheckBox
+from ..tools.gui_tools import PYAFToggle
+from ..widgets.load_parameters import load_parameters
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFButtonGroup
 from ..widgets.clean_up import CleanUpWidget
@@ -54,12 +59,24 @@ from ..widgets_main.subwidgets.curve_selector import ResultsSelectorWidget
 from ..widgets_main.subwidgets.fit_parameters import FitParamsWidget
 from ..widgets.curve_modify import CurveModWidget
 from ..plots.PYAFPlot import PYAFPlot
+from ..compute_tools import breakthrough
+from ..compute_tools.stiffness import brush
 from ..compute_tools.stiffness.main import Stiffness
 from ..compute_tools.work_and_rupture_force.main import WorkAndRuptureForce
 from ..compute_tools.stiffness_correction import StiffnessCorrection
+from ..compute_tools.viscoelasticity import main as visco_main
+from ..compute_tools.stiffness import contact_models
+from ..compute_tools.stiffness import bec
+from ..widgets import plot_options
 from ..compute_tools.loading_rates import GetLoadingRate
 from ..compute_tools.events import GetEvents
 from ..tools.PYAFWidget import PYAFWidget
+
+
+def file_label(data):
+    """Short name of a file in the messages (without the end added by the
+    AFM software, as in the plots)."""
+    return experiment.auto_short_name(os.path.basename(str(data.filename)))
 
 
 class ComputeWidget(PYAFWidget):
@@ -80,12 +97,15 @@ class ComputeWidget(PYAFWidget):
         self.compute_stiffness = Stiffness()
         self.compute_work_and_rupture_force = WorkAndRuptureForce()
         self.stiffness_correction = StiffnessCorrection()
+        self.compute_visco = visco_main.ViscoCompute()
         self.compute_events = GetEvents()
         self.get_lr = GetLoadingRate()
 
         self.canvas_resolution = self.parent.canvas_resolution
-        self.curve_canvas_size = [800, 350]
-        self.meshgrid_canvas_size = [300, 300]
+        # Height of the plots: the height of the main window is set by
+        # this tab (the boxes of the tabs below take the rest)
+        self.curve_canvas_size = [800, 299]
+        self.meshgrid_canvas_size = [300, 299]
 
         # --- Main layout -----------------------------------------------------
 
@@ -93,11 +113,16 @@ class ComputeWidget(PYAFWidget):
 
         # --- Experiment ------------------------------------------------------
         self.GL_choosers = QtWidgets.QGridLayout()
-        self.GL_choosers.setContentsMargins(0, 0, 0, 0)
+        self.GL_choosers.setContentsMargins(8, 0, 8, 2)
+        self.GL_choosers.setHorizontalSpacing(4)
 
         self.HL_choser = QtWidgets.QHBoxLayout()
         self.list_exp2 = PYAFComboBox(self, "list2")
-        self.list_exp2.setFixedSize(350, 26)
+        self.list_exp2.setFixedSize(374, 26)
+        # The min-width of the application style sheet overrides the fixed
+        # width: set it for this list (width of the text area, without the
+        # padding and the drop-down arrow)
+        self.list_exp2.setStyleSheet("QComboBox { min-width: 335px; }")
         for data in shared.exp.list:
             self.list_exp2.addItem(data.filename)
         self.HL_choser.addWidget(self.list_exp2)
@@ -106,25 +131,25 @@ class ComputeWidget(PYAFWidget):
         self.curve_selector = ResultsSelectorWidget(self, name)
         # self.curve_selector is added to the layout in update_widget().
 
-        HL_empty = QtWidgets.QHBoxLayout()
-        HL_empty.addStretch(1)
-
         self.GL_choosers.addLayout(self.HL_choser, 0, 0)
-        self.GL_choosers.addLayout(HL_empty, 0, 2)
+
 
         widgets_list.widget_progressbar.update()
 
-        self.CB_zoom_in = PYAFCheckBox(self, "zoom_in", "Zoom in")
+        self.TG_zoom_in = PYAFToggle(self, "zoom_in", "Zoom in")
         self.IN_zoom_in_factor = PYAFInput(
-            self, "zoom_in_factor", "Zoom factor")
+            self, "zoom_in_factor", "factor", 40)
         self.BT_next_zoom_element = PYAFButton(
             self, "next_zoom_element", ">", size=40)
+        self.BT_next_zoom_element.setToolTip(
+            "Zoom on the next element of the curve (jump of contact, events, "
+            "breakthroughs)")
 
         widgets_list.widget_progressbar.update()
 
         # Canvas Meshgrid
         sizes = [self.meshgrid_canvas_size[0] // self.canvas_resolution,
-                 self.meshgrid_canvas_size[1] // self.canvas_resolution,
+                 self.meshgrid_canvas_size[1] / self.canvas_resolution,
                  self.canvas_resolution]
 
         self.W_mesh = QtWidgets.QWidget()
@@ -136,7 +161,7 @@ class ComputeWidget(PYAFWidget):
 
         # Canvas curves
         sizes = [self.curve_canvas_size[0] // self.canvas_resolution,
-                 self.curve_canvas_size[1] // self.canvas_resolution,
+                 self.curve_canvas_size[1] / self.canvas_resolution,
                  self.canvas_resolution]
         self.W_curve = QtWidgets.QWidget()
         self.MPL_curve = PYAFPlot(self, "fit_preview", self.W_curve, sizes)
@@ -144,29 +169,64 @@ class ComputeWidget(PYAFWidget):
         widgets_list.widget_progressbar.update()
 
         # Calc All
-        self.CB_compute_all = PYAFCheckBox(self, "compute_all", "Compute all")
+        self.TG_compute_all = PYAFToggle(self, "compute_all", "Compute all")
         label = "Apply to all"
-        self.CB_apply_to_all = PYAFCheckBox(self, "apply_to_all", label)
+        self.TG_apply_to_all = PYAFToggle(self, "apply_to_all", label)
 
+        self.BT_flatten = PYAFButton(self, "flatten", "Flatten", size=80)
+        self.BT_curve_mod = PYAFButton(
+            self, "curve_mod", "Tilting/Smoothing", size=150)
+        self.BT_clean_up = PYAFButton(self, "clean_up", "Clean Up", size=95)
+
+        # Map navigation: file, flatten, curve selector (added in
+        # update_widget)
+        self.GL_choosers.addWidget(self.BT_flatten, 0, 1)
+        self.box_navigation = QtWidgets.QGroupBox("Map navigation")
+        self.box_navigation.setLayout(self.GL_choosers)
+
+        # Curves: modifications, clean up and zoom
+        self.HL_curves = QtWidgets.QHBoxLayout()
+        self.HL_curves.setContentsMargins(8, 0, 8, 2)
+        self.HL_curves.addWidget(self.BT_clean_up)
+        self.HL_curves.addWidget(self.BT_curve_mod)
+        self.HL_curves.addSpacing(4)
+        self.HL_curves.addWidget(self.TG_zoom_in)
+        self.HL_curves.addWidget(self.IN_zoom_in_factor)
+        self.HL_curves.addWidget(self.BT_next_zoom_element)
+        self.box_curves = QtWidgets.QGroupBox("Curves")
+        self.box_curves.setLayout(self.HL_curves)
+
+        # Both boxes at the top of the tab
+        self.HL_top = QtWidgets.QHBoxLayout()
+        # (they share the width of the tab, aligned with the panels below)
+        self.HL_top.addWidget(self.box_navigation)
+        self.HL_top.addWidget(self.box_curves)
+
+        # Options of the computation
+        # Right aligned, above the compute buttons of the tabs
+        # Load parameters on the left, below the maps, as high as the toggles
+        # (no margin and vertical padding of the theme)
+        self.BT_load_params = PYAFButton(
+            self, "load_parameters", "Load parameters", size=120)
+        self.BT_load_params.setToolTip(
+            "Load parameters from previously exported JSON parameter file")
+        self.BT_load_params.setStyleSheet(
+            "QPushButton { margin: 0px; padding: 0px 1.2ex; }")
+        metrics = self.BT_load_params.fontMetrics()
+        self.BT_load_params.setFixedHeight(max(
+            self.TG_apply_to_all.sizeHint().height(), metrics.height() + 8))
         self.HL_options = QtWidgets.QHBoxLayout()
-        self.BT_flatten = PYAFButton(self, "flatten", "Flatten")
-        self.BT_curve_mod = PYAFButton(self, "curve_mod", "Curve modifications")
-        self.BT_clean_up = PYAFButton(self, "clean_up", "Clean Up")
-        self.HL_options.addWidget(self.BT_flatten)
-        self.HL_options.addWidget(self.BT_curve_mod)
-        self.HL_options.addWidget(self.BT_clean_up)
-
-        self.HL_options.addWidget(self.CB_compute_all)
-        self.HL_options.addWidget(self.CB_apply_to_all)
-        self.HL_options.addWidget(self.CB_zoom_in)
-        self.HL_options.addWidget(self.IN_zoom_in_factor)
-        self.HL_options.addWidget(self.BT_next_zoom_element)
+        self.HL_options.addWidget(self.BT_load_params)
         self.HL_options.addStretch(1)
+        self.HL_options.addWidget(self.TG_apply_to_all)
+        self.HL_options.addWidget(self.TG_compute_all)
 
         widgets_list.widget_progressbar.update()
 
         # Tabs
         self.tabs = QtWidgets.QTabWidget()
+        # Styled as pills by the stylesheets
+        self.tabs.setObjectName("subTabs")
         self.tabs.currentChanged.connect(self.tabs_changed)
 
         self.widget_app = QtWidgets.QWidget()
@@ -189,20 +249,37 @@ class ComputeWidget(PYAFWidget):
         label = "Tip radius [nm]"
         self.IN_tip_radius = PYAFInput(self, "tip_radius", label, 60)
         label = "Tip half-opening angle (" + "\u00b0" + ")"
-        self.IN_tip_angle = PYAFInput(self, "tip_angle", label)
-        self.IN_poisson = PYAFInput(self, "poisson", "Poisson ratio")
-        self.IN_tip_radius.input.setValidator(misc_tools.validator("UF"))
-        self.IN_tip_angle.input.setValidator(misc_tools.validator("UF"))
+        # Same width for the three inputs of the model parameters
+        self.IN_tip_angle = PYAFInput(self, "tip_angle", label, 60)
+        self.IN_poisson = PYAFInput(self, "poisson", "Poisson ratio", 60)
+        self.IN_tip_angle.setToolTip(
+            "Half-angle between the axis of the tip and its face (for a "
+            "pyramid: the face, not the edge).")
+        self.IN_tip_radius.setToolTip(
+            "Radius of the apex of the tip (sphere, paraboloid, blunted "
+            "tips), of the flat punch, or of the cylinder of the needle "
+            "and the nanowire.")
+        # 0 is refused (division by zero in the models)
+        self.IN_tip_radius.input.setValidator(misc_tools.validator("PF"))
+        self.IN_tip_angle.input.setValidator(misc_tools.validator("PF"))
         self.IN_poisson.input.setValidator(misc_tools.validator("UF"))
 
         # Model
         self.HL_list_stiff = QtWidgets.QHBoxLayout()
         self.label_models_list = QtWidgets.QLabel("Model : ")
         self.list_models = PYAFComboBox(self, "list_models")
-        self.models = [
-            "Hertz (Paraboloid)", "Sneddon (Cone)", "Bilodeau (Pyramid)", "Stiffness tomography", "Flat punch"]
+        self.models = contact_models.MODEL_NAMES
         for model in self.models:
             self.list_models.addItem(str(model))
+        # Wide enough to display the longest model name. Set with a style
+        # sheet: the min-width of the application style sheet would override
+        # setMinimumWidth (here min-width is the width of the text area)
+        metrics = self.list_models.fontMetrics()
+        longest = max(metrics.horizontalAdvance(m) for m in self.models)
+        self.list_models.setStyleSheet(
+            "QComboBox { min-width: " + str(longest + 20) + "px; }")
+        # The list that opens is also wide enough for the names
+        self.list_models.view().setMinimumWidth(longest + 80)
 
         self.HL_list_stiff.addWidget(self.label_models_list)
         self.HL_list_stiff.addWidget(self.list_models)
@@ -215,7 +292,29 @@ class ComputeWidget(PYAFWidget):
         self.GL_stiffness_params.addLayout(self.HL_list_stiff, 0, 0)
         self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
         # Position 2, defined in update_widget
-        self.GL_stiffness_params.addLayout(VL_empty1, 3, 0)
+        # Brush model (paraboloid and sphere), rows 4 and 5, defined in
+        # update_GUI
+        self.TG_brush = PYAFToggle(self, "brush_model", "Brush model")
+        self.TG_brush.setToolTip(
+            "Brush model of the cells (Sokolov et al. 2007, Makarova et al. "
+            "2023), with a spherical probe:\nthe cell body is fitted near "
+            "the maximum load (brush squeezed), then the force of the brush "
+            "below it,\nF = 100 kT R N^1.5 L exp(-2\u03c0 h / L) for 0.1 < "
+            "h / L < 0.8: length L and grafting density N of the brush\n"
+            "(effective chains per \u00b5m\u00b2). Computed with the "
+            "elasticity (Fitting), "
+            "maps in the Results tab. Zero of the force: baseline of the "
+            "point of contact,\nwhose refit is set to 0 (it would move the "
+            "baseline into the brush).")
+        self.IN_brush_threshold_pct = PYAFInput(
+            self, "brush_threshold_pct", "Body fit above [% max force]", 60)
+        self.IN_brush_threshold_pct.setToolTip(
+            "The brush is squeezed near the maximum load: the cell body is "
+            "fitted above this percentage of the maximum force of each "
+            "curve,\nthe brush below it (dotted line on the curve)")
+        self.IN_brush_threshold_pct.input.setValidator(
+            misc_tools.validator("RF", bottom=1, top=99, decimal=1))
+        self.GL_stiffness_params.addLayout(VL_empty1, 6, 0)
 
         self.Box_stiff_exp_params.setLayout(self.GL_stiffness_params)
         VL_stiff_exp_params = QtWidgets.QVBoxLayout()
@@ -228,17 +327,22 @@ class ComputeWidget(PYAFWidget):
         self.VL_fit_params_stiff = QtWidgets.QVBoxLayout()
 
         self.GRP_stiffness_params = PYAFButtonGroup(self, "stiffness_params")
-        self.RBT_calculus_params = QtWidgets.QRadioButton("Calculus/Tomography")
+        self.RBT_calculus_params = QtWidgets.QRadioButton("Tomography")
+        self.RBT_calculus_params.setToolTip(
+            "Stiffness tomography: slope of each segment of the indentation "
+            "(Slope model)")
         self.RBT_fitting_params = QtWidgets.QRadioButton("Fitting")
+        self.RBT_fitting_params.setToolTip(
+            "Fit of the elasticity on the indentation (Hertz type models)")
         self.GRP_stiffness_params.addButton(self.RBT_calculus_params, 0)
         self.GRP_stiffness_params.addButton(self.RBT_fitting_params, 1)
 
         BOX_stiffness_mode = QtWidgets.QGroupBox("Computation method")
         HL_stiffness_mode = QtWidgets.QHBoxLayout()
         HL_stiffness_mode.addStretch(1)
-        HL_stiffness_mode.addWidget(self.RBT_calculus_params)
-        HL_stiffness_mode.addStretch(1)
         HL_stiffness_mode.addWidget(self.RBT_fitting_params)
+        HL_stiffness_mode.addStretch(1)
+        HL_stiffness_mode.addWidget(self.RBT_calculus_params)
         HL_stiffness_mode.addStretch(1)
         BOX_stiffness_mode.setLayout(HL_stiffness_mode)
 
@@ -268,8 +372,8 @@ class ComputeWidget(PYAFWidget):
         VL_button_compute_stiffness.addWidget(self.BT_compute_stiffness)
         VL_button_compute_stiffness.addStretch(1)
 
-        self.HL_widget_app.addWidget(W_stiff_exp_params)
         self.HL_widget_app.addWidget(W_fit_params_pocs)
+        self.HL_widget_app.addWidget(W_stiff_exp_params)
         self.HL_widget_app.addWidget(W_stiff_segments)
         self.HL_widget_app.addLayout(VL_button_compute_stiffness)
 
@@ -291,6 +395,10 @@ class ComputeWidget(PYAFWidget):
             self.BT_compute_work_and_rupture_force)
         VL_button_compute_work.addStretch(1)
 
+        # Box centered in the tab (the spacing balances the compute button)
+        self.HL_widget_ret.addSpacing(
+            self.BT_compute_work_and_rupture_force.width())
+        self.HL_widget_ret.addStretch(1)
         self.HL_widget_ret.addWidget(W_fit_params_jocs)
         self.HL_widget_ret.addStretch(1)
         self.HL_widget_ret.addLayout(VL_button_compute_work)
@@ -386,9 +494,14 @@ class ComputeWidget(PYAFWidget):
         VL_loading_rates.addStretch(1)
 
         VL_coeff = QtWidgets.QVBoxLayout()
+        VL_coeff.addStretch(1)
         VL_coeff.addWidget(self.IN_lr_coef)
         VL_coeff.addStretch(1)
 
+        # Coefficient centered in the tab (the spacing balances the compute
+        # button)
+        HL_loading_rates.addSpacing(self.BT_get_lr.width())
+        HL_loading_rates.addStretch(1)
         HL_loading_rates.addLayout(VL_coeff)
         HL_loading_rates.addStretch(1)
         HL_loading_rates.addLayout(VL_loading_rates)
@@ -400,9 +513,19 @@ class ComputeWidget(PYAFWidget):
         self.BT_height_corr = PYAFButton(self, "height_correction", "Compute")
         self.BT_height_corr.setFixedSize(100, 100)
 
-        # Instruction label
-        self.label_info = QtWidgets.QLabel("Either select the substrate from the ROI manager (results tab) or input"
-                                           " the known height of the sample")
+        # Main action buttons, highlighted by the stylesheet
+        for button in (self.BT_compute_stiffness,
+                       self.BT_compute_work_and_rupture_force,
+                       self.BT_compute_events, self.BT_get_lr,
+                       self.BT_height_corr):
+            button.setObjectName("primaryButton")
+
+        # Instruction label (models with a correction of Garcia & Garcia)
+        names = [contact_models.MODEL_NAMES[m] for m in contact_models.HAS_BEC]
+        self.label_info = QtWidgets.QLabel(
+            "Applies to " + ", ".join(names[:-1]) + " and " + names[-1] +
+            " models.\nEither select the substrate from the ROI manager "
+            "(results tab) or input the known height of the sample")
 
         # ROI selection (Label + Dropdown)
         self.label_list_roi = QtWidgets.QLabel("ROI of substrate:")
@@ -410,14 +533,16 @@ class ComputeWidget(PYAFWidget):
         self.list_roi_glass.setFixedSize(100, 26)  # Fixed width to prevent stretching
 
         # Noise floor input (Label + Input Box)
-        self.label_noise_floor = QtWidgets.QLabel("Noise floor [nm]:")  # Label for noise floor
-        self.IN_noise_floor = PYAFInput(self, "noise_floor", "", width=50)  # Input box for noise floor
-        self.IN_noise_floor.input.setValidator(misc_tools.validator("UF"))  # Validation
+        self.label_noise_floor = QtWidgets.QLabel(
+            "Noise floor: discard the first")  # Label for noise floor
+        self.IN_noise_floor = PYAFInput(self, "noise_floor", "[nm]", width=50)  # Input box for noise floor
+        self.IN_noise_floor.input.setValidator(
+            misc_tools.validator("UF_or_empty"))  # Validation
 
         # Sample height input (Switched Label & Input Box)
         self.label_sample_height = QtWidgets.QLabel("Sample height [nm]:")  # Separate label
         self.IN_user_h = PYAFInput(self, "user_h", "", width=50)  # Empty label in PYAFInput
-        self.IN_user_h.input.setValidator(misc_tools.validator("UF"))
+        self.IN_user_h.input.setValidator(misc_tools.validator("UF_or_empty"))
 
         # Layout for ROI selection (aligns label & dropdown closely)
         self.stiff_corr_row = QtWidgets.QHBoxLayout()
@@ -453,25 +578,245 @@ class ComputeWidget(PYAFWidget):
         VL_stiff_corr.addWidget(self.BT_height_corr)
         VL_stiff_corr.addStretch(1)
 
+        # Options centered in the tab (the spacing balances the compute
+        # button), as in the other tabs
         HL_stiff_corr = QtWidgets.QHBoxLayout()
+        HL_stiff_corr.addSpacing(self.BT_height_corr.width())
+        HL_stiff_corr.addStretch(1)
         HL_stiff_corr.addLayout(VL_stiff_corr_opts)
         HL_stiff_corr.addStretch(1)
         HL_stiff_corr.addLayout(VL_stiff_corr)
 
         self.widget_stiff_corr.setLayout(HL_stiff_corr)
 
+        # --- Viscoelasticity -------------------------------------------------
+
+        self.widget_visco = QtWidgets.QWidget()
+
+        label = QtWidgets.QLabel(
+            "Ting fit of the approach and the retraction (power-law "
+            "rheology, Efremov et al. 2017; B.E.C.: Tejedor & Garcia "
+            "2025).\nUses the point of contact, the baseline, the model and "
+            "the modulus of the elasticity fit (Fitting).\n"
+            "Model and fit procedure of PyFMRheo: "
+            "github.com/DyNaMo-INSERM/PyFMlab_DyNaMo")
+        label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        # Small text, below the parameters
+        label.setFont(gui_tools.font_of_size(
+            max(label.font().pointSize() - 2, 8)))
+
+        self.Box_visco = QtWidgets.QGroupBox("Ting fit")
+        GL_visco = QtWidgets.QGridLayout()
+        GL_visco.setVerticalSpacing(4)
+
+        self.label_visco_solver = QtWidgets.QLabel("Solver :")
+        self.list_visco_solver = PYAFComboBox(self, "visco_solver")
+        self.list_visco_solver.addItem("Analytical (constant speeds)")
+        self.list_visco_solver.addItem("Numerical (measured indentation)")
+        HL_solver = QtWidgets.QHBoxLayout()
+        HL_solver.addWidget(self.label_visco_solver)
+        HL_solver.addWidget(self.list_visco_solver)
+        HL_solver.addStretch(1)
+
+        self.CB_visco_bec = PYAFCheckBox(
+            self, "visco_bec", "Bottom effect correction (B.E.C. tab)")
+        self.CB_visco_bec.setToolTip(
+            "Height of the sample defined in the B.E.C. tab (substrate ROI "
+            "or sample height). Uses the numerical solver.")
+        self.CB_visco_drag = PYAFCheckBox(
+            self, "visco_drag_correction", "Correct viscous drag")
+        self.CB_visco_drag.setToolTip(
+            "The retract baseline is shifted by the viscous drag of the "
+            "cantilever: its offset from the approach baseline is removed.")
+        self.IN_visco_offset = PYAFInput(
+            self, "visco_contact_offset", "Baseline before contact [nm]",
+            60)
+        self.IN_visco_offset.setToolTip(
+            "Part of the curve before the point of contact included in the "
+            "fit (as the contact_offset of PyFMRheo): the time of contact is "
+            "fitted, it can move from the point of contact of the elasticity "
+            "fit.")
+        self.IN_visco_offset.input.setValidator(misc_tools.validator("UF"))
+        self.IN_visco_points = PYAFInput(
+            self, "visco_nbr_points", "Points (downsampling)", 60)
+        self.IN_visco_points.setToolTip(
+            "The curve is averaged down to this number of points before the "
+            "fit (as pts_downsample in PyFMRheo): the numerical solver "
+            "grows with the square of the number of points.")
+        self.IN_visco_points.input.setValidator(
+            misc_tools.validator("MI", bottom=20))
+        self.CB_visco_beta_auto = PYAFCheckBox(
+            self, "visco_beta_auto",
+            "Automatic initial fluidity (0.05 if E > 10 kPa, else 0.25)")
+        self.IN_visco_beta = PYAFInput(
+            self, "visco_beta_init", "Initial fluidity", 60)
+        self.IN_visco_beta.input.setValidator(
+            misc_tools.validator("RF", bottom=0.01, top=0.99, decimal=3))
+        self.IN_visco_frequency = PYAFInput(
+            self, "visco_frequency", "Frequency of E\u2032, E\u2033 [Hz]",
+            60)
+        self.IN_visco_frequency.setToolTip(
+            "Frequency of the storage and loss moduli maps (Results tab), "
+            "computed from E\u2080 and the fluidity\n(power law, no new fit). "
+            "Limited to the time scales of the curves, measured by the "
+            "computation (medians of the curves):\nfrom 1 / contact time "
+            "to 1 / (2 x time between two fitted points); outside, the "
+            "values would be an\nextrapolation of the model. Set to 1 / "
+            "contact time (time scale of the measurement) by the "
+            "computation, unless a frequency\nsupported by the curves was "
+            "entered. Each file has its own frequency; with apply to "
+            "all, a new value is also given to the files whose curves "
+            "support it.")
+        self.IN_visco_frequency.input.setValidator(misc_tools.validator("PF"))
+
+        GL_visco.addLayout(HL_solver, 0, 0)
+        GL_visco.addWidget(self.CB_visco_bec, 1, 0)
+        GL_visco.addWidget(self.CB_visco_drag, 2, 0)
+        GL_visco.addWidget(self.IN_visco_offset, 0, 1)
+        GL_visco.addWidget(self.IN_visco_points, 1, 1)
+        GL_visco.addWidget(self.CB_visco_beta_auto, 2, 1)
+        GL_visco.addWidget(self.IN_visco_beta, 3, 1)
+        GL_visco.addWidget(self.IN_visco_frequency, 4, 1)
+        GL_visco.setColumnStretch(2, 1)
+        self.Box_visco.setLayout(GL_visco)
+
+        VL_visco_opts = QtWidgets.QVBoxLayout()
+        VL_visco_opts.addWidget(self.Box_visco)
+        VL_visco_opts.addWidget(label)
+        VL_visco_opts.addStretch(1)
+
+        self.BT_visco = PYAFButton(self, "compute_visco", "Compute")
+        self.BT_visco.setFixedSize(100, 100)
+        self.BT_visco.setObjectName("primaryButton")
+        VL_visco = QtWidgets.QVBoxLayout()
+        VL_visco.addStretch(1)
+        VL_visco.addWidget(self.BT_visco)
+        VL_visco.addStretch(1)
+
+        # Options centered in the tab (the spacing balances the compute
+        # button), as in the other tabs
+        HL_visco = QtWidgets.QHBoxLayout()
+        HL_visco.addSpacing(self.BT_visco.width())
+        HL_visco.addStretch(1)
+        HL_visco.addLayout(VL_visco_opts)
+        HL_visco.addStretch(1)
+        HL_visco.addLayout(VL_visco)
+        self.widget_visco.setLayout(HL_visco)
+
+        # --- Breakthroughs of supported lipid bilayers -----------------------
+
+        self.widget_breakthrough = QtWidgets.QWidget()
+        self.Box_breakthrough = QtWidgets.QGroupBox(
+            "Breakthroughs (approach curves)")
+        self.IN_bt_n_sigma = PYAFInput(
+            self, "breakthrough_n_sigma", "Threshold (\u00d7 noise)", 60)
+        self.IN_bt_n_sigma.setToolTip(
+            "A breakthrough is a sudden jump of the separation (tip-sample "
+            "distance) on the approach, with a drop of the force: the jump "
+            "must exceed this number of times the noise of the separation "
+            "of the curve")
+        self.IN_bt_n_sigma.input.setValidator(misc_tools.validator("PF"))
+        self.IN_bt_min_thickness = PYAFInput(
+            self, "breakthrough_min_thickness", "Minimum jump [nm]", 60)
+        self.IN_bt_min_thickness.setToolTip(
+            "Minimum jump of the separation: the thickness of the bilayer "
+            "compressed at the rupture (about 4-5 nm for a bilayer)")
+        self.IN_bt_min_thickness.input.setValidator(
+            misc_tools.validator("PF"))
+        self.IN_bt_min_force = PYAFInput(
+            self, "breakthrough_min_force", "Minimum force [nN]", 60)
+        self.IN_bt_min_force.setToolTip(
+            "Minimum breakthrough force (Fb): higher to skip the jumps at "
+            "the contact")
+        self.IN_bt_min_force.input.setValidator(misc_tools.validator("UF"))
+        self.IN_bt_max_events = PYAFInput(
+            self, "breakthrough_max_events", "Maximum per curve", 60)
+        self.IN_bt_max_events.setToolTip(
+            "Maximum number of breakthroughs per curve (stacked bilayers); "
+            "the maps and plots use the first one")
+        self.IN_bt_max_events.input.setValidator(
+            misc_tools.validator("RI", bottom=1, top=20))
+        GL_bt = QtWidgets.QGridLayout()
+        GL_bt.addWidget(self.IN_bt_n_sigma, 0, 0)
+        GL_bt.addWidget(self.IN_bt_min_thickness, 1, 0)
+        GL_bt.addWidget(self.IN_bt_min_force, 0, 1)
+        GL_bt.addWidget(self.IN_bt_max_events, 1, 1)
+        GL_bt.setColumnStretch(2, 1)
+        self.Box_breakthrough.setLayout(GL_bt)
+        label_bt = QtWidgets.QLabel(
+            "Breakthrough force Fb (force at the rupture of the bilayer) and "
+            "jump of the separation (thickness of the compressed bilayer).\n"
+            "Preview: approach force vs distance to the support, with the "
+            "breakthroughs found with these settings.\n"
+            "Nominal loading rate: spring constant \u00d7 approach velocity "
+            "(Gum\u00ed-Audenis & Giannotti 2019).\n"
+            "Correct the baseline tilt first (Tilting/Smoothing): a tilted "
+            "baseline biases Fb and can hide the low breakthroughs.")
+        label_bt.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        # Small text, below the parameters, as in the viscoelasticity tab
+        label_bt.setFont(gui_tools.font_of_size(
+            max(label_bt.font().pointSize() - 2, 8)))
+        VL_bt_opts = QtWidgets.QVBoxLayout()
+        VL_bt_opts.addWidget(self.Box_breakthrough)
+        VL_bt_opts.addWidget(label_bt)
+        VL_bt_opts.addStretch(1)
+
+        self.BT_breakthrough = PYAFButton(
+            self, "compute_breakthrough", "Compute")
+        self.BT_breakthrough.setFixedSize(100, 100)
+        self.BT_breakthrough.setObjectName("primaryButton")
+        VL_bt = QtWidgets.QVBoxLayout()
+        VL_bt.addStretch(1)
+        VL_bt.addWidget(self.BT_breakthrough)
+        VL_bt.addStretch(1)
+
+        # Options centered in the tab, as in the other tabs
+        HL_bt = QtWidgets.QHBoxLayout()
+        HL_bt.addSpacing(self.BT_breakthrough.width())
+        HL_bt.addStretch(1)
+        HL_bt.addLayout(VL_bt_opts)
+        HL_bt.addStretch(1)
+        HL_bt.addLayout(VL_bt)
+        self.widget_breakthrough.setLayout(HL_bt)
+
         # --- Set up page -----------------------------------------------------
 
         self.tabs.addTab(self.widget_app, "Elasticity")
         self.tabs.addTab(self.widget_stiff_corr, "B.E.C.")
+        self.tabs.addTab(self.widget_visco, "Viscoelasticity")
         self.tabs.addTab(self.widget_ret, "Work, Rupture force")
         self.tabs.addTab(self.widget_events, "Unbinding events")
         self.tabs.addTab(self.widget_loading_rates, "Loading rates")
+        self.tabs.addTab(self.widget_breakthrough, "Breakthrough")
+
+        # Margins of the pages, with the padding of the pane (no padding in
+        # the stylesheet, see QTabWidget#subTabs::pane)
+        for i in range(self.tabs.count()):
+            layout = QtWidgets.QWidget.layout(self.tabs.widget(i))
+            m = layout.contentsMargins()
+            layout.setContentsMargins(m.left() + 4, m.top() + 4,
+                                      m.right() + 4, m.bottom() + 4)
+
+        # The boxes keep their height (no empty space at their bottom) when
+        # the tabs are taller
+        self.HL_widget_app.setAlignment(QtCore.Qt.AlignTop)
+        self.HL_widget_ret.setAlignment(QtCore.Qt.AlignTop)
+
+        # The events tab is the tallest: no vertical margins around the
+        # parameter boxes (the tab and the boxes keep theirs), to leave more
+        # height to the plots
+        for widget in (self.widget_kernel, self.widget_msf):
+            # (some widgets have an attribute named layout)
+            layout = QtWidgets.QWidget.layout(widget)
+            margins = layout.contentsMargins()
+            layout.setContentsMargins(margins.left(), 0, margins.right(), 0)
 
         self.GL_compute = QtWidgets.QGridLayout()
-        self.GL_compute.addWidget(self.MPL_meshgrid, 0, 0)
-        self.GL_compute.addWidget(self.MPL_curve, 0, 1)
-        self.GL_compute.addLayout(self.GL_choosers, 1, 0, 1, 0)
+        # Compact rows (plots, navigation, options, computation tabs)
+        self.GL_compute.setVerticalSpacing(4)
+        self.GL_compute.addLayout(self.HL_top, 0, 0, 1, 0)
+        self.GL_compute.addWidget(self.MPL_meshgrid, 1, 0)
+        self.GL_compute.addWidget(self.MPL_curve, 1, 1)
         self.GL_compute.addLayout(self.HL_options, 2, 0, 1, 0)
         self.GL_compute.addWidget(self.tabs, 3, 0, 1, 0)
 
@@ -490,7 +835,7 @@ class ComputeWidget(PYAFWidget):
         if data.is_single:
             self.curve_selector.setParent(None)
         else:
-            self.GL_choosers.addWidget(self.curve_selector, 0, 1)
+            self.GL_choosers.addWidget(self.curve_selector, 0, 2)
             self.curve_selector.update_widget()
 
         if data.events_algorithm == "kernel":
@@ -503,6 +848,10 @@ class ComputeWidget(PYAFWidget):
 
         self.STK_stiffness_mode.setCurrentIndex(data.stiffness_mode)
 
+        # Tomography and Fitting parameters (start, segment size,
+        # ranges) of the selected file
+        self.widget_calculus.update_widget()
+        self.widget_fitting.update_widget()
         widgets_list.widget_fit_param_pocs.update_widget()
         widgets_list.widget_fit_param_jocs.update_widget()
         widgets_list.widget_fit_param_jocs_events.update_widget()
@@ -520,21 +869,28 @@ class ComputeWidget(PYAFWidget):
         # Reset zoomed in position
         shared.zoomed_in_element = 0
 
-        if self.tabs.currentIndex() == 0:
+        widget = self.tabs.currentWidget()
+        if widget is self.widget_app:
             shared.exp.compute_type = "stiffness"
             self.BT_next_zoom_element.setEnabled(False)
-        elif self.tabs.currentIndex() == 1:
+        elif widget is self.widget_stiff_corr:
             shared.exp.compute_type = "stiffness_corr"
             self.BT_next_zoom_element.setEnabled(False)
-        elif self.tabs.currentIndex() == 2:
+        elif widget is self.widget_visco:
+            shared.exp.compute_type = "viscoelasticity"
+            self.BT_next_zoom_element.setEnabled(False)
+        elif widget is self.widget_breakthrough:
+            shared.exp.compute_type = "breakthrough"
+            self.BT_next_zoom_element.setEnabled(True)
+        elif widget is self.widget_ret:
             shared.exp.compute_type = "work_and_rupture_force"
             self.BT_next_zoom_element.setEnabled(True)
-        elif self.tabs.currentIndex() == 3:
+        elif widget is self.widget_events:
             shared.exp.compute_type = "events"
             self.BT_next_zoom_element.setEnabled(True)
-        elif self.tabs.currentIndex() == 4:
+        elif widget is self.widget_loading_rates:
             shared.exp.compute_type = "loading_rates"
-            self.BT_next_zoom_element.setEnabled(False)
+            self.BT_next_zoom_element.setEnabled(True)
 
         self.update_MPL("MPL_canvas")
 
@@ -558,95 +914,160 @@ class ComputeWidget(PYAFWidget):
                 self.MPL_meshgrid.setParent(None)
                 self.BT_clean_up.setEnabled(False)
             else:
-                self.GL_compute.addWidget(self.MPL_meshgrid, 0, 0)
+                self.GL_compute.addWidget(self.MPL_meshgrid, 1, 0)
                 self.BT_clean_up.setEnabled(True)
 
         if element == "apply_to_all" or element == "all":
-            self.CB_apply_to_all.setChecked(shared.exp.apply_to_all_compute)
+            self.TG_apply_to_all.setChecked(shared.exp.apply_to_all_compute)
 
         if element == "stiffness_model_selected" or element == "all":
+            # Tomography: Slope model only. Fitting: the other models (files
+            # saved with the previous Calculus mode)
+            tomography = not data.perform_fit
+            if tomography and data.stiffness_model_selected != 3:
+                self.set_model(data, 3)
+                data.tomography = 1
+            elif not tomography and data.stiffness_model_selected == 3:
+                self.set_model(data, 0)
+            for index in range(len(self.models)):
+                if (index == 3) == tomography:
+                    gui_tools.enable_combobox_item(self.list_models, index)
+                else:
+                    gui_tools.disable_combobox_item(self.list_models, index)
             self.list_models.setCurrentIndex(data.stiffness_model_selected)
 
             self.update_MPL("MPL_canvas")
             self.update_GUI("buttons_compute")
 
         if element == "BT_height_correction" or element == "all":
-            # In the case of the model with the slope, do not allow the
-            # height correction computation.
+            # Bottom effect correction: elasticity, model with a correction,
+            # and a height (substrate ROI or sample height)
+            reason = bec.check_file(data)
+            self.BT_height_corr.setEnabled(reason is None)
+            self.BT_height_corr.setToolTip(
+                "" if reason is None else "Not available: " + reason)
 
-            model = data.used_stiffness_model_selected
-            roi = data.roi_glass_id
-            user_h = data.user_h
-            if data.stiffness_calculated and (roi != 0 or (user_h is not None and user_h != 0)) and model != 3:
-                self.BT_height_corr.setEnabled(True)
+        if element == "breakthrough" or element == "all":
+            self.IN_bt_n_sigma.changeValue(
+                misc_tools.format_number(data.breakthrough_n_sigma))
+            self.IN_bt_min_thickness.changeValue(
+                misc_tools.format_number(data.breakthrough_min_thickness))
+            self.IN_bt_min_force.changeValue(
+                misc_tools.format_number(data.breakthrough_min_force))
+            self.IN_bt_max_events.changeValue(
+                int(data.breakthrough_max_events))
+
+        if element == "visco" or element == "all":
+            self.list_visco_solver.setCurrentIndex(
+                1 if data.visco_bec else data.visco_solver)
+            self.list_visco_solver.setEnabled(not data.visco_bec)
+            self.CB_visco_bec.setChecked(data.visco_bec)
+            self.CB_visco_drag.setChecked(data.visco_drag_correction)
+            self.IN_visco_offset.changeValue(data.visco_contact_offset)
+            self.IN_visco_points.changeValue(data.visco_nbr_points)
+            self.CB_visco_beta_auto.setChecked(data.visco_beta_auto)
+            self.IN_visco_beta.changeValue(data.visco_beta_init)
+            # Frequency of E' and E'': within the time scales of the curves
+            # (window measured by the computation)
+            window = getattr(data, "visco_frequency_window", None)
+            label = "Frequency of E\u2032, E\u2033 [Hz]"
+            if window is not None:
+                label += " (" + "\u2013".join(
+                    "%.3g" % f if f < 1000 else "%.0f" % f
+                    for f in window) + ")"
+                self.IN_visco_frequency.input.setValidator(
+                    misc_tools.validator("RF", bottom=window[0],
+                                         top=window[1], decimal=3))
             else:
-                self.BT_height_corr.setEnabled(False)
+                self.IN_visco_frequency.input.setValidator(
+                    misc_tools.validator("PF"))
+            self.IN_visco_frequency.label.setText("  " + label)
+            self.IN_visco_frequency.changeValue(
+                float("%.3g" % getattr(data, "visco_frequency", 1.0)))
+            self.IN_visco_beta.setEnabled(not data.visco_beta_auto)
+            # The elasticity fit is needed (and a height for the B.E.C.)
+            reason = visco_main.check_file(data)
+            self.BT_visco.setEnabled(reason is None)
+            self.BT_visco.setToolTip(
+                "" if reason is None else "Not available: " + reason)
 
         if element == "roi_list_height_corr" or element == "all":
-            # Remove old items
+            # ROIs set as substrate in the ROI manager, numbered as in it
+            # (position in the list; roi_glass_id: position + 1, 0: none)
+            substrates = [index + 1 for index, roi in
+                          enumerate(data.roi_list)
+                          if roi.glass_coeffs is not None]
+            if data.roi_glass_id not in substrates:
+                # The substrate ROI was removed or unset
+                data.roi_glass_id = 0
+            if data.roi_glass_id == 0 and len(substrates) == 1 and \
+                    not data.user_h:
+                # A single substrate: chosen
+                data.roi_glass_id = substrates[0]
+            self.list_roi_glass.blockSignals(True)
             self.list_roi_glass.clear()
-
-            # Add rois
             self.list_roi_glass.addItem("None")
-            count = 1
-            for roi in shared.exp.current_data.roi_list:
-                if roi.glass_coeffs is not None:
-                    self.list_roi_glass.addItem(str(roi.roi_id + 1))
-                    # Select
-                    if data.roi_glass_id == roi.roi_id + 1:
-                        self.list_roi_glass.setCurrentIndex(count)
-                    count += 1
+            for number in substrates:
+                self.list_roi_glass.addItem(str(number))
+            self.list_roi_glass.setCurrentText(
+                str(data.roi_glass_id) if data.roi_glass_id else "None")
+            self.list_roi_glass.blockSignals(False)
+            # Inputs and button with the substrate (also after "all": the
+            # button is updated above, before the substrate)
+            self.update_GUI("IN_user_h")
+            self.update_GUI("BT_height_correction")
 
         if element == "IN_user_h" or element == "all":
-            self.IN_user_h.input.setText("None")
-            if data.user_h is not None:
-                self.IN_user_h.input.setText(str(data.user_h))
+            # Empty input when no value is defined
+            self.IN_user_h.changeValue(
+                "" if data.user_h is None else data.user_h)
+            self.IN_noise_floor.changeValue(
+                "" if data.noise_floor is None else data.noise_floor)
+            # The noise floor is used with a substrate ROI, the sample height
+            # without one
+            self.IN_noise_floor.setEnabled(data.roi_glass_id != 0)
+            self.IN_user_h.setEnabled(data.roi_glass_id == 0)
 
         if element == "get_lr" or element == "all":
             self.BT_get_lr.setEnabled(data.events_calculated)
 
         if element == "grid_model_options" or element == "all":
-            if data.stiffness_model_selected == 0:
-                self.IN_tip_angle.setParent(None)
+            # Inputs of the tip of the model: radius and/or angle (none for
+            # the slope)
+            model = data.stiffness_model_selected
+            self.IN_tip_radius.setParent(None)
+            self.IN_tip_angle.setParent(None)
+            self.IN_poisson.setParent(None)
+            if model != contact_models.SLOPE:
+                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
+            row = 2
+            if model in contact_models.USES_RADIUS:
+                self.IN_tip_radius.label.setText(
+                    "  " + contact_models.RADIUS_LABELS.get(
+                        model, contact_models.RADIUS_LABEL))
                 self.IN_tip_radius.input.setText(str(data.tip_radius))
-                self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
-                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-                # Enable fit options
-                self.RBT_fitting_params.setChecked(True)
-                self.RBT_fitting_params.setEnabled(True)
-            elif data.stiffness_model_selected == 1:
-                self.IN_tip_radius.setParent(None)
+                self.GL_stiffness_params.addWidget(self.IN_tip_radius, row, 0)
+                row += 1
+            if model in contact_models.USES_ANGLE:
                 self.IN_tip_angle.input.setText(str(data.tip_angle))
-                self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
-                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-                # Enable fit options
-                self.RBT_fitting_params.setChecked(True)
-                self.RBT_fitting_params.setEnabled(True)
-            elif data.stiffness_model_selected == 2:
-                self.IN_tip_radius.setParent(None)
-                self.IN_tip_angle.input.setText(str(data.tip_angle))
-                self.GL_stiffness_params.addWidget(self.IN_tip_angle, 2, 0)
-                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-                # Enable fit options
-                self.RBT_fitting_params.setChecked(True)
-                self.RBT_fitting_params.setEnabled(True)
-            elif data.stiffness_model_selected == 3:
-                self.IN_tip_radius.setParent(None)
-                self.IN_tip_angle.setParent(None)
-                self.IN_poisson.setParent(None)
-                # Disable fit options
-                self.RBT_fitting_params.setChecked(False)
-                self.RBT_fitting_params.setEnabled(False)
-            if data.stiffness_model_selected == 4:
-                self.IN_tip_angle.setParent(None)
-                self.IN_tip_radius.input.setText(str(data.tip_radius))
-                self.GL_stiffness_params.addWidget(self.IN_tip_radius, 2, 0)
-                self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
-                # Enable fit options
-                self.RBT_fitting_params.setChecked(True)
-                self.RBT_fitting_params.setEnabled(True)
+                self.GL_stiffness_params.addWidget(self.IN_tip_angle, row, 0)
+
+            # Brush model: models of a sphere
+            self.TG_brush.setParent(None)
+            self.IN_brush_threshold_pct.setParent(None)
+            if brush.available(data):
+                self.TG_brush.setChecked(data.brush_model)
+                self.IN_brush_threshold_pct.input.setText(
+                    misc_tools.format_number(data.brush_threshold_pct))
+                self.IN_brush_threshold_pct.setEnabled(data.brush_model)
+                self.GL_stiffness_params.addWidget(self.TG_brush, 4, 0)
+                self.GL_stiffness_params.addWidget(
+                    self.IN_brush_threshold_pct, 5, 0)
 
             self.IN_poisson.input.setText(str(data.poisson_ratio))
+
+            # Display the mode of the file (the slope model may have changed it)
+            self.update_GUI("stiffness_params")
 
         # if element == "input_segments" or element == "all":
             # self.IN_start.input.setText(str(data.indentation_start))
@@ -654,27 +1075,19 @@ class ComputeWidget(PYAFWidget):
             # self.IN_step.input.setText(str(data.indentation_step))
 
         if element == "zoom_in" or element == "all":
-            self.CB_zoom_in.setChecked(data.auto_zoom_in)
+            self.TG_zoom_in.setChecked(data.auto_zoom_in)
 
         if element == "zoom_fit_preview_factor" or element == "all":
             self.IN_zoom_in_factor.changeValue(data.zoom_fit_preview_factor)
 
         if element == "compute_all" or element == "all":
-            self.CB_compute_all.setChecked(shared.exp.calc_all)
+            self.TG_compute_all.setChecked(shared.exp.calc_all)
 
         if element == "flatten" or element == "all":
             if data.scan_size_x != 0:
                 self.BT_flatten.setEnabled(True)
             else:
                 self.BT_flatten.setEnabled(False)
-
-        # if element == "strict_stop" or element == "all":
-            # self.CB_strict_stop.setChecked(data.strict_stop)
-            # Enable or disable strict stop mode
-            # if data.indentation_stop != 0:
-                # self.CB_strict_stop.setEnabled(True)
-            # else:
-                # self.CB_strict_stop.setEnabled(False)
 
         # if element == "tomography" or element == "all":
             # self.CB_tomography.setChecked(data.tomography)
@@ -691,10 +1104,8 @@ class ComputeWidget(PYAFWidget):
         if element == "stiffness_params" or element == "all":
             if data.stiffness_mode == 0:
                 self.RBT_calculus_params.setChecked(True)
-                data.perform_fit = False
             elif data.stiffness_mode == 1:
                 self.RBT_fitting_params.setChecked(True)
-                data.perform_fit = True
 
         if element == "events_curve_type" or element == "all":
             if data.events_curve_type == "curve":
@@ -702,13 +1113,32 @@ class ComputeWidget(PYAFWidget):
             elif data.events_curve_type == "detection":
                 self.RBT_detection.setChecked(True)
 
+    @staticmethod
+    def set_model(data, model):
+        """Selects the model of the elasticity. Each model keeps its own tip
+        radius and angle (default values of the model until the user changes
+        them)."""
+        old = data.stiffness_model_selected
+        if model != old:
+            if old in contact_models.USES_RADIUS:
+                data.tip_radii[old] = data.tip_radius
+            if old in contact_models.USES_ANGLE:
+                data.tip_angles[old] = data.tip_angle
+            if model in contact_models.USES_RADIUS:
+                data.tip_radius = data.tip_radii.get(
+                    model, contact_models.DEFAULT_RADIUS[model])
+            if model in contact_models.USES_ANGLE:
+                data.tip_angle = data.tip_angles.get(
+                    model, contact_models.DEFAULT_ANGLE[model])
+        data.stiffness_model_selected = model
+
     def list_updated(self, name):
         """Called when a list is updated."""
         data = shared.exp.current_data
 
         if name == "list_models":
             # This list lets you chose the model for the stiffness computation.
-            data.stiffness_model_selected = self.list_models.currentIndex()
+            self.set_model(data, self.list_models.currentIndex())
             # Update the GUI
             self.update_GUI("grid_model_options")
 
@@ -732,6 +1162,9 @@ class ComputeWidget(PYAFWidget):
             data.roi_glass_id = value
 
             self.update_GUI("BT_height_correction")
+
+        elif name == "visco_solver":
+            data.visco_solver = self.list_visco_solver.currentIndex()
 
         elif name == "list2":
             self.parent.file_changed("list2")
@@ -759,7 +1192,6 @@ class ComputeWidget(PYAFWidget):
         # elif field == "input_stop":
             # if self.IN_stop.input.text() != "":
                 # data.indentation_stop = self.IN_stop.get_int_value()
-                # self.update_GUI("strict_stop")
 
         # elif field == "input_step":
             # if self.IN_step.input.text() != "":
@@ -773,23 +1205,115 @@ class ComputeWidget(PYAFWidget):
             data.zoom_fit_preview_factor = val
 
         elif field == "noise_floor":
+            # An empty input removes the value
             if self.IN_noise_floor.input.text() != "":
                 data.noise_floor = self.IN_noise_floor.get_float_value()
+            else:
+                data.noise_floor = None
 
         elif field == "user_h":
             if self.IN_user_h.input.text() != "":
                 data.user_h = self.IN_user_h.get_float_value()
+            else:
+                data.user_h = None
+
+        elif field == "visco_contact_offset":
+            data.visco_contact_offset = self.IN_visco_offset.get_float_value()
+
+        elif field == "brush_threshold_pct":
+            data.brush_threshold_pct = \
+                self.IN_brush_threshold_pct.get_float_value()
+
+        elif field == "breakthrough_n_sigma":
+            data.breakthrough_n_sigma = self.IN_bt_n_sigma.get_float_value()
+
+        elif field == "breakthrough_min_thickness":
+            data.breakthrough_min_thickness = \
+                self.IN_bt_min_thickness.get_float_value()
+
+        elif field == "breakthrough_min_force":
+            data.breakthrough_min_force = \
+                self.IN_bt_min_force.get_float_value()
+
+        elif field == "breakthrough_max_events":
+            data.breakthrough_max_events = \
+                self.IN_bt_max_events.get_int_value()
+
+        elif field == "visco_nbr_points":
+            data.visco_nbr_points = self.IN_visco_points.get_int_value()
+
+        elif field == "visco_beta_init":
+            data.visco_beta_init = self.IN_visco_beta.get_float_value()
+
+        elif field == "visco_frequency":
+            if self.IN_visco_frequency.input.text() != "":
+                value = self.IN_visco_frequency.get_float_value()
+                data.visco_frequency = visco_main.clamp_frequency(data, value)
+                # With apply to all: also the files whose curves support this
+                # frequency (the others keep theirs)
+                files = [data]
+                if shared.exp.apply_to_all_compute:
+                    files += [dt for dt in shared.exp.list if dt is not data
+                              and visco_main.clamp_frequency(dt, value) ==
+                              value]
+                for dt in files:
+                    dt.visco_frequency = data.visco_frequency
+                    # Kept by the next computations (if supported)
+                    dt.visco_frequency_user = True
+                    # New values: automatic scales of the moduli maps
+                    if dt.visco_calculated:
+                        for mt in ("visco_storage", "visco_loss"):
+                            plot_options.autoscale_elasticity(dt, mt)
+                # Maps of the moduli at this frequency (no new fit)
+                if data.meshgrid_type in ("visco_storage", "visco_loss"):
+                    widgets_list.widget_results.update_MPL("MPL_canvas1")
 
         self.update_MPL("MPL_canvas")
         self.update_GUI("BT_height_correction")
+        self.update_GUI("visco")
 
-    def finish_computation(self, warnings=None):
-        """At the end of the computation, display the errors and refresh the GUI."""
+    @staticmethod
+    def radius_notes(calc_list):
+        """Message for the files indented deeper than the radius of the tip
+        with the paraboloid (Hertz is valid for an indentation much smaller
+        than the radius), None if there is none."""
+        lines = ""
+        for calc_id in calc_list:
+            data = shared.exp.list[calc_id]
+            if not data.stiffness_calculated or \
+                    data.used_stiffness_model_selected not in \
+                    contact_models.RADIUS_LIMITED:
+                continue
+            depth = numpy.asarray(data.indentation[:], dtype=float)
+            depth = depth[numpy.isfinite(depth)]
+            nbr = int(numpy.sum(depth > data.used_tip_radius))
+            if nbr:
+                lines += "<li>" + file_label(data) + " : " + \
+                    str(nbr) + " pixels out of " + str(depth.size) + \
+                    " (median indentation " + \
+                    str(int(round(float(numpy.median(depth))))) + " nm, tip " \
+                    "radius " + str(data.used_tip_radius) + " nm)</li>"
+        if not lines:
+            return None
+        return "The indentation is larger than the tip radius: the " \
+            "paraboloid (Hertz) is valid for an indentation much smaller " \
+            "than the radius. Use the Sneddon (Sphere) model for a bead, or " \
+            "a blunted cone or pyramid for a sharp tip.<ul>" + lines + "</ul>"
+
+    def finish_computation(self, warnings=None, notes=None, info=None):
+        """At the end of the computation, display the errors and refresh the GUI.
+
+        notes: text added to the final message (displayed as a warning).
+        info: text of the final message without warning.
+        """
+        # Indentation range not attained on some pixels (final message)
+        range_text = None
+
         if warnings is not None:
             stop_size_errors = warnings[0]
             no_segment_errors = warnings[1]
             smoothing_warnings = warnings[2]
-            strict_stop_errors = warnings[3]
+            range_warnings = warnings[3] if len(warnings) > 3 else []
 
             found_error_list = []
             for i in range(len(stop_size_errors)):
@@ -822,27 +1346,19 @@ class ComputeWidget(PYAFWidget):
                     found_error_list[i] = True
 
             list_smoothing_warnings = ""
+            list_fit_warnings = ""
             text = ""
             for item in smoothing_warnings:
                 if item:
                     name = shared.exp.list[item[0]].filename
                     for values in item[1]:
-                        # values[0] is set to "smoothing_error"
+                        # values[0] is "smoothing_error" or "fit_error"
                         # the curves are stored in values[1]
-                        text += "<li>" + name + " : " + values[1] + "</li>"
-                    list_smoothing_warnings += text
-
-            list_strict_stop_error = ""
-            for i in range(len(strict_stop_errors)):
-                item = strict_stop_errors[i]
-                if item:
-                    shared.exp.list[item[0]].stiffness_calculated = False
-                    name = shared.exp.list[item[0]].filename
-
-                    text = "<li>" + name + "</li>"
-                    list_strict_stop_error += text
-                else:
-                    found_error_list[i] = True
+                        line = "<li>" + name + " : " + values[1] + "</li>"
+                        if values[0] == "fit_error":
+                            list_fit_warnings += line
+                        else:
+                            list_smoothing_warnings += line
 
             if list_stop_size_error != "":
                 text = "The 'stop' value is too big ! The maximum value you \
@@ -859,15 +1375,20 @@ class ComputeWidget(PYAFWidget):
                         The following curves had a problem : <ul>" + \
                     list_smoothing_warnings + "</ul>"
 
-            if list_strict_stop_error != "":
-                text = "Strict stop was checked but you defined a stop value \
-                        which goes beyond the last point of some curves.<br>\
-                        <br>The following files had a problem : <ul>" + \
-                    list_strict_stop_error + "</ul>"
+            if list_fit_warnings != "":
+                fit_text = "The fit failed for some curves (no contact or \
+                        not enough points in the fit range). No stiffness \
+                        value was stored for these curves (displayed as \
+                        NaN).<br><br>The following curves had a problem : \
+                        <ul>" + list_fit_warnings + "</ul>"
+                if list_smoothing_warnings != "":
+                    text += "<br>" + fit_text
+                else:
+                    text = fit_text
 
             if (list_stop_size_error != "" or list_no_segment_errors != ""
                     or list_smoothing_warnings != ""
-                    or list_strict_stop_error != "") \
+                    or list_fit_warnings != "") \
                     and not consts.UNIT_TESTING:
                 # Create a message box and display it
                 msg = QtWidgets.QMessageBox()
@@ -877,9 +1398,25 @@ class ComputeWidget(PYAFWidget):
                 msg.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
                 msg.exec_()
 
+            # The pixels are computed up to their maximum indentation when the
+            # selected range is not attained: the user is informed in the
+            # final message
+            if range_warnings:
+                lines = ""
+                for calc_id, (stop, nbr, total) in range_warnings:
+                    name = shared.exp.list[calc_id].filename
+                    lines += "<li>" + name + " : selected indentation range " \
+                        + str(stop) + " nm was not attained on " + str(nbr) \
+                        + " pixels out of " + str(total) + "</li>"
+                range_text = "The stiffness was computed up to the maximum " \
+                    "indentation for these pixels.<ul>" + lines + "</ul>"
+
         else:
             # No errors
             found_error_list = [True]
+
+        if notes:
+            range_text = notes if range_text is None else range_text + notes
 
         # Check if we can update the data
         ok = False
@@ -911,6 +1448,7 @@ class ComputeWidget(PYAFWidget):
             widgets_list.widget_fit_param_jocs.update_widget()
             widgets_list.widget_fit_param_jocs_events.update_widget()
             self.update_GUI("BT_height_correction")
+            self.update_GUI("visco")
             self.update_GUI("get_lr")
             # Update the results tab (especially the plot, so that it is
             # initialized and not empty)
@@ -919,7 +1457,6 @@ class ComputeWidget(PYAFWidget):
             stat_tools.get_values()
             widgets_list.widget_results_single.reset_table()
             stat_tools.fetch_group_data()
-            stat_tools.fetch_conditions_data()
             widgets_list.widget_results_single.update_widget()
             widgets_list.widget_results_groups.update_widget()
             widgets_list.widget_results_experiment.update_widget()
@@ -938,8 +1475,12 @@ class ComputeWidget(PYAFWidget):
 
             if not consts.UNIT_TESTING and not consts.AUTOCALC_STIFFNESS:
                 QtWidgets.QApplication.beep()
-                text = "Calculation done."
-                QtWidgets.QMessageBox.warning(self, "Information", text)
+                details = range_text
+                if info:
+                    details = info if details is None else details + info
+                gui_tools.show_success(self, "Calculation complete",
+                                       details,
+                                       warning=range_text is not None)
 
     def button_clicked(self, button):
         """Method called whenever a button is clicked."""
@@ -949,7 +1490,13 @@ class ComputeWidget(PYAFWidget):
 
         data = shared.exp.list[shared.exp.id_selected]
 
-        if button == "button_rand":
+        if button == "load_parameters":
+            # Settings of an exported parameters file (see
+            # widgets.load_parameters), shown in the inputs
+            if load_parameters(self):
+                self.update_widget()
+
+        elif button == "button_rand":
             widgets_list.widget_main.change_curve(0, 0, "rand")
 
         elif button == "back":
@@ -975,10 +1522,12 @@ class ComputeWidget(PYAFWidget):
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
             smoothing_warnings = []
+            range_warnings = []
             stop_size_errors = []
             no_segment_errors = []
-            strict_stop_errors = []
             one_computed = False
+            brush_info = []
+            refit_disabled = []
 
             # Make a list of data to treat
             calc_list = []
@@ -997,23 +1546,18 @@ class ComputeWidget(PYAFWidget):
                 self.logger.debug("Computing %s", data.filename)
 
                 self.compute_stiffness.get_stiffness(calc_id)
+                if self.compute_stiffness.refit_disabled:
+                    refit_disabled.append(
+                        os.path.basename(str(data.filename)))
 
                 if self.compute_stiffness.error == "Error: Stop size":
                     val = str(int(self.compute_stiffness.error_value))
                     stop_size_errors.append([calc_id, val])
                     no_segment_errors.append([])
                     smoothing_warnings.append([])
-                    strict_stop_errors.append([])
 
                 elif self.compute_stiffness.error == "Error: no segments":
                     no_segment_errors.append([calc_id, None])
-                    stop_size_errors.append([])
-                    smoothing_warnings.append([])
-                    strict_stop_errors.append([])
-
-                elif self.compute_stiffness.error == "Error: strict stop":
-                    strict_stop_errors.append([calc_id])
-                    no_segment_errors.append([])
                     stop_size_errors.append([])
                     smoothing_warnings.append([])
 
@@ -1023,7 +1567,6 @@ class ComputeWidget(PYAFWidget):
 
                     stop_size_errors.append([])
                     no_segment_errors.append([])
-                    strict_stop_errors.append([])
 
                     # Store smoothing warnings to display a message at the end
                     # of the computation
@@ -1032,6 +1575,12 @@ class ComputeWidget(PYAFWidget):
                         smoothing_warnings.append([calc_id, warnings])
                     else:
                         smoothing_warnings.append([])
+
+                    # Pixels where the selected indentation range was not
+                    # attained
+                    not_attained = self.compute_stiffness.range_not_attained
+                    if not_attained:
+                        range_warnings.append([calc_id, not_attained])
 
                     data.max_indentation_index = \
                         self.compute_stiffness.max_indentation_index
@@ -1048,6 +1597,16 @@ class ComputeWidget(PYAFWidget):
                     misc_tools.update_indentation_list(calc_id)
                     misc_tools.update_slice_position(calc_id)
 
+                    # Brush model, with the points of contact of this fit
+                    if data.brush_model and data.used_perform_fit and \
+                            brush.available(data, used=True):
+                        found = brush.compute(calc_id)
+                        brush_info.append(
+                            file_label(data) + " : " +
+                            str(found) + " of " +
+                            str(data.nbr_pixels_x * data.nbr_pixels_y) +
+                            " curves with a brush")
+
                 # Reset the error
                 self.compute_stiffness.error = False
 
@@ -1058,9 +1617,21 @@ class ComputeWidget(PYAFWidget):
             warnings = [stop_size_errors,
                         no_segment_errors,
                         smoothing_warnings,
-                        strict_stop_errors]
+                        range_warnings]
 
-            self.finish_computation(warnings)
+            if refit_disabled:
+                # Settings changed for the brush model
+                widgets_list.widget_fit_param_pocs.update_widget()
+                brush_info.append(
+                    "Refit of the point of contact set to 0 for the brush "
+                    "model")
+
+            self.finish_computation(warnings,
+                                    notes=self.radius_notes(calc_list),
+                                    info="<ul>" + "".join(
+                                        "<li>" + text + "</li>"
+                                        for text in brush_info) + "</ul>"
+                                    if brush_info else None)
 
         elif button == "get_work_and_rupture_force":
             # Update all the parameters if needed
@@ -1152,6 +1723,74 @@ class ComputeWidget(PYAFWidget):
 
             self.finish_computation()
 
+        elif button == "compute_visco":
+            # Update all the parameters if needed
+            apply_to_all.apply_to_all("calc_options")
+
+            calc_list = list(range(len(shared.exp.list))) \
+                if shared.exp.calc_all else [shared.exp.id_selected]
+            # Overwrite calc_list with a list defined externally
+            if shared.force_calc_list is not None:
+                calc_list = shared.force_calc_list
+
+            skipped = []
+            for calc_id in calc_list:
+                data = shared.exp.list[calc_id]
+                reason = visco_main.check_file(data)
+                if reason is not None:
+                    skipped.append(file_label(data) + " : " +
+                                   reason)
+                    continue
+                self.logger.debug("Viscoelasticity %s", data.filename)
+                self.compute_visco.compute(calc_id)
+                # Add a result to the result's tab if needed
+                experiment.add_result(calc_id, data.filename)
+                if shared.exp.results_type is None:
+                    shared.exp.results_type = "visco_e0"
+                if self.compute_visco.nbr_failed:
+                    skipped.append(
+                        file_label(data) + " : the fit failed "
+                        "for " + str(self.compute_visco.nbr_failed) +
+                        " curves (NaN)")
+
+            notes = None
+            if skipped:
+                notes = "<ul>" + "".join("<li>" + text + "</li>"
+                                         for text in skipped) + "</ul>"
+            self.finish_computation(notes=notes)
+
+        elif button == "compute_breakthrough":
+            # Update all the parameters if needed
+            apply_to_all.apply_to_all("calc_options")
+
+            calc_list = list(range(len(shared.exp.list))) \
+                if shared.exp.calc_all else [shared.exp.id_selected]
+            # Overwrite calc_list with a list defined externally
+            if shared.force_calc_list is not None:
+                calc_list = shared.force_calc_list
+
+            lines = []
+            for calc_id in calc_list:
+                data = shared.exp.list[calc_id]
+                if data.is_single:
+                    continue
+                self.logger.debug("Breakthroughs %s", data.filename)
+                found = breakthrough.compute(calc_id)
+                experiment.add_result(calc_id, data.filename)
+                if shared.exp.results_type is None:
+                    shared.exp.results_type = "breakthrough_force"
+                total = int(numpy.sum(numpy.asarray(
+                    data.discarded_curves) == 0))
+                lines.append(file_label(data) + " : " +
+                             str(found) + " of " + str(total) +
+                             " curves with a breakthrough")
+
+            info = None
+            if lines:
+                info = "<ul>" + "".join("<li>" + text + "</li>"
+                                        for text in lines) + "</ul>"
+            self.finish_computation(info=info)
+
         elif button == "get_lr":
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
@@ -1227,17 +1866,22 @@ class ComputeWidget(PYAFWidget):
         elif button == "stiffness_params":
             value = self.GRP_stiffness_params.checkedId()
             data.stiffness_mode = value
+            # Tomography: slope of the segments. Fitting: Hertz by default
             if value == 0:
-                data.perform_fit = False
-            elif value == 1:
-                data.perform_fit = True
+                self.set_model(data, 3)
+                data.tomography = 1
+            elif data.stiffness_model_selected == 3:
+                self.set_model(data, 0)
+            self.update_GUI("grid_model_options")
+            self.update_GUI("stiffness_model_selected")
             self.update_widget()
 
         elif button == "next_zoom_element":
             if shared.exp.compute_type == "stiffness":
                 # Only one element, the POC
                 val = None
-            elif shared.exp.compute_type == "stiffness_corr":
+            elif shared.exp.compute_type in ("stiffness_corr",
+                                             "viscoelasticity"):
                 # No element to display here
                 val = None
             elif shared.exp.compute_type == "work_and_rupture_force":
@@ -1250,8 +1894,13 @@ class ComputeWidget(PYAFWidget):
                 else:
                     val = None
             elif shared.exp.compute_type == "loading_rates":
-                # No element to display here
-                val = None
+                # The events and the joc
+                points = self.MPL_curve.canvas.loading_rates_zoom_points
+                val = len(points) if points else None
+            elif shared.exp.compute_type == "breakthrough":
+                # The breakthroughs
+                events = self.MPL_curve.canvas.breakthrough_events
+                val = len(events) if events else None
 
             if val is not None:
                 if shared.zoomed_in_element + 1 < val:
@@ -1268,12 +1917,24 @@ class ComputeWidget(PYAFWidget):
         data = shared.exp.list[shared.exp.id_selected]
 
         if checkbox == "compute_all":
-            shared.exp.calc_all = self.CB_compute_all.isChecked()
+            shared.exp.calc_all = self.TG_compute_all.isChecked()
+
+        elif checkbox == "brush_model":
+            data.brush_model = self.TG_brush.isChecked()
+            self.IN_brush_threshold_pct.setEnabled(data.brush_model)
+            # No refit of the baseline of the point of contact (it would
+            # move the baseline, the zero of the force, into the brush)
+            if data.brush_model:
+                data.fitparam_poc_refit_option = 0
+                data.fitparam_poc_refit_times = 0
+                widgets_list.widget_fit_param_pocs.update_widget()
+            # Threshold on the preview
+            self.update_MPL("MPL_canvas")
 
         elif checkbox == "apply_to_all":
             # Ask the user if he is sure he wants to overwrite his parameters
             do = True
-            value = self.CB_apply_to_all.isChecked()
+            value = self.TG_apply_to_all.isChecked()
             if value:
                 text = "Are you sure you want to overwrite all the parameters \
                         with the current ones ?"
@@ -1286,7 +1947,7 @@ class ComputeWidget(PYAFWidget):
                 ret = msg.exec_()
 
                 if ret == QtWidgets.QMessageBox.No:
-                    self.CB_apply_to_all.setChecked(False)
+                    self.TG_apply_to_all.setChecked(False)
                     do = False
 
             if do:
@@ -1301,19 +1962,26 @@ class ComputeWidget(PYAFWidget):
                 # If we check the box, apply to all the current configuration
                 apply_to_all.apply_to_all("calc_options")
 
-        elif checkbox == "strict_stop":
-            state = self.CB_strict_stop.isChecked()
-            shared.exp.list[shared.exp.id_selected].strict_stop = state
-
         # elif checkbox == "tomography":
             # state = self.CB_tomography.isChecked()
             # shared.exp.list[shared.exp.id_selected].tomography = state
 
+        elif checkbox == "visco_bec":
+            data.visco_bec = self.CB_visco_bec.isChecked()
+            self.update_GUI("visco")
+
+        elif checkbox == "visco_drag_correction":
+            data.visco_drag_correction = self.CB_visco_drag.isChecked()
+
+        elif checkbox == "visco_beta_auto":
+            data.visco_beta_auto = self.CB_visco_beta_auto.isChecked()
+            self.update_GUI("visco")
+
         elif checkbox == "zoom_in":
-            data.auto_zoom_in = self.CB_zoom_in.isChecked()
+            data.auto_zoom_in = self.TG_zoom_in.isChecked()
             tp = shared.exp.compute_type
-            if tp == "events" or tp == "work_and_rupture_force":
-                self.BT_next_zoom_element.setEnabled(data.auto_zoom_in)
+            if tp in ("events", "work_and_rupture_force", "loading_rates"):
+                self.BT_next_zoom_element.setEnabled(True)
             self.update_MPL("MPL_canvas")
 
         elif checkbox == "perform_fit":
@@ -1326,8 +1994,6 @@ class ComputeWidget(PYAFWidget):
                 # self.IN_step.setEnabled(False)
                 # self.CB_tomography.setChecked(False)
                 # self.CB_tomography.setEnabled(False)
-                # self.CB_strict_stop.setChecked(False)
-                # self.CB_strict_stop.setEnabled(False)
 
             else:
                 pass
@@ -1335,7 +2001,6 @@ class ComputeWidget(PYAFWidget):
                 # self.IN_stop.setEnabled(True)
                 # self.IN_step.setEnabled(True)
                 # self.CB_tomography.setEnabled(True)
-                # self.CB_strict_stop.setEnabled(True)
 
 
 

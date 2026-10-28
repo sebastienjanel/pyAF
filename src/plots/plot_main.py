@@ -32,12 +32,37 @@
 """Main plotting module."""
 
 from .. import shared
+from .. import widgets_list
 from ..tools import misc_tools
+import os
 import matplotlib
 import matplotlib.pyplot as pyplot
 import matplotlib.font_manager as fm
 import platform
-from PyQt5 import QtCore
+from qtpy import QtCore
+
+
+def use_plot_font():
+    """Use the font shipped with pyAF for the texts of the plots.
+
+    The font is registered once in matplotlib. It is set at each plot, as
+    changing the theme resets the matplotlib parameters. The default font
+    of matplotlib is used for the characters missing in it, or if the font
+    file is missing.
+    """
+    global _PLOT_FONT_NAME
+    if _PLOT_FONT_NAME is None:
+        path = misc_tools.get_font_path()
+        if os.path.isfile(path):
+            fm.fontManager.addfont(path)
+            _PLOT_FONT_NAME = fm.FontProperties(fname=path).get_name()
+        else:
+            _PLOT_FONT_NAME = ""
+    if _PLOT_FONT_NAME:
+        matplotlib.rcParams["font.family"] = [_PLOT_FONT_NAME, "DejaVu Sans"]
+
+
+_PLOT_FONT_NAME = None
 
 
 class MainPlot:
@@ -72,14 +97,12 @@ class MainPlot:
             # Default savefig directory
             matplotlib.rcParams["savefig.directory"] = self.save_path
 
-        # Font (use the Lucida Grande font I ship)
-        path = misc_tools.get_app_path() + "/fonts/HelveticaNowText-Regular.ttf"
-        font_size = shared.exp.mpl_labels_font_size
-        try:
-            with open(path):
-                self.font = fm.FontProperties(fname=path, size=font_size)
-        except IOError:
-            self.font = fm.FontProperties(size=font_size)
+        # Font of all the texts of the plots (shipped with pyAF, so that the
+        # plots look the same on all the computers)
+        use_plot_font()
+        self.font = fm.FontProperties(
+            family=matplotlib.rcParams["font.family"],
+            size=shared.exp.mpl_labels_font_size)
 
         matplotlib.rcParams["font.size"] = shared.exp.mpl_labels_font_size
         # Adjust distance between xticks and plot, prevents overlapping
@@ -121,6 +144,42 @@ class MainPlot:
 
         self.axes = self.fig.add_subplot(111)
 
+    def leave_margins_for_curves(self, map_type):
+        """Use at least the top and bottom margins of the curves displayed
+        next to this map (computed by their tight layout)."""
+        params = self.fig.subplotpars
+        bottom, top = params.bottom, params.top
+        for curve in get_curves_next_to_map(map_type):
+            # Only for figures of the same height, displayed side by side
+            if abs(curve.fig.bbox.height - self.fig.bbox.height) > 1:
+                continue
+            curve.fig.tight_layout()
+            bottom = max(bottom, curve.fig.subplotpars.bottom)
+            top = min(top, curve.fig.subplotpars.top, stable_top(curve))
+        if bottom < top:
+            self.fig.subplots_adjust(bottom=bottom, top=top)
+
+    def align_with_map(self, map_plot):
+        """Use the same top and bottom as the map displayed next to this
+        curve, so that both have the same height (the map is square and is
+        often limited by its width).
+
+        Returns True if the layout was changed.
+        """
+        axes = getattr(map_plot, "axes", None)
+        if axes is None or axes.figure is self.fig:
+            return False
+        # Only for figures of the same height, displayed side by side
+        if abs(axes.figure.bbox.height - self.fig.bbox.height) > 1:
+            return False
+        position = axes.get_position()
+        current = self.fig.subplotpars
+        if abs(current.bottom - position.y0) < 1e-3 and \
+                abs(current.top - position.y1) < 1e-3:
+            return False
+        self.fig.subplots_adjust(bottom=position.y0, top=position.y1)
+        return True
+
     def plot_labels(self):
         """Plots the x and y lables."""
         if self.xlabel is not None:
@@ -137,6 +196,9 @@ class MainPlot:
         p_type = self.plot_type
 
         if self.parent.single:
+            if p_type in ("results_single", "results_groups"):
+                # Violins: no legend, use all the space
+                self.fig.tight_layout()
             pyplot.draw()
 
             if p_type == "meshgrid_tilt_check":
@@ -148,9 +210,10 @@ class MainPlot:
                 self.empty_bbox = cv.copy_from_bbox(self.axes.bbox)
                 self.current_bbox = cv.copy_from_bbox(self.axes.bbox)
 
+                self.clear_blit_artists()
+                self.draw_corrupted()
                 self.draw_roi("all")
                 self.draw_profiles("all")
-                self.draw_corrupted()
                 self.draw_red_square()
 
                 # If it's for a save (meshgrid)
@@ -177,7 +240,16 @@ class MainPlot:
                 pyplot.show()
 
         else:
-            if p_type in ("results_single", "results_groups", "results_experiment", "results_stats"):
+            if p_type in ("results_single", "results_groups"):
+                # Violins: no legend, use all the space
+                self.fig.tight_layout()
+
+            elif p_type == "results_experiment":
+                # SuperPlot: room on the right for the legend of the
+                # experiments
+                self.fig.tight_layout(rect=(0, 0, 0.86, 1))
+
+            elif p_type == "results_stats":
                 # In the case of the results plot, due to the legend which
                 # is placed outside of the box with a small hack, we can not
                 # use the tight layout. In this case we define the borders
@@ -186,6 +258,16 @@ class MainPlot:
                 # (to leave enough space for the legend).
                 self.fig.subplots_adjust(left=0.125, right=0.7,
                                          bottom=0.2, top=0.9)
+
+            elif p_type in ("meshgrid_data", "small_meshgrid_compute"):
+                # Small map: leave room on the right for the colour bar
+                # (ticks and label)
+                self.fig.subplots_adjust(right=0.78)
+
+            elif p_type == "meshgrid":
+                # Results map: small vertical margins, to be as tall as
+                # possible (the curve next to it is aligned on the map)
+                self.fig.subplots_adjust(bottom=0.1, top=0.975)
 
             elif p_type == "small_meshgrid" or p_type == "multimeshgrid":
                 self.axes.set_axis_off()  # Remove black border
@@ -197,9 +279,23 @@ class MainPlot:
                         p_type != "small_meshgrid_compute" and \
                         p_type != "meshgrid_data":
                     self.fig.tight_layout()
+                    # A curve next to a map has the same height as the map
+                    self.align_with_map(get_map_next_to_curve(p_type))
+
+            # A map keeps at least the margins needed by the curve next to
+            # it (axis labels), so that the curve can be aligned on the map
+            # without hiding its labels (e.g. small windows)
+            if p_type in MAPS_AND_CURVES:
+                self.leave_margins_for_curves(p_type)
 
             # Draw in the canvas
             self.fig.canvas.draw()
+
+            # A map is drawn: align the curve next to it on it
+            for curve in get_curves_next_to_map(p_type):
+                curve.fig.tight_layout()
+                curve.align_with_map(self)
+                curve.fig.canvas.draw()
 
             # Draw ROI for multimeshgrid
             display_roi = shared.exp.display_roi_in_multimeshgrid
@@ -208,3 +304,63 @@ class MainPlot:
 
             if p_type == "meshgrid_tilt_check":
                 self.draw_check_tilt_squares()
+
+
+# Maps and the curves displayed next to them: (widget, map attribute,
+# curve attributes)
+MAPS_AND_CURVES = {
+    "meshgrid_data": ("widget_data", "meshgrid",
+                      ("curve", "curve_1", "curve_2")),
+    "small_meshgrid_compute": ("widget_compute", "MPL_meshgrid",
+                               ("MPL_curve",)),
+    "meshgrid": ("widget_results", "MPL_canvas1", ("MPL_canvas2",))}
+
+# Plot types of these curves, and the map type next to them
+CURVE_MAP_TYPES = {
+    "curve_data": "meshgrid_data",
+    "curve_dataa": "meshgrid_data",
+    "curve_datab": "meshgrid_data",
+    "curve_datac": "meshgrid_data",
+    "fit_preview": "small_meshgrid_compute",
+    "curve_results": "meshgrid"}
+
+
+def _plot_of(widget_name, attribute):
+    """Plot (with fig and axes) of a PYAFPlot of a main widget, or None."""
+    widget = getattr(widgets_list, widget_name, None)
+    pyaf_plot = getattr(widget, attribute, None)
+    plot = getattr(pyaf_plot, "canvas", None)
+    return plot if hasattr(plot, "fig") else None
+
+
+def stable_top(curve):
+    """Top of the axes of a curve leaving room for half a tick label above
+    them, as the tight layout does when the top tick is at the top of the
+    axes. The tight layout only does it in this case: the margin of a map
+    aligned on the curve then changed by some pixels with the y range."""
+    fig = curve.fig
+    labels = [t for t in curve.axes.get_yticklabels() if t.get_text()]
+    if not labels or fig.bbox.height <= 0:
+        return fig.subplotpars.top
+    height = labels[0].get_window_extent(fig.canvas.get_renderer()).height
+    # Padding of the tight layout: 1.08 font size
+    pad = 1.08 * matplotlib.rcParams["font.size"] * fig.dpi / 72.0
+    return 1.0 - (pad + height / 2.0) / fig.bbox.height
+
+
+def get_map_next_to_curve(curve_type):
+    """Map displayed next to a curve of this type, or None."""
+    map_type = CURVE_MAP_TYPES.get(curve_type)
+    if map_type is None:
+        return None
+    widget_name, map_attribute, _ = MAPS_AND_CURVES[map_type]
+    return _plot_of(widget_name, map_attribute)
+
+
+def get_curves_next_to_map(map_type):
+    """Curves displayed next to a map of this type."""
+    if map_type not in MAPS_AND_CURVES:
+        return []
+    widget_name, _, curve_attributes = MAPS_AND_CURVES[map_type]
+    curves = [_plot_of(widget_name, a) for a in curve_attributes]
+    return [c for c in curves if c is not None]

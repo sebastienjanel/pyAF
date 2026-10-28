@@ -1,5 +1,4 @@
 from ..plot_curve import PlotCurve
-from ....tools import curve_tools
 
 class ResultsResiduals(PlotCurve):
     """Plots the Force - Indentation curve."""
@@ -23,7 +22,7 @@ class ResultsResiduals(PlotCurve):
         elif self.data.curve_distance_units == "um":
             self.x_factor = 1e-3
 
-        if self.data.perform_fit:
+        if self.data.used_perform_fit:
             self.get_stiffness_lm_fits()
             self.curve_residuals = self.residuals
             self.segments_fits = None

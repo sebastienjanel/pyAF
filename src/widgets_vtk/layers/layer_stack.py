@@ -38,8 +38,7 @@ from ... import shared
 from .layer import Layer
 from ..utils.common import fill_image_sizes
 from ...tools import misc_tools
-from ..utils.vtk_stack import get_stack_images
-from ..utils.vtk_image import get_actor_plane
+from ..utils.vtk_image import get_actor_plane, image_source, read_frames
 
 
 class LayerStack(Layer):
@@ -55,45 +54,51 @@ class LayerStack(Layer):
         self.filepath = path
         self.bind = True
 
-        self.image_type = itk.Image[itk.UC, 3]
-        reader = itk.ImageFileReader[self.image_type].New()
-        reader.SetFileName(str(path))
-        try:
-            reader.Update()
-        except RuntimeError:
+        # 8 or 16 bits, gray or color: pixels to display, and their gray
+        # levels (for the LUT, the filters and the isosurfaces, as an ITK
+        # image)
+        images = read_frames(path)
+        if images is None:
             # The image was not recognized
             self.load_error = True
             return None
+        self.pixels, self.gray = images
+        self.input_image_orig = itk.image_from_array(self.gray)
+        self.input_image = self.input_image_orig
 
-        self.input_image = reader.GetOutput()
-        self.input_image_orig = self.input_image
-
-        size = self.input_image.GetBufferedRegion().GetSize()
-
+        frames, rows, cols = self.gray.shape
         # Store the sizes of the images (are defined in layer.py)
-        fill_image_sizes(self, size, misc_tools.get_tiff_calibration(path))
+        fill_image_sizes(self, [cols, rows, frames],
+                         misc_tools.get_tiff_calibration(path))
 
-        # Apply filters to the image if needed
-        self.filter_image()
-
-        # Get the list of images as vtk objects
-        self.list_of_images = get_stack_images(self.input_image)
-
-        self.actor = vtk.vtkAssembly()
-
-        lut = self.get_current_lut_options()
-        flip = self.get_current_flip_options()
-        size = [self.size_x, self.size_y]
-        self.actor_list = []
-        for i in range(len(self.list_of_images)):
-            img = self.list_of_images[i]
-            actor = get_actor_plane(img, size, i * self.res_z, lut, flip)
-            self.actor_list.append(actor)
-            self.actor.AddPart(actor)
+        self.build_actors()
 
         self.init_axes()
 
         self.addToRenderer()
+
+    def build_actors(self):
+        """One plane per image of the stack: the pixels, or their gray
+        levels if filtered or through the LUT."""
+        # Apply filters to the image if needed
+        self.filter_image()
+
+        lut = self.get_current_lut_options()
+        filtered = self.use_binary_thresholding or self.smooth_gaussian > 0
+        if lut["use"] or filtered:
+            images = itk.array_from_image(self.input_image)
+        else:
+            images = self.pixels
+
+        flip = self.get_current_flip_options()
+        size = [self.size_x, self.size_y]
+        self.actor = vtk.vtkAssembly()
+        self.actor_list = []
+        for i, image in enumerate(images):
+            actor = get_actor_plane(image_source(image), size,
+                                    i * self.res_z, lut, flip)
+            self.actor_list.append(actor)
+            self.actor.AddPart(actor)
 
     def addToRenderer(self):
         """Add actor to renderer."""
@@ -106,23 +111,7 @@ class LayerStack(Layer):
     def update_actor(self):
         """Update the actor."""
         self.remove_actors()
-        self.actor = vtk.vtkAssembly()
-
-        # Apply filters to the image if needed
-        self.filter_image()
-
-        # Get the list of images as vtk objects
-        self.list_of_images = get_stack_images(self.input_image)
-
-        lut = self.get_current_lut_options()
-        flip = self.get_current_flip_options()
-        size = [self.size_x, self.size_y]
-        self.actor_list = []
-        for i in range(len(self.list_of_images)):
-            img = self.list_of_images[i]
-            actor = get_actor_plane(img, size, i * self.res_z, lut, flip)
-            self.actor_list.append(actor)
-            self.actor.AddPart(actor)
+        self.build_actors()
 
         self.init_axes()
         self.addToRenderer()
@@ -157,14 +146,16 @@ class LayerStack(Layer):
         super().set_opacity(value)
 
     def filter_image(self):
-        """Applies filter to an image."""
+        """Applies the filters (binary threshold, then smoothing) to the
+        image."""
         it = itk.Image[itk.UC, 3]
+        self.input_image = self.input_image_orig
 
         if self.use_binary_thresholding:
             filter_type = itk.BinaryThresholdImageFilter[it, it]
             threshold_filter = filter_type.New()
 
-            threshold_filter.SetInput(self.input_image_orig)
+            threshold_filter.SetInput(self.input_image)
             threshold_filter.SetLowerThreshold(self.lower_thresh)
             threshold_filter.SetUpperThreshold(self.upper_thresh)
             threshold_filter.SetOutsideValue(self.lower_thresh_value)
@@ -173,15 +164,13 @@ class LayerStack(Layer):
             self.input_image = threshold_filter.GetOutput()
             self.input_image.Update()
 
-        if self.smooth_gaussian != 0:
+        if self.smooth_gaussian > 0:
             filter_type = itk.DiscreteGaussianImageFilter[it, it]
             smooth_filter = filter_type.New()
 
             smooth_filter.SetInput(self.input_image)
-            smooth_filter.SetVariance(self.smooth_gaussian)
+            # Standard deviation in pixels
+            smooth_filter.SetVariance(self.smooth_gaussian ** 2)
 
             self.input_image = smooth_filter.GetOutput()
             self.input_image.Update()
-
-        if not self.use_binary_thresholding and self.smooth_gaussian == 0:
-            self.input_image = self.input_image_orig

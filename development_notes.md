@@ -14,3 +14,15 @@ Version 4: Sébastien Janel (and Nuno Duarte)
 -> Fixes for compatibilities with new libraries
 -> Box plots
 -> New fitting and BEC models
+
+##Checking the GUI
+
+tests/check_gui.py loads your files, computes everything on them and uses
+every control of the Data, Compute and Results tabs, before and after the
+computations. It reports the errors with the action which triggered them:
+
+    .venv/bin/python tests/check_gui.py file1 [file2 ...]
+
+Use files of different types together (e.g. a JPK force map, a JPK QI map
+and a Bruker file). It takes about 15 minutes for 3 files, and does not
+modify your pyAF preferences.

@@ -51,16 +51,10 @@ class PlotSmallMeshGridCompute(PlotMeshGrid):
         else:
             self.temp_array[:] = self.data.piezo_image
 
+        # Axes and colour bar, as for the map of the data tab
         self.factor = 1.0
-        self.colorbarlabel = None
+        self.colorbarlabel = "Piezo height [nm]"
         self.title = None
-        self.x_label = None
-        self.y_label = None
-        self.display_colorbar = False
-
-        # Hide the axes
-        self.axes.get_xaxis().set_visible(False)
-        self.axes.get_yaxis().set_visible(False)
 
         # Overwrite colormap to have always a copper colormap for
         #  these meshgrids

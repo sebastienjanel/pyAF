@@ -41,7 +41,7 @@ integration in PYAF).
 import re
 import numpy
 import struct
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 from dateutil.parser import parse
 from struct import unpack
 from ... import widgets_list
@@ -72,11 +72,14 @@ class LoaderNanoscope:
         self.line = None
         self.peakforce = None
 
-        # Fetch the data
-        self.fetch_header()
-        shared.exp.temp_file.create_data_tables(self.unique_id)
-        self.fetch_image()
-        self.fetch_curves()
+        # Fetch the data (close the file even if the reading fails)
+        try:
+            self.fetch_header()
+            shared.exp.temp_file.create_data_tables(self.unique_id)
+            self.fetch_image()
+            self.fetch_curves()
+        finally:
+            self.afm_file.close()
 
     def fetch_header(self):
         """Saves all the informations in the header."""
@@ -385,8 +388,6 @@ class LoaderNanoscope:
         """
         data = shared.exp.list[self.unique_id]
 
-        error_positions = []
-
         # Get the piezo image array from the temp file
         tf = shared.exp.temp_file.file
         dt = "/data/_" + str(self.unique_id)
@@ -508,6 +509,9 @@ class LoaderNanoscope:
         scaling_factor = data.hard_z_scale
         f_samples = data.nbr_points_per_curve_approach
 
+        # Source of the z values, for the labels of the plots
+        data.zsensor_used = bool(data.zsensor_used)
+
         # Get sensor values if we have acces to Z-Sensor data
         if data.zsensor_used:
             curves_x_app, curves_x_ret = self.fetch_approach()
@@ -525,6 +529,8 @@ class LoaderNanoscope:
 
         # Define provisory arrays to store the raw curve
         if self.peakforce:
+            # PeakForce frequency (Hz), for the time of the curves
+            data.pft_freq = self.pft_freq
             prov_app = numpy.zeros([f_samples])
             prov_re = numpy.zeros([f_samples])
             # I am forced to impose this condition, since the sync_distance value

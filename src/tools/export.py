@@ -30,651 +30,534 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-"""Exports the results as text files."""
+"""Exports of the results (see the Export menu): CSV tables (one row per
+curve or event, summary per row), SuperPlot values and tests, DFS fits,
+maps (32-bit TIFF of the values for ImageJ / Fiji, and figures) and the
+parameters (JSON).
 
+Every data export writes its parameters next to it (name.params.json, see
+tools.params_export). The values are in SI units (elasticity in Pa, or the
+stiffness in N/m for the slope model, work in J, forces in N, loading rates
+in N/s, distances in m, indentation in nm).
+"""
+
+import csv
 import os
-import shutil
 
-import pandas as pd
+import matplotlib
 import numpy as np
+import pandas as pd
+import tifffile
 
 from .. import shared
-from .. import widgets_list as wl
-from ..tools import math_tools as mt
+from ..tools import dfs_tools
+from ..tools import map_values
+from ..tools import params_export
 from ..tools import results_sorting
-from ..widgets.progressbar import Progressbar
-
-
-def export_results(folder):
-    """Exports the results as text files.
-
-    The results are saved as filtered (results displayed in the histograms)
-    and unfiltered (raw results). The groups histograms are also saved.
-
-    A file is also saved with the list of which file belongs to which group.
-    """
-    Progressbar()
-    wl.widget_progressbar.set_label("Exporting")
-
-    progressbar_range = 0
-    for row in range(len(shared.exp.results_list)):
-        data_id = shared.exp.results_list[row].data_id
-        if shared.exp.results_list[row].display:
-            data = shared.exp.list[data_id]
-            # Filtered and unfiltered single
-            if data.stiffness_calculated:
-                progressbar_range += 2
-            if data.stiffness_corrected:
-                progressbar_range += 2
-            if data.work_and_rupture_force1_calculated:
-                progressbar_range += 4
-            if data.events_calculated:
-                progressbar_range += 2
-            if data.loading_rates_calculated:
-                progressbar_range += 2
-            # Filtered and unfiltered events per scan
-            if data.events_calculated:
-                progressbar_range += 2
-            # Filtered and unfilterd distances of the events
-            if data.events_calculated:
-                progressbar_range += 2
-
-        # Groups
-        groups = []
-        if shared.exp.results_list[row].group != 0:
-            grp = shared.exp.results_list[row].group
-            if mt.in_list(groups, grp) is False:
-                groups.append(shared.exp.results_list[row].group)
-                data = shared.exp.list[data_id]
-                if data.stiffness_calculated:
-                    progressbar_range += 1
-                if data.stiffness_corrected:
-                    progressbar_range += 1
-                if data.work_and_rupture_force1_calculated:
-                    progressbar_range += 2
-                if data.events_calculated:
-                    progressbar_range += 2
-                if data.loading_rates_calculated:
-                    progressbar_range += 1
-                # Distance of the events
-                if data.events_calculated:
-                    progressbar_range += 1
-
-    wl.widget_progressbar.set_range(0, progressbar_range)
-
-    # Create folders
-    if os.path.exists(folder):
-        shutil.rmtree(folder)
-    os.mkdir(folder)
-    os.mkdir(folder + "/filtered")
-    os.mkdir(folder + "/unfiltered")
-    os.mkdir(folder + "/groups")
-
-    # Save unfiltered data
-    for row in range(len(shared.exp.results_list)):
-        data_id = shared.exp.results_list[row].data_id
-        if shared.exp.results_list[row].display:
-            data = shared.exp.list[data_id]
-
-            pre = folder + "/unfiltered/" + data.filename
-
-            # Stiffness
-            if data.stiffness_calculated:
-                newfile = open(pre + "_elasticity.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tSlice\tElasticity (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.stiffness_array[0])):
-                    for j in range(len(data.stiffness_array[0])):
-                        for k in range(0, len(data.stiffness_array[i][j])):
-                            E = data.stiffness_array[i][j][k]
-                            z = k * data.indentation_step
-                            if not data.tomography:
-                                sl = "0 - " + str(z + data.indentation_step)
-                            else:
-                                sl = str(z) + " - " + \
-                                    str(z + data.indentation_step)
-
-                            text = str(index + 1) + "\t" + \
-                                str(i + 1) + "\t" + \
-                                str(j + 1) + "\t" + \
-                                sl + "\t" + \
-                                str(E) + "\r\n"
-
-                            newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Work
-            if data.work_and_rupture_force1_calculated:
-                newfile = open(pre + "_work.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tWork (J)\r\n".encode(encoding='UTF-8',errors='strict')
-)
-                index = 0
-                for i in range(len(data.work[0])):
-                    for j in range(len(data.work[0])):
-                        text = str(index + 1) + "\t" + \
-                            str(i + 1) + "\t" + \
-                            str(j + 1) + "\t" + \
-                            str(data.work[i][j]) + "\r\n"
-
-                        newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Rupture force1
-            if data.work_and_rupture_force1_calculated:
-                newfile = open(pre + "_rupture_force1.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tRupture force (N)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.rupture_force1[0])):
-                    for j in range(len(data.rupture_force1[0])):
-                        text = str(index + 1) + "\t" + \
-                            str(i + 1) + "\t" + \
-                            str(j + 1) + "\t" + \
-                            str(data.rupture_force1[i][j]) + "\r\n"
-
-                        newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Events force
-            if data.events_calculated:
-                newfile = open(pre + "_events_forces.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tEvent Force (N)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.events_forces[0])):
-                    for j in range(len(data.events_forces[0])):
-                        for k in range(len(data.events_forces[i][j])):
-                            text = str(index + 1) + "\t" + \
-                                str(i + 1) + "\t" + \
-                                str(j + 1) + "\t" + \
-                                str(data.events_forces[i][j][k]) + "\r\n"
-
-                            newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Loading rates
-            if data.loading_rates_calculated:
-                newfile = open(pre + "_loading_rates.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tLoading rate (N/s)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.events_forces[0])):
-                    for j in range(len(data.events_forces[0])):
-                        for k in range(len(data.events_forces[i][j])):
-                            text = str(index + 1) + "\t" + \
-                                str(i + 1) + "\t" + \
-                                str(j + 1) + "\t" + \
-                                str(data.loading_rates[i][j][k]) + "\r\n"
-
-                            newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-            # Event's distance
-            if data.events_calculated:
-                newfile = open(pre + "_event_distance.txt", "wb")
-                newfile.write("Index\tXpos\tYpos\tDistance (m)\r\n".encode(encoding='UTF-8',errors='strict'))
-                index = 0
-                for i in range(len(data.events_forces_distance[0])):
-                    for j in range(len(data.events_forces_distance[0])):
-                        for k in range(len(data.events_forces_distance[i][j])):
-                            text = str(index + 1) + "\t" + \
-                                str(i + 1) + "\t" + \
-                                str(j + 1) + "\t" + \
-                                str(data.events_forces_distance[i][j][k]) + \
-                                "\r\n"
-
-                            newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-
-                        index += 1
-                newfile.close()
-                wl.widget_progressbar.update()
-
-    # Events per scan (unfiltered)
-    found_events = False
-    for i in range(len(shared.exp.results_list)):
-        if shared.exp.results_list[i].display:
-            data_id = shared.exp.results_list[i].data_id
-            if shared.exp.list[data_id].events_calculated:
-                found_events = True
-
-    if found_events:
-        index = 0
-        newfile = open(folder + "/unfiltered/Events_per_scan.txt", "wb")
-        newfile.write("Index\tFilename\tNumber of events\r\n".encode(encoding='UTF-8',errors='strict'))
-        for a in range(len(shared.exp.results_list)):
-            if shared.exp.results_list[a].display:
-                val = 0
-                data_id = shared.exp.results_list[a].data_id
-                data = shared.exp.list[data_id]
-                name = shared.exp.results_list[a].name
-                if data.events_calculated:
-                    for i in range(len(data.events_forces[0])):
-                        for j in range(len(data.events_forces[0])):
-                            for k in range(len(data.events_forces[i][j])):
-                                val += 1
-                text = str(index) + "\t" + name + "\t" + str(val) + "\r\n"
-                newfile.write(text.encode(encoding='UTF-8',errors='strict'))
-                wl.widget_progressbar.update()
-            index += 1
-        newfile.close()
-
-    # Save filtered data
-    for row in range(len(shared.exp.results_list)):
-        data_id = shared.exp.results_list[row].data_id
-        if shared.exp.results_list[row].display:
-            data = shared.exp.list[data_id]
-            name = shared.exp.results_list[row].name
-            pre = folder + "/filtered/" + name
-            # Stiffness
-            if data.stiffness_calculated:
-                newfile = open(pre + "_elasticity.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tSlice\tElasticity (Pa)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="stiffness")
-                write_single_filtered(array, newfile, "stiffness")
-                newfile.close()
-
-            # Work
-            if data.work_and_rupture_force1_calculated:
-                newfile = open(pre + "_work.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tWork (J)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="work")
-                write_single_filtered(array, newfile, "work")
-                newfile.close()
-
-            # Rupture force1
-            if data.work_and_rupture_force1_calculated:
-                newfile = open(pre + "_rupture_force1.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tRupture force (N)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="rupture_force")
-                write_single_filtered(array, newfile, "rupture_force")
-                newfile.close()
-
-            # Events force
-            if data.events_calculated:
-                newfile = open(pre + "_events_forces.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tEvent Force (N)\tSlope\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="events_forces")
-                write_single_filtered(array, newfile, "events_forces")
-                newfile.close()
-
-            # Loading rates
-            if data.loading_rates_calculated:
-                newfile = open(pre + "_loading_rates.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tLoading rate (N/s)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="loading_rates")
-                write_single_filtered(array, newfile, "loading_rates")
-                newfile.close()
-
-            # Event's distance
-            if data.events_calculated:
-                newfile = open(pre + "_event_distance.txt", "wb")
-                results_util = results_sorting.GetResults(export="single")
-                newfile.write("Index\tXpos\tYpos\tDistance (m)\r\n".encode(encoding='UTF-8',errors='strict'))
-                array = results_util.get_results_single(
-                    result_id=row, force_type="events_distance")
-                write_single_filtered(array, newfile, "events_distance")
-                newfile.close()
-
-            wl.widget_progressbar.update()
-
-    # Groups
-    write_group_file("stiffness", folder)
-    write_group_file("work", folder)
-    write_group_file("rupture_force", folder)
-    write_group_file("events_forces", folder)
-    write_group_file("events_per_curve", folder)
-    write_group_file("loading_rates", folder)
-    write_group_file("events_distance", folder)
-
-    # Infos
-    write_info_file(folder)
-
-    wl.widget_progressbar.close()
-
-    return True
-
-
-def export_results_r(folder, stats_flag=True):
-    """
-    Export results in a friendly R format.
-    """
-
-    data_df = pd.DataFrame()
-
-    if stats_flag:
-        data_df_stats = pd.DataFrame()
-
-    for row in range(len(shared.exp.results_list)):
-        data_id = shared.exp.results_list[row].data_id
-        if shared.exp.results_list[row].display:
-            data = shared.exp.list[data_id]
-            row_df = pd.DataFrame()
-
-            if stats_flag:
-                row_df_stats = pd.DataFrame()
-
-            results_util = results_sorting.GetResults(export="r_format")
-
-            if data.stiffness_calculated:
-                print("Shape of data.indentation:", data.indentation.shape)
-
-                # Convert CArray to a NumPy array and flatten it
-                flattened_indentation = np.array(data.indentation).flatten()
-                print("Length of flattened indentation:", flattened_indentation.shape)
-
-                # Get the filtered stiffness data (ROI only)
-                stiffness_array = results_util.get_results_single(result_id=row, force_type="stiffness")
-                stiffness = pd.DataFrame(stiffness_array, columns=["curve_index", "x_pos", "y_pos", "elasticity"])
-
-                # Filter the indentation data to match the ROI
-                # Assuming stiffness_array contains the ROI-filtered data, we need to filter indentation accordingly
-                # Create a mask for the ROI
-                roi_mask = np.zeros(data.indentation.shape, dtype=bool)
-                for curve in stiffness_array:
-                    i, j = int(curve[1]), int(curve[2])  # x_pos and y_pos
-                    roi_mask[i, j] = True
-
-                # Flatten the mask and filter the indentation data
-                flattened_mask = roi_mask.flatten()
-                roi_indentation = flattened_indentation[flattened_mask]
-
-                # Assign the filtered indentation data to the stiffness DataFrame
-                stiffness["indentation"] = roi_indentation
-                print("Length of elasticity indentation:", len(stiffness["indentation"]))
-
-                if stats_flag:
-                    stiffness_stats = stiffness.describe()
-                    ft_stats = export_descriptive_stats(stiffness_stats, "elasticity")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, stiffness)
-
-            # Repeat the same logic for other data types (work, rupture_force, etc.)
-            if data.work_and_rupture_force1_calculated:
-                work_array = results_util.get_results_single(result_id=row, force_type="work")
-                work = pd.DataFrame(work_array, columns=["curve_index", "x_pos", "y_pos", "work"])
-
-                if stats_flag:
-                    work_stats = work.describe()
-                    ft_stats = export_descriptive_stats(work_stats, "work")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, work)
-
-            if data.work_and_rupture_force1_calculated:
-                rupture_force_array = results_util.get_results_single(result_id=row, force_type="rupture_force")
-                rupture_force = pd.DataFrame(rupture_force_array, columns=["curve_index", "x_pos", "y_pos", "rupture_force"])
-
-                if stats_flag:
-                    rupture_force_stats = rupture_force.describe()
-                    ft_stats = export_descriptive_stats(rupture_force_stats, "rupture_force")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, rupture_force)
-
-            if data.loading_rates_calculated:
-                events_forces_array = results_util.get_results_single(result_id=row, force_type="events_forces")
-                events_forces = pd.DataFrame(events_forces_array, columns=["curve_index", "x_pos", "y_pos", "events_forces"])
-
-                if stats_flag:
-                    events_forces_stats = events_forces.describe()
-                    ft_stats = export_descriptive_stats(events_forces_stats, "events_forces")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, events_forces)
-
-            if data.events_calculated:
-                loading_rates_array = results_util.get_results_single(result_id=row, force_type="loading_rates")
-                loading_rates = pd.DataFrame(loading_rates_array, columns=["curve_index", "x_pos", "y_pos", "loading_rates"])
-
-                if stats_flag:
-                    loading_rates_stats = loading_rates.describe()
-                    ft_stats = export_descriptive_stats(loading_rates_stats, "loading_rates")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, loading_rates)
-
-            if data.events_calculated:
-                events_distance_array = results_util.get_results_single(result_id=row, force_type="events_distance")
-                events_distance = pd.DataFrame(events_distance_array, columns=["curve_index", "x_pos", "y_pos", "events_distance"])
-
-                if stats_flag:
-                    events_distance_stats = events_distance.describe()
-                    ft_stats = export_descriptive_stats(events_distance_stats, "events_distance")
-                    row_df_stats = pd.concat([row_df_stats, ft_stats], axis=1)
-
-                row_df = merge_dfs(row_df, events_distance)
-
-            # Add information about the file
-            res = shared.exp.results_list[row]
-            group_id = res.group
-
-            grp = shared.exp.groups_list[group_id]
-            condition_id = grp.condition
-
-            row_df.insert(0, 'condition', condition_id)
-            row_df.insert(1, 'group', group_id)
-            row_df.insert(2, 'file_id', data_id)
-            row_df.insert(3, 'file_name', data.filename)
-
-            data_df = merge_dfs(data_df, row_df, on=None)
-
-            if stats_flag:
-                row_df_stats.insert(0, 'condition', condition_id)
-                row_df_stats.insert(1, 'group', group_id)
-                row_df_stats.insert(2, 'file_id', data_id)
-                row_df_stats.insert(3, 'file_name', data.filename)
-
-                data_df_stats = merge_dfs(data_df_stats, row_df_stats, on=None)
-
-    data_df.to_csv(folder)
-
-    if stats_flag:
-        data_df_stats.to_csv(folder + "_stats")
-
-
-def export_descriptive_stats(variable_df_stats, variable_name):
-    """
-    Export descriptive statistics (Mean, Median, Mod, Min, Max) in a friendly R format.
-    """
-    out_df = pd.DataFrame()
-    for stat_field in variable_df_stats.index.values.tolist():
-        val = variable_df_stats.loc[stat_field, variable_name]
-        out_df[stat_field + "_" + variable_name] = [val]
-
-    return out_df
-
-
-def merge_dfs(df1, df2, how='outer', on=["curve_index", "x_pos", "y_pos"]):
-
-    if df1.empty:
-        mdf = df2
-
-    elif df2.empty:
-        mdf = df1
-
+from ..tools import superplot_tools
+from ..tools.breakthrough_tools import EVENT_VALUES
+from ..tools.colortables import ColorTables
+
+
+def csv_path(path):
+    """Path with the .csv extension."""
+    return path if path.lower().endswith(".csv") else path + ".csv"
+
+
+def exported_rows():
+    """The checked rows of the plots tab: (row index, result, data)."""
+    rows = []
+    for row, result in enumerate(shared.exp.results_list):
+        if result.display:
+            rows.append((row, result, shared.exp.list[result.data_id]))
+    return rows
+
+
+def group_and_condition(result):
+    """The group and the condition (objects) of a row."""
+    group = shared.exp.groups_list[result.group]
+    condition = shared.exp.conditions_list[group.condition]
+    return group, condition
+
+
+def data_tables(rows=None):
+    """Tables of the rows of the Plots tab (the checked ones by default):
+    values (one line per curve, or per event for the curves with events,
+    the values of the curve being repeated on the lines of its events;
+    filtered as in the plots) and descriptive statistics of each row."""
+    tables = []
+    stats = []
+    if rows is None:
+        selected = exported_rows()
     else:
-        mdf = pd.merge(df1, df2, how=how, on=on)
-        mdf.drop_duplicates()
+        selected = [(row, shared.exp.results_list[row],
+                     shared.exp.list[shared.exp.results_list[row].data_id])
+                    for row in rows]
+    for row, result, data in selected:
+        curves, events, row_stats = get_r_tables(row, data)
 
-        if on is not None:
-            mdf.sort_values(by=on)
-
-    return mdf
-
-
-def write_single_filtered(array, newfile, mode):
-    """Writes results to the file for one line.
-
-    Do not forget to shift the indices from 0 to 1 for the users
-    """
-    for line in array:
-        if mode == "stiffness":
-            txt = str(line[0] + 1) + "\t"\
-                + str(line[1] + 1) + "\t"\
-                + str(line[2] + 1) + "\t"\
-                + str(line[3]) + "\t"\
-                + str(line[4]) + "\r\n"
-
+        if curves is None and events is None:
+            continue
+        if curves is None:
+            table = events
+        elif events is None:
+            table = curves
         else:
-            txt = str(line[0] + 1) + "\t"\
-                + str(line[1] + 1) + "\t"\
-                + str(line[2] + 1) + "\t"\
-                + str(line[3]) + "\r\n"\
+            table = pd.merge(curves, events, how="outer", on=CURVE_KEYS)
+        keys = [key for key in CURVE_KEYS + ["event"] if key in table.columns]
+        if "event" in table.columns:
+            # Integers, empty for the curves without events
+            table["event"] = table["event"].astype("Int64")
+        table = table.sort_values(keys)
+        table = table[keys + [c for c in table.columns if c not in keys]]
 
-        newfile.write(txt.encode(encoding='UTF-8',errors='strict'))
+        info = file_info(result, data)
+        for pos, (name, value) in enumerate(info.items()):
+            table.insert(pos, name, value)
+            row_stats.insert(pos, name, value)
+        tables.append(table)
+        stats.append(row_stats)
 
-
-def write_group_file(res_type, folder):
-    """Write file containing the grouped results.
-
-    Each group is written in a column. The columns are separated by
-    semi-colons. If there is no more data in the group, the empty values are
-    written as tabs.
-
-    NOTE: The results_sorting.py file provides the values used here.
-    All the values have been scaled to be displayed directly in the sotware.
-    We need to scale them back for exporting in m, Pa, N or J.
-    """
-    if res_type == "stiffness":
-        name = "stiffness"
-        factor = 1e3
-        title = "Elasticity (Pa)"
-    elif res_type == "work":
-        name = "work"
-        factor = 1e-15
-        title = "Detachment work (J)"
-    elif res_type == "rupture_force":
-        name = "rupture_force"
-        factor = 1e-12
-        title = "Detachment force (N)"
-    elif res_type == "events_forces":
-        name = "events_forces"
-        factor = 1e-12
-        title = "Events forces (N)"
-    elif res_type == "events_per_curve":
-        name = "events_per_curve"
-        factor = 1
-        title = "Events per curve"
-    elif res_type == "loading_rates":
-        name = "loading_rates"
-        factor = 1e-12
-        title = "Loading rates"
-    elif res_type == "events_distance":
-        name = "events_distance"
-        factor = 1e9
-        title = "Event's distance (m)"
-
-    results_util = results_sorting.GetResults(export="groups")
-    [groups, _] = results_util.get_results_groups(force_type=name)
-
-    group_found = False
-    for group_id in range(len(shared.exp.groups_list)):
-        if len(groups[group_id]) > 0:
-            group_found = True
-
-    if group_found:
-        newfile = open(folder + "/groups/Groups_" + name + ".txt", "wb")
-        newfile.write((title + "\r\n").encode(encoding='UTF-8',errors='strict'))
-
-        # Get the length of the biggest group
-        max_len = 0
-        # Group 0 is an empty group (None value in the list)
-        for group_id in range(1, len(shared.exp.groups_list)):
-            if len(groups[group_id]) > max_len:
-                max_len = len(groups[group_id])
-
-        # Add header
-        header = ""
-        for group_id in range(1, len(shared.exp.groups_list)):
-            if len(groups[group_id]) > 0:
-                is_last_group = True
-                for i in range(group_id, len(shared.exp.groups_list) - 1):
-                    if len(groups[i + 1]) > 0:
-                        is_last_group = False
-                        break
-
-                if is_last_group:
-                    # Last group of the line
-                    separator = ""
-
-                else:
-                    # All the other groups
-                    separator = ";"
-
-                header += shared.exp.groups_list[group_id].name + separator
-
-        newfile.write((header + "\r\n").encode(encoding='UTF-8',errors='strict'))
-
-        # Write lines
-        for line_id in range(max_len):
-            text = ""
-
-            for group_id in range(1, len(shared.exp.groups_list)):
-                if len(groups[group_id]) > 0:
-                    is_last_group = True
-                    for i in range(group_id,
-                                   len(shared.exp.groups_list) - 1):
-                        if len(groups[i + 1]) > 0:
-                            is_last_group = False
-                            break
-
-                    if is_last_group:
-                        # Last group of the line
-                        separator = ""
-                    else:
-                        # All the other groups
-                        separator = ";"
-
-                    if line_id < len(groups[group_id]):
-                        if name == "loading_rates":
-                            val = groups[group_id][1][line_id] * factor
-                        else:
-                            val = groups[group_id][line_id] * factor
-
-                        text += str(val) + separator
-
-                    else:
-                        text += "\t" + separator
-
-            newfile.write((text + "\r\n").encode(encoding='UTF-8',errors='strict'))
-
-        newfile.close()
+    data_df = pd.concat(tables, ignore_index=True) if tables \
+        else pd.DataFrame()
+    stats_df = pd.concat(stats, ignore_index=True) if stats \
+        else pd.DataFrame()
+    return data_df, stats_df
 
 
-def write_info_file(folder):
-    """Writes a file containing the list of groups and files."""
-    newfile = open(folder + "/info.txt", "wb")
+def checked_rows():
+    """Indices of the checked rows of the Plots tab."""
+    return [row for row, _, _ in exported_rows()]
 
-    for group in shared.exp.groups_list:
-        # Skip first None groups
-        if group.group_id != 0:
-            newfile.write((group.name + "\r\n").encode(encoding='UTF-8',errors='strict'))
 
-            for result in shared.exp.results_list:
-                if result.group == group.group_id:
-                    newfile.write((result.name + "\r\n").encode(encoding='UTF-8',errors='strict'))
+def export_data_table(path, rows=None):
+    """Values of the rows (the checked ones by default), one line per curve
+    (or event). Returns the written files."""
+    path = csv_path(path)
+    rows = checked_rows() if rows is None else rows
+    data_df, _ = data_tables(rows)
+    data_df.to_csv(path, index=False)
+    json_path = params_export.write_sidecar(
+        path, "Data table (one row per curve or event)", rows=rows)
+    return [path, json_path]
 
-        newfile.write("------------------------------------------\r\n".encode(encoding='UTF-8',errors='strict'))
 
-    newfile.close()
+def export_summary(path, rows=None):
+    """Descriptive statistics of each row (the checked ones by default).
+    Returns the written files."""
+    path = csv_path(path)
+    rows = checked_rows() if rows is None else rows
+    _, stats_df = data_tables(rows)
+    stats_df.to_csv(path, index=False)
+    json_path = params_export.write_sidecar(
+        path, "Summary per row", rows=rows)
+    return [path, json_path]
+
+
+CURVE_KEYS = ["curve_index", "x_pos", "y_pos"]
+
+
+def file_info(result, data):
+    """Columns describing the row: condition, replicate and file."""
+    group, condition = group_and_condition(result)
+    return {"condition": condition.name,
+            "replicate": group.name,
+            "name": result.name,
+            "file_name": data.filename,
+            "condition_id": condition.condition_id,
+            "replicate_id": group.group_id,
+            "file_id": result.data_id}
+
+
+def get_r_tables(row, data):
+    """Tables of a row for the R export: values per curve, values per event
+    and descriptive statistics."""
+    def get(force_type):
+        util = results_sorting.GetResults(export="r_format")
+        return util.get_results_single(result_id=row, force_type=force_type)
+
+    def table(array, name, event=False):
+        columns = CURVE_KEYS + [name] + (["event"] if event else [])
+        df = pd.DataFrame([line[:len(columns)] for line in array],
+                          columns=columns)
+        # Indexes from 1, as in the txt export
+        for key in CURVE_KEYS + (["event"] if event else []):
+            df[key] = df[key].astype(int) + 1
+        return df
+
+    curve_tables = []
+    event_tables = []
+    stats = []
+
+    if data.stiffness_calculated:
+        array = get("stiffness")
+        df = pd.DataFrame([line[:5] for line in array],
+                          columns=CURVE_KEYS + ["elasticity", "slice"])
+        stats.append(describe(df, "elasticity"))
+        for key in CURVE_KEYS:
+            df[key] = df[key].astype(int) + 1
+        if len(df) and df["slice"].max() > 0:
+            # Tomography: one column per slice
+            df = df.pivot_table(index=CURVE_KEYS, columns="slice",
+                                values="elasticity", aggfunc="first")
+            df.columns = ["elasticity_slice_" + str(int(k) + 1)
+                          for k in df.columns]
+            df = df.reset_index()
+        else:
+            df = df.drop(columns="slice")
+        # Indentation reached by the curves
+        df["indentation"] = [float(data.indentation[x - 1][y - 1])
+                             for x, y in zip(df["x_pos"], df["y_pos"])]
+        curve_tables.append(df)
+
+    if data.work_and_rupture_force1_calculated:
+        for force_type, name in (("work", "work"),
+                                 ("rupture_force", "rupture_force")):
+            df = table(get(force_type), name)
+            stats.append(describe(df, name))
+            curve_tables.append(df)
+
+    for force_type, values in results_sorting.PIXEL_TYPES.items():
+        if getattr(data, values["calculated"]):
+            df = table(get(force_type), values["column"])
+            stats.append(describe(df, values["column"]))
+            curve_tables.append(df)
+
+    if data.breakthrough_calculated:
+        # Number of breakthroughs per curve, and all the breakthroughs
+        count = data.breakthrough_count
+        curves = get("breakthrough_force")
+        df = table([[index, i, j, count[i][j]] for index, i, j, _ in curves],
+                   "breakthroughs_per_curve")
+        stats.append(describe(df, "breakthroughs_per_curve"))
+        curve_tables.append(df)
+        force = EVENT_VALUES.index("force")
+        thickness = EVENT_VALUES.index("thickness")
+        lines = [[index, i, j, float(event[force]), float(event[thickness]),
+                  k] for index, i, j, _ in curves
+                 for k, event in enumerate(data.breakthrough_results[i, j])
+                 if np.isfinite(event[force])]
+        columns = CURVE_KEYS + ["breakthrough_forces", "breakthrough_jumps",
+                                "event"]
+        df = pd.DataFrame(lines, columns=columns)
+        for key in CURVE_KEYS + ["event"]:
+            df[key] = df[key].astype(int) + 1
+        event_tables.append(df)
+
+    if data.events_calculated:
+        for force_type, name in (("events_per_curve", "events_per_curve"),
+                                 ("events_rupture_force", "event_max_force")):
+            df = table(get(force_type), name)
+            stats.append(describe(df, name))
+            curve_tables.append(df)
+
+        types = [("events_forces", "events_forces"),
+                 ("events_distance", "events_distance")]
+        if data.loading_rates_calculated:
+            types.insert(1, ("loading_rates", "loading_rates"))
+        for force_type, name in types:
+            df = table(get(force_type), name, event=True)
+            stats.append(describe(df, name))
+            event_tables.append(df)
+
+    curves = merge_tables(curve_tables, CURVE_KEYS)
+    events = merge_tables(event_tables, CURVE_KEYS + ["event"])
+    row_stats = pd.concat(stats, axis=1) if stats else pd.DataFrame([{}])
+    return curves, events, row_stats
+
+
+def merge_tables(tables, keys):
+    """Outer merge of the tables on the keys (None without table)."""
+    if not tables:
+        return None
+    merged = tables[0]
+    for df in tables[1:]:
+        merged = pd.merge(merged, df, how="outer", on=keys)
+    return merged
+
+
+def describe(df, name):
+    """Descriptive statistics of a column, as one line (count_x, mean_x, std_x,
+    min_x, 25%_x, 50%_x, 75%_x, max_x)."""
+    values = df[name].describe()
+    return pd.DataFrame([{stat + "_" + name: values[stat]
+                          for stat in values.index}])
+
+
+def superplot_rows():
+    """Rows of the Plots table in the SuperPlots: in a displayed replicate
+    of a displayed condition."""
+    groups = {g.group_id for g in shared.exp.groups_list[1:]
+              if g.display and g.condition and
+              shared.exp.conditions_list[g.condition].display}
+    return [row for row, result in enumerate(shared.exp.results_list)
+            if result.group in groups]
+
+
+def write_rows(path, rows):
+    """Write a list of dictionaries as a CSV table."""
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def export_superplot(path):
+    """Values of the files of the SuperPlot (with their replicate and
+    condition) and the tests (_tests.csv). Returns the written files, empty
+    without SuperPlot."""
+    conditions = superplot_tools.get_data()
+    rows = superplot_tools.export_rows(conditions)
+    if not rows:
+        return []
+    path = csv_path(path)
+    files = [path]
+    write_rows(path, rows)
+    options = superplot_tools.get_options()
+    tests = superplot_tools.test_rows(conditions, options)
+    if tests:
+        tests_path = path[:-4] + "_tests.csv"
+        write_rows(tests_path, tests)
+        files.append(tests_path)
+    control = next((c.name for c in shared.exp.conditions_list[1:]
+                    if c.condition_id == options["control"]), None)
+    files.append(params_export.write_sidecar(
+        path, "SuperPlot values and tests", rows=superplot_rows(),
+        options={"superplot": {
+            "control": "all pairs"
+            if options["control"] == superplot_tools.ALL_PAIRS else control,
+            "replicates": "paired" if options["paired"] else "unpaired",
+            "test": "mixed model" if options["test"] == "mixed"
+            else "replicate means",
+            "log_scale": bool(options["log"])}}))
+    return files
+
+
+def dfs_rows(mode):
+    """Rows of the Plots table of the DFS fits: the displayed files, or the
+    files of the displayed replicates (speeds)."""
+    if mode == "groups":
+        groups = {g.group_id for g in shared.exp.groups_list[1:]
+                  if g.display}
+        return [row for row, result in enumerate(shared.exp.results_list)
+                if result.group in groups]
+    return checked_rows()
+
+
+def export_dfs_fits(path, mode=None):
+    """DFS fits of the Plots tab (mode "single") or of the Replicates tab
+    ("groups"): model, parameters with their standard errors, R2, and their
+    points (_points.csv). Returns the written files, empty without fit."""
+    mode = mode or shared.exp.dfs_mode
+    fits = [f for f in dfs_tools.get_fits(mode) if f.get("method") != "old"]
+    if not fits:
+        return []
+    path = csv_path(path)
+    lines, points = [], []
+    for number, fit in enumerate(fits, start=1):
+        model = fit.get("model", "bell")
+        lines.append({
+            "fit": number, "model": dfs_tools.MODELS[model][0],
+            "points_from": "files" if mode == "single" else "speeds",
+            "method": fit["method"], "bins": fit.get("nbr_bins")
+            if fit["method"] == "binned" else "",
+            "statistic": fit.get("statistic", "median"),
+            "nbr_points": fit["nbr_points"], "nbr_events": fit["nbr_events"],
+            "x_m": fit["x"], "x_se_m": fit["sx"],
+            "koff_s-1": fit["koff"], "koff_se_s-1": fit["skoff"],
+            "dG_kBT": fit.get("dG", ""), "dG_se_kBT": fit.get("sdG", ""),
+            "feq_N": fit["feq"] * 1e-12 if "feq" in fit else "",
+            "feq_se_N": fit["sfeq"] * 1e-12 if "sfeq" in fit else "",
+            "reduces_to_bell_evans": bool(fit.get("bell_limit", False)),
+            "r2": fit["r2"], "temperature_K": fit["temperature"]})
+        quartiles = fit.get("points_f_q", [])
+        for k, (r, f) in enumerate(zip(fit["points_r"], fit["points_f"])):
+            point = {"fit": number, "loading_rate_N_s": r * 1e-12,
+                     "force_N": f * 1e-12}
+            if k < len(quartiles):
+                point["force_q25_N"] = quartiles[k][0] * 1e-12
+                point["force_q75_N"] = quartiles[k][1] * 1e-12
+            points.append(point)
+    write_rows(path, lines)
+    points_path = path[:-4] + "_points.csv"
+    keys = max(points, key=len).keys()
+    write_rows(points_path, [{k: p.get(k, "") for k in keys} for p in points])
+    json_path = params_export.write_sidecar(
+        path, "DFS fits", rows=dfs_rows(mode),
+        options={"dfs": {"points_from": "files" if mode == "single"
+                         else "speeds"}})
+    return [path, points_path, json_path]
+
+
+def map_type_name(map_type):
+    """Short name of a map for the file names."""
+    return map_type.replace("stiffness_corr", "elasticity_bec").replace(
+        "stiffness", "elasticity")
+
+
+def map_lut(data, map_type):
+    """Colour table of a map (as in pyAF) for ImageJ: (3, 256) uint8."""
+    opts = data.get_color_opts(map_type)
+    tables = ColorTables()
+    name = tables.colortables_mpl_list[opts[0]]
+    if name in ("Rainbow 1", "Cool-Warm"):
+        factor = map_values.factor(data, map_type)
+        cmap, _ = ColorTables(opts[0], None, None, opts[2] * factor,
+                              opts[3] * factor).get_color_as_cdict()
+    else:
+        cmap = matplotlib.colormaps[name]
+    colors = cmap(np.linspace(0.0, 1.0, 256))[:, :3]
+    return np.round(colors * 255).astype(np.uint8).T
+
+
+def export_map(path, data_id, map_type):
+    """Values of a map of a file as a 32-bit TIFF (NaN where there is no
+    value; in the units of the colour bar, see map_values) for ImageJ /
+    Fiji: pixel size in um, the colour table and the range of the colour
+    scale of pyAF (the values are not changed), and the parameters in the
+    information of the image (Image > Show Info). Returns the written
+    file."""
+    data = shared.exp.list[data_id]
+    factor = map_values.factor(data, map_type)
+    values = map_values.values(data, map_type) * factor
+    # Rows of the image: y, from the top
+    image = np.ascontiguousarray(np.flipud(values.T), dtype=np.float32)
+    opts = data.get_color_opts(map_type)
+    low, high = float(opts[1] * factor), float(opts[2] * factor)
+    if not high > low:
+        finite = image[np.isfinite(image)]
+        low, high = (float(finite.min()), float(finite.max())) \
+            if finite.size else (0.0, 1.0)
+    pixel_x = data.scan_size_x / data.nbr_pixels_x / 1000.0
+    pixel_y = data.scan_size_y / data.nbr_pixels_y / 1000.0
+    info = params_export.tiff_description(
+        "Map " + map_values.label(data, map_type), path, [data_id],
+        options={"map": map_type, "unit": map_values.label(data, map_type),
+                 "pixel_size_um": [pixel_x, pixel_y]})
+    tifffile.imwrite(
+        path, image, imagej=True,
+        resolution=(1.0 / pixel_x, 1.0 / pixel_y),
+        metadata={"unit": "um", "min": low, "max": high,
+                  "Ranges": (low, high), "LUTs": [map_lut(data, map_type)],
+                  "Info": info})
+    return [path]
+
+
+def export_map_figure(path, data_id, dpi=300):
+    """Figure of the map of a file as displayed in the Results tab (axes,
+    colour bar), PNG, PDF or SVG (by the extension), with its parameters
+    next to it. Returns the written files."""
+    from ..plots.PYAFPlot import PYAFPlot
+
+    previous = shared.exp.id_selected
+    red_square = shared.exp.meshgrid_display_red_square
+    shared.exp.id_selected = data_id
+    # Without the square of the selected curve (on the screen only)
+    shared.exp.meshgrid_display_red_square = False
+    try:
+        with matplotlib.rc_context({"savefig.dpi": dpi,
+                                    "savefig.bbox": "tight"}):
+            PYAFPlot(None, "meshgrid", save_path=path)
+    finally:
+        shared.exp.id_selected = previous
+        shared.exp.meshgrid_display_red_square = red_square
+    data = shared.exp.list[data_id]
+    json_path = params_export.write_sidecar(
+        path, "Map figure", data_ids=[data_id],
+        options={"map": data.meshgrid_type})
+    return [path, json_path]
+
+
+def export_parameters(path):
+    """Parameters of all the files. Returns the written file."""
+    if not path.lower().endswith(".json"):
+        path += ".json"
+    params_export.write(path, params_export.build(
+        "Parameters", path, data_ids=list(range(len(shared.exp.list))),
+        rows=list(range(len(shared.exp.results_list)))))
+    return [path]
+
+
+# Result types of the SuperPlots, with the computation they need
+RESULT_TYPES = (("stiffness", "stiffness_calculated"),
+                ("work", "work_and_rupture_force1_calculated"),
+                ("rupture_force", "work_and_rupture_force1_calculated"),
+                ("events_forces", "events_calculated"),
+                ("events_per_curve", "events_calculated"),
+                ("events_rupture_force", "events_calculated"),
+                ("events_distance", "events_calculated"),
+                ("visco_e0", "visco_calculated"),
+                ("visco_fluidity", "visco_calculated"),
+                ("visco_tan_delta", "visco_calculated"),
+                ("breakthrough_force", "breakthrough_calculated"),
+                ("breakthrough_thickness", "breakthrough_calculated"),
+                ("brush_modulus", "brush_calculated"),
+                ("brush_length", "brush_calculated"),
+                ("brush_density", "brush_calculated"))
+
+
+def computed_result_types():
+    """Result types computed for at least one file."""
+    return [name for name, flag in RESULT_TYPES
+            if any(getattr(data, flag, False) for data in shared.exp.list)]
+
+
+def export_superplots(folder):
+    """SuperPlot of each computed result type (superplot_<type>.csv), the
+    values of the rows being computed for each type, then for the
+    displayed one again. Returns the written files."""
+    from . import stat_tools
+
+    if not any(g.condition for g in shared.exp.groups_list[1:]):
+        return []
+    files = []
+    displayed = shared.exp.results_type
+    try:
+        for name in computed_result_types():
+            shared.exp.results_type = name
+            stat_tools.get_values()
+            files += export_superplot(os.path.join(
+                folder, "superplot_" + map_type_name(name) + ".csv"))
+    finally:
+        shared.exp.results_type = displayed
+        stat_tools.get_values()
+    return files
+
+
+def export_all(folder):
+    """Everything computed in a folder: data table and summary of all the
+    rows of the Plots tab (all the computed results of each row), SuperPlot
+    of each computed result type, DFS fits, all the computed maps of the
+    files (values in maps/, figures in figures/) and the parameters.
+    Returns the written files."""
+    os.makedirs(folder, exist_ok=True)
+    files = []
+    rows = list(range(len(shared.exp.results_list)))
+    if rows:
+        files += export_data_table(os.path.join(folder, "data_table.csv"),
+                                   rows)
+        files += export_summary(os.path.join(folder, "summary.csv"), rows)
+    files += export_superplots(folder)
+    for mode, name in (("single", "dfs_fits_files.csv"),
+                       ("groups", "dfs_fits_speeds.csv")):
+        files += export_dfs_fits(os.path.join(folder, name), mode)
+    maps = os.path.join(folder, "maps")
+    figures = os.path.join(folder, "figures")
+    os.makedirs(maps, exist_ok=True)
+    os.makedirs(figures, exist_ok=True)
+    for data_id, data in enumerate(shared.exp.list):
+        base = os.path.splitext(os.path.basename(str(data.filename)))[0]
+        displayed = data.meshgrid_type
+        try:
+            for map_type in map_values.available_maps(data):
+                name = base + "_" + map_type_name(map_type)
+                files += export_map(os.path.join(maps, name + ".tif"),
+                                    data_id, map_type)
+                # The figure of the map (drawn for the map of the file)
+                data.meshgrid_type = map_type
+                files += export_map_figure(
+                    os.path.join(figures, name + ".png"), data_id)
+        finally:
+            data.meshgrid_type = displayed
+    files += export_parameters(os.path.join(folder, "parameters.json"))
+    return files

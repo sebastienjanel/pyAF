@@ -42,10 +42,11 @@ from .. import shared
 import os
 from .. import experiment
 from .. import consts
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..tools import gui_tools
 from ..tools import misc_tools
 from ..tools import math_tools
+from ..tools import curve_tools
 from ..tools import events_refresher
 from ..utils import meshgrid_menu
 from ..tools.gui_tools import PYAFInput
@@ -57,6 +58,10 @@ from ..tools.PYAFWidget import PYAFWidget
 from ..widgets.progressbar import Progressbar
 
 
+# File types with the time plots (deflection and z position vs time)
+JPK_FILE_TYPES = ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)")
+
+
 class DataWidget(PYAFWidget):
     """Init the DataWidget UI.
 
@@ -66,9 +71,6 @@ class DataWidget(PYAFWidget):
 
     def __init__(self, parent):
         super().__init__(parent, "widget_data")
-
-        data = shared.exp.list[shared.exp.id_selected]
-        self.file_type_flag = data.file_type in ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)")
 
         self.list_boxes = None
         self.container = None
@@ -112,7 +114,7 @@ class DataWidget(PYAFWidget):
         self.GL_data = QtWidgets.QGridLayout()
 
         # General information -------------------------------------------------
-        self.box_info1 = QtWidgets.QGroupBox()
+        self.box_info1 = QtWidgets.QGroupBox("File parameters")
         self.box_info1.setFixedSize(550, 250)
         self.HL_box_info = QtWidgets.QHBoxLayout()
         self.VL_box_info1 = QtWidgets.QVBoxLayout()
@@ -168,10 +170,11 @@ class DataWidget(PYAFWidget):
         self.HL_box_info.addLayout(self.VL_box_info2)
 
         self.box_info1.setLayout(self.HL_box_info)
-        self.box_info1.setFont(self.parent.smallfont)
+        # The labels have a small font (set in update_GUI), the title keeps
+        # the same font as the other boxes
 
         # Cantilever & Microscope ---------------------------------------------
-        self.box_cantilever = QtWidgets.QGroupBox()
+        self.box_cantilever = QtWidgets.QGroupBox("Calibration")
         self.box_cantilever.setFixedSize(350, 250)
 
         self.IN_spring_constant = PYAFInput(
@@ -180,7 +183,8 @@ class DataWidget(PYAFWidget):
             self, "defl_sens", "Deflection sensitivity [nm/V]", 90)
         self.IN_temp = PYAFInput(
             self, "input_temp", "Temperature [°C]", 90)
-        self.IN_spring_constant.input.setValidator(misc_tools.validator("UF"))
+        # A spring constant of 0 is refused
+        self.IN_spring_constant.input.setValidator(misc_tools.validator("PF"))
         self.IN_defl_sens.input.setValidator(misc_tools.validator("UF"))
         self.IN_temp.input.setValidator(misc_tools.validator("UF"))
 
@@ -202,9 +206,9 @@ class DataWidget(PYAFWidget):
         self.BT_reset_all = PYAFButton(self, "reset_all", "Reset all", size=100)
 
         self.gridLayout = QtWidgets.QGridLayout()
-        self.gridLayout.addWidget(self.IN_spring_constant, 0, 0, 1, 0)
-        self.gridLayout.addWidget(self.IN_defl_sens, 1, 0, 1, 0)
-        self.gridLayout.addWidget(self.IN_temp, 2, 0, 1, 0)
+        self.gridLayout.addWidget(self.IN_spring_constant, 0, 0, 1, 3)
+        self.gridLayout.addWidget(self.IN_defl_sens, 1, 0, 1, 3)
+        self.gridLayout.addWidget(self.IN_temp, 2, 0, 1, 3)
         self.gridLayout.addWidget(self.BT_reset, 3, 0)
         self.gridLayout.addWidget(self.BT_apply_on_all, 3, 1)
         self.gridLayout.addWidget(self.BT_reset_all, 3, 2)
@@ -231,56 +235,56 @@ class DataWidget(PYAFWidget):
         # Curve
         self.curve_size = [490, 350]
         sizes = [self.curve_size[0] / 72.0, self.curve_size[1] / 72.0, 72.0]
-        if self.file_type_flag:
-            self.canvas_stack = QtWidgets.QStackedWidget()
-            self.canvas_curve = QtWidgets.QWidget()
-            self.canvas_curve_a = QtWidgets.QWidget()
-            self.canvas_curve_b = QtWidgets.QWidget()
-            self.curve = PYAFPlot(self, "curve_data", self.canvas_curve, sizes)
-            self.curve_1 = PYAFPlot(self, "curve_dataa", self.canvas_curve_a, sizes)
-            self.curve_2 = PYAFPlot(self, "curve_datab", self.canvas_curve_b, sizes)
+        # The time plots (curve_1 and curve_2) are only available for the
+        # files with a time (JPK, Nanoscope), but are always created: the
+        # files can be of different
+        # types (see update_plot_selector)
+        self.canvas_stack = QtWidgets.QStackedWidget()
+        self.canvas_curve = QtWidgets.QWidget()
+        self.canvas_curve_a = QtWidgets.QWidget()
+        self.canvas_curve_b = QtWidgets.QWidget()
+        self.canvas_curve_force = QtWidgets.QWidget()
+        self.curve = PYAFPlot(self, "curve_data", self.canvas_curve, sizes)
+        # Force vs distance: to check the deflection sensitivity on glass
+        self.curve_3 = PYAFPlot(self, "curve_datac", self.canvas_curve_force,
+                                sizes)
+        self.curve_1 = PYAFPlot(self, "curve_dataa", self.canvas_curve_a, sizes)
+        self.curve_2 = PYAFPlot(self, "curve_datab", self.canvas_curve_b, sizes)
 
-            self.canvas_stack.addWidget(self.curve)
-            self.canvas_stack.addWidget(self.curve_1)
-            self.canvas_stack.addWidget(self.curve_2)
+        # Same order as the plot selector
+        self.canvas_stack.addWidget(self.curve)
+        self.canvas_stack.addWidget(self.curve_3)
+        self.canvas_stack.addWidget(self.curve_1)
+        self.canvas_stack.addWidget(self.curve_2)
 
-            pol = QtWidgets.QSizePolicy.Minimum
-            sizePolicy = QtWidgets.QSizePolicy(pol, pol)
-            self.curve.setSizePolicy(sizePolicy)
-            self.curve_1.setSizePolicy(sizePolicy)
-            self.curve_2.setSizePolicy(sizePolicy)
-            self.canvas_stack.setSizePolicy(sizePolicy)
-            self.canvas_mesh.setSizePolicy(sizePolicy)
-            self.meshgrid.setSizePolicy(sizePolicy)
-
-        else:
-            self.canvas_curve = QtWidgets.QWidget()
-            self.curve = PYAFPlot(self, "curve_data", self.canvas_curve, sizes)
+        pol = QtWidgets.QSizePolicy.Minimum
+        sizePolicy = QtWidgets.QSizePolicy(pol, pol)
+        self.curve.setSizePolicy(sizePolicy)
+        self.curve_1.setSizePolicy(sizePolicy)
+        self.curve_2.setSizePolicy(sizePolicy)
+        self.curve_3.setSizePolicy(sizePolicy)
+        self.canvas_stack.setSizePolicy(sizePolicy)
+        self.canvas_mesh.setSizePolicy(sizePolicy)
+        self.meshgrid.setSizePolicy(sizePolicy)
 
         self.HL_box_infos = QtWidgets.QHBoxLayout()
         self.HL_box_infos.addWidget(self.box_info1)
         self.HL_box_infos.addWidget(self.box_cantilever)
         self.HL_box_infos.addStretch(1)
 
-        if self.file_type_flag:
-            name = "widget_plot_selector_data"
-            self.plot_selector = PlotSelectorWidget(self, name)
+        name = "widget_plot_selector_data"
+        self.plot_selector = PlotSelectorWidget(self, name)
 
         self.GL_data.addLayout(self.HL_box_infos, 0, 0, 1, 0)
-
-        if self.file_type_flag:
-            self.GL_data.addWidget(self.plot_selector, 1, 1)
-
+        self.GL_data.addWidget(self.plot_selector, 1, 1)
         self.GL_data.addWidget(self.meshgrid, 2, 0)
+        self.GL_data.addWidget(self.canvas_stack, 2, 1)
 
-        if self.file_type_flag:
-            self.GL_data.addWidget(self.canvas_stack, 2, 1)
-
-        else:
-            self.GL_data.addWidget(self.curve, 2, 1)
+        self.box_files = QtWidgets.QGroupBox("File list")
+        self.box_files.setLayout(self.VL_list)
 
         self.HL = QtWidgets.QHBoxLayout()
-        self.HL.addLayout(self.VL_list)
+        self.HL.addWidget(self.box_files)
         self.HL.addLayout(self.GL_data)
 
         self.VL.addLayout(self.HL)
@@ -296,7 +300,7 @@ class DataWidget(PYAFWidget):
         for the spring constant, deflection sensitivity or temperature.
         """
         # Check if its a click
-        if event.type() == event.MouseButtonPress:
+        if event.type() == QtCore.QEvent.MouseButtonPress:
             # Check if it's a click on an input field
             if self.IN_spring_constant.input == obj:
                 self.change_info_type("spring")
@@ -395,9 +399,10 @@ class DataWidget(PYAFWidget):
             self.LB_extended_delay.setText("Extended delay : None")
 
         self.IN_spring_constant.changeValue(
-            round(data.spring_constant * 1e9, 4))
+            misc_tools.format_number(data.spring_constant * 1e9))
         self.IN_defl_sens.changeValue(round(data.deflection_sensitivity, 2))
-        self.IN_temp.changeValue(data.temperature - 273.15)
+        self.IN_temp.changeValue(
+            misc_tools.format_number(data.temperature - 273.15))
 
         self.update_GUI("all")
 
@@ -432,11 +437,35 @@ class DataWidget(PYAFWidget):
         self.IN_temp.setFont(self.smallfont)
 
         # Update the meshgrid
+        self.update_plot_selector()
         self.meshgrid.update_plot()
+        self.update_curves()
+
+    def update_curves(self):
+        """Update the curves (the time plots only for the files with a time)."""
         self.curve.update_plot()
-        if self.file_type_flag:
+        self.curve_3.update_plot()
+        if self.has_time():
             self.curve_1.update_plot()
             self.curve_2.update_plot()
+
+    def has_time(self, data=None):
+        """True for the files with the time plots (selected file by
+        default): the JPK files (time of the file) and the Nanoscope files
+        (time computed from the ramp, see curve_tools)."""
+        if data is None:
+            data = shared.exp.list[shared.exp.id_selected]
+        if data.file_type in JPK_FILE_TYPES:
+            return True
+        return curve_tools.get_nanoscope_times(data, 2, 2) is not None
+
+    def update_plot_selector(self):
+        """Display the selected plot. The time plots are only available for
+        the files with a time (JPK, Nanoscope)."""
+        selector = self.plot_selector
+        selector.set_time_plots(self.has_time())
+        index = selector.list_plot_types.currentIndex()
+        self.canvas_stack.setCurrentIndex(index)
 
     def change_info_type(self, newtype):
         """Change the type of information which is selected.
@@ -521,13 +550,13 @@ class DataWidget(PYAFWidget):
             self.list_sel_styles = []
             self.list_unsel_styles = []
             for i in range(len(shared.exp.list)):
-                color = " { background-color: #3daee9; }"
+                color = " { background-color: #3b8eea; }"
                 style = "QWidget#data_" + str(i) + color
                 self.list_sel_styles.append(style)
                 if shared.exp.current_theme == "Dark":
                     color = " { background-color: #31363b; }"
                 elif shared.exp.current_theme == "Light":
-                    color = " { background-color: #EFF0F1; }"
+                    color = " { background-color: #D0D3D7; }"
                 style = "QWidget#data_" + str(i) + color
                 self.list_unsel_styles.append(style)
 
@@ -556,12 +585,9 @@ class DataWidget(PYAFWidget):
             widgets_list.widget_main.change_curve(xpos, ypos)
 
         elif event.button == 3 and event.inaxes == self.meshgrid.canvas.axes:
-            # Get position in screen coordinates (top left position of canvas)
-            globalpos = self.meshgrid.mapToGlobal(QtCore.QPoint(0, 0))
-            # Recalculate positions with canvas position
-            x = globalpos.x() + event.x
-            y = globalpos.y() + (self.mesh_size[1] - event.y)
-            pos = QtCore.QPoint(x, y)
+            # Position of the mouse on screen (the matplotlib event position
+            # is in physical pixels, twice the Qt pixels on Retina screens)
+            pos = QtGui.QCursor.pos()
             meshgrid_menu.create_meshgrid_menu(self, "data", pos)
 
     def button_clicked(self, button):
@@ -579,7 +605,7 @@ class DataWidget(PYAFWidget):
                 data.deflection_sensitivity = None
                 self.IN_defl_sens.changeValue(data.deflection_sensitivity)
                 self.BT_reset.setEnabled(False)
-                self.curve.update_plot()
+                self.update_curves()
 
             elif shared.exp.info_selected == "temp":
                 data.temperature = None
@@ -601,33 +627,25 @@ class DataWidget(PYAFWidget):
             self.update_GUI("thresh_units")
 
         elif button == "apply_on_all":
-            if shared.exp.info_selected == "spring":
-                value = self.IN_spring_constant.get_float_value()
-                for data in shared.exp.list:
-                    data.spring_constant = value
-
-            elif shared.exp.info_selected == "defl":
-                value = self.IN_defl_sens.get_float_value()
-                for data in shared.exp.list:
-                    data.deflection_sensitivity = value
-
-            elif shared.exp.info_selected == "temp":
-                value = self.IN_temp.get_float_value()
-                for data in shared.exp.list:
-                    data.temperature = value + 273.15
+            # Copy the three calibration values of the current file to all
+            # the other files (the exact values, not the rounded ones
+            # displayed in the inputs). The getter returns the spring
+            # constant in N/nm, the setter takes N/m.
+            spring_constant = data.spring_constant * 1e9
+            deflection_sensitivity = data.deflection_sensitivity
+            temperature = data.temperature
+            for other in shared.exp.list:
+                if other is not data:
+                    other.spring_constant = spring_constant
+                    other.deflection_sensitivity = deflection_sensitivity
+                    other.temperature = temperature
 
         elif button == "reset_all":
-            if shared.exp.info_selected == "spring":
-                for data in shared.exp.list:
-                    data.spring_constant = None
-
-            elif shared.exp.info_selected == "defl":
-                for data in shared.exp.list:
-                    data.deflection_sensitivity = None
-
-            elif shared.exp.info_selected == "temp":
-                for data in shared.exp.list:
-                    data.temperature = None
+            # Reset the three calibration values of all the files
+            for other in shared.exp.list:
+                other.spring_constant = None
+                other.deflection_sensitivity = None
+                other.temperature = None
 
         elif button == "add_files":
             self.parent.load_more()
@@ -706,13 +724,6 @@ class DataWidget(PYAFWidget):
                     del shared.exp.results_list[i]
                     del shared.single_data[i]
                     del shared.single_values[i]
-                    if shared.single_factors is not None:
-                        del shared.single_factors[i]
-                    if shared.single_factors is not None:
-                        del shared.single_factors[i]
-                    if shared.single_pdfs_x is not None:
-                        del shared.single_pdfs_x[i]
-                        del shared.single_pdfs_y[i]
                     widgets_list.widget_results_single.tableWidget.removeRow(i)
 
             widgets_list.widget_progressbar.update()
@@ -871,9 +882,10 @@ class DataWidget(PYAFWidget):
         if field == "spring_constant":
             value = self.IN_spring_constant.get_str_value(True)
             # Compare strings, comparing floats won't work well ...
-            if value != str(round(data.spring_constant * 1e9, 4)):
+            if value != misc_tools.format_number(data.spring_constant * 1e9):
                 data.spring_constant = float(value)
                 self.update_GUI("info_selected")
+                self.curve_3.update_plot()
                 QtWidgets.QMessageBox.warning(
                     self,
                     "Info",
@@ -883,10 +895,11 @@ class DataWidget(PYAFWidget):
             if value != str(round(data.deflection_sensitivity, 2)):
                 data.deflection_sensitivity = float(value)
                 self.update_GUI("info_selected")
-                self.curve.update_plot()
+                self.update_curves()
         elif field == "input_temp":
             value = self.IN_temp.get_str_value(True)
-            if value != str(data.temperature):
+            # Compare with the displayed value (in degC)
+            if value != misc_tools.format_number(data.temperature - 273.15):
                 data.temperature = float(value) + 273.15
                 self.update_GUI("info_selected")
 

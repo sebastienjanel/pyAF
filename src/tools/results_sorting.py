@@ -32,11 +32,62 @@
 """Tools used to fetch and sort the results."""
 
 import numpy
-import pandas as pd
 from .. import shared
 from ..tools import math_tools
 from ..tools import curve_tools
+from ..tools import event_filter_tools
 from .. import widgets_list
+
+# Results of the viscoelasticity (Ting fit): name in the lists, label of
+# the plots (displayed values: value * factor), name and unit in the
+# exports (SI), column name in the R export
+VISCO_TYPES = {
+    "visco_e0": {"name": "E\u2080", "label": "E\u2080 [kPa]",
+                 "factor": 1e-3, "export": "E0 (Pa)", "column": "visco_e0"},
+    "visco_fluidity": {"name": "Fluidity", "label": "Fluidity",
+                       "factor": 1.0, "export": "Fluidity",
+                       "column": "fluidity"},
+    "visco_tan_delta": {"name": "Loss tangent",
+                        "label": "tan \u03b4", "factor": 1.0,
+                        "export": "Loss tangent (tan delta)",
+                        "column": "tan_delta"},
+}
+
+
+# Breakthroughs of supported lipid bilayers (first one of each curve)
+BREAKTHROUGH_TYPES = {
+    "breakthrough_force": {"name": "Breakthrough force", "label": "Fb [nN]",
+                           "factor": 1e9, "export": "Breakthrough force (N)",
+                           "column": "breakthrough_force"},
+    "breakthrough_thickness": {"name": "Breakthrough jump",
+                               "label": "Jump [nm]", "factor": 1.0,
+                               "export": "Breakthrough jump (nm)",
+                               "column": "breakthrough_jump"},
+}
+
+# Brush model of the cells (with the elasticity)
+BRUSH_TYPES = {
+    "brush_modulus": {"name": "Elasticity (brush model)",
+                      "label": "E [kPa]", "factor": 1e-3,
+                      "export": "Elasticity of the body (Pa)",
+                      "column": "brush_modulus"},
+    "brush_length": {"name": "Brush length", "label": "Brush length [nm]",
+                     "factor": 1.0, "export": "Brush length (nm)",
+                     "column": "brush_length"},
+    "brush_density": {"name": "Grafting density",
+                      "label": "Grafting density [\u00b5m\u207b\u00b2]",
+                      "factor": 1.0,
+                      "export": "Grafting density (1/um2)",
+                      "column": "grafting_density"},
+}
+
+# Results with one value per pixel (map), with the computation they need
+PIXEL_TYPES = {**{name: dict(values, calculated="visco_calculated")
+                  for name, values in VISCO_TYPES.items()},
+               **{name: dict(values, calculated="breakthrough_calculated")
+                  for name, values in BREAKTHROUGH_TYPES.items()},
+               **{name: dict(values, calculated="brush_calculated")
+                  for name, values in BRUSH_TYPES.items()}}
 
 
 class GetResults:
@@ -65,9 +116,9 @@ class GetResults:
         self.select = None
         self.log = None
 
-        self.filter_dist_left = None
-        self.filter_dist_right = None
-        self.filter_dist_keep_middle = None
+        self.filter_dist_min = None
+        self.filter_dist_max = None
+        self.filter_dist_keep = None
 
         self.filter_slope_min = None
         self.filter_slope_max = None
@@ -77,10 +128,9 @@ class GetResults:
         if data_id is not None and result_id is None:
             self.data = shared.exp.list[data_id]
 
-            self.filter_dist_left = self.data.events_results_filter_dist_left
-            self.filter_dist_right = self.data.events_results_filter_dist_right
-            self.filter_dist_keep_middle = \
-                self.data.events_results_filter_dist_keep_middle
+            self.filter_dist_min = self.data.events_results_filter_dist_min
+            self.filter_dist_max = self.data.events_results_filter_dist_max
+            self.filter_dist_keep = self.data.events_results_filter_dist_keep
 
             self.filter_slope_min = self.data.events_results_filter_slope_min
             self.filter_slope_max = self.data.events_results_filter_slope_max
@@ -92,9 +142,9 @@ class GetResults:
             result = shared.exp.results_list[result_id]
             self.data = shared.exp.list[result.data_id]
 
-            self.filter_dist_left = result.filter_dist_left
-            self.filter_dist_right = result.filter_dist_right
-            self.filter_dist_keep_middle = result.filter_dist_keep_middle
+            self.filter_dist_min = result.filter_dist_min
+            self.filter_dist_max = result.filter_dist_max
+            self.filter_dist_keep = result.filter_dist_keep
 
             self.filter_slope_min = result.filter_slope_min
             self.filter_slope_max = result.filter_slope_max
@@ -137,9 +187,15 @@ class GetResults:
             result = self.prepare_rupture_force2()
         elif self.type == "loading_rates":
             forces, lr = self.prepare_loading_rates()
-            result = [forces, lr]
+            if self.export in ("single", "r_format"):
+                # Rows of the export
+                result = forces
+            else:
+                result = [forces, lr]
         elif self.type == "events_distance":
             result = self.prepare_events_distance()
+        elif self.type in PIXEL_TYPES:
+            result = self.prepare_pixel_values()
 
         result = self.remove_zeros(result)
 
@@ -220,118 +276,29 @@ class GetResults:
                 if widgets_list.widget_progressbar is not None:
                     widgets_list.widget_progressbar.update()
 
+        # No values: NaN (the mode is computed with update_groups_modes)
+        val = numpy.nan
         if self.type != "loading_rates":
             for i in range(len(groups)):
                 if groups[i]:
                     values.append([numpy.mean(groups[i]),
                                    numpy.median(groups[i]),
-                                   numpy.std(groups[i]), 0])
+                                   numpy.std(groups[i]), val])
                 else:
-                    values.append([0, 0, 0, 0])
+                    values.append([val, val, val, val])
 
         elif self.type == "loading_rates":
             for i in range(len(groups)):
                 if groups_forces[i]:
                     values.append([numpy.mean(groups_lr[i]),
                                    numpy.median(groups_lr[i]),
-                                   numpy.std(groups_lr[i]), 0])
+                                   numpy.std(groups_lr[i]), val])
 
                     groups[i] = numpy.array([groups_forces[i], groups_lr[i]])
                 else:
-                    values.append([0, 0, 0, 0])
+                    values.append([val, val, val, val])
         # print(f"Groups:{[groups, values]}")
         return [groups, values]
-
-    def get_results_conditions(self, force_type=None):
-        """"Gets the results for a experimental condition."""
-        # Used by DFS widget and exporting
-        if force_type is not None:
-            self.type = force_type
-
-        values = []
-        conditions = []
-        conditions_forces = []
-        conditions_lr = []
-        for i in range(len(shared.exp.conditions_list)):
-            conditions.append([])
-            # For loading rates
-            conditions_forces.append([])
-            conditions_lr.append([])
-
-        for i in range(len(shared.exp.groups_list)):
-            grp = shared.exp.groups_list[i]
-
-            if grp.condition != 0:
-                if self.export != "conditions":  # How to manage this
-                    # Get the values from single_data which has already been
-                    # prepared. Is really faster
-                    if shared.groups_data is not None:
-                        result = shared.groups_data[i]
-                    else:
-                        # When the refresh at load checkbox is unclicked,
-                        # single data is still set to None. Return nothing
-                        # in this case.
-                        result = []
-                else:
-                    # Refetch the data for exporting
-                    result = self.get_results_groups(force_type)[0][i]
-
-                if self.type != "loading_rates":
-                    conditions[grp.condition].extend(result)
-                else:
-                    conditions_forces[grp.condition].extend(result[0])
-                    conditions_lr[grp.condition].extend(result[1])
-
-                if widgets_list.widget_progressbar is not None:
-                    widgets_list.widget_progressbar.update()
-
-        if self.type != "loading_rates":
-            for i in range(len(conditions)):
-                if conditions[i]:
-                    values.append([len(conditions[i]),
-                                   numpy.mean(conditions[i]),
-                                   numpy.median(conditions[i]),
-                                   numpy.std(conditions[i]), 0])
-                else:
-                    values.append([0, 0, 0, 0, 0])
-
-        elif self.type == "loading_rates":
-            for i in range(len(conditions)):
-                if conditions_forces[i]:
-                    values.append([len(conditions[i]),
-                                   numpy.mean(conditions_lr[i]),
-                                   numpy.median(conditions_lr[i]),
-                                   numpy.std(conditions_lr[i]), 0])
-
-                    conditions[i] = numpy.array([conditions_forces[i], conditions_lr[i]])
-                else:
-                    values.append([0, 0, 0, 0, 0])
-        # print(f"Conditions:{[conditions, values]}")
-        return [conditions, values]
-
-    def get_results_statistical(self, force_type=None):
-        """"Gets the results for a experimental condition."""
-        # Used by DFS widget and exporting
-        if force_type is not None:
-            self.type = force_type
-
-        groups = []
-        conditions = []
-        data = []
-
-        for i in range(1, len(shared.exp.groups_list)):
-            grp = shared.exp.groups_list[i]
-            if shared.groups_data is not None:
-                dt = numpy.asarray(shared.groups_data[i])
-                grps = numpy.ones(dt.shape, dtype=int) * grp.group_id
-                conds = numpy.ones(dt.shape, dtype=int) * grp.condition
-
-                groups.extend(grps)
-                conditions.extend(conds)
-                data.extend(dt)
-
-        # Construct data frame used for plots
-        shared.statistics_data = pd.DataFrame({'Replicate': groups, 'Condition': conditions, 'Data': data})
 
     def prepare_stiffness(self):
         """Get the stiffness results."""
@@ -401,19 +368,12 @@ class GetResults:
 
                             # To export the data to a file, prepare the array
                             if self.export == "single" and found:
-                                z = k * dt.indentation_step
-                                if not dt.tomography:
-                                    sl = "0 - " + str(z + dt.indentation_step)
-                                else:
-                                    sl = str(z) + " - " + \
-                                        str(z + dt.indentation_step)
-
                                 export_array.append(
-                                    [index, i, j, sl, array[-1]])
+                                    [index, i, j, k, array[-1]])
 
                             if self.export == "r_format" and found:
                                 export_array.append(
-                                    [index, i, j, array[-1]])
+                                    [index, i, j, array[-1], k])
 
                     index += 1
 
@@ -465,6 +425,45 @@ class GetResults:
 
         else:
             return numpy.array(array) * 1e15  # in fJ
+
+    def prepare_pixel_values(self):
+        """Results with one value per curve: viscoelasticity (E0, fluidity
+        or loss tangent) or breakthrough (force or jump of the first
+        breakthrough).
+
+        The curves without value (fit failed, no breakthrough: nan) are not
+        in the values of the plots; they are exported as nan.
+        """
+        dt = self.data
+        settings = PIXEL_TYPES[self.type]
+
+        if not getattr(dt, settings["calculated"]):
+            return []
+
+        values = getattr(dt, self.type)
+        factor = settings["factor"]
+        export = self.export in ("single", "r_format")
+        if self.roi_id != 0:
+            roi_vals = dt.roi_list[self.roi_id - 1].values
+
+        array = []
+        export_array = []
+        index = 0
+        for i in range(dt.nbr_pixels_x):
+            for j in range(dt.nbr_pixels_y):
+                if dt.discarded_curves[i][j] == 0 and \
+                        (self.roi_id == 0 or
+                         math_tools.in_list(roi_vals, [i, j])):
+                    value = float(values[i][j])
+                    if export:
+                        export_array.append([index, i, j, value])
+                    elif numpy.isfinite(value):
+                        array.append(value * factor)
+                index += 1
+
+        if export:
+            return export_array
+        return numpy.array(array)
 
     def prepare_rupture_force1(self):
         """Get the rupture forces."""
@@ -527,8 +526,10 @@ class GetResults:
                             array.extend(forces)
 
                         if self.export == "single" or self.export == "r_format":
-                            for k in range(len(forces)):
-                                export_array.append([index, i, j, forces[k]])
+                            events = self.get_data_from_curve(
+                                i, j, "kept_events")
+                            for force, z in zip(forces, events):
+                                export_array.append([index, i, j, force, z])
 
                 index += 1
 
@@ -551,6 +552,8 @@ class GetResults:
 
         tp = "events_per_curve"
         array = []
+        export_array = []
+        index = 0
         for i in range(dt.nbr_pixels_x):
             for j in range(dt.nbr_pixels_y):
                 if dt.discarded_curves[i][j] == 0:
@@ -563,20 +566,31 @@ class GetResults:
 
                         array.append(nbr)
 
+                        if self.export == "single" or self.export == "r_format":
+                            export_array.append([index, i, j, nbr])
+
+                index += 1
+
             if widgets_list.widget_progressbar is not None:
                 widgets_list.widget_progressbar.update()
+
+        if self.export == "single" or self.export == "r_format":
+            # Returning for export function
+            return export_array
 
         return numpy.array(array)
 
     def prepare_rupture_force2(self):
-        """Get the rupture force from the events."""
+        """Get the largest event force of each curve (the curves without
+        events have no value)."""
         dt = self.data
 
         if dt.events_calculated is False:
             return []
 
-        tp = "events_rupture_force"
         array = []
+        export_array = []
+        index = 0
         for i in range(dt.nbr_pixels_x):
             for j in range(dt.nbr_pixels_y):
                 if dt.discarded_curves[i][j] == 0:
@@ -585,12 +599,24 @@ class GetResults:
                         inlist = math_tools.in_list(roi_vals, [i, j])
 
                     if self.roi_id == 0 or inlist:
-                        force = self.get_data_from_curve(i, j, tp)
+                        forces = self.get_data_from_curve(
+                            i, j, "forces_per_curve")
 
-                        array.append(force)
+                        if forces:
+                            array.append(max(forces))
+
+                            if self.export in ("single", "r_format"):
+                                export_array.append(
+                                    [index, i, j, max(forces)])
+
+                index += 1
 
             if widgets_list.widget_progressbar is not None:
                 widgets_list.widget_progressbar.update()
+
+        if self.export == "single" or self.export == "r_format":
+            # Returning for export function
+            return export_array
 
         return numpy.array(array) * 1e12  # in pN
 
@@ -600,8 +626,6 @@ class GetResults:
 
         if dt.events_calculated is False:
             return []
-
-        f_dist = dt.events_forces_distance
 
         array = []
         export_array = []
@@ -621,10 +645,13 @@ class GetResults:
                             array.extend(res)
 
                         if self.export == "single" or self.export == "r_format":
-                            if res:
-                                for k in range(len(res)):
-                                    export_array.append(
-                                        [index, i, j, f_dist[i][j][k]])
+                            events = self.get_data_from_curve(
+                                i, j, "kept_events")
+                            if self.select == 1:
+                                # Only the last event
+                                events = events[:1]
+                            for dist, z in zip(res, events):
+                                export_array.append([index, i, j, dist, z])
 
                 index += 1
 
@@ -637,20 +664,6 @@ class GetResults:
 
         else:
             return numpy.array(array) * 1e9  # in nm
-
-    def count_events_per_scan(self):
-        """This function counts the number of events per scan.
-
-        It parses each curve with the count_events_per_curve function and
-        returns the value.
-        """
-        val = 0
-        for i in range(self.data.nbr_pixels_x):
-            for j in range(self.data.nbr_pixels_y):
-                nbr = self.get_data_from_curve(i, j, "events_per_curve")
-                val = val + nbr
-
-        return val
 
     def prepare_loading_rates(self):
         """Get the loading rates."""
@@ -679,9 +692,12 @@ class GetResults:
                             array_lr.extend(lr)
 
                         if self.export == "single" or self.export == "r_format":
-                            for loading_rate in lr:
+                            events = self.get_data_from_curve(
+                                i, j, "kept_events")
+                            for loading_rate, force, z in zip(
+                                    lr, forces, events):
                                 export_array.append(
-                                    [index, i, j, loading_rate])
+                                    [index, i, j, loading_rate, z, force])
 
                 index += 1
 
@@ -705,6 +721,8 @@ class GetResults:
             curve_tools.get_curve(self.data, [i, j], mode="results_sorting")
 
         if retraction is None:
+            if type_of_data == "kept_events":
+                return []
             if type_of_data == "events_per_curve":
                 return 0
             elif type_of_data == "forces_per_curve":
@@ -734,7 +752,7 @@ class GetResults:
                 return [], []
             elif tp == "events_per_curve" or tp == "events_rupture_force":
                 return 0
-            elif tp == "events_distance":
+            elif tp == "events_distance" or tp == "kept_events":
                 return []
 
         forces = self.data.events_forces[i][j]
@@ -744,6 +762,11 @@ class GetResults:
 
         # Make sure positions are integers.
         event_pos = event_pos.astype("uint32")
+
+        if type_of_data == "kept_events":
+            # Indexes of the events kept by the filters
+            return [z for z in range(len(forces))
+                    if self.filter_event(re[0][event_pos[z]], slopes[z])]
 
         if type_of_data == "events_per_curve":
             nbr_events = 0
@@ -812,17 +835,18 @@ class GetResults:
 
         if shared.exp.hist_remove_zeros:
             if self.export == "single" or self.export == "r_format":
-                if self.type == "loading_rates":
-                    array = array[0]  # In this case the wanted data is in 0
+                # Column of the value in the rows of the export (the slice
+                # comes before the elasticity in the txt export, the zeros of
+                # the loading rates are removed with the forces as in the
+                # plots)
+                if self.type == "stiffness" and self.export == "single":
+                    col = 4
+                elif self.type == "loading_rates":
+                    col = 5
+                else:
+                    col = 3
 
-                new_array = []
-
-                for line in array:
-                    # Stiffness result arrays incorporate an additional parameter sl (segment length)
-                    if line[-1] > 0:
-                        new_array.append(line)
-
-                array = new_array
+                array = [line for line in array if line[col] > 0]
 
             else:
                 # For normal usage or group exports
@@ -846,23 +870,12 @@ class GetResults:
     def filter_event(self, pos, slope):
         """Cheks if an event on the curve can be kept or not.
 
-        Some filters can remove events from the curve so that it is not
-        counted.
+        pos is the position of the event on the distance axis of the curve
+        (negative: the events are situated before the joc2 == 0).
 
-        pos is a negative value (the events are situaded before the joc2 == 0)
-
-        slope is the value of the slope of the fit on the right of the event.
-        The user can ask to filter by keeping only slopes between two values.
+        slope is the value of the slope of the fit next to the event.
         """
-        if self.filter_slope_max != 0 and self.filter_slope_min != 0:
-            if slope > self.filter_slope_max or slope < self.filter_slope_min:
-                return False
-
-        if self.filter_dist_keep_middle:
-            if self.filter_dist_left < pos and pos < self.filter_dist_right:
-                return True
-        else:
-            if self.filter_dist_left > pos or pos > self.filter_dist_right:
-                return True
-
-        return False
+        return event_filter_tools.keep_event(
+            -pos, slope, self.filter_dist_min, self.filter_dist_max,
+            self.filter_dist_keep, self.filter_slope_min,
+            self.filter_slope_max)

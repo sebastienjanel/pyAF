@@ -127,7 +127,6 @@
         "Mac OS"
     ],
     "programmingLanguage": [
-        "Python 2",
         "Python 3"
     ],
     "softwareRequirements": "https://github.com/sebastienjanel/pyAF/blob/main/requirements.txt",

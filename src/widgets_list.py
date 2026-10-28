@@ -54,9 +54,10 @@ widget_about = None
 
 # Sub widgets
 widget_results_chooser_single = None
-widget_results_hist_options_single = None
+widget_violin_options_single = None
 widget_results_chooser_groups = None
-widget_results_hist_options_groups = None
+widget_violin_options_groups = None
+widget_results_chooser_experiment = None
 widget_curve_selector_data = None
 widget_curve_selector_compute = None
 widget_curve_selector_results = None
@@ -92,8 +93,6 @@ widget_vtk_entry = None
 widget_used_parameters = None
 widget_vtk_glass_choser = None
 widget_vtk_binary_threshold = None
-widget_advanced_options = None
-widget_sample_grouping_dialog = None
 
 widget_fit_param_pocs = None
 widget_fit_param_jocs = None

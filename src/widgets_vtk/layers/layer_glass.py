@@ -34,6 +34,7 @@
 import vtk
 from ... import shared
 from .layer import Layer
+from ...tools import planefit
 
 
 class LayerGlass(Layer):
@@ -71,6 +72,10 @@ class LayerGlass(Layer):
         data = shared.exp.list[self.afm_id]
 
         d, a, b, _ = data.roi_list[self.roi_id].glass_coeffs
+        # Same planefit as the topography of the file
+        plane = planefit.topo_coeffs(data)
+        if plane is not None:
+            d, a, b = d - plane[0], a - plane[1], b - plane[2]
         h1 = d
         h2 = a * self.size_x + d
         h3 = a * self.size_x + b * self.size_x + d

@@ -1,15 +1,12 @@
 """
 Python application for fitting Hertz model to different force curves
 """
+import warnings
 import numpy as np
 from lmfit import Parameters, minimize
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, OptimizeWarning
 from . import curve_tools
 from . import search_poc
-
-def get_contact_point_RoV():
-    pass
-
 
 def prepare_data_hertzfit(app, dt, fit_params):
     """
@@ -17,8 +14,9 @@ def prepare_data_hertzfit(app, dt, fit_params):
     """
 
     # Calculate initial guess POC
-    poc_index_before, real_poc, final_fit, _ = search_poc.get_POC(
+    poc_index_before, real_poc, final_fit, fit_segment = search_poc.get_POC(
         app, dt["approach_position"], fit_params)
+    poc_found = search_poc.poc_found(fit_segment)
 
     # Initial values for the POC index and POC pos
     poc_index_i = poc_index_before
@@ -27,6 +25,16 @@ def prepare_data_hertzfit(app, dt, fit_params):
     # Calculate force curve
     k = dt["spring_constant"] * 1e9
     fcapp = curve_tools.get_force_curves(app[0], app[1], poc_pos_i, k)
+
+    if poc_found:
+        # Baseline of the search of the point of contact (deflection vs
+        # piezo, fitted just before the contact): subtracted from the
+        # deflection, so that the force is 0 before the contact as for the
+        # point of contact (the tilt correction leaves a slope)
+        baseline = final_fit[0] * np.asarray(app[0]) + final_fit[1]
+        baseline -= final_fit[0] * poc_pos_i[0] + final_fit[1]
+        fcapp[1] = fcapp[1] - baseline * k
+        fcapp[0] = fcapp[0] + baseline
 
     app[0] = app[0] * 1e-09
     app[1] = app[1] * 1e-09
@@ -73,17 +81,50 @@ def prepare_data_hertzfit(app, dt, fit_params):
     delta = fcapp[0][first::]
     data_to_fit = fcapp[1][first::]
 
-    # Calculate tilt and substract it from the curve. Careful!! Is this done somewhere else?
-    # if dt["substract_tilt"]:
-    offset_no_tilt = np.median(data_to_fit[0:stop])
-    data_to_fit = data_to_fit - offset_no_tilt
+    if not poc_found:
+        # No baseline: the median of the beginning of the curve is used
+        offset_no_tilt = np.median(data_to_fit[0:stop])
+        data_to_fit = data_to_fit - offset_no_tilt
 
-    return delta, data_to_fit, final_fit, first, stop
+    return delta, data_to_fit, final_fit, first, stop, poc_index_i, poc_pos_i, \
+        poc_found
+
+
+def fit_e_fixed_poc(delta, force, coeff, exponent):
+    """Elasticity fitted with the point of contact fixed at delta = 0.
+
+    The model F = coeff * E * delta ** exponent (0 before the contact) is
+    linear in E: least squares solution, E = sum(F g) / sum(g g) with
+    g = coeff * delta ** exponent. Returns nan without indentation.
+    """
+    if exponent is None:
+        return np.nan
+    g = coeff * np.power(np.clip(np.asarray(delta, float), 0, None), exponent)
+    norm = np.sum(g * g)
+    if not np.isfinite(norm) or norm <= 0:
+        return np.nan
+    return float(np.sum(np.asarray(force, float) * g) / norm)
+
+
+def fit_e_fixed_poc_unit(force, unit):
+    """Elasticity fitted with the point of contact fixed, for a model
+    F = E * unit (unit: force per unit modulus at each indentation, see
+    contact_models.unit_force). Returns nan without indentation."""
+    g = np.asarray(unit, float)
+    norm = np.sum(g * g)
+    if not np.isfinite(norm) or norm <= 0:
+        return np.nan
+    return float(np.sum(np.asarray(force, float) * g) / norm)
 
 
 def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):
     """
     Function to obtain delta0 (POC) and E0 by goodness of fit.
+
+    Returns nan for both values if the fit failed, i.e. if the covariance of
+    the parameters could not be estimated. This happens when the parameters
+    are not constrained by the data (no contact, too few points, ...): the
+    returned values would then be meaningless (often the initial guess).
     """
 
     # Initial guesses
@@ -96,11 +137,15 @@ def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):
     try:
         # Perform fit using numpy.optimize.curve_fit function.
         # Levenberg-Marquardt algorithm is used for the least squares fit.
-        fit_result = curve_fit(fit_model, masked_delta, masked_data_to_fit,
-                               method="lm", p0=initial_params,
-                               absolute_sigma=True)
-        ans, _ = fit_result
+        with warnings.catch_warnings():
+            # A failed fit is detected below with the covariance matrix
+            warnings.simplefilter("ignore", OptimizeWarning)
+            fit_result = curve_fit(fit_model, masked_delta,
+                                   masked_data_to_fit, method="lm",
+                                   p0=initial_params, absolute_sigma=True)
+        ans, pcov = fit_result
         delta0_fit, e0_fit = ans
+        fit_ok = np.all(np.isfinite(pcov))
 
     except RuntimeError:
         params = Parameters()
@@ -109,5 +154,9 @@ def do_hertz_fit(fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit):
         fit_result = minimize(fit_model_lmfit, params, args=(masked_delta, masked_data_to_fit))
         e0_fit = fit_result.params['e0_fit'].value
         delta0_fit = fit_result.params['delta0_fit'].value
+        fit_ok = fit_result.success and fit_result.errorbars
+
+    if not fit_ok:
+        return np.nan, np.nan
 
     return delta0_fit, e0_fit

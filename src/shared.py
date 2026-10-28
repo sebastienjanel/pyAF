@@ -67,27 +67,9 @@ VTK_first : see description in widgets_vtk/main.py file
 exp = None
 single_data = None
 groups_data = None
-conditions_data = None
-statistics_data = None  # Data frame containing data for analysis
 
 single_values = None
 groups_values = None
-conditions_values = None
-
-single_factors = None
-groups_factors = None
-conditions_factors = None
-
-single_frequencies = None
-groups_frequencies = None
-conditions_frequencies = None
-
-single_pdfs_x = None
-single_pdfs_y = None
-groups_pdfs_x = None
-groups_pdfs_y = None
-conditions_pdfs_x = None
-conditions_pdfs_y = None
 
 files_removed = False
 
@@ -95,14 +77,6 @@ layer_list = None
 
 clipboard_layer_positions = None
 VTK_first = True
-
-# Statistical tests available
-stat_tests = ["Two-sample T-test", "Paired T-test"]
-
-# Statistial plots available
-stat_plots = ["Boxplot", "Swarmplot", "Violinplot", "Superplot"]
-
-significance = {"***": 0.001, "**": 0.01, "*": 0.05}
 
 # Some basic colors used for the plots
 # Corresponds to "Blue", "Red", "Green", "Orange", "Black"

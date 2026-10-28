@@ -33,9 +33,11 @@
 
 import logging
 import copy
-from PyQt5 import QtWidgets
+import os
+from qtpy import QtWidgets
 from ..tools.temp_file import TempFile
 from ..widgets.progressbar import Progressbar
+from ..tools import gui_tools
 from ..tools import misc_tools
 from ..tools import stat_tools
 from ..load_and_save.file_loader.pyaf import LoaderPYAF
@@ -45,6 +47,10 @@ from ..tools import events_refresher
 from .. import widgets_list
 from .. import shared
 from .. import consts
+
+# Maps of the viscoelasticity with the same color scale in all the files at
+# load (the moduli, as the elasticity, keep the scale of each file)
+VISCO_MAPS = ("visco_fluidity", "visco_tan_delta")
 
 
 class Load:
@@ -124,7 +130,6 @@ class Load:
             widgets_list.widget_results_groups.update_widget()
 
             # Refetch results for the conditions
-            stat_tools.fetch_conditions_data()
             widgets_list.widget_results_experiment.update_widget()
 
             # Update the widgets
@@ -145,24 +150,21 @@ class Load:
             if files_info[i]["checked"] and ftype != "pyAF":
                 data = shared.exp.list[offset + count]
                 if data.corrupted_curves is not None:
-                    name = str(shared.exp.list[offset + count].filename)
+                    # Short name (as in the plots)
+                    from ..experiment import auto_short_name
+                    name = auto_short_name(os.path.basename(
+                        str(shared.exp.list[offset + count].filename)))
                     str_corrupted = str_corrupted + "<li> " + name + "</li>"
                     count += 1
 
         if str_corrupted != "" and consts.UNIT_TESTING is False:
             text = "The following files have corrupted curves: <ul>"\
                 + str_corrupted + "</ul>Please use the clean up widget to "\
-                "see which curves are corrupted.<br><br>"\
-                "You should also contact your AFM reseller for more "\
-                "informations."
+                "see which curves are corrupted."
 
-            # Create a message box
-            msg_corr = QtWidgets.QMessageBox()
-            msg_corr.setText("Error (Corrupted curves)")
-            msg_corr.setInformativeText(text)
-            msg_corr.setIcon(QtWidgets.QMessageBox.Critical)
-            msg_corr.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
-            msg_corr.exec_()
+            # Warning (orange sign, as the other messages)
+            gui_tools.show_success(None, "Corrupted curves", details=text,
+                                   warning=True)
 
         # Check files with missmatch in the number of segments described in the header and the segments found
         # while loading the file.
@@ -309,12 +311,11 @@ class Load:
             # Create tables to store results (Already done for .pyaf files)
             shared.exp.temp_file.create_tables_for_results(offset, "all")
 
-            # If apply_on_all is activated, update the piezo color for all the
-            # files for the first load. (And if it's not a pyAF file)
-            if shared.exp.apply_to_all_data:
-                for i in range(len(shared.exp.list)):
-                    data = shared.exp.list[i]
-                    data.color_opts_piezo[2] = shared.exp.global_max_piezo
+            # Piezo height: scale of each file (autoscale), the heights of
+            # different files are not comparable
+            data_set.color_opts_piezo[1] = 0
+            data_set.color_opts_piezo[2] = data_set.max_piezo
+            data_set.color_opts_piezo[3] = data_set.max_piezo / 2.0
 
 
 def update_colors_at_load():
@@ -337,10 +338,7 @@ def update_colors_at_load():
     found_stiffness = False
     found_work_and_rupture_force1_calculated = False
     found_events_calculated = False
-
-    # Piezo heigth can be taken from the first file, there is always
-    # a colorscale defined for this one
-    piezo = copy.deepcopy(shared.exp.list[0].color_opts_piezo)
+    visco = None
 
     for i in range(len(shared.exp.list)):
         data = shared.exp.list[i]
@@ -358,6 +356,10 @@ def update_colors_at_load():
             work = copy.deepcopy(data.color_opts_work)
             force1 = copy.deepcopy(data.color_opts_rupture_force1)
 
+        if data.visco_calculated and visco is None:
+            visco = [copy.deepcopy(data.get_color_opts(mt))
+                     for mt in VISCO_MAPS]
+
         if data.events_calculated and found_events_calculated is False:
             found_events_calculated = True
             events = copy.deepcopy(data.color_opts_events_per_curve)
@@ -366,11 +368,13 @@ def update_colors_at_load():
     # Set the values
     for i in range(len(shared.exp.list)):
         dt = shared.exp.list[i]
-        dt.color_opts_piezo = piezo
 
         if found_stiffness:
+            # The elasticity keeps the scale of each file (computed or
+            # saved), see apply_to_all
             dt.color_opts_topo = copy.deepcopy(topo)
-            dt.color_opts_stiffness = copy.deepcopy(stiffness)
+            if not dt.stiffness_calculated:
+                dt.color_opts_stiffness = copy.deepcopy(stiffness)
 
         if found_work_and_rupture_force1_calculated:
             dt.color_opts_work = copy.deepcopy(work)
@@ -379,3 +383,7 @@ def update_colors_at_load():
         if found_events_calculated:
             dt.color_opts_events_per_curve = copy.deepcopy(events)
             dt.color_opts_rupture_force2 = copy.deepcopy(force2)
+
+        if visco is not None:
+            for mt, opts in zip(VISCO_MAPS, visco):
+                dt.get_color_opts(mt)[:] = copy.deepcopy(opts)

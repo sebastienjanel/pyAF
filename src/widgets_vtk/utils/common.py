@@ -31,7 +31,18 @@
 
 """Common tools."""
 
+import os
 import vtk
+from ...tools import misc_tools
+
+
+def use_app_font(text_property):
+    """Text in the font of pyAF (Inter, as in the plots), VTK's default
+    (Arial) if the font file is missing."""
+    path = misc_tools.get_font_path()
+    if os.path.isfile(path):
+        text_property.SetFontFamily(vtk.VTK_FONT_FILE)
+        text_property.SetFontFile(path)
 
 
 def center_data(data, size_x, size_y, off=None):

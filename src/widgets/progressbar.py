@@ -31,7 +31,10 @@
 
 """A progressbar."""
 
-from PyQt5 import QtCore, QtWidgets
+import time
+
+from qtpy import QtCore, QtGui, QtWidgets
+from .. import widgets_list
 from ..tools.PYAFWidget import PYAFWidget
 
 
@@ -54,14 +57,35 @@ class Progressbar(PYAFWidget):
         self.widget_VL.addStretch(1)
         self.setLayout(self.widget_VL)
         self.counter = 0
+        self.last_events = 0.0
         self.progressbar.setRange(0, 0)
+        self.adjustSize()
         self.show()
+        # Center once shown, when the size of the title bar is known
+        self.center_window()
 
-    def update(self):
-        """Update by one step."""
-        self.progressbar.setValue(self.counter)
-        self.counter += 1
-        QtCore.QCoreApplication.processEvents()
+    def center_window(self):
+        """Center on the main window if it is displayed, else on the screen."""
+        main = widgets_list.widget_main
+        if main is not None and main.isVisible():
+            center = main.frameGeometry().center()
+        else:
+            screen = QtGui.QGuiApplication.primaryScreen()
+            center = screen.availableGeometry().center()
+        geometry = self.frameGeometry()
+        geometry.moveCenter(center)
+        self.move(geometry.topLeft())
+
+    def update(self, steps=1):
+        """Update by one step (or by the given number of steps)."""
+        self.counter += steps
+        self.progressbar.setValue(self.counter - 1)
+        # Process the events (redraw) at most every 50 ms: processing them
+        # at each step is slow, and also redraws the 3D view each time
+        now = time.monotonic()
+        if now - self.last_events > 0.05:
+            self.last_events = now
+            QtCore.QCoreApplication.processEvents()
 
     def set_label(self, text):
         """Update the label's text."""

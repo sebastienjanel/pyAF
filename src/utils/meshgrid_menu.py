@@ -32,11 +32,12 @@
 """Menu displayed when right-clicking on the meshgrids."""
 
 import os
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from .. import shared
 from .. import widgets_list
 from ..plots.PYAFPlot import PYAFPlot
+from ..tools import params_export
 from ..utils import discarding
 from ..widgets.plot_options import PlotOptionsWidget
 from ..widgets.progressbar import Progressbar
@@ -163,7 +164,7 @@ def create_meshgrid_menu(parent, widget, pos):
             action = QtWidgets.QAction("Change slope filter", parent)
             action.triggered.connect(lambda: parent.change_filter("slope"))
             menu.addAction(action)
-            action = QtWidgets.QAction("Change dist filter", parent)
+            action = QtWidgets.QAction("Change distance filter", parent)
             action.triggered.connect(lambda: parent.change_filter("dist"))
             menu.addAction(action)
 
@@ -251,31 +252,44 @@ def refresh_meshgrids():
     widgets_list.widget_results.MPL_canvas1.update_plot()
 
 
+def tiff_path(filename):
+    """File name with a .tif or .tiff extension."""
+    filename = str(filename)
+    if not filename.lower().endswith((".tif", ".tiff")):
+        filename += ".tif"
+    return filename
+
+
+def write_image_params(path, export):
+    """Parameters of an image of the map of the current file, next to it
+    (name.params.json)."""
+    params_export.write_sidecar(
+        path, export, data_ids=[shared.exp.id_selected],
+        options={"map": shared.exp.current_data.meshgrid_type})
+
+
 def save_without_border(parent):
     """Save the meshgrid without borders."""
-    ffilename, _ = QtWidgets.QFileDialog.getSaveFileName(parent,
-        "Choose a file name", ".", "TIFF (*.tiff)")
-
+    filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+        parent, "Choose a file name", ".", "TIFF (*.tif *.tiff)")
     if not filename:
         return
-    else:
-        orig_save_path = str(filename).split(".")[0]
-        ext = str(filename).split(".")[1]
-
-        save_path = orig_save_path + "." + ext
-        PYAFPlot(parent, "meshgrid", save_path=save_path, noborder=True)
+    save_path = tiff_path(filename)
+    PYAFPlot(parent, "meshgrid", save_path=save_path, noborder=True)
+    write_image_params(save_path, "Map image")
 
 
 def save_slices_as(parent):
     """Save all the slices."""
     data = shared.exp.current_data
-    filename, _ = QtWidgets.QFileDialog.getSaveFileName(parent,
-        "Choose a file name", ".", "TIFF (*.tiff)")
+    filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+        parent, "Choose a file name", ".", "TIFF (*.tif *.tiff)")
     if not filename:
         return
-    else:
-        orig_save_path = str(filename).split(".")[0]
-        ext = str(filename).split(".")[1]
+    # Name of the slices: name_0.tif, name_1.tif... (no split at the dots
+    # of the folders)
+    orig_save_path, ext = os.path.splitext(tiff_path(filename))
+    ext = ext[1:]
 
     # Save the oldposition to reset it afterwards
     old_pos = data.stiffness_depth_view
@@ -301,3 +315,4 @@ def save_slices_as(parent):
 
     # Close the progressbar
     widgets_list.widget_progressbar.close()
+    write_image_params(orig_save_path + "." + ext, "Map slices (images)")

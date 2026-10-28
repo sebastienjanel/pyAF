@@ -31,11 +31,15 @@
 
 """Menu for the 3D widget."""
 
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..tools.gui_tools import PYAFButton
-from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFButtonGroup
+from ..tools.gui_tools import PYAFComboBox
+from ..tools.gui_tools import PYAFToggle
+from ..tools import map_values
+from .utils import vtk_afm
+from .utils.vtk_image import COLORMAPS
 from ..tools import misc_tools
 from .slicing import SlicingWidget
 from ..widgets.plot_options import PlotOptionsWidget
@@ -47,142 +51,131 @@ from .. import consts
 
 
 class MenuOptionsWidget(QtWidgets.QWidget):
-    """This widget contains the menu with to options for a particular layer."""
+    """Options of the selected layer: its position, and the boxes of its
+    type (AFM, image, substrate, isosurface)."""
 
     def __init__(self):
         super().__init__()
 
-        VL = QtWidgets.QVBoxLayout()
-        VL.setContentsMargins(0, 0, 0, 0)
-
-        # Tabs
-        self.tabs = QtWidgets.QTabWidget()
+        self.VL = QtWidgets.QVBoxLayout()
+        self.VL.setContentsMargins(0, 0, 0, 0)
 
         self.tab_options = WidgetOptions(self)
         self.tab_afm = WidgetAFM(self)
-        self.tab_afm2 = WidgetAFM2(self)
-
-        self.tab_HR = None
         self.tab_Optics = None
         self.tab_glass = None
         self.tab_isosurface = None
 
-        self.tabs.addTab(self.tab_options, "Options")
-        self.tabs.addTab(self.tab_afm, "AFM")
-        self.tabs.addTab(self.tab_afm2, "AFM 2")
+        # Boxes of the type of the selected layer
+        self.VL_type = QtWidgets.QVBoxLayout()
+        self.VL_type.setContentsMargins(0, 0, 0, 0)
+        self.VL_type.addWidget(self.tab_afm)
+        self.type_box = None
 
-        VL.addWidget(self.tabs)
-
-        self.setLayout(VL)
+        # The position box goes in the left column, below the list of the
+        # layers (see MenuLayerListWidget.add_position_box)
+        self.VL.addLayout(self.VL_type)
+        self.VL.addStretch(1)
+        self.setLayout(self.VL)
+        self.setFixedWidth(300)
 
     def update_widget(self):
-        """Update the GUI."""
+        """Update the GUI: boxes of the type of the selected layer."""
         row = widgets_list.widget_vtk.get_current_layer()
+        layer_type = shared.layer_list[row].type
 
-        # Get current tab index to reselect it afterwards
-        index = self.tabs.currentIndex()
+        # Remove the box of the previous layer type
+        if self.type_box is not None:
+            self.type_box.setParent(None)
+            self.type_box.deleteLater()
+            self.type_box = None
 
-        # Remove tabs
-        if self.tabs.count() == 3:
-            self.tabs.removeTab(2)
-        self.tabs.removeTab(1)
-
-        # Get the type of tab and display it
-        if shared.layer_list[row].type == "afm":
-            self.tabs.addTab(self.tab_afm, "AFM 1")
-            self.tabs.addTab(self.tab_afm2, "AFM 2")
+        # The AFM boxes stay (for the AFM layer of the selected layer, see
+        # WidgetAFM.current), the box of the other layer types below
+        if any(layer.type == "afm" for layer in shared.layer_list):
             self.tab_afm.update_widget()
-            self.tab_afm2.update_widget()
-        elif shared.layer_list[row].type == "single_image" or \
-                shared.layer_list[row].type == "stack":
-            self.tab_Optics = WidgetOptics(self)
-            self.tabs.addTab(self.tab_Optics, "Image")
-            self.tab_Optics.update_widget()
-        elif shared.layer_list[row].type == "HR":
-            self.tab_HR = WidgetOptics(self)
-            self.tabs.addTab(self.tab_HR, "HR")
-            self.tab_HR.update_widget()
-        elif shared.layer_list[row].type == "glass":
-            self.tab_glass = WidgetGlass(self)
-            self.tabs.addTab(self.tab_glass, "Substrate")
-            self.tab_glass.update_widget()
-        elif shared.layer_list[row].type == "isosurface":
-            self.tab_isosurface = WidgetIsoSurface(self)
-            self.tabs.addTab(self.tab_isosurface, "Isosurface")
-            self.tab_isosurface.update_widget()
+        if layer_type != "afm":
+            if layer_type in ("single_image", "stack"):
+                self.tab_Optics = WidgetOptics(self)
+                widget, title = self.tab_Optics, "Image"
+            elif layer_type == "glass":
+                self.tab_glass = WidgetGlass(self)
+                widget, title = self.tab_glass, "Substrate"
+            else:
+                self.tab_isosurface = WidgetIsoSurface(self)
+                widget, title = self.tab_isosurface, "Isosurface"
+            self.type_box = QtWidgets.QGroupBox(title)
+            layout = QtWidgets.QVBoxLayout()
+            layout.setContentsMargins(4, 4, 4, 4)
+            layout.addWidget(widget)
+            self.type_box.setLayout(layout)
+            self.VL_type.addWidget(self.type_box)
+            widget.update_widget()
 
         self.tab_options.update_widget()
 
-        # Select tab
-        self.tabs.setCurrentIndex(index)
 
-
-class WidgetOptions(QtWidgets.QWidget):
-    """Tab containing the main options for a layer.
-
-    This tab is common for all layers. It allows to change the position of the
-    layer and it's opacity.
-    """
+class WidgetOptions(QtWidgets.QGroupBox):
+    """Position of the selected layer (common to all the layers): mouse
+    action, position, angle, opacity and z scale."""
 
     def __init__(self, parent):
-        super().__init__()
+        super().__init__("Position")
 
         self.parent = parent
 
-        self.VL = QtWidgets.QVBoxLayout()
+        GL = QtWidgets.QGridLayout()
+        GL.setContentsMargins(6, 6, 6, 6)
+        GL.setVerticalSpacing(4)
 
-        # Camera actions
-        self.VL_actions = QtWidgets.QVBoxLayout()
+        # Mouse action
+        HL_actions = QtWidgets.QHBoxLayout()
         self.BG_action = PYAFButtonGroup(self, "RBT_action")
         self.RBT_camera = QtWidgets.QRadioButton("Camera")
         self.RBT_translate = QtWidgets.QRadioButton("Translate")
         self.RBT_rotate = QtWidgets.QRadioButton("Rotate")
         self.RBT_camera.setChecked(True)
-        self.BG_action.addButton(self.RBT_camera, 0)
-        self.BG_action.addButton(self.RBT_translate, 1)
-        self.BG_action.addButton(self.RBT_rotate, 2)
-        self.VL_actions.addWidget(self.RBT_camera)
-        self.VL_actions.addWidget(self.RBT_translate)
-        self.VL_actions.addWidget(self.RBT_rotate)
+        for index, button in enumerate((self.RBT_camera, self.RBT_translate,
+                                        self.RBT_rotate)):
+            self.BG_action.addButton(button, index)
+            HL_actions.addWidget(button)
+        HL_actions.addStretch(1)
+        self.RBT_camera.setToolTip("The mouse moves the camera")
+        self.RBT_translate.setToolTip(
+            "The mouse moves the selected layer (view from the top)")
+        self.RBT_rotate.setToolTip("The mouse rotates the selected layer")
 
-        # Position
-        self.box = QtWidgets.QGroupBox("Position")
-        self.vl_box = QtWidgets.QVBoxLayout()
+        # Position [um] and angle [degrees], two per row
+        self.IN_pos_x = PYAFInput(self, "pos_x", "X [\u03bcm]", width=60)
+        self.IN_pos_y = PYAFInput(self, "pos_y", "Y [\u03bcm]", width=60)
+        self.IN_pos_z = PYAFInput(self, "pos_z", "Z [\u03bcm]", width=60)
+        self.IN_angle = PYAFInput(self, "angle", "Angle [\u00b0]", width=60)
+        for field in (self.IN_pos_x, self.IN_pos_y, self.IN_pos_z,
+                      self.IN_angle):
+            field.input.setValidator(misc_tools.validator("F"))
 
-        self.IN_pos_x = PYAFInput(self, "pos_x", "X", width=200)
-        self.IN_pos_x.input.setValidator(misc_tools.validator("F"))
-        self.IN_pos_y = PYAFInput(self, "pos_y", "Y", width=200)
-        self.IN_pos_y.input.setValidator(misc_tools.validator("F"))
-        self.IN_pos_z = PYAFInput(self, "pos_z", "Z", width=200)
-        self.IN_pos_z.input.setValidator(misc_tools.validator("F"))
-        self.IN_angle = PYAFInput(self, "angle", "Angle", width=200)
-        self.IN_angle.input.setValidator(misc_tools.validator("F"))
+        self.IN_opacity = PYAFInput(self, "opacity", "Opacity [%]", width=60)
+        self.IN_opacity.input.setValidator(
+            misc_tools.validator("RI", bottom=0, top=100))
+        self.TG_display_zscale = PYAFToggle(self, "disp_zscale", "Z scale")
 
-        layer = shared.layer_list[0]
-        self.IN_pos_x.changeValue(str(layer.pos_x / 1000.0))
-        self.IN_pos_y.changeValue(str(layer.pos_y / 1000.0))
-        self.IN_pos_z.changeValue(str(layer.pos_z / 1000.0))
-        self.IN_angle.changeValue(str(layer.angle))
-        self.vl_box.addWidget(self.IN_pos_x)
-        self.vl_box.addWidget(self.IN_pos_y)
-        self.vl_box.addWidget(self.IN_pos_z)
-        self.vl_box.addWidget(self.IN_angle)
-        self.box.setLayout(self.vl_box)
+        GL.addLayout(HL_actions, 0, 0, 1, 2)
+        GL.addWidget(self.IN_pos_x, 1, 0)
+        GL.addWidget(self.IN_pos_y, 1, 1)
+        GL.addWidget(self.IN_pos_z, 2, 0)
+        GL.addWidget(self.IN_angle, 2, 1)
+        GL.addWidget(self.IN_opacity, 3, 0)
+        GL.addWidget(self.TG_display_zscale, 3, 1)
+        self.setLayout(GL)
 
-        text = "Opacity (%)"
-        self.IN_opacity = PYAFInput(self, "opacity", text, width=80)
-        self.IN_opacity.input.setValidator(misc_tools.validator("RI", bottom=0, top=100))
+        self.show_position(shared.layer_list[0])
 
-        label = "Display Z scale"
-        self.CB_display_zscale = PYAFCheckBox(self, "disp_zscale", label)
-
-        self.VL.addLayout(self.VL_actions)
-        self.VL.addWidget(self.box)
-        self.VL.addWidget(self.IN_opacity)
-        self.VL.addWidget(self.CB_display_zscale)
-        self.VL.addStretch(1)
-
-        self.setLayout(self.VL)
+    def show_position(self, layer):
+        """Position of a layer in the inputs (2 decimals, angle 1)."""
+        self.IN_pos_x.changeValue("%.2f" % (layer.pos_x / 1000.0))
+        self.IN_pos_y.changeValue("%.2f" % (layer.pos_y / 1000.0))
+        self.IN_pos_z.changeValue("%.2f" % (layer.pos_z / 1000.0))
+        self.IN_angle.changeValue("%.1f" % layer.angle)
 
     def button_clicked(self, button):
         """Called when a button is clicked."""
@@ -203,15 +196,11 @@ class WidgetOptions(QtWidgets.QWidget):
         index = widgets_list.widget_vtk.get_current_layer()
         layer = shared.layer_list[index]
 
-        # Update the inputs
-        self.IN_pos_x.changeValue(str(layer.pos_x / 1000.0))
-        self.IN_pos_y.changeValue(str(layer.pos_y / 1000.0))
-        self.IN_pos_z.changeValue(str(layer.pos_z / 1000.0))
-        self.IN_angle.changeValue(str(layer.angle))
+        self.show_position(layer)
         self.IN_opacity.changeValue(str(layer.opacity))
 
         # Display or hide the z scale
-        self.CB_display_zscale.setChecked(layer.display_z_scale)
+        self.TG_display_zscale.setChecked(layer.display_z_scale)
 
     def input_updated(self, name):
         """Called when an input field is updated."""
@@ -225,15 +214,12 @@ class WidgetOptions(QtWidgets.QWidget):
             newpos_z = self.IN_pos_z.get_float_value() * 1000.0
             angle = self.IN_angle.get_float_value()
 
-            if angle == layer.angle:
-                dx, dy, dz = 0, 0, 0
-                if newpos_x != layer.pos_x:
-                    dx = newpos_x - layer.pos_x
-                if newpos_y != layer.pos_y:
-                    dy = newpos_y - layer.pos_y
-                if newpos_z != layer.pos_z:
-                    dz = newpos_z - layer.pos_z
-
+            if round(angle, 1) == round(layer.angle, 1):
+                # Moves smaller than the displayed precision are ignored
+                dx, dy, dz = [new - old if abs(new - old) >= 10 else 0
+                              for new, old in ((newpos_x, layer.pos_x),
+                                               (newpos_y, layer.pos_y),
+                                               (newpos_z, layer.pos_z))]
                 layer.translate(dx, dy, dz)
 
             else:
@@ -243,15 +229,31 @@ class WidgetOptions(QtWidgets.QWidget):
             value = self.IN_opacity.get_int_value()
             shared.layer_list[index].set_opacity(value)
 
-    def checkbox_clicked(self, name):
-        """Called whenever a checkbox is clicked."""
+    def toggle_clicked(self, name):
+        """Called when a toggle is clicked."""
         index = widgets_list.widget_vtk.get_current_layer()
         layer = shared.layer_list[index]
 
         if name == "disp_zscale":
-            layer.display_z_scale = self.CB_display_zscale.isChecked()
+            layer.display_z_scale = self.TG_display_zscale.isChecked()
             # Reinitialize the axes
             layer.init_axes()
+
+
+# LUTs of the images from black to a color (RGB); then the colormaps
+# (see vtk_image) and the custom colors
+LUT_COLORS = {"Gray": (1.0, 1.0, 1.0), "Red": (1.0, 0.0, 0.0),
+              "Green": (0.0, 1.0, 0.0), "Blue": (0.0, 0.0, 1.0),
+              "Cyan": (0.0, 1.0, 1.0), "Magenta": (1.0, 0.0, 1.0),
+              "Yellow": (1.0, 1.0, 0.0)}
+LUTS = ["None"] + list(LUT_COLORS) + list(COLORMAPS) + ["Custom"]
+
+
+def color_icon(color):
+    """Square icon of a color (RGB(A) from 0 to 1)."""
+    pixmap = QtGui.QPixmap(14, 14)
+    pixmap.fill(QtGui.QColor.fromRgbF(*color[:3]))
+    return QtGui.QIcon(pixmap)
 
 
 class WidgetOptics(QtWidgets.QWidget):
@@ -272,60 +274,82 @@ class WidgetOptics(QtWidgets.QWidget):
         self.VL = QtWidgets.QVBoxLayout()
 
         if self.type == "single_image" or self.type == "stack":
-            self.box = QtWidgets.QGroupBox()
-            self.vl_box = QtWidgets.QVBoxLayout()
+            # Sizes of the image and of its pixels [um], x and y (and z for
+            # the stacks) on a line
+            GL = QtWidgets.QGridLayout()
+            GL.setContentsMargins(0, 0, 0, 0)
+            GL.setVerticalSpacing(4)
+            GL.addWidget(QtWidgets.QLabel("Size [\u03bcm]"), 0, 0)
+            GL.addWidget(QtWidgets.QLabel("Pixel [\u03bcm]"), 1, 0)
+            self.IN_x_size = PYAFInput(self, "size_x", "X", width=55)
+            self.IN_y_size = PYAFInput(self, "size_y", "Y", width=55)
+            self.IN_z_size = PYAFInput(self, "size_z", "Z", width=55)
+            self.IN_x_res = PYAFInput(self, "res_x", "X", width=55)
+            self.IN_y_res = PYAFInput(self, "res_y", "Y", width=55)
+            self.IN_z_res = PYAFInput(self, "res_z", "Z", width=55)
+            fields = [[self.IN_x_size, self.IN_y_size],
+                      [self.IN_x_res, self.IN_y_res]]
+            if self.type == "stack":
+                fields[0].append(self.IN_z_size)
+                fields[1].append(self.IN_z_res)
+            for row, line in enumerate(fields):
+                for col, field in enumerate(line):
+                    field.input.setValidator(misc_tools.validator("UF"))
+                    GL.addWidget(field, row, col + 1)
+            self.IN_x_res.setToolTip("Pixel width")
+            self.IN_y_res.setToolTip("Pixel height")
+            GL.setColumnStretch(len(fields[0]) + 1, 1)
+            self.VL.addLayout(GL)
 
-            label = "X size (um)"
-            self.IN_x_size = PYAFInput(self, "size_x", label, width=100)
-            self.IN_x_size.input.setValidator(misc_tools.validator("UF"))
-            label = "Y size (um)"
-            self.IN_y_size = PYAFInput(self, "size_y", label, width=100)
-            self.IN_y_size.input.setValidator(misc_tools.validator("UF"))
-            label = "Z size (um)"
-            self.IN_z_size = PYAFInput(self, "size_z", label, width=100)
-            self.IN_z_size.input.setValidator(misc_tools.validator("UF"))
-            label = "Pixel width (um)"
-            self.IN_x_res = PYAFInput(self, "res_x", label, width=100)
-            self.IN_x_res.input.setValidator(misc_tools.validator("UF"))
-            label = "Pixel height (um)"
-            self.IN_y_res = PYAFInput(self, "res_y", label, width=100)
-            self.IN_y_res.input.setValidator(misc_tools.validator("UF"))
-            label = "Pixel height (um)"
-            self.IN_z_res = PYAFInput(self, "res_z", label, width=100)
-            self.IN_z_res.input.setValidator(misc_tools.validator("UF"))
-            self.CB_bind = PYAFCheckBox(self, "bind", "Maintain Aspect Ratio")
+            self.TG_bind = PYAFToggle(self, "bind", "Maintain aspect ratio")
+            self.VL.addWidget(self.TG_bind)
+            HL = QtWidgets.QHBoxLayout()
+            self.BT_apply = PYAFButton(self, "apply", "Apply changes", 125)
+            self.BT_reset = PYAFButton(self, "reset", "Reset", 125)
+            self.BT_reset.setToolTip("Sizes of the file")
+            HL.addWidget(self.BT_apply)
+            HL.addWidget(self.BT_reset)
+            HL.addStretch(1)
+            self.VL.addLayout(HL)
 
-            self.BT_apply = PYAFButton(self, "apply", "Apply changes", 200)
-            self.BT_reset = PYAFButton(self, "reset", "Reset to default", 200)
-            self.vl_box.addWidget(self.IN_x_size)
-            self.vl_box.addWidget(self.IN_y_size)
-            self.vl_box.addWidget(self.IN_z_size)
-            self.vl_box.addWidget(self.IN_x_res)
-            self.vl_box.addWidget(self.IN_y_res)
-            self.vl_box.addWidget(self.IN_z_res)
-            self.vl_box.addWidget(self.CB_bind)
-            self.vl_box.addWidget(self.BT_apply)
-            self.vl_box.addWidget(self.BT_reset)
-            self.box.setLayout(self.vl_box)
-
-            self.VL.addWidget(self.box)
-
-            self.BT_use_LUT = PYAFButton(self, "use_lut", "Use LUT", 200)
-            label = "LUT threshold "
-            self.IN_threshold = PYAFInput(self, "input_threshold", label)
-            self.IN_threshold.input.setValidator(misc_tools.validator("UF"))
-            label = "Invert LUT"
-            self.BT_invert_LUT = PYAFButton(self, "invert_lut", label, 200)
-            label = "LUT max color"
-            self.BT_LUT_max_col = PYAFButton(self, "lut_max_color", label, 200)
-            self.VL.addWidget(self.BT_use_LUT)
-            self.VL.addWidget(self.BT_invert_LUT)
-            self.VL.addWidget(self.BT_LUT_max_col)
+            # Lookup table (LUT): colors of the gray levels, the background
+            # (dark, or bright if inverted) transparent up to the threshold
+            self.list_LUT = PYAFComboBox(self, "lut")
+            for name in LUTS:
+                self.list_LUT.addItem(name)
+            self.list_LUT.fit_to_contents()
+            self.list_LUT.setToolTip(
+                "Colors of the gray levels of the image (None: original "
+                "image). Custom: from the min to the max color.")
+            self.TG_invert_LUT = PYAFToggle(self, "invert_lut", "Invert")
+            self.TG_invert_LUT.setToolTip(
+                "Colors reversed (bright pixels in the min color); the "
+                "threshold makes the bright pixels transparent (e.g. bright "
+                "background)")
+            HL = QtWidgets.QHBoxLayout()
+            HL.addWidget(QtWidgets.QLabel("LUT"))
+            HL.addWidget(self.list_LUT)
+            HL.addWidget(self.TG_invert_LUT)
+            HL.addStretch(1)
+            self.VL.addLayout(HL)
+            HL = QtWidgets.QHBoxLayout()
+            self.BT_LUT_min_col = PYAFButton(self, "lut_min_color",
+                                             "Min color", 125)
+            self.BT_LUT_max_col = PYAFButton(self, "lut_max_color",
+                                             "Max color", 125)
+            HL.addWidget(self.BT_LUT_min_col)
+            HL.addWidget(self.BT_LUT_max_col)
+            HL.addStretch(1)
+            self.VL.addLayout(HL)
+            label = "Threshold (0-255)"
+            self.IN_threshold = PYAFInput(self, "input_threshold", label,
+                                          width=55)
+            self.IN_threshold.input.setValidator(
+                misc_tools.validator("RI", bottom=0, top=255))
+            self.IN_threshold.setToolTip(
+                "Gray levels of the background made transparent (dark "
+                "background, bright if inverted)")
             self.VL.addWidget(self.IN_threshold)
-
-        elif self.type == "HR":
-            self.BT_HR_color = PYAFButton(self, "HR_color", "HR Color", 200)
-            self.VL.addWidget(self.BT_HR_color)
 
         if self.type == "stack":
             self.IN_slide = PYAFInput(self, "input_slide", "Slide", width=100)
@@ -362,11 +386,11 @@ class WidgetOptics(QtWidgets.QWidget):
         # Options to flip the images (X or Y, mirrored flip)
         VL_flip = QtWidgets.QVBoxLayout()
 
-        self.CB_flip_x = PYAFCheckBox(self, "flip_x", "Flip around X axis")
-        self.CB_flip_y = PYAFCheckBox(self, "flip_y", "Flip around Y axis")
+        self.TG_flip_x = PYAFToggle(self, "flip_x", "Flip around X axis")
+        self.TG_flip_y = PYAFToggle(self, "flip_y", "Flip around Y axis")
 
-        VL_flip.addWidget(self.CB_flip_x)
-        VL_flip.addWidget(self.CB_flip_y)
+        VL_flip.addWidget(self.TG_flip_x)
+        VL_flip.addWidget(self.TG_flip_y)
 
         if consts.ADVANCED:
             self.VL.addLayout(VL_flip)
@@ -374,8 +398,12 @@ class WidgetOptics(QtWidgets.QWidget):
         # Option to smooth the image
         VL_smooth = QtWidgets.QVBoxLayout()
 
-        self.IN_smooth = PYAFInput(self, "smooth", "Smooth (Gaussian)")
+        label = "Gaussian smoothing \u03c3 [px]"
+        self.IN_smooth = PYAFInput(self, "smooth", label, width=55)
         self.IN_smooth.input.setValidator(misc_tools.validator("UF"))
+        self.IN_smooth.setToolTip(
+            "Smooths the image (Gaussian filter of standard deviation "
+            "\u03c3, in pixels; 0: no smoothing)")
 
         VL_smooth.addWidget(self.IN_smooth)
 
@@ -407,37 +435,17 @@ class WidgetOptics(QtWidgets.QWidget):
             layer.update_actor()
             self.update_widget()
 
-        elif button == "use_lut":
-            if layer.use_lut:
-                layer.use_lut = False
-            else:
-                layer.use_lut = True
-
-            layer.update_actor()
-
-            self.update_widget()
-
-        elif button == "invert_lut":
-            if layer.lut_invert:
-                layer.lut_invert = False
-            else:
-                layer.lut_invert = True
-
-            layer.update_actor()
-
-        elif button == "HR_color":
-            # self.colorwidget_HR = MPQColorDialog(self, "HR_color")
-            pass
-
         elif button == "apply":
             layer.update_actor()
             self.update_widget()
 
-        elif button == "lut_max_color":
-            color = misc_tools.ask_user_for_color(layer.lut_max_color)
+        elif button in ("lut_min_color", "lut_max_color"):
+            # Attributes lut_min_color and lut_max_color of the layer
+            color = misc_tools.ask_user_for_color(getattr(layer, button))
             if color is not False:
-                layer.lut_max_color = color
+                setattr(layer, button, color)
                 layer.update_actor()
+                self.update_widget()
 
         elif button == "binary_tresh":
             if widgets_list.widget_vtk_binary_threshold is None:
@@ -446,6 +454,21 @@ class WidgetOptics(QtWidgets.QWidget):
             else:
                 widgets_list.widget_vtk_binary_threshold.activateWindow()
                 widgets_list.widget_vtk_binary_threshold.raise_()
+
+    def list_updated(self, name):
+        """A LUT was chosen: colors from black to a color, colormap, or
+        custom colors."""
+        index = widgets_list.widget_vtk.get_current_layer()
+        layer = shared.layer_list[index]
+        lut = self.list_LUT.currentText()
+        layer.use_lut = lut != "None"
+        if layer.use_lut:
+            layer.lut_name = lut
+            if lut in LUT_COLORS:
+                layer.lut_min_color = [0.0, 0.0, 0.0, 1.0]
+                layer.lut_max_color = list(LUT_COLORS[lut]) + [1.0]
+        layer.update_actor()
+        self.update_widget()
 
     def slider_moved(self):
         """Called when the slider for the stacks is moved."""
@@ -462,14 +485,18 @@ class WidgetOptics(QtWidgets.QWidget):
         layer = shared.layer_list[index]
 
         if name == "bind":
-            layer.bind = self.CB_bind.isChecked()
+            layer.bind = self.TG_bind.isChecked()
+
+        elif name == "invert_lut":
+            layer.lut_invert = self.TG_invert_LUT.isChecked()
+            layer.update_actor()
 
         elif name == "flip_x":
-            layer.flip_x = self.CB_flip_x.isChecked()
+            layer.flip_x = self.TG_flip_x.isChecked()
             layer.update_actor()
 
         elif name == "flip_y":
-            layer.flip_y = self.CB_flip_y.isChecked()
+            layer.flip_y = self.TG_flip_y.isChecked()
             layer.update_actor()
 
     def input_updated(self, name):
@@ -553,28 +580,29 @@ class WidgetOptics(QtWidgets.QWidget):
         layer = shared.layer_list[layer_id]
 
         if layer.type == "single_image" or layer.type == "stack":
-            self.IN_x_size.changeValue(layer.size_x / 1000.0)
-            self.IN_y_size.changeValue(layer.size_y / 1000.0)
-            self.IN_x_res.changeValue(layer.res_x / 1000.0)
-            self.IN_y_res.changeValue(layer.res_y / 1000.0)
+            # Sizes with 2 decimals, pixels with 3 significant digits [um]
+            self.IN_x_size.changeValue("%.2f" % (layer.size_x / 1000.0))
+            self.IN_y_size.changeValue("%.2f" % (layer.size_y / 1000.0))
+            self.IN_x_res.changeValue("%.3g" % (layer.res_x / 1000.0))
+            self.IN_y_res.changeValue("%.3g" % (layer.res_y / 1000.0))
+            if layer.type == "stack":
+                self.IN_z_size.changeValue("%.2f" % (layer.size_z / 1000.0))
+                self.IN_z_res.changeValue("%.3g" % (layer.res_z / 1000.0))
+            self.TG_bind.setChecked(layer.bind)
+
+            self.list_LUT.setCurrentText(
+                layer.lut_name if layer.use_lut else "None")
+            self.TG_invert_LUT.setChecked(layer.lut_invert)
             self.IN_threshold.changeValue(layer.lut_threshold)
-            if layer.use_lut:
-                self.BT_use_LUT.setText("No LUT")
-            else:
-                self.BT_use_LUT.setText("Use LUT")
-
-            self.CB_bind.setChecked(layer.bind)
-
-            if layer.type == "single_image":
-                self.IN_z_size.changeValue("None")
-                self.IN_z_size.setEnabled(False)
-                self.IN_z_res.changeValue("None")
-                self.IN_z_res.setEnabled(False)
-            else:
-                self.IN_z_size.changeValue(layer.size_z / 1000.0)
-                self.IN_z_size.setEnabled(True)
-                self.IN_z_res.changeValue(layer.res_z / 1000.0)
-                self.IN_z_res.setEnabled(True)
+            for button, color in ((self.BT_LUT_min_col, layer.lut_min_color),
+                                  (self.BT_LUT_max_col, layer.lut_max_color)):
+                button.setIcon(color_icon(color))
+            for widget in (self.TG_invert_LUT, self.IN_threshold):
+                widget.setEnabled(layer.use_lut)
+            # Colors chosen only for the custom LUT
+            custom = layer.use_lut and layer.lut_name == "Custom"
+            self.BT_LUT_min_col.setEnabled(custom)
+            self.BT_LUT_max_col.setEnabled(custom)
 
             self.IN_smooth.changeValue(layer.smooth_gaussian)
 
@@ -584,8 +612,8 @@ class WidgetOptics(QtWidgets.QWidget):
             self.IN_slide_op_others.changeValue(layer.others_opacity)
             self.slider.setValue(layer.slide_pos)
 
-        self.CB_flip_x.setChecked(layer.flip_x)
-        self.CB_flip_y.setChecked(layer.flip_y)
+        self.TG_flip_x.setChecked(layer.flip_x)
+        self.TG_flip_y.setChecked(layer.flip_y)
 
 
 class WidgetGlass(QtWidgets.QWidget):
@@ -608,11 +636,11 @@ class WidgetGlass(QtWidgets.QWidget):
         label = "Y size (um) : "
         self.IN_y_size = PYAFInput(self, "size_y", label, width=100)
         self.IN_y_size.input.setValidator(misc_tools.validator("UF"))
-        self.CB_bind = PYAFCheckBox(self, "bind", "Maintain Aspect Ratio")
+        self.TG_bind = PYAFToggle(self, "bind", "Maintain aspect ratio")
         self.BT_reset = PYAFButton(self, "reset", "Reset to default", 200)
         self.vl_box.addWidget(self.IN_x_size)
         self.vl_box.addWidget(self.IN_y_size)
-        self.vl_box.addWidget(self.CB_bind)
+        self.vl_box.addWidget(self.TG_bind)
         self.vl_box.addWidget(self.BT_reset)
         self.box.setLayout(self.vl_box)
 
@@ -622,12 +650,12 @@ class WidgetGlass(QtWidgets.QWidget):
 
         self.setLayout(self.VL)
 
-    def checkbox_clicked(self):
+    def checkbox_clicked(self, _name=None):
         """Called when a checkbox is clicked."""
         layer_id = widgets_list.widget_vtk.get_current_layer()
         layer = shared.layer_list[layer_id]
 
-        layer.bind = self.CB_bind.isChecked()
+        layer.bind = self.TG_bind.isChecked()
 
     def button_clicked(self, button):
         """Called when a button is clicked."""
@@ -670,55 +698,175 @@ class WidgetGlass(QtWidgets.QWidget):
         self.IN_x_size.changeValue(layer.size_x / 1000.0)
         self.IN_y_size.changeValue(layer.size_y / 1000.0)
 
-        self.CB_bind.setChecked(layer.bind)
+        self.TG_bind.setChecked(layer.bind)
 
 
 class WidgetAFM(QtWidgets.QWidget):
-    """Widget with options for the AFM layer."""
+    """Boxes of the AFM layers: Display (map, height, 3D or flat view,
+    smoothing, slicing) and Colors (color options, apply to all,
+    indentation segment)."""
 
     def __init__(self, parent):
         super().__init__()
 
         self.parent = parent
-        self.open = True
 
-        # Load the settings
-        self.settings = QtCore.QSettings()
+        VL = QtWidgets.QVBoxLayout()
+        VL.setContentsMargins(0, 0, 0, 0)
 
-        self.VL = QtWidgets.QVBoxLayout()
+        # --- Display --------------------------------------------------------
+        box_display = QtWidgets.QGroupBox("Display")
+        GL = QtWidgets.QGridLayout()
+        GL.setContentsMargins(6, 6, 6, 6)
+        GL.setVerticalSpacing(4)
 
-        # parent.parent.parent = MenuWidget.OpenglWidget.DataWidget
-        self.afm_colors_widget = PlotOptionsWidget(self, "vtk")
-        self.afm_indentation_widget = WidgetIndentation(self)
-        self.VL.addWidget(self.afm_colors_widget)
-        self.VL.addWidget(self.afm_indentation_widget)
+        self.list_maps = PYAFComboBox(self, "map")
+        self.list_maps.setToolTip(
+            "Map drawn on the surface (the computed maps of the results "
+            "tab).\nThe elasticity computed with the Tomography is drawn as "
+            "a volume (one value per indentation segment).")
+        for combo in ("list_maps",):
+            getattr(self, combo).setSizeAdjustPolicy(
+                QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            getattr(self, combo).setMinimumContentsLength(14)
+        self.list_height = PYAFComboBox(self, "height")
+        self.list_height.setToolTip(
+            "Height of the surface: zero-force topography (computed with "
+            "the elasticity) or piezo height")
 
-        label = "Refresh background (slower)"
-        self.CB_refresh = PYAFCheckBox(self, "refresh_background", label)
-        checked = self.settings.value("refreshBackgroundInOpenGL", True)
-        checked = checked
-        if checked:
-            self.CB_refresh.setChecked(True)
-        else:
-            self.CB_refresh.setChecked(False)
+        HL_mode = QtWidgets.QHBoxLayout()
+        self.GRP_mode = PYAFButtonGroup(self, "RBT_mode")
+        self.RBT_3D = QtWidgets.QRadioButton("3D")
+        self.RBT_2D = QtWidgets.QRadioButton("Flat")
+        self.RBT_3D.setToolTip("Surface at its height")
+        self.RBT_2D.setToolTip("Flat surface (at the Z position)")
+        self.GRP_mode.addButton(self.RBT_3D, 0)
+        self.GRP_mode.addButton(self.RBT_2D, 1)
+        HL_mode.addWidget(self.RBT_3D)
+        HL_mode.addWidget(self.RBT_2D)
 
+        self.TG_smoothing = PYAFToggle(self, "smoothing", "Smoothing")
+        self.TG_smoothing.setToolTip(
+            "Colors interpolated between the pixels and smoother surface "
+            "(subdivision of the triangles), slower.\nOff: one color per "
+            "pixel, as in the maps.")
+        # Smoothing, then 3D or flat, on a line
+        HL_mode.insertWidget(0, self.TG_smoothing)
+        HL_mode.addStretch(1)
         self.BT_slicing = PYAFButton(self, "slicing", "Slicing")
+        self.BT_slicing.setToolTip("Part of the map displayed (in x and y)")
 
-        self.VL.addWidget(self.CB_refresh)
-        self.VL.addWidget(self.BT_slicing)
-        self.VL.addStretch(1)
+        GL.addWidget(QtWidgets.QLabel("Map"), 0, 0)
+        GL.addWidget(self.list_maps, 0, 1)
+        GL.addWidget(QtWidgets.QLabel("Height"), 1, 0)
+        GL.addWidget(self.list_height, 1, 1)
+        GL.addLayout(HL_mode, 2, 0, 1, 2)
+        GL.addWidget(self.BT_slicing, 3, 0, 1, 2)
+        GL.setColumnStretch(1, 1)
+        box_display.setLayout(GL)
 
-        self.setLayout(self.VL)
+        # --- Colors ---------------------------------------------------------
+        box_colors = QtWidgets.QGroupBox("Colors")
+        VL_colors = QtWidgets.QVBoxLayout()
+        VL_colors.setContentsMargins(6, 6, 6, 6)
+        self.BT_colors = PYAFButton(self, "colors", "Color options")
+        self.BT_colors.setToolTip(
+            "Color scale of the map (same options as the map of the "
+            "results tab)")
+        self.TG_apply_to_all = PYAFToggle(self, "apply_to_all",
+                                          "Apply to all")
+        self.TG_apply_to_all.setToolTip(
+            "The map, the colors and the indentation segment are changed "
+            "for all the files of the 3D view")
+        # Indentation segment of the elasticity (Tomography)
+        self.afm_indentation_widget = WidgetIndentation(self)
+        HL_colors = QtWidgets.QHBoxLayout()
+        HL_colors.addWidget(self.BT_colors)
+        HL_colors.addWidget(self.TG_apply_to_all)
+        HL_colors.addStretch(1)
+        VL_colors.addLayout(HL_colors)
+        VL_colors.addWidget(self.afm_indentation_widget)
+        box_colors.setLayout(VL_colors)
 
-    def checkbox_clicked(self, name):
-        """Called when a checkbox is clicked."""
-        if name == "refresh_background":
-            value = self.CB_refresh.isChecked()
-            self.settings.setValue("refreshBackgroundInOpenGL", value)
+        VL.addWidget(box_display)
+        VL.addWidget(box_colors)
+        self.setLayout(VL)
+
+    def current(self):
+        """AFM layer of the options and its file: the selected layer, or the
+        AFM layer of the file of the selected layer (substrate), or the first
+        AFM layer (images)."""
+        layer_id = widgets_list.widget_vtk.get_current_layer()
+        layer = shared.layer_list[layer_id]
+        if layer.type != "afm":
+            afm = [lay for lay in shared.layer_list if lay.type == "afm"]
+            same = [lay for lay in afm
+                    if lay.afm_id == getattr(layer, "afm_id", None)]
+            layer = (same or afm)[0]
+        return layer, shared.exp.list[layer.afm_id]
+
+    def afm_layers(self, layer):
+        """Layers changed by an option: all the AFM layers with apply to all,
+        else the selected one."""
+        if shared.exp.apply_to_all_data:
+            return [lay for lay in shared.layer_list if lay.type == "afm"]
+        return [layer]
+
+    def show_map(self, data):
+        """Displays the map of the 3D view in the results tab (the color
+        options are the ones of the displayed map)."""
+        data.meshgrid_type = data.opengl_map_type
+        if data is shared.exp.current_data:
+            widgets_list.widget_results.select_map(data.opengl_map_type)
+        if widgets_list.widget_meshgrid_options is not None:
+            widgets_list.widget_meshgrid_options.update_widget()
+
+    def list_updated(self, name):
+        """A list was changed: map or height."""
+        layer, data = self.current()
+        if name == "map":
+            map_type = self.list_maps.currentData()
+            for lay in self.afm_layers(layer):
+                dt = shared.exp.list[lay.afm_id]
+                if map_type in map_values.available_maps(dt):
+                    dt.opengl_map_type = map_type
+                    self.show_map(dt)
+                    lay.update_tomography()
+        elif name == "height":
+            height = self.list_height.currentData()
+            for lay in self.afm_layers(layer):
+                dt = shared.exp.list[lay.afm_id]
+                dt.opengl_height = height
+                lay.update_tomography()
+        self.update_widget()
 
     def button_clicked(self, button):
         """Called when a button is clicked."""
-        if button == "slicing":
+        layer, data = self.current()
+
+        if button == "RBT_mode":
+            flat = self.GRP_mode.checkedId() == 1
+            for lay in self.afm_layers(layer):
+                shared.exp.list[lay.afm_id].opengl_afm_flat_view = flat
+                lay.update_tomography()
+            self.update_widget()
+
+        elif button == "colors":
+            # Color options window (as for the maps), for the file of the
+            # selected layer and its map
+            self.show_map(data)
+            if widgets_list.widget_meshgrid_options is None:
+                PlotOptionsWidget(self, "vtk")
+                widgets_list.widget_meshgrid_options.setWindowTitle(
+                    "Color options")
+                widgets_list.widget_meshgrid_options.resize(250, 250)
+                widgets_list.widget_meshgrid_options.show()
+            widgets_list.widget_meshgrid_options.update_widget(
+                data_id=layer.afm_id)
+            widgets_list.widget_meshgrid_options.activateWindow()
+            widgets_list.widget_meshgrid_options.raise_()
+
+        elif button == "slicing":
             if widgets_list.widget_slicing is None:
                 # Create new widget
                 SlicingWidget(self)
@@ -729,207 +877,56 @@ class WidgetAFM(QtWidgets.QWidget):
                 widgets_list.widget_slicing.activateWindow()
                 widgets_list.widget_slicing.raise_()
 
-    def update_widget(self):
-        """Updates the widget."""
-        layer_id = widgets_list.widget_vtk.get_current_layer()
-        afm_id = shared.layer_list[layer_id].afm_id
-        self.afm_colors_widget.update_widget(data_id=afm_id)
-        self.afm_indentation_widget.update_widget(data_id=afm_id)
+    def toggle_clicked(self, name):
+        """Called when a toggle is clicked."""
+        layer, data = self.current()
 
+        if name == "smoothing":
+            for lay in self.afm_layers(layer):
+                dt = shared.exp.list[lay.afm_id]
+                dt.vtk_smoothing_type = "loop" \
+                    if self.TG_smoothing.isChecked() else None
+                # Colors per pixel or interpolated: new surface
+                lay.update_tomography()
 
-class WidgetAFM2(QtWidgets.QWidget):
-    """Widget with options for the AFM layer."""
-
-    def __init__(self, parent):
-        super().__init__()
-
-        self.parent = parent
-        self.open = True
-
-        self.VL = QtWidgets.QVBoxLayout()
-
-        # Option to chose between 3D or 2D
-        HL_mode = QtWidgets.QHBoxLayout()
-        self.GRP_mode = PYAFButtonGroup(self, "RBT_mode")
-        self.RBT_3D = QtWidgets.QRadioButton("3D")
-        self.RBT_2D = QtWidgets.QRadioButton("2D")
-        self.GRP_mode.addButton(self.RBT_3D, 0)
-        self.GRP_mode.addButton(self.RBT_2D, 1)
-        HL_mode.addWidget(self.RBT_3D)
-        HL_mode.addWidget(self.RBT_2D)
-
-        self.VL_radio_buttons = QtWidgets.QVBoxLayout()
-        self.GRP_surf_type = PYAFButtonGroup(self, "RBT_action")
-        self.RBT_stiffness = QtWidgets.QRadioButton("Elasticity")
-        self.RBT_stiffness_sq = QtWidgets.QRadioButton("Elasticity (squares)")
-        self.RBT_topo_dots = QtWidgets.QRadioButton("Topo (dots)")
-        self.RBT_topo_surf = QtWidgets.QRadioButton("Topo (surf)")
-        self.GRP_surf_type.addButton(self.RBT_stiffness, 0)
-        self.GRP_surf_type.addButton(self.RBT_stiffness_sq, 1)
-        self.GRP_surf_type.addButton(self.RBT_topo_dots, 2)
-        self.GRP_surf_type.addButton(self.RBT_topo_surf, 3)
-        self.VL_radio_buttons.addWidget(self.RBT_stiffness)
-        self.VL_radio_buttons.addWidget(self.RBT_stiffness_sq)
-        # self.VL_radio_buttons.addWidget(self.RBT_topo_dots)
-        self.VL_radio_buttons.addWidget(self.RBT_topo_surf)
-
-        # Add 3 bouttons to chose the type of smoothing
-        VL_smoothing = QtWidgets.QVBoxLayout()
-        self.GRP_smoothing = PYAFButtonGroup(self, "RBT_smooth")
-        self.RBT_none = QtWidgets.QRadioButton("No smoothing")
-        self.RBT_loop = QtWidgets.QRadioButton("LoopSubdivision")
-        self.RBT_butterfly = QtWidgets.QRadioButton("ButterflySubdivision")
-        self.GRP_smoothing.addButton(self.RBT_none, 0)
-        self.GRP_smoothing.addButton(self.RBT_loop, 1)
-        self.GRP_smoothing.addButton(self.RBT_butterfly, 2)
-
-        # Add inputs with smoothing options
-        name = "Smoothing iterations"
-        self.IN_smooth_iter = PYAFInput(self, "smooth_iter", name, width=50)
-        self.IN_smooth_iter.input.setValidator(misc_tools.validator("UF"))
-        name = "Target decimation"
-        self.IN_targ_decim = PYAFInput(self, "targ_decimate", name, width=50)
-        self.IN_targ_decim.input.setValidator(misc_tools.validator("UF"))
-
-        BT_apply_smoothing = PYAFButton(self, "apply_smoothing", "Apply")
-
-        VL_smoothing.addWidget(self.RBT_none)
-        VL_smoothing.addWidget(self.RBT_loop)
-        VL_smoothing.addWidget(self.RBT_butterfly)
-        VL_smoothing.addWidget(self.IN_smooth_iter)
-        VL_smoothing.addWidget(self.IN_targ_decim)
-        VL_smoothing.addWidget(BT_apply_smoothing)
-
-        self.VL.addLayout(HL_mode)
-        self.VL.addLayout(self.VL_radio_buttons)
-        self.VL.addLayout(VL_smoothing)
-        self.VL.addStretch(1)
-
-        self.setLayout(self.VL)
-
-        self.update_widget()
-
-    def _input_updated(self, val):
-        """Called when an input is updated."""
-        # Can be called only if the widget still exists
-        if self.open:
-            self.input_updated(val)
-
-    def closeEvent(self, event):
-        """Called when the widget is closed."""
-        self.open = False
-        # Close the widget
-        event.accept()
-
-    def button_clicked(self, button):
-        """Called when a button is clicked."""
-        layer_id = widgets_list.widget_vtk.get_current_layer()
-        layer = shared.layer_list[layer_id]
-        data = shared.exp.list[layer.afm_id]
-
-        if button == "RBT_mode":
-            val = self.GRP_mode.checkedId()
-            if val == 0:
-                data.opengl_afm_flat_view = False
-            elif val == 1:
-                data.opengl_afm_flat_view = True
-
-            self.update_widget()
-
-            layer.update_tomography()
-
-        elif button == "RBT_action":
-            val = self.GRP_surf_type.checkedId()
-            widg = widgets_list.widget_results
-            if val == 0:
-                data.opengl_surf_type = "Stiffness"
-                widg.RBT_mesh_stiffness.setChecked(True)
-            elif val == 1:
-                data.opengl_surf_type = "Stiffness_squares"
-                widg.RBT_mesh_stiffness.setChecked(True)
-            elif val == 2:
-                data.opengl_surf_type = "Topo_dots"
-                widg.RBT_mesh_topography.setChecked(True)
-            elif val == 3:
-                data.opengl_surf_type = "Topo_surf"
-                widg.RBT_mesh_topography.setChecked(True)
-            widgets_list.widget_results.button_clicked("BTG_meshgrid_type")
-
-            layer.update_tomography()
-
-        elif button == "RBT_smooth":
-            # Change the type of smoothing
-            val = self.GRP_smoothing.checkedId()
-            if val == 0:
-                data.vtk_smoothing_type = None
-            elif val == 1:
-                data.vtk_smoothing_type = "loop"
-            elif val == 2:
-                data.vtk_smoothing_type = "butterfly"
-
-        elif button == "apply_smoothing":
-            # Set focus so that input_updated is called if needed
-            # Will update the parameters for the smooting
-            self.setFocus()
-            layer.update_smoothing()
-
-    def input_updated(self, name):
-        """Called when an input is updated."""
-        layer_id = widgets_list.widget_vtk.get_current_layer()
-        afm_id = shared.layer_list[layer_id].afm_id
-        data = shared.exp.list[afm_id]
-
-        if name == "smooth_iter":
-            data.vtk_smoothing_iterations = self.IN_smooth_iter.get_int_value()
-
-        elif name == "targ_decimate":
-            val = self.IN_targ_decim.get_float_value()
-            data.vtk_decimate_target_reduction = val
+        elif name == "apply_to_all":
+            shared.exp.apply_to_all_data = self.TG_apply_to_all.isChecked()
+            widgets_list.widget_results.update_GUI("apply_to_all")
+            self.afm_indentation_widget.update_widget(data_id=layer.afm_id)
 
     def update_widget(self):
-        """Updates the widget."""
-        layer_id = widgets_list.widget_vtk.get_current_layer()
-        afm_id = shared.layer_list[layer_id].afm_id
-        data = shared.exp.list[afm_id]
+        """Updates the boxes for the selected AFM layer."""
+        layer, data = self.current()
+        if data.opengl_map_type not in map_values.available_maps(data):
+            data.opengl_map_type = "stiffness"
 
-        if data.opengl_afm_flat_view:
-            self.RBT_2D.setChecked(True)
-            self.RBT_stiffness_sq.setEnabled(True)
-        else:
-            self.RBT_3D.setChecked(True)
-            self.RBT_stiffness_sq.setEnabled(False)
-            # Do not allow stiffness squares in 3D
-            if data.opengl_surf_type == "Stiffness_squares":
-                data.opengl_surf_type = "Stiffness"
-                self.RBT_stiffness.setChecked(True)
+        # Maps computed for the file
+        self.list_maps.blockSignals(True)
+        self.list_maps.clear()
+        for map_type in map_values.available_maps(data):
+            self.list_maps.addItem(map_values.MAPS[map_type][0], map_type)
+        self.list_maps.setCurrentIndex(
+            self.list_maps.findData(data.opengl_map_type))
+        self.list_maps.blockSignals(False)
 
-        # Type of surface to display (set different meshgrid type for color)
-        # Changing the meshgrid type for this is not very clean ...
-        if data.opengl_surf_type == "Stiffness":
-            self.RBT_stiffness.setChecked(True)
-            widgets_list.widget_results.RBT_mesh_stiffness.setChecked(True)
-        elif data.opengl_surf_type == "Stiffness_squares":
-            self.RBT_stiffness_sq.setChecked(True)
-            widgets_list.widget_results.RBT_mesh_stiffness.setChecked(True)
-        elif data.opengl_surf_type == "Topo_dots":
-            self.RBT_topo_dots.setChecked(True)
-            widgets_list.widget_results.RBT_mesh_topography.setChecked(True)
-        elif data.opengl_surf_type == "Topo_surf":
-            self.RBT_topo_surf.setChecked(True)
-            widgets_list.widget_results.RBT_mesh_topography.setChecked(True)
-        widgets_list.widget_results.button_clicked("BTG_meshgrid_type")
+        # Heights: topography if computed, piezo height
+        self.list_height.blockSignals(True)
+        self.list_height.clear()
+        if data.stiffness_calculated:
+            self.list_height.addItem("Topography (zero force)", "topo")
+        self.list_height.addItem("Piezo height", "piezo")
+        index = self.list_height.findData(data.opengl_height)
+        self.list_height.setCurrentIndex(max(index, 0))
+        self.list_height.blockSignals(False)
 
-        # Smoothing options
-        if data.vtk_smoothing_type is None:
-            self.RBT_none.setChecked(True)
-        elif data.vtk_smoothing_type == "loop":
-            self.RBT_loop.setChecked(True)
-        elif data.vtk_smoothing_type == "butterfly":
-            self.RBT_butterfly.setChecked(True)
+        flat = data.opengl_afm_flat_view
+        (self.RBT_2D if flat else self.RBT_3D).setChecked(True)
+        self.TG_smoothing.setChecked(data.vtk_smoothing_type is not None)
+        self.TG_apply_to_all.setChecked(shared.exp.apply_to_all_data)
 
-        # Other smoothing options
-        self.IN_smooth_iter.changeValue(data.vtk_smoothing_iterations)
-        self.IN_targ_decim.changeValue(data.vtk_decimate_target_reduction)
+        # Indentation segment: only for the elasticity volume (Tomography)
+        self.afm_indentation_widget.update_widget(data_id=layer.afm_id)
+        self.afm_indentation_widget.setEnabled(vtk_afm.is_volume(data))
 
 
 class WidgetIsoSurface(QtWidgets.QWidget):

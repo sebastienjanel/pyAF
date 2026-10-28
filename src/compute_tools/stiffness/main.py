@@ -42,6 +42,7 @@ Young modulus (depending on the model).
 import multiprocessing
 import numpy
 from ...compute_tools import multiproc
+from . import brush
 
 if multiprocessing.current_process().name == "MainProcess":
     # Do not reimport this in the child processes.
@@ -83,14 +84,42 @@ class Stiffness:
         self.max_indentation_index = 0
         self.list_of_smoothing_errors = []
         self.error = False
+        # The refit of the point of contact was set to 0 (brush model)
+        self.refit_disabled = False
+        # [stop, pixels where the stop was not attained, computed pixels]
+        self.range_not_attained = None
 
     def get_stiffness(self, calc_id):
         """Method used to launch the computation."""
         data = shared.exp.list[calc_id]
+
+        # Reset the state of the previous computation
+        self.error = False
+        self.range_not_attained = None
+
         # Be sure that the data is updated (when computing "all", the hdf5
         # file is closed en reopened many times, so that we need to call an
         # update here)
         data.update()
+
+        # Tomography: slope of each segment. Fitting: a Hertz type model
+        # (files saved with the previous Calculus mode)
+        if not data.perform_fit:
+            data.stiffness_model_selected = 3
+            data.tomography = 1
+        elif data.stiffness_model_selected == 3:
+            data.stiffness_model_selected = 0
+
+        # Brush model: no refit of the baseline of the point of contact (it
+        # would move the baseline, the zero of the force, into the brush)
+        self.refit_disabled = False
+        if data.brush_model and data.perform_fit and \
+                brush.available(data) and \
+                (data.fitparam_poc_refit_option or
+                 data.fitparam_poc_refit_times):
+            data.fitparam_poc_refit_option = 0
+            data.fitparam_poc_refit_times = 0
+            self.refit_disabled = True
 
         misc_tools.save_used_params(data, "stiffness")
 
@@ -108,6 +137,8 @@ class Stiffness:
         if data.stiffness_calculated:
             self.temp_file.delete_tables_for_results(calc_id, "stiffness")
             self.temp_file.create_tables_for_results(calc_id, "stiffness")
+        # Files saved before the fit quality
+        self.temp_file.create_fit_quality_table(calc_id)
 
         # Calculate the coefficients only once for all curves
         if data.stiffness_model_selected == 0:
@@ -119,7 +150,7 @@ class Stiffness:
             div = 2.0 * math.tan(math.radians(data.tip_angle))
             coeff = math.pi / div * (1.0 - data.poisson_ratio ** 2)
         elif data.stiffness_model_selected == 2:
-            # Bilodeau (Pyramid)
+            # Barber & Billings (4-sided pyramid)
             div = math.tan(math.radians(data.tip_angle))
             coeff = math.sqrt(2) * ((1.0 - data.poisson_ratio ** 2) / div)
         elif data.stiffness_model_selected == 3:
@@ -129,6 +160,9 @@ class Stiffness:
             # Flat punch
             div = 2 * data.tip_radius * pow(10, -9)
             coeff = (1.0 - data.poisson_ratio ** 2) / div
+        else:
+            # Tabulated models (sphere, blunted tips): no single coefficient
+            coeff = 1.0
 
         # Piezo image (last position of the extended piezo)
         piezo_image = \
@@ -177,7 +211,8 @@ class Stiffness:
             "fit_range_type": data.fit_range_type,
             "force_start": data.force_start,
             "force_stop": data.force_stop,
-            "strict_stop": data.used_strict_stop,
+            "fit_min_indentation": data.fit_min_indentation,
+            "fit_poc_window": data.fit_poc_window,
             "model_selected": data.stiffness_model_selected,
             "tomography": data.tomography,
             "trig_threshold": data.trig_threshold,
@@ -190,42 +225,21 @@ class Stiffness:
 
         # Compute and get the list of errors if there are some
         filepath = self.temp_file.filepath
-        self.list_of_smoothing_errors = multiproc.compute(
-            "stiffness", calc_id, dt, filepath)
-
-        # Reopen the hdf5 file
-        self.temp_file.open_file()
+        try:
+            self.list_of_smoothing_errors = multiproc.compute(
+                "stiffness", calc_id, dt, filepath)
+        finally:
+            # Reopen the hdf5 file (also after an error)
+            self.temp_file.open_file()
 
         st = "/data/_" + str(calc_id)
         tf = self.temp_file.file
         stiffness = tf.get_node(st + "/results", "stiffness_array")
         topography = tf.get_node(st + "/results", "topography")
 
-        # Check for strict stop (NOT USED ANYMORE)
-        strict_stop_error = False
-        if data.used_strict_stop and data.indentation_stop != 0:
-            dist = data.used_indentation_stop - data.used_indentation_start
-            if data.used_indentation_step == 0:
-                segments_per_curve = 1
-            else:
-                segments_per_curve = dist // data.used_indentation_step
-            for i in range(len(stiffness)):
-                if len(stiffness[i]) != segments_per_curve:
-                    strict_stop_error = True
-                    # No need to check further, we found an error
-                    break
-
-            # Delete the stiffness
-            if strict_stop_error:
-                widgets_list.widget_progressbar.close()
-                self.error = "Error: strict stop"
-
-                # Delete result table
-                name = "stiffness"
-                self.temp_file.delete_tables_for_results(str(calc_id), name)
-                self.temp_file.create_tables_for_results(str(calc_id), name)
-
-                return True
+        # The pixels are computed up to the selected stop, or up to their
+        # maximum indentation if the stop is not attained (counted below)
+        indentation = tf.get_node(st + "/results", "indentation")
 
         # Calculate the maximum indentation index
         z_array = []
@@ -242,8 +256,19 @@ class Stiffness:
         # Store the base to get a minimal value to correct the pocs array
         base = []
         step = data.indentation_step
+        # The indentation stop applies to Tomography and to the
+        # indentation range mode of the fit
+        stop = data.used_indentation_stop
+        check_stop = stop != 0 and \
+            (not data.perform_fit or data.fit_range_type == 1)
+        nbr_computed = 0
+        nbr_not_attained = 0
         for i in range(len(stiffness)):
             k = len(stiffness[i])
+            if k != 0:
+                nbr_computed += 1
+                if check_stop and indentation[row][col] < stop:
+                    nbr_not_attained += 1
             z_array.append(k * data.indentation_step)
             # At least one value was found
             if k != 0 and nosegment:
@@ -258,6 +283,9 @@ class Stiffness:
                 row += 1
 
         self.max_indentation_index = max_ind
+        if nbr_not_attained:
+            self.range_not_attained = [stop, nbr_not_attained, nbr_computed]
+
         if nosegment:
             # The step was too big or we wanted to calculate too far
             # z_array is only populated wit 0, 0 segments
@@ -273,7 +301,7 @@ class Stiffness:
         # Correct POC with piezo height (piezo_image) for topography and
         # stiffness display. Get a corrected POC array (when 3D is
         # reconstructed, the last point in z is = 0)
-        minimum = numpy.amin(base)
+        minimum = numpy.nanmin(base)
         for i in range(data.nbr_pixels_x):
             for j in range(data.nbr_pixels_y):
                 topography[i, j] = topography[i][j] - minimum
@@ -281,6 +309,31 @@ class Stiffness:
         # Flush the file and update the values in the experiment class
         self.temp_file.flush_file()
         data.stiffness_calculated = True
+
+        # No fit quality with the Tomography
+        if data.meshgrid_type.startswith("fit_") and \
+                not data.has_fit_quality():
+            data.meshgrid_type = "stiffness"
+
+        # The viscoelasticity uses the points of contact and the moduli of
+        # the elasticity fit: to be computed again
+        if data.visco_calculated:
+            data.visco_calculated = False
+            data.visco_results = None
+            if data.meshgrid_type.startswith("visco_"):
+                data.meshgrid_type = "stiffness"
+            if data.display_curve_type == "visco":
+                data.display_curve_type = "defl_ext"
+
+        # The brush model uses the points of contact of the elasticity: to
+        # be computed again (after this computation, see the compute tab)
+        if data.brush_calculated:
+            data.brush_calculated = False
+            data.brush_results = None
+            if data.meshgrid_type.startswith("brush_"):
+                data.meshgrid_type = "stiffness"
+            if data.display_curve_type == "brush":
+                data.display_curve_type = "defl_ext"
 
         # Close the progressbar and return
         widgets_list.widget_progressbar.close()

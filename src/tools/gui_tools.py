@@ -32,10 +32,11 @@
 """Some tools for the graphical interface of PYAF."""
 
 import logging
-import qtwidgets
+import os
+import re
 from .. import shared
 from .. import widgets_list
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 
 
@@ -194,6 +195,13 @@ class PYAFInput(QtWidgets.QWidget):
 
         self.input = QtWidgets.QLineEdit()
         self.input.setFixedSize(width, height)
+
+        # Last accepted value, restored when the user leaves the input with
+        # a value refused by its validator (e.g. 0 for a fit length)
+        self.last_text = ""
+        self.input.editingFinished.connect(self.save_last_text)
+        self.input.installEventFilter(self)
+
         if "_input_updated" in dir(parent):
             # If the parent class is a PYAFWidget (that's what the dir() check
             # is for), then it has an _input_updated method. This method
@@ -224,6 +232,20 @@ class PYAFInput(QtWidgets.QWidget):
         self.logger.debug("Input updated: %s, value: %s", self.name, value)
 
         self.input.setText(str(value))
+        self.last_text = self.input.text()
+
+    def save_last_text(self):
+        """Keep the accepted value (editingFinished is only emitted for
+        the values accepted by the validator)."""
+        self.last_text = self.input.text()
+
+    def eventFilter(self, obj, event):
+        """Restore the last accepted value when leaving the input with a
+        refused value."""
+        if obj is self.input and event.type() == QtCore.QEvent.FocusOut and \
+                not self.input.hasAcceptableInput():
+            self.input.setText(self.last_text)
+        return super().eventFilter(obj, event)
 
     def setEnabled(self, value):
         """Enable or disable the input."""
@@ -299,6 +321,24 @@ class CenteredCellwidget2(QtWidgets.QWidget):
         self.setLayout(layout)
 
 
+class ClickableCellLabel(QtWidgets.QLabel):
+    """A text for the tablewidgets, which can be clicked."""
+
+    clicked = QtCore.Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.setAlignment(QtCore.Qt.AlignCenter)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+
+    def mouseReleaseEvent(self, event):
+        """Emit clicked when the left button is released on the text."""
+        if event.button() == QtCore.Qt.LeftButton and \
+                self.rect().contains(event.position().toPoint()):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
 class CenteredCellCheckbox(QtWidgets.QWidget):
     """A centered checkbox for the tablewidgets."""
 
@@ -319,24 +359,6 @@ class CenteredCellCheckbox(QtWidgets.QWidget):
 
 
 
-class CenteredCellInput(QtWidgets.QWidget):
-    """A centered input field for the tablewidgets."""
-
-    def __init__(self, parent, name, cell_id):
-        super().__init__()
-
-        layout = QtWidgets.QVBoxLayout()
-        layout.setAlignment(QtCore.Qt.AlignHCenter)
-        self.input = QtWidgets.QLineEdit()
-        layout.addWidget(self.input)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        self.setLayout(layout)
-
-        self.input.editingFinished.connect(
-            lambda: parent.input_updated(name, cell_id))
-
-
 class CenteredCellRadioButton(QtWidgets.QWidget):
     """A centered radiobutton for the tablewidgets."""
 
@@ -347,6 +369,24 @@ class CenteredCellRadioButton(QtWidgets.QWidget):
         layout.setAlignment(QtCore.Qt.AlignHCenter)
         self.radio_button = QtWidgets.QRadioButton()
         layout.addWidget(self.radio_button)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.setLayout(layout)
+
+
+class FullCellWidget(QtWidgets.QWidget):
+    """A widget filling its cell of a tablewidget.
+
+    A widget put directly in a cell takes the size of its contents when it
+    is added to a visible table: in a layout, it keeps the size of the cell.
+    """
+
+    def __init__(self, widget):
+        super().__init__()
+
+        self.widget = widget
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.setLayout(layout)
@@ -384,10 +424,44 @@ class PYAFButton(QtWidgets.QPushButton):
 
         if size is None:
             size = 150
-        self.setFixedWidth(size)
+        # Width chosen for the layout, enlarged if the text does not fit
+        # (the fonts are wider on some systems, e.g. on Linux)
+        self.base_width = size
         self.setFixedHeight(40)
         self.setText(text)
         self.clicked.connect(self.button_clicked)
+
+    def setText(self, text):
+        """Set the text, and adapt the width of the button to it."""
+        super().setText(text)
+        self.update_width()
+
+    def update_width(self):
+        """Width of the button: the chosen one, or the width of the text
+        with the padding of the style sheets (1.2ex on each side, and the
+        border) if larger."""
+        metrics = self.fontMetrics()
+        text_width = metrics.horizontalAdvance(self.text()) + \
+            3 * metrics.xHeight() + 4
+        QtWidgets.QPushButton.setFixedWidth(
+            self, max(self.base_width, text_width))
+
+    def setFixedWidth(self, width):
+        """The chosen width (enlarged if the text does not fit)."""
+        self.base_width = width
+        self.update_width()
+
+    def setFixedSize(self, *args):
+        """The chosen size (enlarged if the text does not fit)."""
+        super().setFixedSize(*args)
+        self.base_width = self.minimumWidth()
+        self.update_width()
+
+    def changeEvent(self, event):
+        """Adapt the width when the font changes (style sheets)."""
+        super().changeEvent(event)
+        if event.type() == QtCore.QEvent.FontChange:
+            self.update_width()
 
     def button_clicked(self):
         """Called when the button is clicked.
@@ -466,6 +540,74 @@ class PYAFComboBox(QtWidgets.QComboBox):
         """Redefine wheelEvent. It will be disabled."""
         pass
 
+    def fit_to_contents(self):
+        """Make the list wide enough for its longest item.
+
+        The style sheets define a min-width, which overrides
+        setMinimumWidth, so the width is set with a style sheet.
+        """
+        # Bold font: the widest text (bold in some style sheets)
+        font = QtGui.QFont(self.font())
+        font.setBold(True)
+        metrics = QtGui.QFontMetrics(font)
+        longest = max((metrics.horizontalAdvance(self.itemText(i))
+                       for i in range(self.count())), default=0)
+        self.setStyleSheet(
+            "QComboBox { min-width: " + str(longest + 30) + "px; }")
+
+
+class ToggleSwitch(QtWidgets.QCheckBox):
+    """A checkbox drawn as an on/off switch."""
+
+    # Height of the switch [px], twice as wide
+    HEIGHT = 17
+
+    def __init__(self, checked_color="#3b8eea", parent=None):
+        super().__init__(parent)
+        self.checked_color = QtGui.QColor(checked_color)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setFixedHeight(self.HEIGHT)
+
+    def sizeHint(self):
+        return QtCore.QSize(2 * self.HEIGHT + 6, self.HEIGHT)
+
+    def hitButton(self, pos):
+        # The whole widget is clickable
+        return self.contentsRect().contains(pos)
+
+    def paintEvent(self, event):
+        rect = self.contentsRect()
+        height = min(rect.height(), self.HEIGHT)
+        width = min(rect.width(), 2 * height)
+        radius = height / 2.0
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+        if not self.isEnabled():
+            # Disabled: faded
+            painter.setOpacity(0.4)
+
+        # Bar
+        bar = QtCore.QRectF(rect.x(), rect.y() + (rect.height() - height) / 2,
+                            width, height)
+        if self.isChecked():
+            painter.setBrush(self.checked_color.lighter())
+        else:
+            painter.setBrush(QtGui.QColor(QtCore.Qt.gray))
+        painter.drawRoundedRect(bar, radius, radius)
+
+        # Handle
+        if self.isChecked():
+            painter.setBrush(self.checked_color)
+            x_center = bar.right() - radius
+        else:
+            painter.setBrush(QtGui.QColor(QtCore.Qt.white))
+            x_center = bar.left() + radius
+        painter.drawEllipse(QtCore.QPointF(x_center, bar.center().y()),
+                            radius - 2, radius - 2)
+        painter.end()
+
 
 class PYAFToggle(QtWidgets.QWidget):
     """Reimplementation of the PyQT Toggle.
@@ -489,8 +631,8 @@ class PYAFToggle(QtWidgets.QWidget):
         if size is None:
             size = 100
 
-        self.toggle = qtwidgets.Toggle(checked_color="#00FF44")
-        self.toggle.setFixedWidth(70)
+        self.toggle = ToggleSwitch(checked_color="#3b8eea")
+        self.toggle.setFixedWidth(2 * ToggleSwitch.HEIGHT + 6)
         self.toggle.clicked.connect(self.toggle_clicked)
 
         self.label = QtWidgets.QLabel()
@@ -499,18 +641,31 @@ class PYAFToggle(QtWidgets.QWidget):
 
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.toggle)
-        self.layout.addStretch(1)
         self.setLayout(self.layout)
+        # Width of the label and the switch (like a checkbox)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Maximum,
+                           QtWidgets.QSizePolicy.Fixed)
+
+    def isChecked(self):
+        """State of the toggle."""
+        return self.toggle.isChecked()
+
+    def setChecked(self, value):
+        """Changes the state of the toggle (without calling the parent)."""
+        self.toggle.setChecked(value)
 
     def toggle_clicked(self):
         """Called when the toggle is clicked.
 
-        Calls the parent toggle_clicked method and logs the toggle which was
-        clicked.
+        Calls the parent toggle_clicked method (or checkbox_clicked, the
+        toggles replacing checkboxes) and logs the toggle which was clicked.
         """
         self.logger.debug("Toggle clicked : %s", self.name)
 
-        self.parent.toggle_clicked(self.name)
+        if hasattr(self.parent, "toggle_clicked"):
+            self.parent.toggle_clicked(self.name)
+        else:
+            self.parent.checkbox_clicked(self.name)
 
 
 class ClearWidgetsFromLayout:
@@ -532,11 +687,43 @@ def disable_combobox_item(combobox, position):
     # 2011/01/disabling-qcombobox-items.html
 
     index = combobox.model().index(position, 0)
-    combobox.model().setData(index, QtCore.QVariant(0), QtCore.Qt.UserRole - 1)
+    combobox.model().setData(index, 0, QtCore.Qt.UserRole - 1)
 
 
 def enable_combobox_item(combobox, position):
     """Function used to enable a row in a qcombobox."""
     index = combobox.model().index(position, 0)
-    combobox.model().setData(index,
-                             QtCore.QVariant(1 | 32), QtCore.Qt.UserRole - 1)
+    combobox.model().setData(index, 1 | 32, QtCore.Qt.UserRole - 1)
+
+
+def show_success(parent, text, details=None, warning=False):
+    """Message box for an operation completed successfully, with a green
+    check mark, or a warning sign if something needs the attention of the
+    user (explained in the details)."""
+    # Imported here to avoid a circular import
+    from ..gui_styles.theme_handler import get_icons_path
+
+    msg = QtWidgets.QMessageBox(parent)
+    msg.setWindowTitle("pyAF")
+    msg.setText("<b>" + text + "</b>")
+    if details:
+        msg.setInformativeText(no_wrap_items(details))
+    name = "warning.svg" if warning else "success.svg"
+    icon = QtGui.QIcon(os.path.join(get_icons_path(), name))
+    msg.setIconPixmap(icon.pixmap(48, 48))
+    msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
+    msg.exec_()
+
+
+def no_wrap_items(details):
+    """The items of the lists of a message (a file name and its result)
+    on one row: the message box takes their width when it sizes itself
+    (within its limits, about 1000 px)."""
+    return re.sub(r"<li>", '<li style="white-space:pre">', details)
+
+
+def font_of_size(size):
+    """The default font of the application, with the given point size."""
+    font = QtGui.QFont()
+    font.setPointSize(size)
+    return font

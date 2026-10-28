@@ -36,6 +36,54 @@ import numpy
 from ... import widgets_list
 from ...tools.colortables import ColorTables
 from .common import center_data
+from ...tools import map_values
+
+
+def get_topography_for_geometry(data):
+    """Height of the 3D surface (numpy array [nm]): piezo height or zero-force
+    topography (opengl_height), with the planefit; pixels without height at
+    the lowest level (VTK needs finite coordinates)."""
+    return map_values.height(data)
+
+
+def map_type(data):
+    """Map drawn in the 3D view (elasticity by default)."""
+    mt = getattr(data, "opengl_map_type", "stiffness")
+    return mt if mt in map_values.available_maps(data) else "stiffness"
+
+
+def is_volume(data):
+    """The elasticity is drawn as a volume (top, bottom and sides): with the
+    Tomography (one value per indentation segment), not in the flat view."""
+    if data.opengl_afm_flat_view or \
+            map_type(data) not in map_values.ELASTICITY_MAPS:
+        return False
+    _, step, tomography = data.get_used_indentation()
+    return not data.used_perform_fit or bool(tomography and step)
+
+
+def get_colortable(data, mt):
+    """Color table of a map (its color options, as in the results tab)."""
+    opts = data.get_color_opts(mt)
+    return ColorTables(opts[0], data.color_saturation, data.color_negative,
+                       opts[2], opts[3], mode="scalarMap",
+                       color_nan=data.color_nan, min_value=opts[1])
+
+
+def get_colors(data, mt, vals):
+    """RGBA colors (uint8, [x][y][4]) of the values of a map; nan values with
+    the nan color (or transparent)."""
+    vals = numpy.asarray(vals, dtype=float)
+    nans = ~numpy.isfinite(vals)
+    colortable = get_colortable(data, mt)
+    carray = numpy.array(colortable.scalarMap.to_rgba(
+        numpy.where(nans, 0.0, vals), bytes=True))
+    if data.nan_color_transparent:
+        color = [0, 0, 0, 0]
+    else:
+        color = numpy.array(data.color_nan) * 255.0
+    carray[nans] = color
+    return carray
 
 
 def get_surface(parent, data, mode):
@@ -49,71 +97,35 @@ def get_surface(parent, data, mode):
     at the same position when the indentation is maximal, but having the offset
     ensures that those are two separate surfaces (surface and bottom).
     """
-    colortable = ColorTables(data.colortableid, data.color_saturation,
-                             data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
+    topo = get_topography_for_geometry(data)
+    mt = map_type(data)
+    volume = is_volume(data)
+    # Without smoothing, each pixel has its own color (no interpolation of
+    # the colors between the pixels)
+    pixel_colors = data.vtk_smoothing_type is None
 
-    # Get the array with the stiffness
-    if data.stiffness_corrected:
+    # Elasticity values per indentation segment (volume)
+    if mt == "stiffness_corr":
         array = data.stiffness_corrected_array
     else:
         array = data.stiffness_array
 
     widgets_list.widget_progressbar.set_label("Prepare data (" + mode + ")")
 
-    # Fill the vals array containing the stiffness values
-    vals = numpy.zeros([data.nbr_pixels_x, data.nbr_pixels_y])
-    nans = numpy.zeros([data.nbr_pixels_x, data.nbr_pixels_y])
     if mode == "top":
-        tp = data.opengl_surf_type
-
-        for i in range(data.nbr_pixels_x):
-            for j in range(data.nbr_pixels_y):
-                if tp == "Topo_surf":
-                    if len(array[i][j]) > data.stiffness_depth_view:
-                        vals[i][j] = data.topography[i][j]
-                    else:
-                        nans[i][j] = True
-                else:
-                    if len(array[i][j]) > data.stiffness_depth_view:
-                        # Take the stiffness value of the slice
-                        vals[i][j] = array[i][j][data.stiffness_depth_view]
-                    else:
-                        # Display as nan
-                        nans[i][j] = True
-
-            widgets_list.widget_progressbar.update()
-
-    elif mode == "bottom":
+        # Values of the map (elasticity at the indentation segment shown)
+        vals = map_values.values(data, mt)
+    else:
+        # Bottom of the volume: last available segment
+        vals = numpy.full([data.nbr_pixels_x, data.nbr_pixels_y], numpy.nan)
         for i in range(data.nbr_pixels_x):
             for j in range(data.nbr_pixels_y):
                 if len(array[i][j]) > data.stiffness_depth_view:
-                    # Display the last aviable position
                     vals[i][j] = array[i][j][-1]
-                else:
-                    # Display as nan
-                    nans[i][j] = True
-
-            widgets_list.widget_progressbar.update()
+    widgets_list.widget_progressbar.update(data.nbr_pixels_x)
 
     widgets_list.widget_progressbar.set_label("Assign colors (" + mode + ")")
-
-    # Convert the stiffness values to color values with matplotlib
-    carray = numpy.array(colortable.scalarMap.to_rgba(vals, bytes=True))
-
-    # scalarMap.to_rgba can not replace nans. In this case we just
-    # post-process the color array (this is very fast) and replace the
-    # nans by a transparent color (or the color chosen by the user)
-    if data.nan_color_transparent:
-        color = [0, 0, 0, 0]
-    else:
-        color = numpy.array(data.color_nan) * 255.0
-
-    # Replace the nans by the nan color
-    for i in range(data.nbr_pixels_x):
-        for j in range(data.nbr_pixels_y):
-            if nans[i][j]:
-                carray[i][j] = color
+    carray = get_colors(data, mt, vals)
 
     # Make a z_array containing the height for each pixel
     dpt = data.stiffness_depth_view * data.used_indentation_step
@@ -126,16 +138,18 @@ def get_surface(parent, data, mode):
     z_offset = 0.001
 
     used_st = data.used_indentation_step
+    if not volume:
+        dpt = 0
     for i in range(data.opengl_slice_bottom, data.opengl_slice_top + 1, 1):
         for j in range(data.opengl_slice_left, data.opengl_slice_right + 1, 1):
             if mode == "top":
                 if data.opengl_afm_flat_view:
                     z_array[i][j] = parent.pos_z
                 else:
-                    z_array[i][j] = data.topography[i][j] - dpt
-            if mode == "top" or mode == "bottom":
+                    z_array[i][j] = topo[i][j] - dpt
+            if volume:
                 val = (len(array[i][j]) - 1) * used_st - z_offset
-                bottom_array[i][j] = data.topography[i][j] - val
+                bottom_array[i][j] = topo[i][j] - val
 
     # The z positions which will be used are the ones from the z_array
     # So in case of the bottom array redefine the z_array
@@ -170,7 +184,7 @@ def get_surface(parent, data, mode):
             # In this case, the point is below the maximum depth, so use
             # just the maximum depth for the point
             # Reshift at + z_offset to be at the right position
-            if data.opengl_afm_flat_view is False and mode == "top":
+            if volume and mode == "top":
                 if z1 < bottom_array[i][j]:
                     z1 = bottom_array[i][j] + z_offset
                 if z2 < bottom_array[i][j + 1]:
@@ -201,7 +215,7 @@ def get_surface(parent, data, mode):
             # In this case, the point is below the maximum depth, so use
             # just the maximum depth for the point
             # Reshift at + z_offset to be at the right position
-            if data.opengl_afm_flat_view is False and mode == "top":
+            if volume and mode == "top":
                 if z1 < bottom_array[i][j + 1]:
                     z1 = bottom_array[i][j + 1] + z_offset
                 if z2 < bottom_array[i + 1][j + 1]:
@@ -224,12 +238,18 @@ def get_surface(parent, data, mode):
             count += 6
 
             triangles.InsertNextCell(triangle)
-            colors.InsertNextTuple(carray[i][j])
-            colors.InsertNextTuple(carray[i][j + 1])
-            colors.InsertNextTuple(carray[i + 1][j])
-            colors.InsertNextTuple(carray[i][j + 1])
-            colors.InsertNextTuple(carray[i + 1][j + 1])
-            colors.InsertNextTuple(carray[i + 1][j])
+            if pixel_colors:
+                # One color per pixel (the two triangles of the square)
+                colors.InsertNextTuple(carray[i][j])
+                colors.InsertNextTuple(carray[i][j])
+            else:
+                # Colors of the corners, interpolated (smoothing)
+                colors.InsertNextTuple(carray[i][j])
+                colors.InsertNextTuple(carray[i][j + 1])
+                colors.InsertNextTuple(carray[i + 1][j])
+                colors.InsertNextTuple(carray[i][j + 1])
+                colors.InsertNextTuple(carray[i + 1][j + 1])
+                colors.InsertNextTuple(carray[i + 1][j])
 
             widgets_list.widget_progressbar.update()
 
@@ -238,7 +258,10 @@ def get_surface(parent, data, mode):
 
     # Add the geometry and topology to the polydata
     polydata.SetPoints(points)
-    polydata.GetPointData().SetScalars(colors)
+    if pixel_colors:
+        polydata.GetCellData().SetScalars(colors)
+    else:
+        polydata.GetPointData().SetScalars(colors)
     polydata.SetPolys(triangles)
 
     # Translate to 0,0,0
@@ -256,13 +279,13 @@ def get_surface(parent, data, mode):
 
 def get_side(data, side):
     """Method to build the 4 actors for the sides of the tomography."""
+    topo = get_topography_for_geometry(data)
     widgets_list.widget_progressbar.set_label("Prepare data (" + side + ")")
 
-    colortable = ColorTables(data.colortableid, data.color_saturation,
-                             data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
+    mt = map_type(data)
+    colortable = get_colortable(data, mt)
 
-    if data.stiffness_corrected:
+    if mt == "stiffness_corr":
         array = data.stiffness_corrected_array
     else:
         array = data.stiffness_array
@@ -274,7 +297,7 @@ def get_side(data, side):
 
     triangles = vtk.vtkCellArray()
 
-    step = data.indentation_step
+    _, step, _ = data.get_used_indentation()
     depth = data.stiffness_depth_view
 
     # Get the maximum indentation depth for a side, and the number of triangles
@@ -395,12 +418,12 @@ def get_side(data, side):
                 if (finallen > lennext - 2) and z >= (lencurrent - 1):
                     break
 
-                z1 = data.topography[c][b] - z * step
+                z1 = topo[c][b] - z * step
                 if z >= lennext:
-                    z2 = data.topography[c + 1][b] - (lennext - 1) * step
+                    z2 = topo[c + 1][b] - (lennext - 1) * step
                 else:
-                    z2 = data.topography[c + 1][b] - z * step
-                z3 = data.topography[c][b] - z * step - step
+                    z2 = topo[c + 1][b] - z * step
+                z3 = topo[c][b] - z * step - step
 
                 points.InsertNextPoint(c * data.x_size, b * data.y_size, z1)
                 points.InsertNextPoint(c * data.x_size + data.x_size,
@@ -433,14 +456,14 @@ def get_side(data, side):
                 if (finallen > lenbefore - 2) and z >= (lencurrent - 1):
                     break
 
-                z1 = data.topography[c][b] - z * step
+                z1 = topo[c][b] - z * step
                 if z >= lenbefore - 1:
-                    z2 = data.topography[
+                    z2 = topo[
                         c - 1][b] - lenbefore * step + step
                 else:
-                    z2 = data.topography[c - 1][b] - z * step - step
+                    z2 = topo[c - 1][b] - z * step - step
 
-                z3 = data.topography[c][b] - z * step - step
+                z3 = topo[c][b] - z * step - step
 
                 points.InsertNextPoint(c * data.x_size, b * data.y_size, z1)
                 points.InsertNextPoint(c * data.x_size - data.x_size,
@@ -489,12 +512,12 @@ def get_side(data, side):
                 if (finallen > lennext - 2) and z >= (lencurrent - 1):
                     break
 
-                z1 = data.topography[a][c] - z * step
+                z1 = topo[a][c] - z * step
                 if z >= lennext:
-                    z2 = data.topography[a][c + 1] - (lennext - 1) * step
+                    z2 = topo[a][c + 1] - (lennext - 1) * step
                 else:
-                    z2 = data.topography[a][c + 1] - z * step
-                z3 = data.topography[a][c] - z * step - step
+                    z2 = topo[a][c + 1] - z * step
+                z3 = topo[a][c] - z * step - step
 
                 points.InsertNextPoint(a * data.x_size, c * data.y_size, z1)
                 points.InsertNextPoint(a * data.x_size,
@@ -527,14 +550,14 @@ def get_side(data, side):
                 if (finallen > lenbefore - 2) and z >= (lencurrent - 1):
                     break
 
-                z1 = data.topography[a][c] - z * step
+                z1 = topo[a][c] - z * step
                 if z >= lenbefore - 1:
-                    z2 = data.topography[a][
+                    z2 = topo[a][
                         c - 1] - lenbefore * step + step
                 else:
-                    z2 = data.topography[a][c - 1] - z * step - step
+                    z2 = topo[a][c - 1] - z * step - step
 
-                z3 = data.topography[a][c] - z * step - step
+                z3 = topo[a][c] - z * step - step
 
                 points.InsertNextPoint(a * data.x_size, c * data.y_size, z1)
                 points.InsertNextPoint(a * data.x_size,
@@ -570,239 +593,6 @@ def get_side(data, side):
     polydata = center_data(polydata, data.scan_size_x, data.scan_size_y)
 
     return polydata
-
-
-def get_surface_as_squares(data, off):
-    """Uses triangles to draw rectangles. No color interpolation is done.
-
-    The offset parameter is used to center the data like the triangle surface.
-    """
-    colortable = ColorTables(data.colortableid, data.color_saturation,
-                             data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap")
-
-    # Get the array with the stiffness
-    if data.stiffness_corrected:
-        array = data.stiffness_corrected_array
-    else:
-        array = data.stiffness_array
-
-    # Fill the vals array containing the stiffness values
-    vals = numpy.zeros([data.nbr_pixels_x, data.nbr_pixels_y])
-    nans = numpy.zeros([data.nbr_pixels_x, data.nbr_pixels_y])
-    depth = data.stiffness_depth_view
-    for i in range(data.nbr_pixels_x):
-        for j in range(data.nbr_pixels_y):
-            if len(array[i][j]) > data.stiffness_depth_view:
-                vals[i][j] = data.stiffness_array[i][j][depth]
-            else:
-                nans[i][j] = True
-
-    # Convert the stiffness values to color values with matplotlib
-    carray = numpy.array(colortable.scalarMap.to_rgba(vals, bytes=True))
-
-    # scalarMap.to_rgba can not replace nans. In this case we just
-    # post-process the color array (this is very fast) and replace the
-    # nans by a transparent color (or the color chosen by the user)
-    if data.nan_color_transparent:
-        color = [0, 0, 0, 0]
-    else:
-        color = numpy.array(data.color_nan) * 255.0
-
-    # Replace the nans by the nan color
-    for i in range(data.nbr_pixels_x):
-        for j in range(data.nbr_pixels_y):
-            if nans[i][j]:
-                carray[i][j] = color
-
-    # Create the triangles
-    colors = vtk.vtkUnsignedCharArray()
-    colors.SetNumberOfComponents(4)
-
-    points = vtk.vtkPoints()
-
-    triangles = vtk.vtkCellArray()
-
-    count = 0
-
-    for i in range(data.opengl_slice_bottom, data.opengl_slice_top + 1, 1):
-        for j in range(data.opengl_slice_left, data.opengl_slice_right + 1, 1):
-            points.InsertNextPoint(i * data.x_size, j * data.y_size, 0)
-            points.InsertNextPoint(i * data.x_size,
-                                   j * data.y_size + data.y_size, 0)
-            points.InsertNextPoint(i * data.x_size + data.x_size,
-                                   j * data.y_size, 0)
-
-            triangle = vtk.vtkTriangle()
-            triangle.GetPointIds().SetId(0, count)
-            triangle.GetPointIds().SetId(1, count + 1)
-            triangle.GetPointIds().SetId(2, count + 2)
-
-            triangles.InsertNextCell(triangle)
-
-            points.InsertNextPoint(i * data.x_size,
-                                   j * data.y_size + data.y_size, 0)
-            points.InsertNextPoint(i * data.x_size + data.x_size,
-                                   j * data.y_size + data.y_size, 0)
-            points.InsertNextPoint(i * data.x_size + data.x_size,
-                                   j * data.y_size, 0)
-
-            triangle = vtk.vtkTriangle()
-            triangle.GetPointIds().SetId(0, count + 3)
-            triangle.GetPointIds().SetId(1, count + 4)
-            triangle.GetPointIds().SetId(2, count + 5)
-
-            count += 6
-
-            triangles.InsertNextCell(triangle)
-            colors.InsertNextTuple(carray[i][j])
-            colors.InsertNextTuple(carray[i][j])
-            colors.InsertNextTuple(carray[i][j])
-            colors.InsertNextTuple(carray[i][j])
-            colors.InsertNextTuple(carray[i][j])
-            colors.InsertNextTuple(carray[i][j])
-
-    # Create a polydata object
-    polydata = vtk.vtkPolyData()
-
-    # Add the geometry and topology to the polydata
-    polydata.SetPoints(points)
-    polydata.GetPointData().SetScalars(colors)
-    polydata.SetPolys(triangles)
-
-    # Translate to 0,0,0
-    polydata = center_data(polydata, data.scan_size_x, data.scan_size_y, off)
-
-    return polydata, 0
-
-
-def get_actor_surface_as_cubes(self, data, mode):
-    """Not working for the moment"""
-    colortable = ColorTables(data.colortableid, data.color_saturation,
-                             data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap",
-                             color_nan=data.color_nan)
-
-    if data.stiffness_corrected:
-        array = data.stiffness_corrected_array
-    else:
-        array = data.stiffness_array
-
-    points = vtk.vtkPoints()
-    colors = vtk.vtkUnsignedCharArray()
-    colors.SetNumberOfComponents(4)
-    val_E = numpy.nan
-    for i in range(data.opengl_slice_bottom, data.opengl_slice_top + 1, 1):
-        for j in range(data.opengl_slice_left, data.opengl_slice_right + 1, 1):
-            if mode == "top":
-                if data.opengl_afm_flat_view:
-                    z = self.pos_z
-                else:
-                    z = data.topography[i][j] - \
-                        data.stiffness_depth_view * data.indentation_step
-            elif mode == "bottom":
-                z = data.topography[i][j] - \
-                    (len(array[i][j]) - 1) * data.indentation_step
-
-            points.InsertNextPoint(i * data.x_size, j * data.y_size, z)
-
-            if len(array[i][j]) > data.stiffness_depth_view:
-                val_E = array[i][j][data.stiffness_depth_view]
-            else:
-                val_E = numpy.nan
-
-            color_st = colortable.get_color_as_list(val_E)
-            color = [int(color_st[0] * 255),
-                     int(color_st[1] * 255),
-                     int(color_st[2] * 255),
-                     int(color_st[3] * 255)]
-            colors.InsertNextTuple(color)
-
-    # Combine into a polydata
-    polydata = vtk.vtkPolyData()
-    polydata.SetPoints(points)
-    polydata.GetPointData().SetScalars(colors)
-
-    # Translate to 0,0,0
-    polydata = center_data(polydata, data.scan_size_x, data.scan_size_y)
-
-    # Create anything you want here, we will use a cube for the demo.
-    cubeSource = vtk.vtkCubeSource()
-    cubeSource.SetXLength(data.x_size)
-    cubeSource.SetYLength(data.y_size)
-    cubeSource.SetZLength(data.indentation_step)
-
-    glyph3D = vtk.vtkGlyph3D()
-    glyph3D.SetColorModeToColorByScalar()
-    glyph3D.SetSourceConnection(cubeSource.GetOutputPort())
-    glyph3D.SetInput(polydata)
-    glyph3D.ScalingOff()
-    glyph3D.Update()
-
-    # Create a mapper and actor
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputConnection(glyph3D.GetOutputPort())
-
-    actorsurface = vtk.vtkActor()
-    actorsurface.SetMapper(mapper)
-
-    return actorsurface
-
-
-def get_surface_as_points(self, data, mode):
-    """Topography as single dots."""
-    colortable = ColorTables(data.colortableid, data.color_saturation,
-                             data.color_negative, data.colortable_max_value,
-                             data.colortable_middle_value, mode="scalarMap",
-                             color_nan=data.color_nan)
-
-    points = vtk.vtkPoints()
-    colors = vtk.vtkUnsignedCharArray()
-    colors.SetNumberOfComponents(4)
-    val_E = numpy.nan
-    for i in range(data.opengl_slice_bottom, data.opengl_slice_top + 1, 1):
-        for j in range(data.opengl_slice_left, data.opengl_slice_right + 1, 1):
-            if mode == "top":
-                if data.opengl_afm_flat_view:
-                    z = self.pos_z
-                else:
-                    z = data.topography[i][j]
-
-            points.InsertNextPoint(i * data.x_size, j * data.y_size, z)
-
-            if len(data.stiffness_array[i][j]) > data.stiffness_depth_view:
-                val_E = data.topography[i][j]
-            else:
-                val_E = numpy.nan
-
-            color_st = colortable.get_color_as_list(val_E)
-            color = [int(color_st[0] * 255),
-                     int(color_st[1] * 255),
-                     int(color_st[2] * 255),
-                     int(color_st[3] * 255)]
-            colors.InsertNextTuple(color)
-
-    # Combine into a polydata
-    polydata = vtk.vtkPolyData()
-    polydata.SetPoints(points)
-    polydata.GetPointData().SetScalars(colors)
-
-    # Translate to 0,0,0
-    polydata = center_data(polydata, data.scan_size_x, data.scan_size_y)
-
-    # Create anything you want here, we will use a cube for the demo.
-    cubeSource = vtk.vtkDiskSource()
-    cubeSource.SetInnerRadius(0)
-    cubeSource.SetOuterRadius(50)
-
-    glyph3D = vtk.vtkGlyph3D()
-    glyph3D.SetColorModeToColorByScalar()
-    glyph3D.SetSourceConnection(cubeSource.GetOutputPort())
-    glyph3D.ScalingOff()
-    glyph3D.SetInputData(polydata)
-    glyph3D.Update()
-
-    return glyph3D
 
 
 def get_actor_profile(sizes, trans, z_scale, profile, polydata_tomo):

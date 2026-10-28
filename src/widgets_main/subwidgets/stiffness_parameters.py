@@ -33,11 +33,9 @@
 
 from ... import shared
 from ... import widgets_list
-from ... import consts
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtWidgets
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools.gui_tools import PYAFInput, PYAFComboBox
-from ...tools.gui_tools import PYAFCheckBox
 from ...tools import misc_tools
 
 
@@ -53,6 +51,16 @@ class StiffnessParamsWidget(PYAFWidget):
         self.list_range_mode = PYAFComboBox(self, "list_range_mode")
         self.list_range_mode.addItem("Force")
         self.list_range_mode.addItem("Indentation")
+        # Wide enough to display the longest item. Set with a style sheet:
+        # the min-width of the application style sheet would override
+        # setMinimumWidth (here min-width is the width of the text area)
+        metrics = self.list_range_mode.fontMetrics()
+        longest = max(metrics.horizontalAdvance(self.list_range_mode.itemText(i))
+                      for i in range(self.list_range_mode.count()))
+        self.list_range_mode.setStyleSheet(
+            "QComboBox { min-width: " + str(longest + 20) + "px; }")
+        # The list that opens is also wide enough for the items
+        self.list_range_mode.view().setMinimumWidth(longest + 80)
 
         # Indentation start
         self.IN_start = PYAFInput(self, "input_start_in", "Start [nm]")
@@ -70,6 +78,24 @@ class StiffnessParamsWidget(PYAFWidget):
         self.F_stop = PYAFInput(self, "input_stop_f", "Stop (%)")
         self.F_stop.input.setValidator(misc_tools.validator("UI"))
 
+        # Limits of the fit (percentages)
+        self.IN_min_indentation = PYAFInput(
+            self, "input_min_indentation", "Min. indentation (%)")
+        self.IN_min_indentation.input.setValidator(
+            misc_tools.validator("UF"))
+        self.IN_min_indentation.setToolTip(
+            "Percentage of the piezo travel after the contact. When the "
+            "indentation is smaller,\nthe sample is too stiff for the "
+            "cantilever (e.g. glass): the point of contact is not\nfitted, "
+            "the elasticity is fitted with the detected point of contact.")
+        self.IN_poc_window = PYAFInput(
+            self, "input_poc_window", "Max. POC shift (%)")
+        self.IN_poc_window.input.setValidator(misc_tools.validator("UF"))
+        self.IN_poc_window.setToolTip(
+            "Percentage of the indentation: the fit can move the point of "
+            "contact by at most\nthis much. Further, or if the fit fails, "
+            "the elasticity is fitted with the\ndetected point of contact.")
+
         data = shared.exp.list[shared.exp.id_selected]
 
         self.IN_start.changeValue(data.indentation_start)
@@ -82,6 +108,7 @@ class StiffnessParamsWidget(PYAFWidget):
         # Force range selection
         self.force_selection = QtWidgets.QWidget(None)
         self.VL_force_selection = QtWidgets.QVBoxLayout()
+        self.VL_force_selection.setContentsMargins(0, 0, 0, 0)
         self.VL_force_selection.addWidget(self.F_start)
         self.VL_force_selection.addWidget(self.F_stop)
         self.VL_force_selection.addStretch(1)
@@ -90,6 +117,7 @@ class StiffnessParamsWidget(PYAFWidget):
         # Indentation range selection
         self.indentation_selection = QtWidgets.QWidget(None)
         self.VL_indentation_selection = QtWidgets.QVBoxLayout()
+        self.VL_indentation_selection.setContentsMargins(0, 0, 0, 0)
         self.VL_indentation_selection.addWidget(self.IN_start)
         self.VL_indentation_selection.addWidget(self.IN_stop)
         self.VL_indentation_selection.addStretch(1)
@@ -98,41 +126,56 @@ class StiffnessParamsWidget(PYAFWidget):
         self.STK_data_selection.addWidget(self.force_selection)
         self.STK_data_selection.addWidget(self.indentation_selection)
 
-        # Checkboxes
-        label = "Tomography"
-        self.CB_tomography = PYAFCheckBox(self, "tomography", label)
-        # self.CB_strict_stop = PYAFCheckBox(self, "strict_stop", "Strict stop")
-        # self.CB_perform_fit = PYAFCheckBox(self, "perform_fit", "Perform fit")
-
         widgets_list.widget_progressbar.update()
 
         self.VL_params_stiff = QtWidgets.QVBoxLayout()
         # Display the start parameter only in advanced mode
 
         if self.name == "widget_calculus":
-            self.VL_list_calc = QtWidgets.QVBoxLayout()
-            if consts.ADVANCED:
-                self.VL_list_calc.addWidget(self.IN_start)
-                self.VL_list_calc.addWidget(self.IN_step)
-                # By default tomography is set to False. We display the Kasas
-                # model only in advanced mode.
-                self.VL_list_calc.addWidget(self.CB_tomography)
-            else:
-                self.VL_list_calc.addWidget(self.IN_step)
-
-            self.VL_list_calc.addStretch(1)
-            self.VL_params_stiff.addLayout(self.VL_list_calc)
+            # Tomography: segments of the indentation (the inputs are not in
+            # the stacked widget of the fit ranges, which is not used here)
+            self.STK_data_selection.setParent(None)
+            self.IN_stop.setToolTip("0: up to the end of the indentation")
+            self.IN_step.setToolTip("0: a single segment")
+            box_segments = QtWidgets.QGroupBox("Segments")
+            VL_segments = QtWidgets.QVBoxLayout()
+            VL_segments.addWidget(self.IN_start)
+            VL_segments.addWidget(self.IN_stop)
+            VL_segments.addWidget(self.IN_step)
+            VL_segments.addStretch(1)
+            box_segments.setLayout(VL_segments)
+            self.VL_params_stiff.setContentsMargins(0, 0, 0, 0)
+            self.VL_params_stiff.addWidget(box_segments)
 
         elif self.name == "widget_fitting":
 
             self.HL_list_range_mode = QtWidgets.QHBoxLayout()
-            self.label_range_mode = QtWidgets.QLabel("Range Mode : ")
+            self.label_range_mode = QtWidgets.QLabel("Range mode")
             self.HL_list_range_mode.addWidget(self.label_range_mode)
             self.HL_list_range_mode.addWidget(self.list_range_mode)
             self.HL_list_range_mode.addStretch(1)
 
-            self.VL_params_stiff.addLayout(self.HL_list_range_mode)
-            self.VL_params_stiff.addWidget(self.STK_data_selection)
+            # Range of the data fitted, and limits of the fit, side by side
+            # under the computation method
+            box_range = QtWidgets.QGroupBox("Fit range")
+            VL_range = QtWidgets.QVBoxLayout()
+            VL_range.addLayout(self.HL_list_range_mode)
+            VL_range.addWidget(self.STK_data_selection)
+            box_range.setLayout(VL_range)
+
+            box_adjustment = QtWidgets.QGroupBox("Fit adjustment")
+            VL_adjustment = QtWidgets.QVBoxLayout()
+            VL_adjustment.addWidget(self.IN_min_indentation)
+            VL_adjustment.addWidget(self.IN_poc_window)
+            VL_adjustment.addStretch(1)
+            box_adjustment.setLayout(VL_adjustment)
+
+            HL_boxes = QtWidgets.QHBoxLayout()
+            HL_boxes.setContentsMargins(0, 0, 0, 0)
+            HL_boxes.addWidget(box_range)
+            HL_boxes.addWidget(box_adjustment)
+            self.VL_params_stiff.setContentsMargins(0, 0, 0, 0)
+            self.VL_params_stiff.addLayout(HL_boxes)
 
         self.setLayout(self.VL_params_stiff)
 
@@ -147,22 +190,18 @@ class StiffnessParamsWidget(PYAFWidget):
         """
         data = shared.exp.current_data
 
-        if self.name == "widget_calculus":
-            self.IN_start.changeValue(data.indentation_start)
-            self.IN_step.changeValue(data.indentation_step)
-            self.CB_tomography.setChecked(data.tomography)
+        # Fill all the inputs (also the hidden ones, e.g. the other range
+        # mode), so that they all display the values of the selected file
+        self.IN_start.changeValue(data.indentation_start)
+        self.IN_stop.changeValue(data.indentation_stop)
+        self.IN_step.changeValue(data.indentation_step)
+        self.F_start.changeValue(data.force_start)
+        self.F_stop.changeValue(data.force_stop)
+        self.IN_min_indentation.changeValue(data.fit_min_indentation)
+        self.IN_poc_window.changeValue(data.fit_poc_window)
 
-        elif self.name == "widget_fitting":
+        if self.name == "widget_fitting":
             val = data.fit_range_type
-
-            if val == 0:
-                self.F_start.changeValue(data.force_start)
-                self.F_stop.changeValue(data.force_stop)
-
-            elif val == 1:
-                self.IN_start.changeValue(data.indentation_start)
-                self.IN_stop.changeValue(data.indentation_stop)
-
             self.list_range_mode.setCurrentIndex(val)
             self.STK_data_selection.setCurrentIndex(val)
 
@@ -198,7 +237,6 @@ class StiffnessParamsWidget(PYAFWidget):
         if field == "input_stop_in":
             if self.IN_stop.input.text() != "":
                 data.indentation_stop = self.IN_stop.get_int_value()
-                # self.update_GUI("strict_stop")
 
         if field == "input_step_in":
             if self.IN_step.input.text() != "":
@@ -212,13 +250,13 @@ class StiffnessParamsWidget(PYAFWidget):
             if self.F_stop.input.text() != "":
                 data.force_stop = self.F_stop.get_int_value()
 
+        if field == "input_min_indentation":
+            if self.IN_min_indentation.input.text() != "":
+                data.fit_min_indentation = \
+                    self.IN_min_indentation.get_float_value()
+
+        if field == "input_poc_window":
+            if self.IN_poc_window.input.text() != "":
+                data.fit_poc_window = self.IN_poc_window.get_float_value()
+
         widgets_list.widget_compute.update_MPL("MPL_canvas")
-
-    def checkbox_clicked(self, checkbox):
-        """Called when a checkbox is clicked."""
-
-        if checkbox == "tomography":
-            state = self.CB_tomography.isChecked()
-            shared.exp.list[shared.exp.id_selected].tomography = state
-
-        # widgets_list.widget_compute.update_MPL("MPL_canvas")
