@@ -1,32 +1,35 @@
-# pyAF : An AFM Force Curve Analysis Software
+# pyAF : An AFM Force Curve Analysis Software Dedicated to Biologists
 
-pyAF is a Python software to analyze force curves & force maps acquired by atomic force microscopes (Bruker and JPK).
+pyAF is a Python software to analyze force curves & force maps acquired by atomic force microscopes (up to now Bruker and JPK).
 Developed at CMPI lab (https://cmpi.cnrs.fr).
 
 It computes:
 - Elasticity with several models and bottom effect correction (BEC)
 - Stiffness tomography
+- Viscoelasticity (Ting, Garcia)
+- Microrheology (Alcaraz)
 - Work of detachment and rupture force
-- Unbinding events and loading rates
-- Zero-force topography
+- Unbinding events and loading rates (SMFS)
+- Zero-force topography, flattening, plane fitting
 - Regions of interest for substrate definition and stats
 - Curve tilt correction and smoothing
 - 3D map rendering
-- Text export (to R), Statistics (UNPOLISHED)
-- Multi files and (partial) multiprocessing
+- Text and JSON export
+- Full statistical analysis: violin plots and superplots
+- Multi files and multiprocessing
 
 This software is governed by the CeCILL license under French law and abiding by the rules of distribution of free software. You can use, modify and/or redistribute the software under the terms of the CeCILL license as circulated by CEA, CNRS and INRIA at the following URL "http://www.cecill.info".
 
 The plots use the Inter font (https://rsms.me/inter), shipped in src/fonts under the SIL Open Font License 1.1 (src/fonts/OFL.txt).
 
-Main coding made by Michka Popoff (https://theses.fr/api/v1/document/2014LIL10220).
+Main initial coding made by Michka Popoff (https://theses.fr/api/v1/document/2014LIL10220).
 Modified by Antoine Dujardin, Simone Bovio, Javier Lopez-Alonso, Nuno Duarte, Sébastien Janel.
 
 When using the program, cite the original article : Stiffness tomography of eukaryotic intracellular compartments by atomic force microscopy (Nanoscale, 2019,11, 10320-10328).
 DOI	https://doi.org/10.1039/C8NR08955H
 
 DISCLAIMER: pyAF is a lab-developed software, it is not a commercial software.
-Check as much as possible results provided vs other software (e.g. JPK DP) to rule out any no supported edge cases! 
+Check as much as possible results provided vs other software (e.g. JPK DP) to rule out any no supported edge cases! And please report to us any wrong results.
 
 INSTALL procedure with PyCharm software (free for academics):
 - clone the repository (https://github.com/sebastienjanel/pyAF.git) in PyCharm (File/Project from Version Control)

@@ -3,17 +3,29 @@
 ##pyAF
 *****************************
 Version 1: Michka Popoff, PhD work
--> stiffness tomography, adhesion, events, GUI, 3D, stats
+-> stiffness tomography, adhesion, events, GUI, 3D, histogram stats
 
-Version 2: Antoine Dujardin, PhD work.
-Version 3: Javier Lopez-Alonso, PhD work.
+Version 2: Antoine Dujardin, PhD work
+
+Version 3: Javier Lopez-Alonso, PhD work
 -> migration to python3 and fitting algorythm
 -> export to r for data plotting
 
-Version 4: Sébastien Janel (and Nuno Duarte)
+Version 4: Sébastien Janel and Nuno Duarte
 -> Fixes for compatibilities with new libraries
 -> Box plots
 -> New fitting and BEC models
+
+Version 5: Sébastien Janel
+→ Updated python and librairies
+→ Revamped interface (toggles, selectors, theme, autoscale, LUT, plotting)
+→ Additional elasticity models
+→ Updated Bottom effect corrections factors (Garcia)
+→ New Ting viscoelasticity fit (Garcia)
+→ New Microrheology (Alcaraz)
+→ New Breakthrough analysis
+→ Complete new statistics: violin plots + superplots
+→ Revamped result export with JSON
 
 ##Checking the GUI
 
