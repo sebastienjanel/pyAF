@@ -118,7 +118,8 @@ def unit_force(data, delta, height=None):
     model = data.used_stiffness_model_selected
     radius = data.used_tip_radius * 1e-9
     g = contact_models.unit_force(model, radius, data.used_tip_angle,
-                                  data.used_poisson_ratio, delta)
+                                  data.used_poisson_ratio, delta,
+                                  data.get_used_shell_thickness() * 1e-9)
     if height is not None and numpy.isfinite(height):
         g = g * contact_models.bec_factor(delta, model, radius,
                                           data.used_tip_angle, height)

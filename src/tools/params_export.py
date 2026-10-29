@@ -167,9 +167,15 @@ def elasticity(data):
     return {
         "model": name,
         "tip_radius_nm": data.used_tip_radius
-        if model in contact_models.USES_RADIUS else None,
+        if model in contact_models.USES_RADIUS and
+        model != contact_models.THIN_SHELL else None,
+        # Thin shell: radius of the vesicle
+        "vesicle_radius_nm": data.used_tip_radius
+        if model == contact_models.THIN_SHELL else None,
         "tip_half_angle_deg": data.used_tip_angle
         if model in contact_models.USES_ANGLE else None,
+        "shell_thickness_nm": data.get_used_shell_thickness()
+        if model in contact_models.USES_THICKNESS else None,
         "poisson_ratio": data.used_poisson_ratio,
         "method": "Fitting" if data.used_perform_fit else "Tomography",
         "fit_range": fit_range,
@@ -258,7 +264,8 @@ SETTINGS = {
     "elasticity": (
         "stiffness_model_selected", "stiffness_mode", "fit_range_type",
         "brush_model", "brush_threshold_pct",
-        "tip_radius", "tip_angle", "poisson_ratio", "indentation_start",
+        "tip_radius", "tip_angle", "shell_thickness", "poisson_ratio",
+        "indentation_start",
         "indentation_stop", "indentation_step", "force_start", "force_stop",
         "fit_min_indentation", "fit_poc_window", "tomography",
         "fitparam_poc_skip_start", "fitparam_poc_fit_length",

@@ -228,6 +228,7 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.tip_radii = dict(cur.tip_radii)
                 dt.tip_angle = cur.tip_angle
                 dt.tip_angles = dict(cur.tip_angles)
+                dt.shell_thickness = cur.shell_thickness
                 dt.poisson_ratio = cur.poisson_ratio
                 dt.brush_model = cur.brush_model
                 dt.brush_threshold_pct = cur.brush_threshold_pct

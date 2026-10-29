@@ -290,7 +290,13 @@ class UsedParametersWidget(PYAFWidget):
             if val in contact_models.USES_ANGLE:
                 tip.append("half-angle " + misc_tools.format_number(
                     dt.used_tip_angle) + "\u00b0")
-            self.LB_tip.setText("Tip : " + ", ".join(tip) if tip else "")
+            if val in contact_models.USES_THICKNESS:
+                tip.append("shell thickness " + misc_tools.format_number(
+                    dt.get_used_shell_thickness()) + " nm")
+            # Thin shell: radius of the vesicle
+            what = "Vesicle : " if val == contact_models.THIN_SHELL \
+                else "Tip : "
+            self.LB_tip.setText(what + ", ".join(tip) if tip else "")
             self.LB_tip.setVisible(bool(tip))
             self.LB_poisson_ratio.setText(
                 "Poisson ratio : " + str(dt.used_poisson_ratio))

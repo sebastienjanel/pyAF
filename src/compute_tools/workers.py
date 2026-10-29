@@ -62,6 +62,7 @@ STIFFNESS_FIT_PARAMS = {
     "poisson_ratio": "poisson_ratio",
     "tip_radius": "tip_radius",
     "tip_angle": "tip_angle",
+    "shell_thickness": "shell_thickness",
     "fit_range_type": "fit_range_type"}
 
 STIFFNESS_OPTIONS = {

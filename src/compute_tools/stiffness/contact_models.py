@@ -51,6 +51,11 @@ Models (index of the model in pyAF):
    F = 4/3 E/(1 - nu^2) R^2 + 2 R E/(1 - nu^2) (delta - R) beyond.
    In both models dF/d delta = 2 a E/(1 - nu^2) (a: contact radius) is
    continuous at delta_c.
+10. Thin shell (Reissner): point load on a thin spherical shell of
+   radius R (the vesicle, not the tip) and thickness h, linear for an
+   indentation small compared to R (Reissner 1946; Calò et al.,
+   Nanoscale 2014; Vorselen et al., Front. Mol. Biosci. 2020):
+   F = 4 E h^2 / (R sqrt(3 (1 - nu^2))) delta.
 
 The models 5 to 7 are tabulated (force per unit modulus vs indentation)
 and interpolated. Units: SI (m, N, Pa); angles in degrees (half-angle
@@ -71,6 +76,7 @@ BLUNTED_CONE = 6
 BLUNTED_PYRAMID = 7
 NEEDLE = 8
 NANOWIRE = 9
+THIN_SHELL = 10
 
 # Number of sides of the pyramids (models 2 and 7)
 PYRAMID_SIDES = 4
@@ -80,25 +86,32 @@ MODEL_NAMES = ["Paraboloid (Hertz)", "Cone (Sneddon)",
                "Flat punch (Sneddon)", "Sphere (Sneddon)",
                "Blunted cone (Briscoe)",
                "Blunted 4-sided pyramid (Rico)",
-               "Needle (Garcia & Garcia)", "Nanowire (Garcia & Garcia)"]
+               "Needle (Garcia & Garcia)", "Nanowire (Garcia & Garcia)",
+               "Thin shell (Reissner)"]
 
 # Parameters of the tips: radius and angle
 USES_RADIUS = (PARABOLOID, FLAT_PUNCH, SPHERE, BLUNTED_CONE,
-               BLUNTED_PYRAMID, NEEDLE, NANOWIRE)
+               BLUNTED_PYRAMID, NEEDLE, NANOWIRE, THIN_SHELL)
 USES_ANGLE = (CONE, PYRAMID, BLUNTED_CONE, BLUNTED_PYRAMID, NEEDLE)
 
 # Meaning of the radius for each model (label of the input)
 RADIUS_LABELS = {FLAT_PUNCH: "Punch radius [nm]",
                  NEEDLE: "Needle radius [nm]",
-                 NANOWIRE: "Wire radius [nm]"}
+                 NANOWIRE: "Wire radius [nm]",
+                 THIN_SHELL: "Vesicle radius [nm]"}
 RADIUS_LABEL = "Tip radius [nm]"
 
 # Default radius of the tip of each model [nm] (MLCT-Bio probes for the
-# blunted tips, smallest nanowire of Garcia & Garcia 2018), used until the
-# user changes it for the model
+# blunted tips, smallest nanowire of Garcia & Garcia 2018; radius of the
+# vesicle for the thin shell), used until the user changes it for the model
 DEFAULT_RADIUS = {PARABOLOID: 75, FLAT_PUNCH: 100, SPHERE: 75,
                   BLUNTED_CONE: 10, BLUNTED_PYRAMID: 20, NEEDLE: 5,
-                  NANOWIRE: 50}
+                  NANOWIRE: 50, THIN_SHELL: 50}
+
+# Models with a shell thickness (lipid bilayer of the vesicles: 4 nm by
+# default, as in Calò et al. 2014 and Vorselen et al. 2020)
+USES_THICKNESS = (THIN_SHELL,)
+DEFAULT_THICKNESS = 4.0
 
 # Default half-opening angle of each model [degrees]: 15 for the cones
 # (also the end of the needle), 35 for the pyramids (MLCT-Bio probes)
@@ -115,13 +128,16 @@ HAS_BEC = (PARABOLOID, CONE, PYRAMID, FLAT_PUNCH)
 RADIUS_LIMITED = (PARABOLOID,)
 
 # Power laws: F = coeff * E * delta ** exponent
-EXPONENTS = {PARABOLOID: 1.5, CONE: 2.0, PYRAMID: 2.0, FLAT_PUNCH: 1.0}
+EXPONENTS = {PARABOLOID: 1.5, CONE: 2.0, PYRAMID: 2.0, FLAT_PUNCH: 1.0,
+             THIN_SHELL: 1.0}
 
 _TABLES = {}
 
 
-def power_law(model, tip_radius, tip_angle, poisson_ratio):
-    """(coeff, exponent) of the power-law models (None for the others)."""
+def power_law(model, tip_radius, tip_angle, poisson_ratio,
+              thickness=DEFAULT_THICKNESS * 1e-9):
+    """(coeff, exponent) of the power-law models (None for the others).
+    thickness: thickness of the shell [m] (thin shell)."""
     nu = 1.0 - poisson_ratio ** 2
     if model == PARABOLOID:
         return 4.0 / 3.0 * math.sqrt(tip_radius) / nu, 1.5
@@ -135,6 +151,9 @@ def power_law(model, tip_radius, tip_angle, poisson_ratio):
                 (n * math.sin(math.pi / n)) / nu, 2.0)
     if model == FLAT_PUNCH:
         return 2.0 * tip_radius / nu, 1.0
+    if model == THIN_SHELL:
+        # Radius of the vesicle
+        return 4.0 * thickness ** 2 / (tip_radius * math.sqrt(3.0 * nu)), 1.0
     return None
 
 
@@ -264,15 +283,17 @@ def bec_factor(delta, model, tip_radius, tip_angle, height):
     return 1.0 + sum(c * x ** (k + 1) for k, c in enumerate(coeffs))
 
 
-def unit_force(model, tip_radius, tip_angle, poisson_ratio, delta):
+def unit_force(model, tip_radius, tip_angle, poisson_ratio, delta,
+               thickness=DEFAULT_THICKNESS * 1e-9):
     """Force per unit modulus g(delta) (F = E g(delta)), 0 for delta <= 0.
 
-    tip_radius in m, tip_angle in degrees, delta in m (array).
+    tip_radius in m, tip_angle in degrees, delta in m (array), thickness of
+    the shell in m (thin shell).
     """
     delta = numpy.asarray(delta, dtype=float)
     out = numpy.zeros(delta.shape)
     pos = delta > 0
-    law = power_law(model, tip_radius, tip_angle, poisson_ratio)
+    law = power_law(model, tip_radius, tip_angle, poisson_ratio, thickness)
     if law is not None:
         coeff, exponent = law
         out[pos] = coeff * delta[pos] ** exponent

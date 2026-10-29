@@ -218,6 +218,7 @@ class Stiffness:
             "trig_threshold": data.trig_threshold,
             "tip_radius": data.tip_radius,
             "tip_angle": data.tip_angle,
+            "shell_thickness": data.shell_thickness,
             "poisson_ratio": data.poisson_ratio,
             "perform_fit": data.perform_fit,
             "coeff": coeff

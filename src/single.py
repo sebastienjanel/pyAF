@@ -409,6 +409,9 @@ class SingleFile:
         # contact_models.DEFAULT_ANGLE for the others)
         self.tip_angle = 35
         self.tip_angles = {}
+        # Thickness of the shell of the thin shell model [nm] (lipid
+        # bilayer of the vesicles)
+        self.shell_thickness = 4.0
         self.poisson_ratio = 0.5
         self.indentation_start = 0
         self.indentation_stop = 0
@@ -435,6 +438,7 @@ class SingleFile:
         self.used_fit_range_type = None
         self.used_tip_radius = None
         self.used_tip_angle = None
+        self.used_shell_thickness = None
         self.used_poisson_ratio = None
         self.used_indentation_start = None
         self.used_force_start = None
@@ -1121,6 +1125,13 @@ class SingleFile:
         return (self.indentation_start if start is None else start,
                 self.indentation_step if step is None else step,
                 self.tomography if tomography is None else tomography)
+
+    def get_used_shell_thickness(self):
+        """Thickness of the shell used for the elasticity [nm] (thin shell
+        model), the current one for the files saved before it was stored."""
+        if self.used_shell_thickness is None:
+            return self.shell_thickness
+        return self.used_shell_thickness
 
     def reset_discarded(self):
         """Method used to reset the discarded curve array."""

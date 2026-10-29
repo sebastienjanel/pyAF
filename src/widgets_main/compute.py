@@ -252,16 +252,28 @@ class ComputeWidget(PYAFWidget):
         # Same width for the three inputs of the model parameters
         self.IN_tip_angle = PYAFInput(self, "tip_angle", label, 60)
         self.IN_poisson = PYAFInput(self, "poisson", "Poisson ratio", 60)
+        self.IN_shell_thickness = PYAFInput(
+            self, "shell_thickness", "Shell thickness [nm]", 60)
+        self.IN_shell_thickness.setToolTip(
+            "Thickness h of the shell of the vesicle (lipid bilayer: about "
+            "4 nm).\nThin shell (Reissner): F = 4 E h\u00b2 / (R "
+            "\u221a(3 (1 - \u03bd\u00b2))) \u03b4, valid for an indentation "
+            "small compared to the radius R of the vesicle\n(fit range: "
+            "indentation up to about 0.1 R, Vorselen et al. 2020), with a "
+            "tip sharper than the vesicle, on its top.")
         self.IN_tip_angle.setToolTip(
             "Half-angle between the axis of the tip and its face (for a "
             "pyramid: the face, not the edge).")
         self.IN_tip_radius.setToolTip(
             "Radius of the apex of the tip (sphere, paraboloid, blunted "
             "tips), of the flat punch, or of the cylinder of the needle "
-            "and the nanowire.")
+            "and the nanowire.\nThin shell: radius of the vesicle (not of "
+            "the tip).")
         # 0 is refused (division by zero in the models)
         self.IN_tip_radius.input.setValidator(misc_tools.validator("PF"))
         self.IN_tip_angle.input.setValidator(misc_tools.validator("PF"))
+        self.IN_shell_thickness.input.setValidator(
+            misc_tools.validator("PF"))
         self.IN_poisson.input.setValidator(misc_tools.validator("UF"))
 
         # Model
@@ -1037,6 +1049,7 @@ class ComputeWidget(PYAFWidget):
             model = data.stiffness_model_selected
             self.IN_tip_radius.setParent(None)
             self.IN_tip_angle.setParent(None)
+            self.IN_shell_thickness.setParent(None)
             self.IN_poisson.setParent(None)
             if model != contact_models.SLOPE:
                 self.GL_stiffness_params.addWidget(self.IN_poisson, 1, 0)
@@ -1051,6 +1064,11 @@ class ComputeWidget(PYAFWidget):
             if model in contact_models.USES_ANGLE:
                 self.IN_tip_angle.input.setText(str(data.tip_angle))
                 self.GL_stiffness_params.addWidget(self.IN_tip_angle, row, 0)
+            if model in contact_models.USES_THICKNESS:
+                self.IN_shell_thickness.input.setText(
+                    misc_tools.format_number(data.shell_thickness))
+                self.GL_stiffness_params.addWidget(
+                    self.IN_shell_thickness, row, 0)
 
             # Brush model: models of a sphere
             self.TG_brush.setParent(None)
@@ -1180,6 +1198,11 @@ class ComputeWidget(PYAFWidget):
         elif field == "tip_angle":
             if self.IN_tip_angle.input.text() != "":
                 data.tip_angle = self.IN_tip_angle.get_float_value()
+
+        elif field == "shell_thickness":
+            if self.IN_shell_thickness.input.text() != "":
+                data.shell_thickness = \
+                    self.IN_shell_thickness.get_float_value()
 
         elif field == "poisson":
             if self.IN_poisson.input.text() != "":

@@ -203,6 +203,7 @@ def save_used_params(data, mode):
         data.used_fit_range_type = data.fit_range_type
         data.used_tip_radius = data.tip_radius
         data.used_tip_angle = data.tip_angle
+        data.used_shell_thickness = data.shell_thickness
         data.used_poisson_ratio = data.poisson_ratio
         data.used_indentation_start = data.indentation_start
         data.used_indentation_stop = data.indentation_stop

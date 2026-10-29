@@ -47,7 +47,8 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
     model_selected = o_params["model_selected"]
     # Exponent of the indentation in the model (for the fit with a fixed
     # point of contact)
-    exponent = {0: 1.5, 1: 2.0, 2: 2.0, 4: 1.0}.get(model_selected)
+    exponent = {0: 1.5, 1: 2.0, 2: 2.0, 4: 1.0,
+                contact_models.THIN_SHELL: 1.0}.get(model_selected)
 
     if model_selected == 0:
         # Hertz with sphere
@@ -76,6 +77,16 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         fit_model_lmfit = sm.flat_punch_lmfit
         div = fit_params["tip_radius"] * 1e-9
         sm.coeff = 2 * div / (1.0 - fit_params["poisson_ratio"] ** 2)
+
+    elif model_selected == contact_models.THIN_SHELL:
+        # Thin shell (Reissner): linear, as the flat punch, the radius being
+        # the one of the vesicle
+        fit_model = sm.flat_punch
+        fit_model_lmfit = sm.flat_punch_lmfit
+        sm.coeff = contact_models.power_law(
+            model_selected, fit_params["tip_radius"] * 1e-9, 0.0,
+            fit_params["poisson_ratio"],
+            fit_params["shell_thickness"] * 1e-9)[0]
 
     else:
         # Sphere (exact), blunted cone and pyramid, needle and nanowire:
