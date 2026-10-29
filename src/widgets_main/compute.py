@@ -475,8 +475,10 @@ class ComputeWidget(PYAFWidget):
         HL_events_compute_type.addWidget(BOX_algorithms)
         HL_events_compute_type.addStretch(1)
 
+        # Jump of contact first (left), then the parameters of the
+        # algorithm (column 1, see update_widget)
         self.GL_events = QtWidgets.QGridLayout()
-        self.GL_events.addWidget(W_fit_params_jocs_events, 0, 1)
+        self.GL_events.addWidget(W_fit_params_jocs_events, 0, 0)
 
         VL_events_options = QtWidgets.QVBoxLayout()
         VL_events_options.addLayout(HL_events_compute_type)
@@ -505,9 +507,24 @@ class ComputeWidget(PYAFWidget):
         VL_loading_rates.addWidget(self.BT_get_lr)
         VL_loading_rates.addStretch(1)
 
+        # Description, small text below the coefficient (as in the
+        # viscoelasticity tab)
+        label_lr = QtWidgets.QLabel(
+            "Effective loading rate of each event: slope of the force vs "
+            "time (retraction velocity \u00d7 slope of the force vs "
+            "distance),\nfitted on the part of the curve before the "
+            "rupture, over this fraction of the rupture force (0.33: last "
+            "third).\nEvans & Ritchie, Biophys. J. 1997; Ray et al., "
+            "Langmuir 2007.")
+        label_lr.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        label_lr.setFont(gui_tools.font_of_size(
+            max(label_lr.font().pointSize() - 2, 8)))
+
         VL_coeff = QtWidgets.QVBoxLayout()
         VL_coeff.addStretch(1)
         VL_coeff.addWidget(self.IN_lr_coef)
+        VL_coeff.addSpacing(6)
+        VL_coeff.addWidget(label_lr)
         VL_coeff.addStretch(1)
 
         # Coefficient centered in the tab (the spacing balances the compute
@@ -535,9 +552,16 @@ class ComputeWidget(PYAFWidget):
         # Instruction label (models with a correction of Garcia & Garcia)
         names = [contact_models.MODEL_NAMES[m] for m in contact_models.HAS_BEC]
         self.label_info = QtWidgets.QLabel(
-            "Applies to " + ", ".join(names[:-1]) + " and " + names[-1] +
+            "Bottom effect correction of a sample bonded to the substrate "
+            "(Garcia & Garcia, Biophys. J. 2018).\nApplies to " +
+            ", ".join(names[:-1]) + " and " + names[-1] +
             " models.\nEither select the substrate from the ROI manager "
             "(results tab) or input the known height of the sample")
+        self.label_info.setTextInteractionFlags(
+            QtCore.Qt.TextSelectableByMouse)
+        # Small text, below the parameters, as in the viscoelasticity tab
+        self.label_info.setFont(gui_tools.font_of_size(
+            max(self.label_info.font().pointSize() - 2, 8)))
 
         # ROI selection (Label + Dropdown)
         self.label_list_roi = QtWidgets.QLabel("ROI of substrate:")
@@ -576,10 +600,13 @@ class ComputeWidget(PYAFWidget):
 
         # Vertical layout to stack components
         self.stiff_corr_opts = QtWidgets.QVBoxLayout()
-        self.stiff_corr_opts.addWidget(self.label_info)  # Instruction text
         self.stiff_corr_opts.addLayout(self.stiff_corr_row)  # ROI label + dropdown
         self.stiff_corr_opts.addLayout(self.stiff_corr_noise_row)  # Add noise floor layout
         self.stiff_corr_opts.addLayout(self.stiff_corr_height_row)  # Sample height label + input
+        # Instruction text, below the parameters (as in the viscoelasticity
+        # tab)
+        self.stiff_corr_opts.addSpacing(6)
+        self.stiff_corr_opts.addWidget(self.label_info)
 
         VL_stiff_corr_opts = QtWidgets.QVBoxLayout()
         VL_stiff_corr_opts.addLayout(self.stiff_corr_opts)
@@ -852,11 +879,11 @@ class ComputeWidget(PYAFWidget):
 
         if data.events_algorithm == "kernel":
             self.widget_msf.setParent(None)
-            self.GL_events.addWidget(self.widget_kernel, 0, 0)
+            self.GL_events.addWidget(self.widget_kernel, 0, 1)
 
         elif data.events_algorithm == "msf":
             self.widget_kernel.setParent(None)
-            self.GL_events.addWidget(self.widget_msf, 0, 0)
+            self.GL_events.addWidget(self.widget_msf, 0, 1)
 
         self.STK_stiffness_mode.setCurrentIndex(data.stiffness_mode)
 
