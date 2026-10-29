@@ -336,6 +336,16 @@ class Stiffness:
             if data.display_curve_type == "brush":
                 data.display_curve_type = "defl_ext"
 
+        # The microrheology uses the point of contact and the working
+        # indentation of the elasticity fit: to be computed again
+        if data.microrheo_calculated:
+            data.microrheo_calculated = False
+            data.microrheo_results = None
+            if data.meshgrid_type.startswith("microrheo_"):
+                data.meshgrid_type = "stiffness"
+            if data.display_curve_type == "microrheology":
+                data.display_curve_type = "defl_ext"
+
         # Close the progressbar and return
         widgets_list.widget_progressbar.close()
 

@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -98,6 +99,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.meshgrid_type = mt
             elif mt.startswith("brush_") and dt.brush_calculated:
                 dt.meshgrid_type = mt
+            elif mt.startswith("microrheo_") and dt.microrheo_calculated:
+                dt.meshgrid_type = mt
             elif mt.startswith("fit_") and dt.has_fit_quality():
                 dt.meshgrid_type = mt
             elif mt == "piezo":
@@ -192,8 +195,12 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 for name in ("color_opts_visco_e0", "color_opts_visco_storage",
                              "color_opts_visco_loss"):
                     setattr(dt, name, copy.deepcopy(getattr(cur, name)))
+                for name in ("color_opts_microrheo_storage",
+                             "color_opts_microrheo_loss"):
+                    setattr(dt, name, copy.deepcopy(getattr(cur, name)))
             for name in ("color_opts_visco_fluidity",
-                         "color_opts_visco_tan_delta", "color_opts_fit_r2",
+                         "color_opts_visco_tan_delta",
+                         "color_opts_microrheo_tan_delta", "color_opts_fit_r2",
                          "color_opts_fit_poc_fixed"):
                 setattr(dt, name, copy.deepcopy(getattr(cur, name)))
             dt.stiffness_color_log = getattr(cur, "stiffness_color_log",
@@ -274,6 +281,16 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                              "beta_auto", "beta_init", "drag_correction"):
                     setattr(dt, "visco_" + name,
                             getattr(cur, "visco_" + name))
+
+        if exp.compute_type == "microrheology" or mode == "all":
+            cur = exp.list[oldid]
+            for dt in exp.list:
+                # Not the frequency of the maps: one of the frequencies of
+                # each file (see the compute tab)
+                dt.microrheo_method = cur.microrheo_method
+                dt.microrheo_drag = cur.microrheo_drag
+                dt.microrheo_piezo = None if cur.microrheo_piezo is None \
+                    else dict(cur.microrheo_piezo)
 
         if exp.compute_type == "breakthrough" or mode == "all":
             cur = exp.list[oldid]

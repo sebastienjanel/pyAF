@@ -1,3 +1,36 @@
+# Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
+# Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
+#
+# This software is a computer program whose purpose is to analyze force curves
+# recorded with an atomic force microscope.
+#
+# This software is governed by the CeCILL license under French law and
+# abiding by the rules of distribution of free software. You can use, modify
+# and/ or redistribute the software under the terms of the CeCILL license as
+# circulated by CEA, CNRS and INRIA at the following URL
+# "http://www.cecill.info".
+#
+# As a counterpart to the access to the source code and rights to copy,
+# modify and redistribute granted by the license, users are provided only
+# with a limited warranty and the software's author, the holder of the
+# economic rights, and the successive licensors have only limited liability.
+#
+# In this respect, the user's attention is drawn to the risks associated
+# with loading, using, modifying and/or developing or reproducing the
+# software by the user in light of its specific status of free software,
+# that may mean that it is complicated to manipulate, and that also
+# therefore means that it is reserved for developers and experienced
+# professionals having in-depth computer knowledge. Users are therefore
+# encouraged to load and test the software's suitability as regards their
+# requirements in conditions enabling the security of their systems and/or
+# data to be ensured and, more generally, to use and operate it in the
+# same conditions as regards security.
+#
+# The fact that you are presently reading this means that you have had
+# knowledge of the CeCILL license and that you accept its terms.
+
+
 """Viscoelasticity: Ting fit of the approach and the retraction curves.
 
 The power-law rheology of the sample (modulus E0 at 1 s and fluidity) is
@@ -102,11 +135,13 @@ def downsample(values, nbr):
     return numpy.add.reduceat(values, edges[:-1]) / numpy.diff(edges)
 
 
-def prepare_curve(data, i, j, settings):
+def prepare_curve(data, i, j, settings, whole=False):
     """Force, indentation and time of a curve for the Ting fit (SI units).
 
     Returns (time, delta, force, idx_tm, tc_init, f0_init, has_pause), or
-    None if the curve can not be fitted (no point of contact).
+    None if the curve can not be fitted (no point of contact). With whole,
+    the indentation and the force of the whole curve (not downsampled) and
+    the index of the end of the loading: (delta, force, k_tm).
     """
     poc = data.pocs_real[i][j]
     z_poc, d_poc = float(poc[0]), float(poc[1])
@@ -180,6 +215,8 @@ def prepare_curve(data, i, j, settings):
     delta = (z - z_poc - defl) * 1e-9
     force = defl * k
     k_tm = int(numpy.argmax(z))
+    if whole:
+        return delta, force, k_tm
 
     # Fitted part: indentation > -contact offset, from the approach to
     # the retraction

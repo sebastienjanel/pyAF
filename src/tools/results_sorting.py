@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -81,9 +82,27 @@ BRUSH_TYPES = {
                       "column": "grafting_density"},
 }
 
+# Microrheology, at the frequency of the maps of each file
+MICRORHEO_TYPES = {
+    "microrheo_storage": {"name": "G\u2032 (microrheology)",
+                          "label": "G\u2032 [kPa]", "factor": 1e-3,
+                          "export": "Storage modulus G' (Pa)",
+                          "column": "microrheo_storage"},
+    "microrheo_loss": {"name": "G\u2033 (microrheology)",
+                       "label": "G\u2033 [kPa]", "factor": 1e-3,
+                       "export": "Loss modulus G'' (Pa)",
+                       "column": "microrheo_loss"},
+    "microrheo_tan_delta": {"name": "Loss tangent (microrheology)",
+                            "label": "tan \u03b4", "factor": 1.0,
+                            "export": "Loss tangent G''/G'",
+                            "column": "microrheo_tan_delta"},
+}
+
 # Results with one value per pixel (map), with the computation they need
 PIXEL_TYPES = {**{name: dict(values, calculated="visco_calculated")
                   for name, values in VISCO_TYPES.items()},
+               **{name: dict(values, calculated="microrheo_calculated")
+                  for name, values in MICRORHEO_TYPES.items()},
                **{name: dict(values, calculated="breakthrough_calculated")
                   for name, values in BREAKTHROUGH_TYPES.items()},
                **{name: dict(values, calculated="brush_calculated")

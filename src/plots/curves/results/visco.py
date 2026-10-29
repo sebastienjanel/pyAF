@@ -1,5 +1,4 @@
-# Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
-# Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -66,12 +65,19 @@ class ResultsVisco(PlotCurve):
 
         self.used = self.plot_type != "fit_preview"
         self.fit = None
+        # Compute tab without zoom: the whole curve, with the fit on its
+        # fitted part
+        self.whole = None
         self.message = "No viscoelastic fit for this curve"
         if not self.used:
             reason = visco.check_file(self.data)
             if reason is None:
                 self.fit = visco.fit_curve(self.data, self.xpos, self.ypos,
                                            used=False)
+                if not self.data.auto_zoom_in:
+                    self.whole = visco.prepare_curve(
+                        self.data, self.xpos, self.ypos,
+                        visco.get_settings(self.data), whole=True)
             else:
                 self.message = "Preview not available:\n" + reason
         elif self.data.visco_calculated:
@@ -89,14 +95,21 @@ class ResultsVisco(PlotCurve):
             inputs, result = self.fit
             time, delta, force, idx_tm, tc_init = inputs[2:7]
             has_pause, height = inputs[8], inputs[10]
-            x = delta * self.x_factor
-            f = force * self.force_factor
-            self.axes.plot(x[:idx_tm + 1], f[:idx_tm + 1],
+            # Curve: fitted points (downsampled), or the whole curve
+            if self.whole is not None:
+                curve_delta, curve_force, curve_tm = self.whole
+            else:
+                curve_delta, curve_force, curve_tm = delta, force, idx_tm
+            cx = curve_delta * self.x_factor
+            cf = curve_force * self.force_factor
+            self.axes.plot(cx[:curve_tm + 1], cf[:curve_tm + 1],
                            color=curve_color("approach"), label="Approach",
                            **self.curve_style())
-            self.axes.plot(x[idx_tm:], f[idx_tm:],
+            self.axes.plot(cx[curve_tm:], cf[curve_tm:],
                            color=curve_color("retraction"), label="Retract",
                            **self.curve_style())
+            # Fit drawn on the fitted points
+            x = delta * self.x_factor
             if result["success"]:
                 settings = visco.get_settings(self.data, used=self.used)
                 common = visco.get_model(self.data, settings)

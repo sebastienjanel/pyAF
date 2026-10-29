@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -135,12 +136,8 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
             if get_time_segments_flag:
                 curve_x_time_pause = data.curves_pause[i][j][2]
 
-        if data.nbr_points_per_modulation_curve is not None:
-            curve_x_modulation = data.curves_modulation[i][j][0]
-            curve_y_modulation = data.curves_modulation[i][j][1]
-
-            if get_time_segments_flag:
-                curve_x_time_modulation = data.curves_modulation[i][j][2]
+        # The modulation segments are read with get_modulation_segments
+        # (several segments, not needed by the other computations)
 
         deflection_sensitivity = data.deflection_sensitivity
 
@@ -325,6 +322,30 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
                                    ind_offset_ret[0], stretch_length)
 
     return approach, retraction, pause, modulation, zero, smoothing_error
+
+
+def get_modulation_segments(data, i, j):
+    """Sine modulation segments of a curve (JPK microrheology), in the
+    order of data.modulation_frequencies: list of (frequency [Hz], height
+    [nm], deflection [nm], time [s]), the height in the frame of the
+    approach curve, the deflection with the deflection sensitivity. None
+    if the file has no modulation segment."""
+    if data.modulation_frequencies is None or \
+            data.modulation_nbr_points is None or \
+            data.nbr_points_per_modulation_curve is None:
+        return None
+    curves = numpy.asarray(data.curves_modulation[i, j], dtype=float)
+    if curves.ndim != 3:
+        # File loaded with a previous version of pyAF (one segment)
+        return None
+    sensitivity = data.deflection_sensitivity
+    segments = []
+    for k, (freq, nbr) in enumerate(zip(data.modulation_frequencies,
+                                        data.modulation_nbr_points)):
+        segments.append((freq, curves[k, 0, :nbr],
+                         curves[k, 1, :nbr] * sensitivity,
+                         curves[k, 2, :nbr]))
+    return segments
 
 
 def get_nanoscope_times(data, nbr_app, nbr_ret):

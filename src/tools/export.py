@@ -52,6 +52,7 @@ import tifffile
 from .. import shared
 from ..tools import dfs_tools
 from ..tools import map_values
+from ..compute_tools import microrheology
 from ..tools import params_export
 from ..tools import results_sorting
 from ..tools import superplot_tools
@@ -218,10 +219,26 @@ def get_r_tables(row, data):
             curve_tables.append(df)
 
     for force_type, values in results_sorting.PIXEL_TYPES.items():
+        if force_type in results_sorting.MICRORHEO_TYPES:
+            # All the frequencies, below
+            continue
         if getattr(data, values["calculated"]):
             df = table(get(force_type), values["column"])
             stats.append(describe(df, values["column"]))
             curve_tables.append(df)
+
+    if data.microrheo_calculated:
+        # G' and G'' of the curves at each frequency (Pa)
+        curves = get("microrheo_storage")
+        for frequency in microrheology.frequencies(data):
+            for name, column in (("storage", "G_storage"),
+                                 ("loss", "G_loss")):
+                column += "_" + format(frequency, "g") + "Hz"
+                values = data.get_microrheo_result(name, frequency)
+                df = table([[index, i, j, float(values[i][j])]
+                            for index, i, j, _ in curves], column)
+                stats.append(describe(df, column))
+                curve_tables.append(df)
 
     if data.breakthrough_calculated:
         # Number of breakthroughs per curve, and all the breakthroughs
@@ -489,6 +506,9 @@ RESULT_TYPES = (("stiffness", "stiffness_calculated"),
                 ("visco_e0", "visco_calculated"),
                 ("visco_fluidity", "visco_calculated"),
                 ("visco_tan_delta", "visco_calculated"),
+                ("microrheo_storage", "microrheo_calculated"),
+                ("microrheo_loss", "microrheo_calculated"),
+                ("microrheo_tan_delta", "microrheo_calculated"),
                 ("breakthrough_force", "breakthrough_calculated"),
                 ("breakthrough_thickness", "breakthrough_calculated"),
                 ("brush_modulus", "brush_calculated"),

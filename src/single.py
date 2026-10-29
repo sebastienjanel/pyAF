@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -165,6 +166,8 @@ class SingleFile:
         self.loading_rates_calculated = False
         self.events_calculated = False
         self.visco_calculated = False
+        # Microrheology (modulation segments in contact)
+        self.microrheo_calculated = False
         # Breakthroughs of supported lipid bilayers (approach curves)
         self.breakthrough_calculated = False
         # Brush model of the cells (with the elasticity)
@@ -230,6 +233,15 @@ class SingleFile:
         # PeakForce frequency (Hz) of the Nanoscope PeakForce files
         self.pft_freq = None
         self.segment_durations = None   # JPK
+        # Sine modulations of the piezo in contact (JPK, microrheology):
+        # frequency [Hz], amplitude [nm] and number of points of each
+        # modulation segment (curves_modulation[i, j, segment])
+        self.modulation_frequencies = None
+        self.modulation_amplitudes = None
+        self.modulation_nbr_points = None
+        # Height of each modulation above the surface [nm] (0: in contact;
+        # modulations at several heights: viscous drag of the cantilever)
+        self.modulation_heights = None
         self.corrupted_curves = None
 
         # Color tables id's for the meshgrids (default)
@@ -261,6 +273,11 @@ class SingleFile:
         self.color_opts_brush_modulus = [2, 0, 0, 0, 0]
         self.color_opts_brush_length = [12, 0, 0, 0, 0]
         self.color_opts_brush_density = [12, 0, 0, 0, 0]
+        # Microrheology: storage and loss moduli and loss tangent at the
+        # frequency of the maps (as the viscoelasticity)
+        self.color_opts_microrheo_storage = [2, 0, 0, 0, 0]
+        self.color_opts_microrheo_loss = [4, 0, 0, 0, 0]
+        self.color_opts_microrheo_tan_delta = [6, 0, 2, 1, 0]
         # Quality of the elasticity fit: R^2 from 0.9 (white to red: the
         # bad fits in red, the good ones light), and the pixels with the
         # point of contact fixed (Reds: fixed in red)
@@ -508,6 +525,21 @@ class SingleFile:
         self.brush_results = None
         self.used_brush_model = None
         self.used_brush_threshold_pct = None
+        # Microrheology (see compute_tools.microrheology): method of the
+        # transfer function ("fft" or "sine"), viscous drag coefficient of
+        # the cantilever b(0) [uN s/m], frequency of the maps [Hz]
+        self.microrheo_method = "fft"
+        self.microrheo_drag = 0.0
+        self.microrheo_frequency = None
+        # Piezo characterization for the correction of the height (dict of
+        # frequencies, phase [degrees], quotient and file, None: no
+        # correction), see microrheology.piezo_characterization
+        self.microrheo_piezo = None
+        # Results [i, j, frequency (increasing), k], k: microrheology.VALUES
+        self.microrheo_results = None
+        self.used_microrheo_method = None
+        self.used_microrheo_drag = None
+        self.used_microrheo_piezo = None
 
         # Display options
         self.meshgrid_type = "piezo"
@@ -1202,6 +1234,16 @@ class SingleFile:
                     opts[1], opts[2] = limits
                     opts[3] = sum(limits) / 2.0
 
+        # Microrheology: moduli with the automatic scale of the elasticity
+        if self.microrheo_calculated and color:
+            for name in ("microrheo_storage", "microrheo_loss"):
+                limits = robust_range(getattr(self, name),
+                                      self.stiffness_color_log)
+                if limits is not None:
+                    opts = getattr(self, "color_opts_" + name)
+                    opts[1], opts[2] = limits
+                    opts[3] = sum(limits) / 2.0
+
         # Breakthroughs: force and thickness from the 2nd to the 98th
         # percentile, number from 0 to the maximum
         if self.breakthrough_calculated and color:
@@ -1547,6 +1589,39 @@ class SingleFile:
         """Grafting density of the brush [1/um^2]."""
         return self.get_brush_result("density")
 
+    def get_microrheo_result(self, name, frequency=None):
+        """Map of a result of the microrheology at a frequency (the
+        frequency of the maps by default), nan when not computed."""
+        from .compute_tools import microrheology
+        nx, ny = self.nbr_pixels_x, self.nbr_pixels_y
+        if not self.microrheo_calculated or self.microrheo_results is None:
+            return numpy.full((nx, ny), numpy.nan)
+        freqs = microrheology.frequencies(self)
+        if frequency is None:
+            frequency = self.microrheo_frequency
+        if frequency not in freqs:
+            return numpy.full((nx, ny), numpy.nan)
+        return numpy.array(
+            self.microrheo_results[:, :, freqs.index(frequency),
+                                   microrheology.VALUES.index(name)],
+            dtype=float)
+
+    @property
+    def microrheo_storage(self):
+        """Storage modulus G' at the frequency of the maps [Pa]."""
+        return self.get_microrheo_result("storage")
+
+    @property
+    def microrheo_loss(self):
+        """Loss modulus G'' at the frequency of the maps [Pa]."""
+        return self.get_microrheo_result("loss")
+
+    @property
+    def microrheo_tan_delta(self):
+        """Loss tangent G'' / G' at the frequency of the maps."""
+        with numpy.errstate(divide="ignore", invalid="ignore"):
+            return self.microrheo_loss / self.microrheo_storage
+
     @property
     def breakthrough_force(self):
         """Force of the first breakthrough of the curves [N]."""
@@ -1647,6 +1722,9 @@ class SingleFile:
                  "brush_modulus": "color_opts_brush_modulus",
                  "brush_length": "color_opts_brush_length",
                  "brush_density": "color_opts_brush_density",
+                 "microrheo_storage": "color_opts_microrheo_storage",
+                 "microrheo_loss": "color_opts_microrheo_loss",
+                 "microrheo_tan_delta": "color_opts_microrheo_tan_delta",
                  "fit_r2": "color_opts_fit_r2",
                  "fit_poc_fixed": "color_opts_fit_poc_fixed"}
         return getattr(self, names[mt])

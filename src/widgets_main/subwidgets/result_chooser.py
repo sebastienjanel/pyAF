@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -40,7 +41,7 @@ from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools import misc_tools
 from ...tools.results_sorting import BREAKTHROUGH_TYPES, BRUSH_TYPES, \
-    VISCO_TYPES
+    MICRORHEO_TYPES, VISCO_TYPES
 
 
 def groups():
@@ -51,6 +52,9 @@ def groups():
             (name, values["name"]) for name, values in BRUSH_TYPES.items())),
         ("Viscoelasticity", tuple(
             (name, values["name"]) for name, values in VISCO_TYPES.items())),
+        ("Microrheology", tuple(
+            (name, values["name"])
+            for name, values in MICRORHEO_TYPES.items())),
         ("Adhesion", (("work", "Detachment work"),
                       ("rupture_force", "Detachment force"),
                       ("events_forces", "Events force"),
@@ -78,6 +82,8 @@ def available(result_type):
         return any(item.visco_calculated for item in datas)
     if result_type in BREAKTHROUGH_TYPES:
         return any(item.breakthrough_calculated for item in datas)
+    if result_type in MICRORHEO_TYPES:
+        return any(item.microrheo_calculated for item in datas)
     if result_type in BRUSH_TYPES:
         return any(item.brush_calculated for item in datas)
     return False

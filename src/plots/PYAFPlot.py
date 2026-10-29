@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -47,6 +48,7 @@ from .meshgrids.stiffness_slice_corr_meshgrid import \
     PlotStiffnessSliceCorrMeshGrid
 from .meshgrids.work_meshgrid import PlotWorkMeshGrid
 from .meshgrids.visco_meshgrid import PlotViscoMeshGrid
+from .meshgrids.microrheo_meshgrid import PlotMicrorheoMeshGrid
 from .meshgrids.breakthrough_meshgrid import PlotBreakthroughMeshGrid
 from .meshgrids.fit_quality_meshgrid import PlotFitQualityMeshGrid
 from .meshgrids.rupture_force1_meshgrid import PlotRuptureForce1MeshGrid
@@ -102,6 +104,7 @@ from .curves.results.indentation import ResultsIndentation
 # Residuals
 from .curves.results.residuals import ResultsResiduals
 from .curves.results.visco import ResultsVisco
+from .curves.results.microrheology import ResultsMicrorheology
 from .curves.results.brush import ResultsBrush
 
 # Events
@@ -255,6 +258,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                 self.canvas = PlotStiffnessSliceCorrMeshGrid(self)
             elif mesh.startswith("visco_") and dt.visco_calculated:
                 self.canvas = PlotViscoMeshGrid(self)
+            elif mesh.startswith("microrheo_") and dt.microrheo_calculated:
+                self.canvas = PlotMicrorheoMeshGrid(self)
             elif mesh.startswith("breakthrough_") and \
                     dt.breakthrough_calculated:
                 self.canvas = PlotBreakthroughMeshGrid(self)
@@ -311,6 +316,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ResultsVisco(self)
                 elif c_type == "brush":
                     self.canvas = ResultsBrush(self)
+                elif c_type == "microrheology":
+                    self.canvas = ResultsMicrorheology(self)
             elif p_type == "fit_preview":
                 if ct == "stiffness":
                     self.canvas = ComputeStiffness(self)
@@ -331,6 +338,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ComputeLoadingRates(self)
                 elif ct == "viscoelasticity":
                     self.canvas = ResultsVisco(self)
+                elif ct == "microrheology":
+                    self.canvas = ResultsMicrorheology(self)
                 elif ct == "breakthrough":
                     self.canvas = ComputeBreakthrough(self)
         elif p_type == "results_single":
@@ -498,4 +507,6 @@ def curve_type_available(data, curve_type):
         return data.visco_calculated
     if curve_type == "brush":
         return data.brush_calculated
+    if curve_type == "microrheology":
+        return data.microrheo_calculated
     return True

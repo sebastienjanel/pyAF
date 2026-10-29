@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -331,11 +332,13 @@ class TempFile:
             fi.create_carray(st + "/curves", "pause", tables.Float32Atom(),
                              shape=shape, filters=comp)
 
-        # Curves (modulation)
+        # Curves (modulation): all the modulation segments of each pixel,
+        # padded to the longest one (see data.modulation_nbr_points)
         if dt.nbr_points_per_modulation_curve is not None:
             shape = (
                 dt.nbr_pixels_x,
                 dt.nbr_pixels_y,
+                len(dt.modulation_nbr_points or [None]),
                 n,
                 dt.nbr_points_per_modulation_curve)
             fi.create_carray(st + "/curves", "modulation", tables.Float32Atom(),

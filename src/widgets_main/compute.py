@@ -65,6 +65,10 @@ from ..compute_tools.stiffness.main import Stiffness
 from ..compute_tools.work_and_rupture_force.main import WorkAndRuptureForce
 from ..compute_tools.stiffness_correction import StiffnessCorrection
 from ..compute_tools.viscoelasticity import main as visco_main
+from ..compute_tools import microrheology
+from ..compute_tools import viscous_drag
+from ..widgets.viscous_drag import ViscousDragDialog
+from ..widgets.piezo_characterization import PiezoCharacterizationDialog
 from ..compute_tools.stiffness import contact_models
 from ..compute_tools.stiffness import bec
 from ..widgets import plot_options
@@ -742,6 +746,117 @@ class ComputeWidget(PYAFWidget):
         HL_visco.addLayout(VL_visco)
         self.widget_visco.setLayout(HL_visco)
 
+        # --- Microrheology ---------------------------------------------------
+
+        self.widget_microrheo = QtWidgets.QWidget()
+
+        label = QtWidgets.QLabel(
+            "Complex shear modulus G* = G\u2032 + i G\u2033 from the sine "
+            "modulations of the piezo in contact,"
+            "\none value per frequency: F/\u03b4 at the frequency, "
+            "linearized contact model of the elasticity fit at the working "
+            "indentation (Alcaraz et al. 2003).\n"
+            "Uses the point of contact, the baseline, the model and the tip "
+            "of the elasticity fit (Fitting). Method of PyFMRheo: "
+            "github.com/DyNaMo-INSERM/PyFMlab_DyNaMo")
+        label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        # Small text, below the parameters
+        label.setFont(gui_tools.font_of_size(
+            max(label.font().pointSize() - 2, 8)))
+
+        self.Box_microrheo = QtWidgets.QGroupBox("Microrheology")
+        GL_microrheo = QtWidgets.QGridLayout()
+        GL_microrheo.setVerticalSpacing(4)
+
+        self.label_microrheo_method = QtWidgets.QLabel("Method :")
+        self.list_microrheo_method = PYAFComboBox(self, "microrheo_method")
+        for name, key in zip(microrheology.METHOD_NAMES,
+                             microrheology.METHODS):
+            self.list_microrheo_method.addItem(name, key)
+        self.list_microrheo_method.setToolTip(
+            "FFT: ratio of the Fourier transforms of the force and of the "
+            "indentation at the frequency (transfer function).\n"
+            "Sine fit: ratio of the sines fitted at the frequency on the "
+            "force and on the indentation.\nThe slow drift of each "
+            "modulation is removed first (rolling average over one "
+            "period). Both give the same values for whole periods.")
+        self.list_microrheo_method.fit_to_contents()
+        HL_microrheo_method = QtWidgets.QHBoxLayout()
+        HL_microrheo_method.addWidget(self.label_microrheo_method)
+        HL_microrheo_method.addWidget(self.list_microrheo_method)
+        HL_microrheo_method.addStretch(1)
+
+        self.IN_microrheo_drag = PYAFInput(
+            self, "microrheo_drag",
+            "Viscous drag b(0) [\u00b5N\u00b7s/m]", 60)
+        self.IN_microrheo_drag.setToolTip(
+            "Viscous drag coefficient of the liquid on the cantilever at "
+            "the surface, b(0): i 2\u03c0 f b(0) is removed from F/\u03b4 "
+            "(Alcaraz et al. 2003).\nMeasured by oscillating the "
+            "cantilever at several heights above the surface and "
+            "extrapolating to contact (0: no correction).")
+        self.IN_microrheo_drag.input.setValidator(
+            misc_tools.validator("UF"))
+        self.BT_microrheo_drag = PYAFButton(
+            self, "microrheo_drag_file", "From file\u2026")
+        self.BT_microrheo_drag.setToolTip(
+            "b(0) from a viscous drag measurement loaded in pyAF: "
+            "modulations of the cantilever at several heights above the "
+            "surface (no contact).\nb(h) = Im(F/\u03b4) / (2\u03c0 f) at "
+            "each height, extrapolated to the surface with "
+            "b(h) = A / (h + h_eff) (Alcaraz et al. 2002).")
+        HL_microrheo_drag = QtWidgets.QHBoxLayout()
+        HL_microrheo_drag.addWidget(self.IN_microrheo_drag)
+        HL_microrheo_drag.addWidget(self.BT_microrheo_drag)
+        HL_microrheo_drag.addStretch(1)
+
+        GL_microrheo.addLayout(HL_microrheo_method, 0, 0)
+        GL_microrheo.addLayout(HL_microrheo_drag, 1, 0)
+
+        # Piezo correction: lag and gain of the piezo measured on a curve of
+        # a rigid sample (substrate)
+        self.label_microrheo_piezo = QtWidgets.QLabel()
+        self.BT_microrheo_piezo = PYAFButton(
+            self, "microrheo_piezo", "From this curve")
+        self.BT_microrheo_piezo.setToolTip(
+            "Lag and gain of the piezo measured on the displayed curve, which "
+            "must be on a rigid sample (substrate: the deflection follows the "
+            "piezo),\nwith the same modulations: the height is corrected at "
+            "each frequency (PyFMRheo, piezo characterization).")
+        self.BT_microrheo_piezo_clear = PYAFButton(
+            self, "microrheo_piezo_clear", "Clear")
+        HL_microrheo_piezo = QtWidgets.QHBoxLayout()
+        HL_microrheo_piezo.addWidget(QtWidgets.QLabel("Piezo correction : "))
+        HL_microrheo_piezo.addWidget(self.label_microrheo_piezo)
+        HL_microrheo_piezo.addWidget(self.BT_microrheo_piezo)
+        HL_microrheo_piezo.addWidget(self.BT_microrheo_piezo_clear)
+        HL_microrheo_piezo.addStretch(1)
+        GL_microrheo.addLayout(HL_microrheo_piezo, 2, 0)
+        self.Box_microrheo.setLayout(GL_microrheo)
+
+        VL_microrheo_opts = QtWidgets.QVBoxLayout()
+        VL_microrheo_opts.addWidget(self.Box_microrheo)
+        VL_microrheo_opts.addWidget(label)
+        VL_microrheo_opts.addStretch(1)
+
+        self.BT_microrheo = PYAFButton(self, "compute_microrheo", "Compute")
+        self.BT_microrheo.setFixedSize(100, 100)
+        self.BT_microrheo.setObjectName("primaryButton")
+        VL_microrheo = QtWidgets.QVBoxLayout()
+        VL_microrheo.addStretch(1)
+        VL_microrheo.addWidget(self.BT_microrheo)
+        VL_microrheo.addStretch(1)
+
+        # Options centered in the tab (the spacing balances the compute
+        # button), as in the other tabs
+        HL_microrheo = QtWidgets.QHBoxLayout()
+        HL_microrheo.addSpacing(self.BT_microrheo.width())
+        HL_microrheo.addStretch(1)
+        HL_microrheo.addLayout(VL_microrheo_opts)
+        HL_microrheo.addStretch(1)
+        HL_microrheo.addLayout(VL_microrheo)
+        self.widget_microrheo.setLayout(HL_microrheo)
+
         # --- Breakthroughs of supported lipid bilayers -----------------------
 
         self.widget_breakthrough = QtWidgets.QWidget()
@@ -823,6 +938,7 @@ class ComputeWidget(PYAFWidget):
         self.tabs.addTab(self.widget_app, "Elasticity")
         self.tabs.addTab(self.widget_stiff_corr, "B.E.C.")
         self.tabs.addTab(self.widget_visco, "Viscoelasticity")
+        self.tabs.addTab(self.widget_microrheo, "Microrheology")
         self.tabs.addTab(self.widget_ret, "Work, Rupture force")
         self.tabs.addTab(self.widget_events, "Unbinding events")
         self.tabs.addTab(self.widget_loading_rates, "Loading rates")
@@ -917,6 +1033,9 @@ class ComputeWidget(PYAFWidget):
             self.BT_next_zoom_element.setEnabled(False)
         elif widget is self.widget_visco:
             shared.exp.compute_type = "viscoelasticity"
+            self.BT_next_zoom_element.setEnabled(False)
+        elif widget is self.widget_microrheo:
+            shared.exp.compute_type = "microrheology"
             self.BT_next_zoom_element.setEnabled(False)
         elif widget is self.widget_breakthrough:
             shared.exp.compute_type = "breakthrough"
@@ -1028,6 +1147,24 @@ class ComputeWidget(PYAFWidget):
             reason = visco_main.check_file(data)
             self.BT_visco.setEnabled(reason is None)
             self.BT_visco.setToolTip(
+                "" if reason is None else "Not available: " + reason)
+
+        if element == "microrheo" or element == "all":
+            self.list_microrheo_method.setCurrentIndex(
+                self.list_microrheo_method.findData(data.microrheo_method))
+            self.IN_microrheo_drag.changeValue(
+                misc_tools.format_number(data.microrheo_drag))
+            piezo = data.microrheo_piezo
+            self.label_microrheo_piezo.setText(
+                "None" if not piezo else piezo["file"] + " [" + ", ".join(
+                    str(k) for k in piezo["curve"]) + "]")
+            self.BT_microrheo_piezo.setEnabled(
+                microrheology.available(data))
+            self.BT_microrheo_piezo_clear.setEnabled(bool(piezo))
+            # Modulation segments and the elasticity fit are needed
+            reason = microrheology.check_file(data)
+            self.BT_microrheo.setEnabled(reason is None)
+            self.BT_microrheo.setToolTip(
                 "" if reason is None else "Not available: " + reason)
 
         if element == "roi_list_height_corr" or element == "all":
@@ -1208,6 +1345,10 @@ class ComputeWidget(PYAFWidget):
 
             self.update_GUI("BT_height_correction")
 
+        elif name == "microrheo_method":
+            data.microrheo_method = self.list_microrheo_method.currentData()
+            self.update_MPL("MPL_canvas")
+
         elif name == "events_algorithm":
             data.events_algorithm = self.list_events_algorithm.currentData()
             self.update_widget()
@@ -1218,6 +1359,7 @@ class ComputeWidget(PYAFWidget):
 
         elif name == "visco_solver":
             data.visco_solver = self.list_visco_solver.currentIndex()
+            self.update_MPL("MPL_canvas")
 
         elif name == "list2":
             self.parent.file_changed("list2")
@@ -1303,6 +1445,10 @@ class ComputeWidget(PYAFWidget):
         elif field == "visco_beta_init":
             data.visco_beta_init = self.IN_visco_beta.get_float_value()
 
+        elif field == "microrheo_drag":
+            if self.IN_microrheo_drag.input.text() != "":
+                data.microrheo_drag = self.IN_microrheo_drag.get_float_value()
+
         elif field == "visco_frequency":
             if self.IN_visco_frequency.input.text() != "":
                 value = self.IN_visco_frequency.get_float_value()
@@ -1329,6 +1475,57 @@ class ComputeWidget(PYAFWidget):
         self.update_MPL("MPL_canvas")
         self.update_GUI("BT_height_correction")
         self.update_GUI("visco")
+        self.update_GUI("microrheo")
+
+    def piezo_from_curve(self):
+        """Piezo characterization on the displayed curve (on a rigid
+        sample), shown before it is used."""
+        data = shared.exp.current_data
+        i = shared.exp.meshgrid_click_xpos
+        j = shared.exp.meshgrid_click_ypos
+        result = microrheology.piezo_characterization(data, i, j)
+        if result is None:
+            return
+        dialog = PiezoCharacterizationDialog(self, result)
+        if dialog.exec_():
+            files = shared.exp.list if shared.exp.apply_to_all_compute \
+                else [data]
+            for dt in files:
+                dt.microrheo_piezo = dict(result)
+            self.update_GUI("microrheo")
+            self.update_MPL("MPL_canvas")
+
+    def drag_from_file(self):
+        """b(0) from a viscous drag measurement loaded in pyAF (chosen if
+        there are several), shown with its fit before it is used."""
+        files = viscous_drag.drag_files()
+        if not files:
+            gui_tools.show_success(
+                self, "No viscous drag measurement loaded",
+                details="Load the file of the viscous drag measurement in "
+                "pyAF (Data tab): modulations of the cantilever at several "
+                "heights above the surface, without contact (JPK force map "
+                "with modulation segments separated by retract segments).",
+                warning=True)
+            return
+        data = files[0]
+        if len(files) > 1:
+            names = [file_label(dt) for dt in files]
+            name, ok = QtWidgets.QInputDialog.getItem(
+                self, "Viscous drag", "Measurement :", names, 0, False)
+            if not ok:
+                return
+            data = files[names.index(name)]
+        result = viscous_drag.compute(data)
+        dialog = ViscousDragDialog(self, data, result)
+        if dialog.exec_() and numpy.isfinite(result["b0"]):
+            value = float("%.4g" % (result["b0"] * 1e6))
+            files = shared.exp.list if shared.exp.apply_to_all_compute \
+                else [shared.exp.current_data]
+            for dt in files:
+                dt.microrheo_drag = value
+            self.update_GUI("microrheo")
+            self.update_MPL("MPL_canvas")
 
     @staticmethod
     def radius_notes(calc_list):
@@ -1507,6 +1704,7 @@ class ComputeWidget(PYAFWidget):
             widgets_list.widget_fit_param_jocs_events.update_widget()
             self.update_GUI("BT_height_correction")
             self.update_GUI("visco")
+            self.update_GUI("microrheo")
             self.update_GUI("get_lr")
             # Update the results tab (especially the plot, so that it is
             # initialized and not empty)
@@ -1817,6 +2015,58 @@ class ComputeWidget(PYAFWidget):
                                          for text in skipped) + "</ul>"
             self.finish_computation(notes=notes)
 
+        elif button == "microrheo_drag_file":
+            self.drag_from_file()
+
+        elif button == "microrheo_piezo":
+            self.piezo_from_curve()
+
+        elif button == "microrheo_piezo_clear":
+            files = shared.exp.list if shared.exp.apply_to_all_compute \
+                else [data]
+            for dt in files:
+                dt.microrheo_piezo = None
+            self.update_GUI("microrheo")
+            self.update_MPL("MPL_canvas")
+
+        elif button == "compute_microrheo":
+            # Update all the parameters if needed
+            apply_to_all.apply_to_all("calc_options")
+
+            calc_list = list(range(len(shared.exp.list))) \
+                if shared.exp.calc_all else [shared.exp.id_selected]
+            # Overwrite calc_list with a list defined externally
+            if shared.force_calc_list is not None:
+                calc_list = shared.force_calc_list
+
+            skipped = []
+            lines = []
+            for calc_id in calc_list:
+                data = shared.exp.list[calc_id]
+                reason = microrheology.check_file(data)
+                if reason is not None:
+                    skipped.append(file_label(data) + " : " + reason)
+                    continue
+                self.logger.debug("Microrheology %s", data.filename)
+                nbr = microrheology.compute(calc_id)
+                experiment.add_result(calc_id, data.filename)
+                if shared.exp.results_type is None:
+                    shared.exp.results_type = "microrheo_storage"
+                lines.append(file_label(data) + " : " + str(nbr) +
+                             " curves, " + str(len(
+                                 microrheology.frequencies(data))) +
+                             " frequencies")
+
+            notes = None
+            if skipped:
+                notes = "<ul>" + "".join("<li>" + text + "</li>"
+                                         for text in skipped) + "</ul>"
+            info = None
+            if lines and not skipped:
+                info = "<ul>" + "".join("<li>" + text + "</li>"
+                                        for text in lines) + "</ul>"
+            self.finish_computation(notes=notes, info=info)
+
         elif button == "compute_breakthrough":
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
@@ -2011,13 +2261,19 @@ class ComputeWidget(PYAFWidget):
         elif checkbox == "visco_bec":
             data.visco_bec = self.CB_visco_bec.isChecked()
             self.update_GUI("visco")
+            self.update_GUI("microrheo")
+            self.update_MPL("MPL_canvas")
 
         elif checkbox == "visco_drag_correction":
             data.visco_drag_correction = self.CB_visco_drag.isChecked()
+            # Baseline of the retraction in the preview
+            self.update_MPL("MPL_canvas")
 
         elif checkbox == "visco_beta_auto":
             data.visco_beta_auto = self.CB_visco_beta_auto.isChecked()
             self.update_GUI("visco")
+            self.update_GUI("microrheo")
+            self.update_MPL("MPL_canvas")
 
         elif checkbox == "zoom_in":
             data.auto_zoom_in = self.TG_zoom_in.isChecked()

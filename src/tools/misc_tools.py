@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -386,7 +387,9 @@ MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
                   "visco_tan_delta", "fit_r2", "fit_poc_fixed",
                   "visco_storage", "visco_loss", "breakthrough_force",
                   "breakthrough_thickness", "breakthrough_count",
-                  "brush_modulus", "brush_length", "brush_density")
+                  "brush_modulus", "brush_length", "brush_density",
+                  "microrheo_storage", "microrheo_loss",
+                  "microrheo_tan_delta")
 
 
 def get_meshgrid_type_as_string(mesh_id):

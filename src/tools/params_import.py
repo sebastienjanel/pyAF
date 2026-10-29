@@ -1,5 +1,4 @@
-# Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
-# Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -41,6 +40,7 @@ from .params_export import SETTINGS
 # Parts of the settings, in the order of the dialog: (key, name)
 PARTS = (("elasticity", "Elasticity"),
          ("viscoelasticity", "Viscoelasticity"),
+         ("microrheology", "Microrheology"),
          ("work_and_rupture_force", "Detachment work and force"),
          ("events", "Events"),
          ("loading_rates", "Loading rates"),
@@ -51,7 +51,8 @@ PARTS = (("elasticity", "Elasticity"),
 
 
 # Parts of the computations (the curves and calibration are always given)
-COMPUTATIONS = ("elasticity", "viscoelasticity", "work_and_rupture_force",
+COMPUTATIONS = ("elasticity", "viscoelasticity", "microrheology",
+                "work_and_rupture_force",
                 "events", "loading_rates", "breakthrough")
 
 

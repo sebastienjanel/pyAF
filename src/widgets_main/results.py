@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -59,6 +60,8 @@ from ..plots.plot_main import MainPlot
 from ..plots.PYAFPlot import PYAFPlot, curve_type_available
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools import events_refresher
+from ..widgets import plot_options
+from ..compute_tools import microrheology
 
 if consts.ALLOW_VTK:
     from ..widgets_vtk.entry import VTKEntryWidget
@@ -218,6 +221,12 @@ class ResultsWidget(PYAFWidget):
             "brush_density": "Elastic: grafting density N of the brush "
             "(brush model): effective number of chains per \u00b5m\u00b2, "
             "from the amplitude of its force.",
+            "microrheo_storage": "Microrheology: storage modulus G\u2032 "
+            "at the frequency of the maps (Microrheology tab of Compute).",
+            "microrheo_loss": "Microrheology: loss modulus G\u2033 at the "
+            "frequency of the maps (Microrheology tab of Compute).",
+            "microrheo_tan_delta": "Microrheology: loss tangent "
+            "G\u2033 / G\u2032 at the frequency of the maps.",
             "fit_r2": "R\u00b2 of the elasticity fit, on the fitted points "
             "after the point of contact.",
             "fit_poc_fixed": "Pixels where the point of contact could not be "
@@ -242,6 +251,9 @@ class ResultsWidget(PYAFWidget):
                                  ("visco_tan_delta", "Loss tangent"),
                                  ("visco_storage", "Storage modulus E\u2032"),
                                  ("visco_loss", "Loss modulus E\u2033"))),
+            ("Microrheology", (("microrheo_storage", "Storage modulus G\u2032"),
+                               ("microrheo_loss", "Loss modulus G\u2033"),
+                               ("microrheo_tan_delta", "Loss tangent"))),
             ("Adhesion", (("work", "Detachment work"),
                           ("rupture_force", "Detachment force"),
                           ("events_per_curve", "Events per curve"),
@@ -276,6 +288,12 @@ class ResultsWidget(PYAFWidget):
                                            QtCore.Qt.ToolTipRole)
         self.list_maps.fit_to_contents()
         self.label_maps = QtWidgets.QLabel("Map")
+        # Frequency of the microrheology maps (shown with these maps only)
+        self.label_microrheo_frequency = QtWidgets.QLabel("Frequency:")
+        self.list_microrheo_frequency = PYAFComboBox(
+            self, "list_microrheo_frequency")
+        self.list_microrheo_frequency.setToolTip(
+            "Modulation frequency of the microrheology maps [Hz]")
         widgets_list.widget_progressbar.update()
         widgets_list.widget_progressbar.update()
 
@@ -310,6 +328,9 @@ class ResultsWidget(PYAFWidget):
             ("visco", "Viscoelastic fit", None),
             ("brush", "Brush fit", "Brush model: force - distance curve of "
              "the approach with the fits of the cell body and of the brush"),
+            ("microrheology", "Microrheology G\u2032, G\u2033",
+             "Microrheology: storage and loss moduli vs the frequency of "
+             "the modulations"),
             ("results_force_events", "Force curve (events)", None))
         self.list_curves = PYAFComboBox(self, "list_curves")
         for name, label, tip in self.curve_types:
@@ -420,7 +441,13 @@ class ResultsWidget(PYAFWidget):
         self.GL_choser.addWidget(QtWidgets.QLabel("File"), 0, 0)
         self.GL_choser.addWidget(self.list_exp, 0, 1)
         self.GL_choser.addWidget(self.label_maps, 1, 0)
-        self.GL_choser.addWidget(self.list_maps, 1, 1, QtCore.Qt.AlignLeft)
+        HL_map = QtWidgets.QHBoxLayout()
+        HL_map.addWidget(self.list_maps)
+        HL_map.addSpacing(12)
+        HL_map.addWidget(self.label_microrheo_frequency)
+        HL_map.addWidget(self.list_microrheo_frequency)
+        HL_map.addStretch(1)
+        self.GL_choser.addLayout(HL_map, 1, 1)
         self.GL_choser.setColumnStretch(1, 1)
         self.HL_navigation = QtWidgets.QHBoxLayout()
         self.HL_navigation.addStretch(1)
@@ -517,6 +544,8 @@ class ResultsWidget(PYAFWidget):
             data.display_curve_type = "visco"
         elif mt.startswith("brush_") and data.brush_calculated:
             data.display_curve_type = "brush"
+        elif mt.startswith("microrheo_") and data.microrheo_calculated:
+            data.display_curve_type = "microrheology"
         elif mt.startswith("breakthrough_") and data.breakthrough_calculated:
             # Approach in force vs distance, with the breakthroughs
             data.display_curve_type = "force"
@@ -570,6 +599,8 @@ class ResultsWidget(PYAFWidget):
                     enabled = data.breakthrough_calculated
                 elif name.startswith("brush_"):
                     enabled = data.brush_calculated
+                elif name.startswith("microrheo_"):
+                    enabled = data.microrheo_calculated
                 else:
                     enabled = available[name]
                 model.item(index).setEnabled(bool(enabled))
@@ -577,6 +608,8 @@ class ResultsWidget(PYAFWidget):
             # Select the map
             self.list_maps.setCurrentIndex(
                 self.map_items[data.meshgrid_type])
+
+            self.update_microrheo_frequency()
 
         if element == "apply_to_all" or element == "all":
             self.TG_app_to_all.setChecked(shared.exp.apply_to_all_data)
@@ -669,7 +702,8 @@ class ResultsWidget(PYAFWidget):
                 self.radiobutton_retrace.setEnabled(False)
                 self.radiobutton_both.setEnabled(False)
 
-            elif data.display_curve_type in ("visco", "brush"):
+            elif data.display_curve_type in ("visco", "brush",
+                                             "microrheology"):
                 # Approach and retraction in time, approach of the brush
                 self.radiobutton_trace.setEnabled(False)
                 self.radiobutton_retrace.setEnabled(False)
@@ -863,6 +897,7 @@ class ResultsWidget(PYAFWidget):
             # The curve corresponding to the map
             curve_changed = self.match_curve_to_map(data)
             apply_to_all.apply_to_all("display_options")
+            self.update_microrheo_frequency()
             # Update the GUI elements
             self.update_MPL("MPL_canvas1")
             if curve_changed:
@@ -1017,12 +1052,57 @@ class ResultsWidget(PYAFWidget):
             self.parent.file_changed("list1")
         elif name == "list_curves":
             self.button_clicked("button_group_type_of_curve")
+        elif name == "list_microrheo_frequency":
+            self.microrheo_frequency_changed()
         elif name == "list_maps":
             if self.list_maps.currentData() is None:
                 # Title of a group (keyboard): back to the displayed map
                 self.update_GUI("BTG_meshgrid_type")
                 return
             self.button_clicked("BTG_meshgrid_type")
+
+    def update_microrheo_frequency(self):
+        """Frequency selector of the microrheology maps: shown with these
+        maps only, with the frequencies of the file."""
+        data = shared.exp.current_data
+        microrheo = data.meshgrid_type.startswith("microrheo_") and \
+            data.microrheo_calculated
+        self.label_microrheo_frequency.setVisible(microrheo)
+        self.list_microrheo_frequency.setVisible(microrheo)
+        if not microrheo:
+            return
+        freqs = microrheology.frequencies(data)
+        if data.microrheo_frequency not in freqs and freqs:
+            data.microrheo_frequency = freqs[0]
+        self.list_microrheo_frequency.blockSignals(True)
+        self.list_microrheo_frequency.clear()
+        for frequency in freqs:
+            self.list_microrheo_frequency.addItem(
+                format(frequency, "g") + " Hz", frequency)
+        if freqs:
+            self.list_microrheo_frequency.setCurrentIndex(
+                freqs.index(data.microrheo_frequency))
+        self.list_microrheo_frequency.blockSignals(False)
+
+    def microrheo_frequency_changed(self):
+        """Frequency of the microrheology maps chosen: maps at this
+        frequency (no new computation), for all the files with this
+        frequency with Apply to all."""
+        data = shared.exp.current_data
+        frequency = self.list_microrheo_frequency.currentData()
+        files = [data]
+        if shared.exp.apply_to_all_data:
+            files += [dt for dt in shared.exp.list if dt is not data and
+                      frequency in microrheology.frequencies(dt)]
+        for dt in files:
+            dt.microrheo_frequency = frequency
+            # New values: automatic scales of the moduli maps
+            if dt.microrheo_calculated:
+                for mt in ("microrheo_storage", "microrheo_loss"):
+                    plot_options.autoscale_elasticity(dt, mt)
+        self.update_MPL("MPL_canvas1")
+        if widgets_list.widget_multimeshgrids is not None:
+            widgets_list.widget_multimeshgrids.update_widget()
 
     def select_map(self, map_type):
         """Displays a map (as chosen in the list of the maps)."""

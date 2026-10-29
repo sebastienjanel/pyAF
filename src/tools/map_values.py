@@ -1,5 +1,4 @@
-# Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
-# Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -52,6 +51,10 @@ MAPS = {
     "visco_tan_delta": ("Loss tangent", "tan δ", 1.0),
     "visco_storage": ("Storage modulus E′", "E′ [kPa]", 1e-3),
     "visco_loss": ("Loss modulus E″", "E″ [kPa]", 1e-3),
+    "microrheo_storage": ("Storage modulus G′ (microrheology)", "G′ [kPa]",
+                          1e-3),
+    "microrheo_loss": ("Loss modulus G″ (microrheology)", "G″ [kPa]", 1e-3),
+    "microrheo_tan_delta": ("Loss tangent (microrheology)", "tan δ", 1.0),
     "breakthrough_force": ("Breakthrough force", "Fb [nN]", 1e9),
     "breakthrough_thickness": ("Breakthrough jump", "Jump [nm]", 1.0),
     "breakthrough_count": ("Breakthroughs per curve",
@@ -85,6 +88,9 @@ def available_maps(data):
         "brush_modulus": data.brush_calculated,
         "brush_length": data.brush_calculated,
         "brush_density": data.brush_calculated,
+        "microrheo_storage": data.microrheo_calculated,
+        "microrheo_loss": data.microrheo_calculated,
+        "microrheo_tan_delta": data.microrheo_calculated,
         "fit_r2": data.has_fit_quality(),
         "fit_poc_fixed": data.has_fit_quality()}
     return [mt for mt in MAPS

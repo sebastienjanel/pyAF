@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -296,7 +297,8 @@ class PlotOptionsWidget(PYAFWidget):
             modulus = mt in MODULUS_MAPS
             if elasticity or modulus:
                 calculated = "stiffness_calculated" if elasticity \
-                    else "visco_calculated"
+                    else "microrheo_calculated" \
+                    if mt.startswith("microrheo_") else "visco_calculated"
                 files = [dt for dt in shared.exp.list
                          if getattr(dt, calculated)] \
                     if shared.exp.apply_to_all_data else [data]
@@ -316,7 +318,7 @@ class PlotOptionsWidget(PYAFWidget):
             elif mt == "events_per_curve":
                 data.colortable_max_value = data.max_nbr_events
                 data.colortable_middle_value = data.max_nbr_events / 2.0
-            elif mt == "visco_tan_delta":
+            elif mt in ("visco_tan_delta", "microrheo_tan_delta"):
                 # Diverging scale centered on tan delta = 1
                 data.colortable_min_value = 0.0
                 data.colortable_max_value = 2.0
@@ -468,6 +470,15 @@ class PlotOptionsWidget(PYAFWidget):
             values = values[numpy.isfinite(values)]
             val = float(values.max()) if values.size else 0.0
             val_all = None
+        elif mt.startswith("microrheo_"):
+            name, unit, factor = {
+                "microrheo_storage": ("Max. G\u2032", "kPa", 1e-3),
+                "microrheo_loss": ("Max. G\u2033", "kPa", 1e-3),
+                "microrheo_tan_delta": ("Max. tan \u03b4", "", 1)}[mt]
+            values = numpy.asarray(getattr(data, mt), dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(values.max()) if values.size else 0.0
+            val_all = None
         elif mt.startswith("breakthrough_"):
             name, unit, factor = {
                 "breakthrough_force": ("Max. breakthrough force", "nN", 1e9),
@@ -506,7 +517,8 @@ class PlotOptionsWidget(PYAFWidget):
         def fmt(value):
             if mt in ("events_per_curve", "breakthrough_count"):
                 return str(int(value))
-            if mt in ("visco_fluidity", "visco_tan_delta", "fit_r2"):
+            if mt in ("visco_fluidity", "visco_tan_delta", "fit_r2",
+                      "microrheo_tan_delta"):
                 return str(round(float(value) * factor, 3))
             if mt == "fit_poc_fixed":
                 return str(round(float(value) * factor, 1))
@@ -542,7 +554,9 @@ class PlotOptionsWidget(PYAFWidget):
         self.CB_log.setEnabled(mt in ("stiffness", "stiffness_slice",
                                       "stiffness_corr",
                                       "stiffness_corr_slice", "visco_e0",
-                                      "visco_storage", "visco_loss"))
+                                      "visco_storage", "visco_loss",
+                                      "microrheo_storage",
+                                      "microrheo_loss"))
 
     def update_parent_elements(self):
         """This method is called to update some elements from the parents widget.
@@ -579,7 +593,8 @@ def color_value_conversion(data, field):
             return 1.0, 0.0
         # kPa to Pa
         return 1e3, 0.0
-    elif mt in ("visco_e0", "visco_storage", "visco_loss"):
+    elif mt in ("visco_e0", "visco_storage", "visco_loss",
+                "microrheo_storage", "microrheo_loss"):
         # kPa to Pa
         return 1e3, 0.0
     elif mt == "work":
@@ -611,10 +626,11 @@ def displayed_color_value(data, field):
         # Work values can be small, keep significant digits
         return float(f"{value:.4g}")
     elif mt in ("rupture_force", "events_rupture_force", "visco_e0",
-                "visco_storage", "visco_loss"):
+                "visco_storage", "visco_loss", "microrheo_storage",
+                "microrheo_loss"):
         return round(value, 2)
     elif mt in ("visco_fluidity", "visco_tan_delta", "fit_r2",
-                "fit_poc_fixed"):
+                "fit_poc_fixed", "microrheo_tan_delta"):
         return round(value, 3)
     return float(f"{value:.7g}")
 

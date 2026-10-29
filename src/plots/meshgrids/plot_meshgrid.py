@@ -1,5 +1,6 @@
 # Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
 # Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -46,7 +47,8 @@ from ...single import ELASTICITY_PERCENTILES
 
 # Viscoelastic moduli maps (log scale and first color below the scale, as
 # the elasticity)
-MODULUS_MAPS = ("visco_e0", "visco_storage", "visco_loss")
+MODULUS_MAPS = ("visco_e0", "visco_storage", "visco_loss",
+                "microrheo_storage", "microrheo_loss")
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from ..plot_main import MainPlot
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar

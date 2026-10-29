@@ -1,5 +1,4 @@
-# Copyright Michka Popoff (2011-2014) michkapopoff@gmail.com
-# Copyright Antoine Dujardin (2016-2017) toine.dujardin@gmail.com
+# Copyright Sébastien Janel (2024- ) sebastien.janel@cnrs.fr
 #
 # This software is a computer program whose purpose is to analyze force curves
 # recorded with an atomic force microscope.
@@ -205,6 +204,18 @@ def viscoelasticity(data):
             else data.used_visco_beta_init}
 
 
+def microrheology(data):
+    """Parameters of the microrheology, None if not computed."""
+    if not data.microrheo_calculated:
+        return None
+    return {"method": "FFT" if data.used_microrheo_method == "fft"
+            else "sine fit",
+            "viscous_drag_b0_uNs_per_m": data.used_microrheo_drag,
+            "piezo_correction": data.used_microrheo_piezo,
+            "frequencies_Hz": sorted(data.modulation_frequencies or []),
+            "modulation_amplitudes_nm": data.modulation_amplitudes}
+
+
 def work_and_rupture_force(data):
     """Parameters of the detachment work and force, None if not
     computed."""
@@ -275,6 +286,8 @@ SETTINGS = {
         "visco_solver", "visco_bec", "visco_contact_offset",
         "visco_nbr_points", "visco_beta_auto", "visco_beta_init",
         "visco_drag_correction"),
+    "microrheology": ("microrheo_method", "microrheo_drag",
+                      "microrheo_piezo"),
     "work_and_rupture_force": (
         "fitparam_joc_skip_start", "fitparam_joc_fit_length",
         "fitparam_joc_refit_option", "fitparam_joc_noise_multiplicator",
@@ -305,6 +318,7 @@ SETTINGS = {
 # Computations of the parts (their settings are given if computed)
 COMPUTED = {"elasticity": "stiffness_calculated",
             "viscoelasticity": "visco_calculated",
+            "microrheology": "microrheo_calculated",
             "work_and_rupture_force": "work_and_rupture_force1_calculated",
             "events": "events_calculated",
             "loading_rates": "loading_rates_calculated",
@@ -340,6 +354,7 @@ def file_params(data):
             "curves": curve_processing(data),
             "elasticity": elasticity(data),
             "viscoelasticity": viscoelasticity(data),
+            "microrheology": microrheology(data),
             "work_and_rupture_force": work_and_rupture_force(data),
             "events": events(data),
             "breakthrough": breakthrough(data),

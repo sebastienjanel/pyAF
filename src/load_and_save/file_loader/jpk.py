@@ -90,6 +90,9 @@ class LoaderJPK:
         # Variables for modulation segments
         self.segment_freqs = []
         self.segment_amps = []
+        # Start and end of the piezo of the segments ([z-start, z-end] in
+        # m, by segment number), for the heights of the modulations
+        self.segment_z = {}
         self.modulation_seg_count = 0
 
         # Pixels positions and way of parsing the data
@@ -246,12 +249,6 @@ class LoaderJPK:
                             self.data.ramp_size = \
                                 relative_z_start - relative_z_end
                             found = True
-                        else:
-                            print("The ramp size was set as the ramp size of" +
-                                  " the first segment. You have multiple " +
-                                  "segments in your file and all the " +
-                                  "features are not completely supported " +
-                                  "by pyAF.")
 
         if ft == "JPK (Single File)":
             # In case of a single file there is only one pixel
@@ -315,6 +312,12 @@ class LoaderJPK:
                     if line.find(val_4) != -1:
                         amplitude = extract_float(line)
                         self.segment_amps.append(amplitude)
+
+                    for k, key in enumerate(("z-start=", "z-end=")):
+                        if line.startswith(header_info_path + key):
+                            value = extract_float(line)
+                            self.segment_z.setdefault(
+                                segment_nbr, [None, None])[k] = value
 
         else:
             # For single files, this data is stored in
@@ -381,6 +384,31 @@ class LoaderJPK:
                 self.segments[item[1]].append(str(item[0]))
                 self.modulation_seg_count += 1
         # print(self.segments)
+
+        # Sine modulations of the piezo in contact (microrheology):
+        # frequency [Hz] and amplitude [nm] of each modulation segment
+        if self.segments["modulation"] and \
+                len(self.segment_freqs) == len(self.segments["modulation"]):
+            self.data.modulation_frequencies = list(self.segment_freqs)
+            if len(self.segment_amps) == len(self.segment_freqs):
+                self.data.modulation_amplitudes = \
+                    [amp * 1e9 for amp in self.segment_amps]
+            # Height of each modulation above the surface [nm]: sum of the
+            # retractions since the contact (0: modulation in contact;
+            # viscous drag measured at several heights, see
+            # compute_tools.viscous_drag)
+            heights = []
+            height = 0.0
+            for nbr, style in self.segments_types:
+                z = self.segment_z.get(nbr)
+                if style == "extend":
+                    height = 0.0
+                elif style == "retract" and z and None not in z:
+                    height += abs(z[0] - z[1]) * 1e9
+                elif style == "modulation":
+                    heights.append(height)
+            if len(heights) == len(self.segments["modulation"]):
+                self.data.modulation_heights = heights
         self.nbr_points_array_approach = []
         self.nbr_points_array_retraction = []
         self.nbr_points_array_pause = []
@@ -431,7 +459,10 @@ class LoaderJPK:
                     self.nbr_points_array_pause.append(self.afm_file.getinfo(
                         segment_path + "channels/vDeflection.dat").file_size // 4)
 
-                if self.segments["modulation"] is not []:
+                # Number of points of each modulation segment (the same
+                # for all the pixels: from the first valid pixel)
+                if self.segments["modulation"] and \
+                        not self.nbr_points_array_modulation:
                     for i in range(len(self.segments["modulation"])):
                         if self.file_type != "JPK (Single File)":
                             segment_path = "index/" + str(index_nbr) + "/segments/" + \
@@ -441,8 +472,6 @@ class LoaderJPK:
 
                         self.nbr_points_array_modulation.append(self.afm_file.getinfo(
                             segment_path + "channels/vDeflection.dat").file_size // 4)
-
-                    # print(self.nbr_points_array_modulation)
 
             else:
                 self.corrupted_pixel.append(0)
@@ -454,8 +483,6 @@ class LoaderJPK:
                 if self.segments["pause"] is not None:
                     self.nbr_points_array_pause.append(1)
 
-                if self.segments["modulation"]:
-                    self.nbr_points_array_modulation.append(1)
 
         max_approach = numpy.amax(self.nbr_points_array_approach)
         max_retraction = numpy.amax(self.nbr_points_array_retraction)
@@ -482,6 +509,9 @@ class LoaderJPK:
             self.max_nbr_points_modulation = int(
                 numpy.amax(self.nbr_points_array_modulation))
         self.data.nbr_points_per_modulation_curve = self.max_nbr_points_modulation
+        if self.nbr_points_array_modulation:
+            self.data.modulation_nbr_points = \
+                list(self.nbr_points_array_modulation)
 
         header = self.afm_file.read(
             "shared-data/header.properties").splitlines()
@@ -743,9 +773,6 @@ class LoaderJPK:
                     if seg[1] == "extend":
                         if line.find(str(seg[0]) + ".setpoint") != -1:
                             self.data.trig_threshold = extract_float(line)
-            print(("The loaded setpoint is the setpoint of the extend " +
-                   "segment. You saved multiple segments and this is not " +
-                   "fully supported"))
 
         # Velocities
         if time_approach is not None and time_retraction is not None:
@@ -956,9 +983,12 @@ class LoaderJPK:
             # Modulation segment ----------------------------
             if self.max_nbr_points_modulation is not None:
 
-                modulation_segments = []
+                # All the modulation segments, padded to the longest one
+                nbr_mod = len(self.segments["modulation"])
+                modulation_segments = numpy.zeros(
+                    [nbr_mod, 3, self.max_nbr_points_modulation])
 
-                for i in range(len(self.segments["modulation"])):
+                for i in range(nbr_mod):
                     segment_path = seg_path + self.segments["modulation"][i] + "/"
 
                     nbr_points = self.nbr_points_array_modulation[i]
@@ -990,7 +1020,8 @@ class LoaderJPK:
 
                         sc_modulation[2] = time_segments["modulation"][i]
 
-                        modulation_segments.append(sc_modulation)
+                        modulation_segments[i, :, :nbr_points] = \
+                            sc_modulation
 
             # Store data ----------------------------
             # Check redundant x positions at start of the curve
@@ -1027,6 +1058,9 @@ class LoaderJPK:
             # The xzero value is the first value on the retraction curve which
             # is not corrupted.
             xzero = sc_retraction[0][retraction_startpos]
+            # Also for the modulation segments (xzero is changed for the
+            # pause below)
+            xzero_curves = xzero
             curves_approach[self.pos_x, self.pos_y, :, :] = \
                 [xzero - sc_approach[0], sc_approach[1], sc_approach[2]]
             curves_retraction[self.pos_x, self.pos_y, :, :] = \
@@ -1039,15 +1073,17 @@ class LoaderJPK:
                 curves_pause[self.pos_x, self.pos_y, :, :] = \
                     [xzero - sc_pause[0], sc_pause[1], sc_pause[2]]
 
-            if self.max_nbr_points_modulation is not None:
-                # For modulation segments we consider that there are no corrupted
-                # parts (but this may be wrong, it was not tested with a lot
-                # of files for the moment)
-                xzero = sc_modulation[0][0]
-                # print(xzero)
-                # print(xzero.shape)
+            if self.max_nbr_points_modulation is not None and \
+                    self.corrupted_pixel[index_nbr]:
+                # For modulation segments we consider that there are no
+                # corrupted parts. Height in the frame of the approach and
+                # of the retraction (same xzero)
+                for i, nbr_points in \
+                        enumerate(self.nbr_points_array_modulation):
+                    modulation_segments[i, 0, :nbr_points] = \
+                        xzero_curves - modulation_segments[i, 0, :nbr_points]
                 curves_modulation[self.pos_x, self.pos_y] = \
-                    [xzero - sc_modulation[0], sc_modulation[1], sc_modulation[2]]
+                    modulation_segments
 
             self.update_positions()
 
@@ -1123,43 +1159,40 @@ class LoaderJPK:
                 self.pos_y = self.pos_y + 1
 
     def get_time_segments(self):
-        time_segments = {"approach": None, "pause": None, "modulation": [], "retraction": None}
+        """Time of the points of the segments [s], from the durations of
+        the segments in the order of the file (the retraction is the last
+        retract segment, the approach the first extend segment)."""
+        time_segments = {"approach": None, "pause": None, "modulation": [],
+                         "retraction": None}
 
-        # Extract durations for each segment and calculate start and end time for each segment.
         sd = self.data.segment_durations
-        # print(sd)
-
-        # print(sd)
-
         times = [sum(sd[:i]) for i in range(len(sd) + 1)]
 
-        # print(times)
-
-        # Get number of points for each segment.
+        # Number of points of each segment
         pa = self.data.nbr_points_per_curve_approach
         pr = self.data.nbr_points_per_curve_retraction
         pp = self.data.nbr_points_per_pause_curve
         pm = self.nbr_points_array_modulation
 
-        # Distribute time evently for every segment.
-        index = 0
-        approach_t = numpy.linspace(times[index], times[index + 1], pa, endpoint=False)
-        time_segments["approach"] = approach_t
-        index = index + 1
+        def linspace(index, nbr):
+            return numpy.linspace(times[index], times[index + 1], nbr,
+                                  endpoint=False)
 
-        if pp is not None:
-            pause_t = numpy.linspace(times[index], times[index + 1], pp, endpoint=False)
-            time_segments["pause"] = pause_t
-            index = index + 1
-
-        if pm is not None or pm:
-            for i in range(len(self.segments["modulation"])):
-                modulation_t = numpy.linspace(times[index], times[index + 1], pm[i], endpoint=False)
-                time_segments["modulation"].append(modulation_t)
-                index = index + 1
-
-        retraction_t = numpy.linspace(times[index], times[index + 1], pr, endpoint=False)
-        time_segments["retraction"] = retraction_t
+        modulation = 0
+        for index, (_, style) in enumerate(self.segments_types):
+            if index + 1 >= len(times):
+                break
+            if style == "extend" and time_segments["approach"] is None:
+                time_segments["approach"] = linspace(index, pa)
+            elif style == "pause" and pp is not None and \
+                    time_segments["pause"] is None:
+                time_segments["pause"] = linspace(index, pp)
+            elif style == "modulation" and modulation < len(pm):
+                time_segments["modulation"].append(
+                    linspace(index, pm[modulation]))
+                modulation += 1
+            elif style == "retract":
+                time_segments["retraction"] = linspace(index, pr)
 
         return time_segments
 
