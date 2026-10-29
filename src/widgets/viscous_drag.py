@@ -47,7 +47,7 @@ class ViscousDragDialog(QtWidgets.QDialog):
     bars) with the fit b(h) = A / (h + h_eff); "Use b(0)" accepts the
     dialog (the value is in self.result["b0"])."""
 
-    def __init__(self, parent, data, result):
+    def __init__(self, parent, data, result, sample=None):
         super().__init__(parent)
         self.result = result
         self.setWindowTitle("Viscous drag")
@@ -85,6 +85,26 @@ class ViscousDragDialog(QtWidgets.QDialog):
         else:
             text = name + ": the fit failed (b(h) does not decrease with " \
                 "the height)."
+        # Dates of the acquisitions (same cantilever, same day expected)
+        if sample is not None and sample is not data and data.date and \
+                sample.date:
+            text += "<br><small>Acquired " + str(data.date) + \
+                ", sample " + os.path.basename(str(sample.filename)) + \
+                " acquired " + str(sample.date) + "</small>"
+        # Piezo correction applied to F / delta (set before the drag)
+        if sample is not None and sample.microrheo_piezo:
+            text += "<br><small>With the piezo correction " + \
+                sample.microrheo_piezo["file"] + " [" + ", ".join(
+                    str(k) for k in sample.microrheo_piezo["curve"]) + \
+                "] (" + ("phase and amplitude" if
+                         sample.microrheo_piezo_amplitude else "phase") + \
+                ")</small>"
+        else:
+            text += "<br><small>Without piezo correction (set it before "\
+                "the drag to apply it to the drag measurement)</small>"
+        warning = cantilever_warning(data, sample)
+        if warning:
+            text += "<br><b>" + warning + "</b>"
         label = QtWidgets.QLabel(text)
         label.setWordWrap(True)
 
@@ -101,3 +121,25 @@ class ViscousDragDialog(QtWidgets.QDialog):
         layout.addWidget(label)
         layout.addWidget(buttons)
         self.setLayout(layout)
+
+
+def cantilever_warning(data, sample, tolerance=0.01):
+    """Warning if the drag measurement and the sample file were not
+    acquired with the same cantilever (spring constant or deflection
+    sensitivity different by more than the tolerance), None otherwise."""
+    if sample is None or sample is data:
+        return None
+    differences = []
+    for name, attribute, unit, factor in (
+            ("spring constant", "spring_constant", "N/m", 1e9),
+            ("deflection sensitivity", "deflection_sensitivity", "nm/V",
+             1)):
+        a, b = getattr(data, attribute), getattr(sample, attribute)
+        if a and b and abs(a - b) > tolerance * abs(b):
+            differences.append(name + " " + format(a * factor, ".4g") +
+                               " vs " + format(b * factor, ".4g") + " " +
+                               unit)
+    if not differences:
+        return None
+    return "Not the cantilever of " + os.path.basename(
+        str(sample.filename)) + ": " + ", ".join(differences) + "."

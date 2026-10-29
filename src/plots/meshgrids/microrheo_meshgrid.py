@@ -31,6 +31,7 @@
 
 import numpy
 from .plot_meshgrid import PlotMeshGrid
+from ...compute_tools import microrheology
 
 
 class PlotMicrorheoMeshGrid(PlotMeshGrid):
@@ -45,10 +46,13 @@ class PlotMicrorheoMeshGrid(PlotMeshGrid):
         super().__init__(parent)
 
         mt = self.mesh_type
-        frequency = self.data.microrheo_frequency
-        at = " at %g Hz" % frequency if frequency is not None else ""
+        label = microrheology.map_label(self.data)
+        at = " at " + label if label is not None else ""
         values = getattr(self.data, mt)
-        if mt in ("microrheo_storage", "microrheo_loss"):
+        if mt == "microrheo_crossover":
+            self.factor = 1.0
+            self.colorbarlabel = "Crossover G\u2032 = G\u2033 [Hz]"
+        elif mt in ("microrheo_storage", "microrheo_loss"):
             self.factor = 1e-3
             self.colorbarlabel = ("G′" if mt == "microrheo_storage"
                                   else "G″") + at + " [kPa]"

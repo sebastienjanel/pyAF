@@ -389,7 +389,7 @@ MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
                   "breakthrough_thickness", "breakthrough_count",
                   "brush_modulus", "brush_length", "brush_density",
                   "microrheo_storage", "microrheo_loss",
-                  "microrheo_tan_delta")
+                  "microrheo_tan_delta", "microrheo_crossover")
 
 
 def get_meshgrid_type_as_string(mesh_id):

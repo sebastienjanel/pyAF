@@ -55,6 +55,8 @@ MAPS = {
                           1e-3),
     "microrheo_loss": ("Loss modulus G″ (microrheology)", "G″ [kPa]", 1e-3),
     "microrheo_tan_delta": ("Loss tangent (microrheology)", "tan δ", 1.0),
+    "microrheo_crossover": ("Crossover frequency G′ = G″",
+                            "Crossover frequency [Hz]", 1.0),
     "breakthrough_force": ("Breakthrough force", "Fb [nN]", 1e9),
     "breakthrough_thickness": ("Breakthrough jump", "Jump [nm]", 1.0),
     "breakthrough_count": ("Breakthroughs per curve",
@@ -91,6 +93,7 @@ def available_maps(data):
         "microrheo_storage": data.microrheo_calculated,
         "microrheo_loss": data.microrheo_calculated,
         "microrheo_tan_delta": data.microrheo_calculated,
+        "microrheo_crossover": data.microrheo_calculated,
         "fit_r2": data.has_fit_quality(),
         "fit_poc_fixed": data.has_fit_quality()}
     return [mt for mt in MAPS

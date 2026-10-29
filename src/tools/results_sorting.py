@@ -84,14 +84,19 @@ BRUSH_TYPES = {
 
 # Microrheology, at the frequency of the maps of each file
 MICRORHEO_TYPES = {
-    "microrheo_storage": {"name": "G\u2032 (microrheology)",
+    "microrheo_storage": {"name": "G\u2032",
                           "label": "G\u2032 [kPa]", "factor": 1e-3,
                           "export": "Storage modulus G' (Pa)",
                           "column": "microrheo_storage"},
-    "microrheo_loss": {"name": "G\u2033 (microrheology)",
+    "microrheo_loss": {"name": "G\u2033",
                        "label": "G\u2033 [kPa]", "factor": 1e-3,
                        "export": "Loss modulus G'' (Pa)",
                        "column": "microrheo_loss"},
+    "microrheo_crossover": {"name": "Crossover frequency G\u2032 = G\u2033",
+                            "label": "Crossover frequency [Hz]",
+                            "factor": 1.0,
+                            "export": "Crossover frequency (Hz)",
+                            "column": "microrheo_crossover"},
     "microrheo_tan_delta": {"name": "Loss tangent (microrheology)",
                             "label": "tan \u03b4", "factor": 1.0,
                             "export": "Loss tangent G''/G'",

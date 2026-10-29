@@ -343,7 +343,8 @@ class Stiffness:
             data.microrheo_results = None
             if data.meshgrid_type.startswith("microrheo_"):
                 data.meshgrid_type = "stiffness"
-            if data.display_curve_type == "microrheology":
+            if data.display_curve_type in ("microrheology",
+                                           "microrheology_map"):
                 data.display_curve_type = "defl_ext"
 
         # Close the progressbar and return

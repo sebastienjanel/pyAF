@@ -345,7 +345,8 @@ class PlotOptionsWidget(PYAFWidget):
                 high = float(max(numpy.nanmax(data.breakthrough_count), 1))
                 data.colortable_max_value = high
                 data.colortable_middle_value = high / 2.0
-            elif mt.startswith("breakthrough_") or mt.startswith("brush_"):
+            elif mt.startswith("breakthrough_") or \
+                    mt.startswith("brush_") or mt == "microrheo_crossover":
                 # From the 2nd to the 98th percentile
                 values = numpy.asarray(getattr(data, mt), dtype=float)
                 values = values[numpy.isfinite(values)]
@@ -474,7 +475,9 @@ class PlotOptionsWidget(PYAFWidget):
             name, unit, factor = {
                 "microrheo_storage": ("Max. G\u2032", "kPa", 1e-3),
                 "microrheo_loss": ("Max. G\u2033", "kPa", 1e-3),
-                "microrheo_tan_delta": ("Max. tan \u03b4", "", 1)}[mt]
+                "microrheo_tan_delta": ("Max. tan \u03b4", "", 1),
+                "microrheo_crossover": ("Max. crossover frequency", "Hz",
+                                        1)}[mt]
             values = numpy.asarray(getattr(data, mt), dtype=float)
             values = values[numpy.isfinite(values)]
             val = float(values.max()) if values.size else 0.0

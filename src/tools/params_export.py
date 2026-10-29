@@ -212,6 +212,9 @@ def microrheology(data):
             else "sine fit",
             "viscous_drag_b0_uNs_per_m": data.used_microrheo_drag,
             "piezo_correction": data.used_microrheo_piezo,
+            "piezo_amplitude_corrected": bool(
+                data.used_microrheo_piezo_amplitude),
+            "max_frequency_Hz": data.used_microrheo_max_freq or None,
             "frequencies_Hz": sorted(data.modulation_frequencies or []),
             "modulation_amplitudes_nm": data.modulation_amplitudes}
 
@@ -287,7 +290,8 @@ SETTINGS = {
         "visco_nbr_points", "visco_beta_auto", "visco_beta_init",
         "visco_drag_correction"),
     "microrheology": ("microrheo_method", "microrheo_drag",
-                      "microrheo_piezo"),
+                      "microrheo_piezo", "microrheo_max_freq",
+                      "microrheo_piezo_amplitude"),
     "work_and_rupture_force": (
         "fitparam_joc_skip_start", "fitparam_joc_fit_length",
         "fitparam_joc_refit_option", "fitparam_joc_noise_multiplicator",

@@ -227,6 +227,9 @@ class ResultsWidget(PYAFWidget):
             "frequency of the maps (Microrheology tab of Compute).",
             "microrheo_tan_delta": "Microrheology: loss tangent "
             "G\u2033 / G\u2032 at the frequency of the maps.",
+            "microrheo_crossover": "Microrheology: frequency where G\u2033 "
+            "becomes larger than G\u2032 (log interpolation between the "
+            "analysed frequencies; none: no crossing).",
             "fit_r2": "R\u00b2 of the elasticity fit, on the fitted points "
             "after the point of contact.",
             "fit_poc_fixed": "Pixels where the point of contact could not be "
@@ -253,7 +256,9 @@ class ResultsWidget(PYAFWidget):
                                  ("visco_loss", "Loss modulus E\u2033"))),
             ("Microrheology", (("microrheo_storage", "Storage modulus G\u2032"),
                                ("microrheo_loss", "Loss modulus G\u2033"),
-                               ("microrheo_tan_delta", "Loss tangent"))),
+                               ("microrheo_tan_delta", "Loss tangent"),
+                               ("microrheo_crossover",
+                                "Crossover frequency G\u2032 = G\u2033"))),
             ("Adhesion", (("work", "Detachment work"),
                           ("rupture_force", "Detachment force"),
                           ("events_per_curve", "Events per curve"),
@@ -331,6 +336,9 @@ class ResultsWidget(PYAFWidget):
             ("microrheology", "Microrheology G\u2032, G\u2033",
              "Microrheology: storage and loss moduli vs the frequency of "
              "the modulations"),
+            ("microrheology_map", "Microrheology G\u2032, G\u2033 (average)",
+             "Microrheology, average of the file: median of the analysed "
+             "curves with the interquartile range (band) at each frequency"),
             ("results_force_events", "Force curve (events)", None))
         self.list_curves = PYAFComboBox(self, "list_curves")
         for name, label, tip in self.curve_types:
@@ -703,7 +711,8 @@ class ResultsWidget(PYAFWidget):
                 self.radiobutton_both.setEnabled(False)
 
             elif data.display_curve_type in ("visco", "brush",
-                                             "microrheology"):
+                                             "microrheology",
+                                             "microrheology_map"):
                 # Approach and retraction in time, approach of the brush
                 self.radiobutton_trace.setEnabled(False)
                 self.radiobutton_retrace.setEnabled(False)
@@ -1065,23 +1074,23 @@ class ResultsWidget(PYAFWidget):
         """Frequency selector of the microrheology maps: shown with these
         maps only, with the frequencies of the file."""
         data = shared.exp.current_data
+        # Not for the crossover frequency (all the frequencies)
         microrheo = data.meshgrid_type.startswith("microrheo_") and \
+            data.meshgrid_type != "microrheo_crossover" and \
             data.microrheo_calculated
         self.label_microrheo_frequency.setVisible(microrheo)
         self.list_microrheo_frequency.setVisible(microrheo)
         if not microrheo:
             return
-        freqs = microrheology.frequencies(data)
-        if data.microrheo_frequency not in freqs and freqs:
-            data.microrheo_frequency = freqs[0]
+        names = microrheology.shown_labels(data)
+        label = microrheology.map_label(data)
         self.list_microrheo_frequency.blockSignals(True)
         self.list_microrheo_frequency.clear()
-        for frequency in freqs:
-            self.list_microrheo_frequency.addItem(
-                format(frequency, "g") + " Hz", frequency)
-        if freqs:
-            self.list_microrheo_frequency.setCurrentIndex(
-                freqs.index(data.microrheo_frequency))
+        for name in names:
+            self.list_microrheo_frequency.addItem(name, name)
+        if label is not None:
+            self.list_microrheo_frequency.setCurrentIndex(names.index(label))
+        self.list_microrheo_frequency.fit_to_contents()
         self.list_microrheo_frequency.blockSignals(False)
 
     def microrheo_frequency_changed(self):
@@ -1089,13 +1098,13 @@ class ResultsWidget(PYAFWidget):
         frequency (no new computation), for all the files with this
         frequency with Apply to all."""
         data = shared.exp.current_data
-        frequency = self.list_microrheo_frequency.currentData()
+        label = self.list_microrheo_frequency.currentData()
         files = [data]
         if shared.exp.apply_to_all_data:
             files += [dt for dt in shared.exp.list if dt is not data and
-                      frequency in microrheology.frequencies(dt)]
+                      label in microrheology.shown_labels(dt)]
         for dt in files:
-            dt.microrheo_frequency = frequency
+            dt.microrheo_frequency = label
             # New values: automatic scales of the moduli maps
             if dt.microrheo_calculated:
                 for mt in ("microrheo_storage", "microrheo_loss"):

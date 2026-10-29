@@ -64,9 +64,11 @@ def drag_files():
     return [data for data in shared.exp.list if available(data)]
 
 
-def curve(data, i, j):
+def curve(data, i, j, piezo=None):
     """b(h) of a curve: list of (height [m], frequency [Hz], b [N s/m]) for
-    the modulations above the surface, None without modulation."""
+    the modulations above the surface, None without modulation. piezo: file
+    whose piezo correction (current settings) is applied to F / delta, as
+    for the sample (JPK/Bruker note TN301, Eq. 7); None: no correction."""
     segments = curve_tools.get_modulation_segments(data, i, j)
     if segments is None:
         return None
@@ -78,14 +80,16 @@ def curve(data, i, j):
         zd, dd, td = microrheology.detrend(frequency, z, d, t)
         if len(zd) <= 8:
             continue
+        correction = (0.0, 1.0) if piezo is None else \
+            microrheology.piezo_correction(piezo, frequency, used=False)
         h, _ = microrheology.transfer_function(frequency, zd, dd, td, "fft",
-                                               k)
+                                               k, correction)
         results.append((height * 1e-9, frequency,
                         h.imag / (2.0 * math.pi * frequency)))
     return results
 
 
-def compute(data):
+def compute(data, piezo=None):
     """b(h) of all the curves of the file (median and standard deviation at
     each height) and its extrapolation to the surface. Returns a dict:
     heights [m], b, b_std [N s/m], nbr (curves), b0 [N s/m], h_eff [m]
@@ -96,7 +100,7 @@ def compute(data):
         for j in range(data.nbr_pixels_y):
             if data.discarded_curves[i][j]:
                 continue
-            result = curve(data, i, j)
+            result = curve(data, i, j, piezo)
             if not result:
                 continue
             nbr += 1

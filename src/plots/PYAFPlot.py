@@ -316,7 +316,7 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ResultsVisco(self)
                 elif c_type == "brush":
                     self.canvas = ResultsBrush(self)
-                elif c_type == "microrheology":
+                elif c_type in ("microrheology", "microrheology_map"):
                     self.canvas = ResultsMicrorheology(self)
             elif p_type == "fit_preview":
                 if ct == "stiffness":
@@ -507,6 +507,6 @@ def curve_type_available(data, curve_type):
         return data.visco_calculated
     if curve_type == "brush":
         return data.brush_calculated
-    if curve_type == "microrheology":
+    if curve_type in ("microrheology", "microrheology_map"):
         return data.microrheo_calculated
     return True

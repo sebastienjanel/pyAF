@@ -278,6 +278,8 @@ class SingleFile:
         self.color_opts_microrheo_storage = [2, 0, 0, 0, 0]
         self.color_opts_microrheo_loss = [4, 0, 0, 0, 0]
         self.color_opts_microrheo_tan_delta = [6, 0, 2, 1, 0]
+        # Crossover frequency G' = G'' (Gray: black to white)
+        self.color_opts_microrheo_crossover = [12, 0, 0, 0, 0]
         # Quality of the elasticity fit: R^2 from 0.9 (white to red: the
         # bad fits in red, the good ones light), and the pixels with the
         # point of contact fixed (Reds: fixed in red)
@@ -527,7 +529,8 @@ class SingleFile:
         self.used_brush_threshold_pct = None
         # Microrheology (see compute_tools.microrheology): method of the
         # transfer function ("fft" or "sine"), viscous drag coefficient of
-        # the cantilever b(0) [uN s/m], frequency of the maps [Hz]
+        # the cantilever b(0) [uN s/m], modulation segment of the maps (its
+        # label, see microrheology.labels)
         self.microrheo_method = "fft"
         self.microrheo_drag = 0.0
         self.microrheo_frequency = None
@@ -535,11 +538,20 @@ class SingleFile:
         # frequencies, phase [degrees], quotient and file, None: no
         # correction), see microrheology.piezo_characterization
         self.microrheo_piezo = None
+        # Maximal frequency analysed [Hz] (0: all; limitation of the head)
+        self.microrheo_max_freq = 0.0
+        # Piezo correction of the amplitude too (else the phase lag only)
+        self.microrheo_piezo_amplitude = False
+        # Preview of the compute tab: the oscillations (raw data) instead of
+        # G' and G''
+        self.microrheo_preview_raw = False
         # Results [i, j, frequency (increasing), k], k: microrheology.VALUES
         self.microrheo_results = None
         self.used_microrheo_method = None
         self.used_microrheo_drag = None
         self.used_microrheo_piezo = None
+        self.used_microrheo_max_freq = None
+        self.used_microrheo_piezo_amplitude = None
 
         # Display options
         self.meshgrid_type = "piezo"
@@ -1234,8 +1246,16 @@ class SingleFile:
                     opts[1], opts[2] = limits
                     opts[3] = sum(limits) / 2.0
 
-        # Microrheology: moduli with the automatic scale of the elasticity
+        # Microrheology: moduli with the automatic scale of the elasticity,
+        # crossover frequency from the 2nd to the 98th percentile
         if self.microrheo_calculated and color:
+            values = numpy.asarray(self.microrheo_crossover, dtype=float)
+            values = values[numpy.isfinite(values)]
+            if values.size:
+                low, high = numpy.percentile(values, [2, 98])
+                opts = self.color_opts_microrheo_crossover
+                opts[1], opts[2] = float(low), float(max(high, low))
+                opts[3] = (opts[1] + opts[2]) / 2.0
             for name in ("microrheo_storage", "microrheo_loss"):
                 limits = robust_range(getattr(self, name),
                                       self.stiffness_color_log)
@@ -1589,20 +1609,21 @@ class SingleFile:
         """Grafting density of the brush [1/um^2]."""
         return self.get_brush_result("density")
 
-    def get_microrheo_result(self, name, frequency=None):
-        """Map of a result of the microrheology at a frequency (the
-        frequency of the maps by default), nan when not computed."""
+    def get_microrheo_result(self, name, label=None):
+        """Map of a result of the microrheology for a modulation segment
+        (its label, see microrheology.labels: "10 Hz", "10 Hz (2)"; the
+        segment of the maps by default), nan when not computed."""
         from .compute_tools import microrheology
         nx, ny = self.nbr_pixels_x, self.nbr_pixels_y
         if not self.microrheo_calculated or self.microrheo_results is None:
             return numpy.full((nx, ny), numpy.nan)
-        freqs = microrheology.frequencies(self)
-        if frequency is None:
-            frequency = self.microrheo_frequency
-        if frequency not in freqs:
+        names = microrheology.labels(self)
+        if label is None:
+            label = microrheology.map_label(self)
+        if label not in names:
             return numpy.full((nx, ny), numpy.nan)
         return numpy.array(
-            self.microrheo_results[:, :, freqs.index(frequency),
+            self.microrheo_results[:, :, names.index(label),
                                    microrheology.VALUES.index(name)],
             dtype=float)
 
@@ -1615,6 +1636,12 @@ class SingleFile:
     def microrheo_loss(self):
         """Loss modulus G'' at the frequency of the maps [Pa]."""
         return self.get_microrheo_result("loss")
+
+    @property
+    def microrheo_crossover(self):
+        """Crossover frequency G' = G'' of the curves [Hz]."""
+        from .compute_tools import microrheology
+        return microrheology.crossover_map(self)
 
     @property
     def microrheo_tan_delta(self):
@@ -1725,6 +1752,7 @@ class SingleFile:
                  "microrheo_storage": "color_opts_microrheo_storage",
                  "microrheo_loss": "color_opts_microrheo_loss",
                  "microrheo_tan_delta": "color_opts_microrheo_tan_delta",
+                 "microrheo_crossover": "color_opts_microrheo_crossover",
                  "fit_r2": "color_opts_fit_r2",
                  "fit_poc_fixed": "color_opts_fit_poc_fixed"}
         return getattr(self, names[mt])

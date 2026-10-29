@@ -72,6 +72,16 @@ METHOD_NAMES = ("FFT (transfer function)", "Sine fit")
 # Results for each frequency (index in data.microrheo_results[i, j, f])
 VALUES = ("storage", "loss", "r2", "indentation")
 
+# Minimal working indentation [m]: below it the point of contact of the
+# elasticity fit is at the end of the approach (failed detection) and the
+# moduli, in 1 / sqrt(delta0), are meaningless
+MIN_INDENTATION = 10e-9
+
+# Maximal amplitude of the indentation over the working indentation: above
+# it the probe leaves the sample during the oscillation (no linear
+# response, no value at this frequency)
+MAX_AMPLITUDE_RATIO = 0.8
+
 # Models of the elasticity fit without microrheology (no contact model, or
 # not the indentation of the sample)
 UNSUPPORTED_MODELS = (contact_models.SLOPE, contact_models.THIN_SHELL)
@@ -113,8 +123,17 @@ def get_settings(data, used=False):
     computation if used is True): method, viscous drag coefficient
     b(0) [uN s/m] and piezo characterization (None: no correction)."""
     prefix = "used_microrheo_" if used else "microrheo_"
-    return {name: getattr(data, prefix + name)
-            for name in ("method", "drag", "piezo")}
+    return {name: getattr(data, prefix + name, None)
+            for name in ("method", "drag", "piezo", "max_freq",
+                         "piezo_amplitude")}
+
+
+def analysed(data, frequency, used=True):
+    """True if the frequency is analysed: not above the maximal frequency of
+    the settings (0 or None: all the frequencies, as max_freq in
+    PyFMRheo)."""
+    max_freq = get_settings(data, used)["max_freq"]
+    return not max_freq or frequency <= max_freq
 
 
 def detrend(frequency, z, d, t):
@@ -203,13 +222,18 @@ def transfer_function(frequency, z, d, t, method, k, piezo=(0.0, 1.0)):
 def piezo_correction(data, frequency, used=True):
     """Phase [degrees] and amplitude quotient of the piezo at the frequency
     (piezo characterization of the settings, interpolated linearly between
-    its frequencies as in PyFMRheo), (0, 1) without correction."""
-    piezo = get_settings(data, used)["piezo"]
+    its frequencies as in PyFMRheo), (0, 1) without correction. The
+    amplitude is corrected only if asked (piezo_amplitude): the phase lag
+    only, as in Alcaraz et al. 2002 and the JPK/Bruker note TN301."""
+    settings = get_settings(data, used)
+    piezo = settings["piezo"]
     if not piezo:
         return 0.0, 1.0
     freqs = numpy.asarray(piezo["frequencies"], float)
-    return (float(numpy.interp(frequency, freqs, piezo["phase"])),
-            float(numpy.interp(frequency, freqs, piezo["quotient"])))
+    phase = float(numpy.interp(frequency, freqs, piezo["phase"]))
+    quotient = float(numpy.interp(frequency, freqs, piezo["quotient"])) \
+        if settings["piezo_amplitude"] else 1.0
+    return phase, quotient
 
 
 def piezo_characterization(data, i, j):
@@ -273,15 +297,31 @@ def working_indentation(data, i, j):
     return float(numpy.max(delta))
 
 
+def skip_reason(data, i, j):
+    """Reason why a curve is not analysed (no elasticity value, no point of
+    contact or working indentation below MIN_INDENTATION), None if it is
+    analysed."""
+    values = data.stiffness_array[i][j]
+    if not len(values) or not numpy.isfinite(values[0]):
+        return "no elasticity value"
+    delta0 = working_indentation(data, i, j)
+    if delta0 is None:
+        return "no point of contact"
+    if delta0 < MIN_INDENTATION:
+        return "working indentation below " + \
+            format(MIN_INDENTATION * 1e9, "g") + " nm"
+    return None
+
+
 def curve(data, i, j, used=True, full=False):
     """Microrheology of a curve: list of results for the frequencies in
     increasing order, each a dict with frequency, storage, loss, r2,
     indentation [m] (and, with full, the detrended time, indentation and
     force). None if the curve can not be analysed."""
     segments = curve_tools.get_modulation_segments(data, i, j)
-    delta0 = working_indentation(data, i, j)
-    if segments is None or delta0 is None:
+    if segments is None or skip_reason(data, i, j) is not None:
         return None
+    delta0 = working_indentation(data, i, j)
     segments = [segment for segment, contact in
                 zip(segments, in_contact(data)) if contact]
     settings = get_settings(data, used)
@@ -292,12 +332,29 @@ def curve(data, i, j, used=True, full=False):
     # Spring constant in N/m, heights and deflections in nm
     k = k * 1e9
     results = []
-    for frequency, z, d, t in sorted(segments, key=lambda s: s[0]):
-        out = {"frequency": frequency, "indentation": delta0,
-               "storage": numpy.nan, "loss": numpy.nan, "r2": numpy.nan}
+    # In increasing frequency (a repeated frequency in the order of the
+    # acquisition, see labels)
+    for (frequency, z, d, t), label in zip(
+            sorted(segments, key=lambda s: s[0]), labels(data)):
+        out = {"frequency": frequency, "label": label, "indentation": delta0,
+               "storage": numpy.nan, "loss": numpy.nan, "r2": numpy.nan,
+               "skipped": None}
         if len(z) > 8 and numpy.ptp(t) > 0:
             zd, dd, td = detrend(frequency, z, d, t)
-            if len(zd) > 8:
+            # Amplitude of the indentation [m]: the probe must stay in
+            # contact during the oscillation
+            amplitude = abs(sine_fit(td - td[0], zd - dd,
+                                     2.0 * math.pi * frequency)[0]) * 1e-9 \
+                if len(zd) > 8 else 0.0
+            out["amplitude"] = amplitude
+            if not analysed(data, frequency, used):
+                # Above the maximal frequency: no value
+                pass
+            elif amplitude > MAX_AMPLITUDE_RATIO * delta0:
+                out["skipped"] = "indentation amplitude above " + \
+                    format(MAX_AMPLITUDE_RATIO * 100, "g") + \
+                    " % of the working indentation"
+            elif len(zd) > 8:
                 h, r2 = transfer_function(
                     frequency, zd, dd, td, settings["method"], k,
                     piezo_correction(data, frequency, used))
@@ -312,16 +369,128 @@ def curve(data, i, j, used=True, full=False):
 
 def frequencies(data):
     """Frequencies of the modulation segments in contact in increasing
-    order [Hz]."""
+    order [Hz] (a repeated frequency is repeated)."""
     return sorted(f for f, contact in
                   zip(data.modulation_frequencies or [], in_contact(data))
                   if contact)
 
 
+def labels(data):
+    """Names of the modulation segments in contact, in the order of
+    frequencies: "10 Hz", or "10 Hz (1)", "10 Hz (2)" for a frequency
+    applied several times (in the order of the acquisition)."""
+    freqs = frequencies(data)
+    names = []
+    for k, frequency in enumerate(freqs):
+        name = format(frequency, "g") + " Hz"
+        if freqs.count(frequency) > 1:
+            name += " (" + str(freqs[:k + 1].count(frequency)) + ")"
+        names.append(name)
+    return names
+
+
+def shown_labels(data, used=True):
+    """Labels of the analysed modulation segments (up to the maximal
+    frequency), for the maps, the plots and the exports."""
+    return [name for name, frequency in zip(labels(data), frequencies(data))
+            if analysed(data, frequency, used)]
+
+
+def crossover(freqs, storage, loss):
+    """Frequency where G'' becomes larger than G' (first crossing in
+    increasing frequency), interpolated linearly in log(G''/G') vs
+    log(f) between the two frequencies around it; nan without crossing (or
+    with non positive moduli)."""
+    freqs = numpy.asarray(freqs, float)
+    storage = numpy.asarray(storage, float)
+    loss = numpy.asarray(loss, float)
+    ok = numpy.isfinite(storage) & numpy.isfinite(loss) & (storage > 0) & \
+        (loss > 0)
+    freqs, ratio = freqs[ok], numpy.log(loss[ok] / storage[ok])
+    for k in range(len(freqs) - 1):
+        if ratio[k] < 0 <= ratio[k + 1] and freqs[k + 1] > freqs[k]:
+            x0, x1 = math.log(freqs[k]), math.log(freqs[k + 1])
+            x = x0 + (x1 - x0) * (-ratio[k]) / (ratio[k + 1] - ratio[k])
+            return math.exp(x)
+    return numpy.nan
+
+
+def crossover_map(data):
+    """Crossover frequency G' = G'' of the curves [Hz] (analysed
+    frequencies), nan without crossing or when not computed."""
+    nx, ny = data.nbr_pixels_x, data.nbr_pixels_y
+    result = numpy.full((nx, ny), numpy.nan)
+    if not data.microrheo_calculated or data.microrheo_results is None:
+        return result
+    names = labels(data)
+    shown = [names.index(name) for name in shown_labels(data)]
+    freqs = numpy.array(frequencies(data))[shown]
+    values = numpy.asarray(data.microrheo_results, float)
+    storage = values[:, :, shown, VALUES.index("storage")]
+    loss = values[:, :, shown, VALUES.index("loss")]
+    for i in range(nx):
+        for j in range(ny):
+            result[i, j] = crossover(freqs, storage[i, j], loss[i, j])
+    return result
+
+
+def map_statistics(data):
+    """Median and quartiles of G' and G'' over the analysed curves of the
+    file at each analysed frequency: dict with frequencies, labels,
+    storage and loss (arrays [25 %, 50 %, 75 %] per frequency, Pa) and
+    nbr (curves with a value), None when not computed."""
+    if not data.microrheo_calculated or data.microrheo_results is None:
+        return None
+    names = labels(data)
+    shown = [names.index(name) for name in shown_labels(data)]
+    values = numpy.asarray(data.microrheo_results, float)
+    out = {"frequencies": numpy.array(frequencies(data))[shown],
+           "labels": [names[k] for k in shown], "nbr": []}
+    for name in ("storage", "loss"):
+        quartiles = []
+        for k in shown:
+            v = values[:, :, k, VALUES.index(name)].ravel()
+            v = v[numpy.isfinite(v)]
+            quartiles.append(numpy.percentile(v, [25, 50, 75]) if v.size
+                             else numpy.full(3, numpy.nan))
+            if name == "storage":
+                out["nbr"].append(int(v.size))
+        out[name] = numpy.array(quartiles)
+    return out
+
+
+def map_label(data):
+    """Modulation segment of the maps of the file (one of shown_labels, the
+    first one by default; files saved with the frequency as a number)."""
+    names = shown_labels(data)
+    label = data.microrheo_frequency
+    if isinstance(label, (int, float)):
+        label = format(label, "g") + " Hz"
+        if label not in names:
+            # Repeated frequency: its first application
+            label += " (1)"
+    if label not in names:
+        label = names[0] if names else None
+    data.microrheo_frequency = label
+    return label
+
+
+def piezo_outside(data, used=True):
+    """Frequencies in contact outside the frequencies of the piezo
+    characterization (its values at the nearest frequency are used)."""
+    piezo = get_settings(data, used)["piezo"]
+    if not piezo:
+        return []
+    low, high = min(piezo["frequencies"]), max(piezo["frequencies"])
+    return sorted({f for f in frequencies(data) if (f < low or f > high) and
+                   analysed(data, f, used)})
+
+
 def compute(calc_id):
     """Microrheology of all the curves of a file, stored in
     data.microrheo_results [i, j, frequency, VALUES]. Returns the number of
-    curves analysed."""
+    curves analysed and the numbers of curves skipped by reason (see
+    skip_reason)."""
     data = shared.exp.list[calc_id]
     nx, ny = data.nbr_pixels_x, data.nbr_pixels_y
     freqs = frequencies(data)
@@ -333,13 +502,22 @@ def compute(calc_id):
     widgets_list.widget_progressbar.set_range(0, nx * ny)
     results = numpy.full((nx, ny, len(freqs), len(VALUES)), numpy.nan)
     nbr = 0
+    skipped = {}
     try:
         for i in range(nx):
             for j in range(ny):
                 if not data.discarded_curves[i][j]:
-                    values = curve(data, i, j)
+                    reason = skip_reason(data, i, j)
+                    if reason is not None:
+                        skipped[reason] = skipped.get(reason, 0) + 1
+                    values = None if reason else curve(data, i, j)
                     if values is not None:
                         nbr += 1
+                        for value in values:
+                            if value["skipped"]:
+                                key = value["label"] + ": " + \
+                                    value["skipped"]
+                                skipped[key] = skipped.get(key, 0) + 1
                         for f, value in enumerate(values):
                             results[i, j, f] = [value[name]
                                                 for name in VALUES]
@@ -349,7 +527,6 @@ def compute(calc_id):
 
     data.microrheo_results = results.astype(numpy.float32)
     data.microrheo_calculated = True
-    if data.microrheo_frequency not in freqs and freqs:
-        data.microrheo_frequency = freqs[0]
+    map_label(data)
     data.update()
-    return nbr
+    return nbr, skipped

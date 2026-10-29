@@ -219,7 +219,8 @@ def get_r_tables(row, data):
             curve_tables.append(df)
 
     for force_type, values in results_sorting.PIXEL_TYPES.items():
-        if force_type in results_sorting.MICRORHEO_TYPES:
+        if force_type in ("microrheo_storage", "microrheo_loss",
+                          "microrheo_tan_delta"):
             # All the frequencies, below
             continue
         if getattr(data, values["calculated"]):
@@ -230,11 +231,14 @@ def get_r_tables(row, data):
     if data.microrheo_calculated:
         # G' and G'' of the curves at each frequency (Pa)
         curves = get("microrheo_storage")
-        for frequency in microrheology.frequencies(data):
+        for label in microrheology.shown_labels(data):
+            # "10 Hz (2)" -> "10Hz_2"
+            suffix = label.replace(" Hz", "Hz").replace(" (", "_") \
+                .rstrip(")")
             for name, column in (("storage", "G_storage"),
                                  ("loss", "G_loss")):
-                column += "_" + format(frequency, "g") + "Hz"
-                values = data.get_microrheo_result(name, frequency)
+                column += "_" + suffix
+                values = data.get_microrheo_result(name, label)
                 df = table([[index, i, j, float(values[i][j])]
                             for index, i, j, _ in curves], column)
                 stats.append(describe(df, column))

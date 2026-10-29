@@ -40,7 +40,8 @@ import seaborn as sns
 from ..plot_main import MainPlot
 from ... import shared
 from ...tools import dfs_tools
-from ...tools.results_sorting import PIXEL_TYPES
+from ...tools.results_sorting import MICRORHEO_TYPES, PIXEL_TYPES
+from ...compute_tools import microrheology
 
 
 class PlotResults(MainPlot):
@@ -186,7 +187,7 @@ class PlotResults(MainPlot):
             if self.plot_selected == "box":
                 self.xlabel = ""
             else:
-                self.xlabel = PIXEL_TYPES[rt]["label"]
+                self.xlabel = pixel_label(rt)
 
         if pt == "results_single":
             if self.plot_selected == "box":
@@ -205,7 +206,7 @@ class PlotResults(MainPlot):
                 elif rt == "loading_rates":
                     self.ylabel = "Loading rate [pN/s]"
                 elif rt in PIXEL_TYPES:
-                    self.ylabel = PIXEL_TYPES[rt]["label"]
+                    self.ylabel = pixel_label(rt)
             else:
                 if shared.exp.norm_hist_single:
                     self.ylabel = r"Probability density"
@@ -371,3 +372,22 @@ class PlotResults(MainPlot):
                 y = dfs_tools.model_force(fit, x)
                 self.axes.plot(x, y, "r", linewidth=2)
 
+
+
+def pixel_label(result_type):
+    """Axis label of a result with one value per curve. Microrheology: with
+    the frequency of the maps of the files, or a warning if the files are
+    not at the same frequency (each file gives its values at its own
+    frequency of the maps, see the Results tab)."""
+    label = PIXEL_TYPES[result_type]["label"]
+    if result_type not in MICRORHEO_TYPES or \
+            result_type == "microrheo_crossover":
+        return label
+    names = sorted({microrheology.map_label(data) for data in shared.exp.list
+                    if data.microrheo_calculated} - {None})
+    if len(names) == 1:
+        return label.replace(" [", " at " + names[0] + " [") \
+            if " [" in label else label + " at " + names[0]
+    if names:
+        return label + "\nDIFFERENT FREQUENCIES: " + ", ".join(names)
+    return label

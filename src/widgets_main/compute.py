@@ -810,8 +810,35 @@ class ComputeWidget(PYAFWidget):
         HL_microrheo_drag.addWidget(self.BT_microrheo_drag)
         HL_microrheo_drag.addStretch(1)
 
+        # Maximal frequency (head of the AFM: resonances of the head above
+        # about 500 Hz, the deflection no longer follows the piezo)
+        self.IN_microrheo_max_freq = PYAFInput(
+            self, "microrheo_max_freq", "Max. frequency [Hz]", 60)
+        self.IN_microrheo_max_freq.setToolTip(
+            "The modulations above this frequency are not analysed (0: all "
+            "the frequencies), as max_freq in PyFMRheo.\nAbove the "
+            "bandwidth of the AFM head (resonances), the deflection does not "
+            "follow the piezo, even on the substrate:\ncheck the piezo "
+            "characterization (amplitude quotient far below 1, phase above "
+            "about 45\u00b0).")
+        self.IN_microrheo_max_freq.input.setValidator(
+            misc_tools.validator("UF"))
+        HL_microrheo_method.insertSpacing(HL_microrheo_method.count() - 1, 20)
+        HL_microrheo_method.insertWidget(HL_microrheo_method.count() - 1,
+                                         self.IN_microrheo_max_freq)
+        # Preview: the oscillations (raw data) or G' and G''
+        self.TG_microrheo_raw = PYAFToggle(
+            self, "microrheo_raw", "Show the oscillations")
+        self.TG_microrheo_raw.setToolTip(
+            "Preview of the displayed curve: the oscillations (deflection vs "
+            "time of each modulation) instead of G\u2032 and G\u2033 vs "
+            "the frequency.")
+        HL_microrheo_method.insertSpacing(HL_microrheo_method.count() - 1, 20)
+        HL_microrheo_method.insertWidget(HL_microrheo_method.count() - 1,
+                                         self.TG_microrheo_raw)
         GL_microrheo.addLayout(HL_microrheo_method, 0, 0)
-        GL_microrheo.addLayout(HL_microrheo_drag, 1, 0)
+        # Row 2: after the piezo correction (used by the drag measurement)
+        GL_microrheo.addLayout(HL_microrheo_drag, 2, 0)
 
         # Piezo correction: lag and gain of the piezo measured on a curve of
         # a rigid sample (substrate)
@@ -830,8 +857,16 @@ class ComputeWidget(PYAFWidget):
         HL_microrheo_piezo.addWidget(self.label_microrheo_piezo)
         HL_microrheo_piezo.addWidget(self.BT_microrheo_piezo)
         HL_microrheo_piezo.addWidget(self.BT_microrheo_piezo_clear)
+        self.CB_microrheo_piezo_amplitude = PYAFCheckBox(
+            self, "microrheo_piezo_amplitude", "Correct the amplitude")
+        self.CB_microrheo_piezo_amplitude.setToolTip(
+            "Also correct the amplitude of the height by the amplitude "
+            "quotient of the reference (as corr_amp in PyFMRheo).\nOff: "
+            "the phase lag only, as in Alcaraz et al. 2002 and the "
+            "JPK/Bruker note TN301.")
+        HL_microrheo_piezo.addWidget(self.CB_microrheo_piezo_amplitude)
         HL_microrheo_piezo.addStretch(1)
-        GL_microrheo.addLayout(HL_microrheo_piezo, 2, 0)
+        GL_microrheo.addLayout(HL_microrheo_piezo, 1, 0)
         self.Box_microrheo.setLayout(GL_microrheo)
 
         VL_microrheo_opts = QtWidgets.QVBoxLayout()
@@ -1154,6 +1189,8 @@ class ComputeWidget(PYAFWidget):
                 self.list_microrheo_method.findData(data.microrheo_method))
             self.IN_microrheo_drag.changeValue(
                 misc_tools.format_number(data.microrheo_drag))
+            self.IN_microrheo_max_freq.changeValue(
+                misc_tools.format_number(data.microrheo_max_freq or 0))
             piezo = data.microrheo_piezo
             self.label_microrheo_piezo.setText(
                 "None" if not piezo else piezo["file"] + " [" + ", ".join(
@@ -1161,6 +1198,12 @@ class ComputeWidget(PYAFWidget):
             self.BT_microrheo_piezo.setEnabled(
                 microrheology.available(data))
             self.BT_microrheo_piezo_clear.setEnabled(bool(piezo))
+            self.CB_microrheo_piezo_amplitude.setChecked(
+                bool(data.microrheo_piezo_amplitude))
+            self.CB_microrheo_piezo_amplitude.setEnabled(bool(piezo))
+            self.TG_microrheo_raw.setChecked(
+                bool(getattr(data, "microrheo_preview_raw", False)))
+            self.TG_microrheo_raw.setEnabled(microrheology.available(data))
             # Modulation segments and the elasticity fit are needed
             reason = microrheology.check_file(data)
             self.BT_microrheo.setEnabled(reason is None)
@@ -1445,6 +1488,11 @@ class ComputeWidget(PYAFWidget):
         elif field == "visco_beta_init":
             data.visco_beta_init = self.IN_visco_beta.get_float_value()
 
+        elif field == "microrheo_max_freq":
+            if self.IN_microrheo_max_freq.input.text() != "":
+                data.microrheo_max_freq = \
+                    self.IN_microrheo_max_freq.get_float_value()
+
         elif field == "microrheo_drag":
             if self.IN_microrheo_drag.input.text() != "":
                 data.microrheo_drag = self.IN_microrheo_drag.get_float_value()
@@ -1508,16 +1556,19 @@ class ComputeWidget(PYAFWidget):
                 "with modulation segments separated by retract segments).",
                 warning=True)
             return
-        data = files[0]
-        if len(files) > 1:
-            names = [file_label(dt) for dt in files]
-            name, ok = QtWidgets.QInputDialog.getItem(
-                self, "Viscous drag", "Measurement :", names, 0, False)
-            if not ok:
-                return
-            data = files[names.index(name)]
-        result = viscous_drag.compute(data)
-        dialog = ViscousDragDialog(self, data, result)
+        # Always chosen by the user (also when there is one)
+        names = [file_label(dt) for dt in files]
+        name, ok = QtWidgets.QInputDialog.getItem(
+            self, "Viscous drag", "Viscous drag measurement :", names, 0,
+            False)
+        if not ok:
+            return
+        data = files[names.index(name)]
+        # With the piezo correction of the sample file (set it first)
+        sample = shared.exp.current_data
+        piezo = sample if sample.microrheo_piezo else None
+        result = viscous_drag.compute(data, piezo)
+        dialog = ViscousDragDialog(self, data, result, sample=sample)
         if dialog.exec_() and numpy.isfinite(result["b0"]):
             value = float("%.4g" % (result["b0"] * 1e6))
             files = shared.exp.list if shared.exp.apply_to_all_compute \
@@ -2048,14 +2099,41 @@ class ComputeWidget(PYAFWidget):
                     skipped.append(file_label(data) + " : " + reason)
                     continue
                 self.logger.debug("Microrheology %s", data.filename)
-                nbr = microrheology.compute(calc_id)
+                nbr, not_analysed = microrheology.compute(calc_id)
                 experiment.add_result(calc_id, data.filename)
                 if shared.exp.results_type is None:
                     shared.exp.results_type = "microrheo_storage"
+                shown = len(microrheology.shown_labels(data))
+                total = len(microrheology.frequencies(data))
                 lines.append(file_label(data) + " : " + str(nbr) +
-                             " curves, " + str(len(
-                                 microrheology.frequencies(data))) +
-                             " frequencies")
+                             " curves, " + str(shown) + " frequencies" +
+                             ("" if shown == total else " (" +
+                              str(total - shown) + " above " +
+                              format(data.microrheo_max_freq, "g") +
+                              " Hz not analysed)"))
+                # Curves or frequencies not analysed (NaN in the maps)
+                for reason, count in not_analysed.items():
+                    if ": " in reason:
+                        # A frequency of the curves: "10 Hz: reason"
+                        label, why = reason.split(": ", 1)
+                        skipped.append(file_label(data) + " : " +
+                                       label + " not analysed for " +
+                                       str(count) + " curves (" + why + ")")
+                    else:
+                        skipped.append(file_label(data) + " : " +
+                                       str(count) + " curves not analysed (" +
+                                       reason + ")")
+                # Piezo correction outside its frequencies
+                outside = microrheology.piezo_outside(data)
+                if outside:
+                    piezo = data.used_microrheo_piezo
+                    skipped.append(
+                        file_label(data) + " : piezo correction of " +
+                        ", ".join(format(f, "g") for f in outside) +
+                        " Hz taken at the nearest frequency of the "
+                        "characterization (" + format(min(
+                            piezo["frequencies"]), "g") + "\u2013" +
+                        format(max(piezo["frequencies"]), "g") + " Hz)")
 
             notes = None
             if skipped:
@@ -2065,6 +2143,10 @@ class ComputeWidget(PYAFWidget):
             if lines and not skipped:
                 info = "<ul>" + "".join("<li>" + text + "</li>"
                                         for text in lines) + "</ul>"
+            elif lines:
+                notes = "<ul>" + "".join("<li>" + text + "</li>"
+                                         for text in lines + skipped) + \
+                    "</ul>"
             self.finish_computation(notes=notes, info=info)
 
         elif button == "compute_breakthrough":
@@ -2262,6 +2344,15 @@ class ComputeWidget(PYAFWidget):
             data.visco_bec = self.CB_visco_bec.isChecked()
             self.update_GUI("visco")
             self.update_GUI("microrheo")
+            self.update_MPL("MPL_canvas")
+
+        elif checkbox == "microrheo_raw":
+            data.microrheo_preview_raw = self.TG_microrheo_raw.isChecked()
+            self.update_MPL("MPL_canvas")
+
+        elif checkbox == "microrheo_piezo_amplitude":
+            data.microrheo_piezo_amplitude = \
+                self.CB_microrheo_piezo_amplitude.isChecked()
             self.update_MPL("MPL_canvas")
 
         elif checkbox == "visco_drag_correction":

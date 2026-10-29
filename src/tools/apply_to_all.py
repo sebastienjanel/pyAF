@@ -200,7 +200,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                     setattr(dt, name, copy.deepcopy(getattr(cur, name)))
             for name in ("color_opts_visco_fluidity",
                          "color_opts_visco_tan_delta",
-                         "color_opts_microrheo_tan_delta", "color_opts_fit_r2",
+                         "color_opts_microrheo_tan_delta",
+                         "color_opts_microrheo_crossover", "color_opts_fit_r2",
                          "color_opts_fit_poc_fixed"):
                 setattr(dt, name, copy.deepcopy(getattr(cur, name)))
             dt.stiffness_color_log = getattr(cur, "stiffness_color_log",
@@ -289,6 +290,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 # each file (see the compute tab)
                 dt.microrheo_method = cur.microrheo_method
                 dt.microrheo_drag = cur.microrheo_drag
+                dt.microrheo_max_freq = cur.microrheo_max_freq
+                dt.microrheo_piezo_amplitude = cur.microrheo_piezo_amplitude
                 dt.microrheo_piezo = None if cur.microrheo_piezo is None \
                     else dict(cur.microrheo_piezo)
 
