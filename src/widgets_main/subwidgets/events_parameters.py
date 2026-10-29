@@ -99,6 +99,59 @@ class EventsParamsWidget(PYAFWidget):
         self.IN_window_size.input.setValidator(
             misc_tools.validator("MI", bottom=2))
 
+        # Help to adapt the parameters (check them with Display: Detection)
+        if self.name == "msf":
+            self.IN_threshold.setToolTip(
+                "Minimum MSF score of a step (absolute value, scaled to a "
+                "step of 10 pN; default 1).\nToo many false events: "
+                "increase it. Small events missed: decrease it.\nIt is not "
+                "normalized to the noise: adapt it when the noise changes "
+                "between files.\nCheck it with Display: Detection (an event "
+                "must cross the green line).")
+        else:
+            self.IN_threshold.setToolTip(
+                "Detection threshold, in multiples of the noise of the curve "
+                "(default 5).\nToo many false events (noise): increase it "
+                "(6-8). Small events missed: decrease it (3-4).\nWith the "
+                "adaptive threshold: height above the smoothed signal.\n"
+                "Check it with Display: Detection (an event must cross the "
+                "green line).")
+        self.IN_fit_size.setToolTip(
+            "Number of points of the lines fitted on each side of an event "
+            "(default 50), giving the force of the event (step between the "
+            "two lines).\nShortened automatically when another event is "
+            "closer. Decrease it for close events, increase it on noisy "
+            "curves.")
+        self.CB_fit_event.setToolTip(
+            "Display the detected events on the curve")
+        self.CB_fit_event_seg.setToolTip(
+            "Display the lines fitted on each side of the events")
+        self.IN_kernel_size.setToolTip(
+            "Half width of the kernel (default 2): smoothing of the local "
+            "slope of the curve.\nSmall (1-2): separates close events but "
+            "follows the noise. Larger (3-5): for noisy or finely sampled "
+            "curves,\nbut events closer than about twice this size merge.")
+        self.CB_adaptive_threshold_option.setToolTip(
+            "Removes the slow variations of the detection signal (smoothed "
+            "signal subtracted) before the threshold.\nUse it when the "
+            "signal drifts, or shows bumps on sloped segments (polymer "
+            "stretching, tilted curve).")
+        self.IN_adaptive_smoothing_window.setToolTip(
+            "Window of the Savitzky-Golay smoothing of the adaptive "
+            "threshold (default 100 points).\nIt must be much wider than "
+            "an event: too small, the smoothing follows the events and "
+            "they are removed.")
+        self.IN_adaptive_smoothing_order.setToolTip(
+            "Order of the polynomial of the Savitzky-Golay smoothing of the "
+            "adaptive threshold (default 2).\nHigher: the smoothing "
+            "follows faster variations.")
+        self.IN_window_size.setToolTip(
+            "Number of points of the window sliding along the curve (half "
+            "on each side of the tested step; default 60).\nLarger: more "
+            "robust to the noise, but events closer than about half a "
+            "window merge,\nand half a window at each end of the curve is "
+            "not analysed. Smaller: for close events.")
+
         GB_conv_params = QtWidgets.QGroupBox("Convolution parameters")
         VL_conv_params = QtWidgets.QVBoxLayout()
         GB_conv_params.setLayout(VL_conv_params)

@@ -426,37 +426,34 @@ class ComputeWidget(PYAFWidget):
         self.widget_kernel = EventsParamsWidget(self, "widget_kernel")
         self.widget_msf = EventsParamsWidget(self, "widget_msf")
 
-        # Algorithm type
-        self.GRP_algorithms = PYAFButtonGroup(self, "events_algorithms")
-        self.RBT_kernel = QtWidgets.QRadioButton("Kernel")
-        self.RBT_msf = QtWidgets.QRadioButton("MSF")
-        self.GRP_algorithms.addButton(self.RBT_kernel, 0)
-        self.GRP_algorithms.addButton(self.RBT_msf, 1)
-
-        BOX_algorithms = QtWidgets.QGroupBox("Methods")
-        HL_algorithms = QtWidgets.QHBoxLayout()
-        HL_algorithms.addStretch(1)
-        HL_algorithms.addWidget(self.RBT_kernel)
-        HL_algorithms.addStretch(1)
-        HL_algorithms.addWidget(self.RBT_msf)
-        HL_algorithms.addStretch(1)
-        BOX_algorithms.setLayout(HL_algorithms)
-
-        # Curve type
-        self.GRP_events_curve_type = PYAFButtonGroup(self, "events_curve_type")
-        self.RBT_curve = QtWidgets.QRadioButton("Curve")
-        self.RBT_detection = QtWidgets.QRadioButton("Detection")
-        self.GRP_events_curve_type.addButton(self.RBT_curve, 0)
-        self.GRP_events_curve_type.addButton(self.RBT_detection, 1)
-
-        BOX_events_curve_type = QtWidgets.QGroupBox("Display")
-        HL_curve_type = QtWidgets.QHBoxLayout()
-        HL_curve_type.addStretch(1)
-        HL_curve_type.addWidget(self.RBT_curve)
-        HL_curve_type.addStretch(1)
-        HL_curve_type.addWidget(self.RBT_detection)
-        HL_curve_type.addStretch(1)
-        BOX_events_curve_type.setLayout(HL_curve_type)
+        # Method of detection and display of the preview: selectors
+        self.label_events_algorithm = QtWidgets.QLabel("Method :")
+        self.list_events_algorithm = PYAFComboBox(self, "events_algorithm")
+        self.list_events_algorithm.addItem("Kernel", "kernel")
+        self.list_events_algorithm.addItem("MSF", "msf")
+        self.list_events_algorithm.setToolTip(
+            "Kernel (default): convolution of the force curve with a short "
+            "ramp (local slope), threshold in multiples of the noise of the "
+            "curve,\nfast, the same threshold works for files with "
+            "different noise. Use the adaptive threshold on curves with "
+            "sloped segments (polymer stretching).\n"
+            "MSF: tests for a step (two parallel lines with an offset) in a "
+            "window sliding along the curve, insensitive to sloped "
+            "segments,\nthreshold in absolute units (scaled to a 10 pN "
+            "step): adapt it when the noise changes between files.")
+        self.label_events_curve_type = QtWidgets.QLabel("Display :")
+        self.list_events_curve_type = PYAFComboBox(self, "events_curve_type")
+        self.list_events_curve_type.addItem("Curve", "curve")
+        self.list_events_curve_type.addItem("Detection", "detection")
+        self.list_events_curve_type.setToolTip(
+            "Curve: force curve with the detected events and their fits.\n"
+            "Detection: signal of the detection (convolution or MSF) with "
+            "the threshold (green line), to adjust the parameters:\nset "
+            "the threshold just above the noise, so that only the jumps "
+            "cross it, and check a few curves (Random curve).")
+        for combo in (self.list_events_algorithm,
+                      self.list_events_curve_type):
+            combo.fit_to_contents()
 
         name = "widget_fit_param_jocs_events"
         W_fit_params_jocs_events = FitParamsWidget(self, name)
@@ -471,8 +468,11 @@ class ComputeWidget(PYAFWidget):
 
         HL_events_compute_type = QtWidgets.QHBoxLayout()
         HL_events_compute_type.addStretch(1)
-        HL_events_compute_type.addWidget(BOX_events_curve_type)
-        HL_events_compute_type.addWidget(BOX_algorithms)
+        HL_events_compute_type.addWidget(self.label_events_algorithm)
+        HL_events_compute_type.addWidget(self.list_events_algorithm)
+        HL_events_compute_type.addSpacing(20)
+        HL_events_compute_type.addWidget(self.label_events_curve_type)
+        HL_events_compute_type.addWidget(self.list_events_curve_type)
         HL_events_compute_type.addStretch(1)
 
         # Jump of contact first (left), then the parameters of the
@@ -1141,10 +1141,10 @@ class ComputeWidget(PYAFWidget):
             self.IN_lr_coef.changeValue(data.lr_coef)
 
         if element == "events_algorithms" or element == "all":
-            if data.events_algorithm == "kernel":
-                self.RBT_kernel.setChecked(True)
-            elif data.events_algorithm == "msf":
-                self.RBT_msf.setChecked(True)
+            self.list_events_algorithm.blockSignals(True)
+            self.list_events_algorithm.setCurrentIndex(
+                self.list_events_algorithm.findData(data.events_algorithm))
+            self.list_events_algorithm.blockSignals(False)
 
         if element == "stiffness_params" or element == "all":
             if data.stiffness_mode == 0:
@@ -1153,10 +1153,10 @@ class ComputeWidget(PYAFWidget):
                 self.RBT_fitting_params.setChecked(True)
 
         if element == "events_curve_type" or element == "all":
-            if data.events_curve_type == "curve":
-                self.RBT_curve.setChecked(True)
-            elif data.events_curve_type == "detection":
-                self.RBT_detection.setChecked(True)
+            self.list_events_curve_type.blockSignals(True)
+            self.list_events_curve_type.setCurrentIndex(
+                self.list_events_curve_type.findData(data.events_curve_type))
+            self.list_events_curve_type.blockSignals(False)
 
     @staticmethod
     def set_model(data, model):
@@ -1207,6 +1207,14 @@ class ComputeWidget(PYAFWidget):
             data.roi_glass_id = value
 
             self.update_GUI("BT_height_correction")
+
+        elif name == "events_algorithm":
+            data.events_algorithm = self.list_events_algorithm.currentData()
+            self.update_widget()
+
+        elif name == "events_curve_type":
+            data.events_curve_type = self.list_events_curve_type.currentData()
+            self.update_widget()
 
         elif name == "visco_solver":
             data.visco_solver = self.list_visco_solver.currentIndex()
@@ -1896,22 +1904,6 @@ class ComputeWidget(PYAFWidget):
                 # Bring to front
                 widgets_list.widget_clean_up.activateWindow()
                 widgets_list.widget_clean_up.raise_()
-
-        elif button == "events_algorithms":
-            value = self.GRP_algorithms.checkedId()
-            if value == 0:
-                data.events_algorithm = "kernel"
-            elif value == 1:
-                data.events_algorithm = "msf"
-            self.update_widget()
-
-        elif button == "events_curve_type":
-            value = self.GRP_events_curve_type.checkedId()
-            if value == 0:
-                data.events_curve_type = "curve"
-            elif value == 1:
-                data.events_curve_type = "detection"
-            self.update_widget()
 
         elif button == "stiffness_params":
             value = self.GRP_stiffness_params.checkedId()
