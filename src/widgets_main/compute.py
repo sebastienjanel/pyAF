@@ -804,7 +804,21 @@ class ComputeWidget(PYAFWidget):
             "modulations of the cantilever at several heights above the "
             "surface (no contact).\nb(h) = Im(F/\u03b4) / (2\u03c0 f) at "
             "each height, extrapolated to the surface with "
-            "b(h) = A / (h + h_eff) (Alcaraz et al. 2002).")
+            "b(h) = A / (h + h_eff) (Alcaraz et al. 2002).\n\n"
+            "Acquisition (JPK force curve or map, with the same cantilever, "
+            "in the same liquid and on the same substrate as the sample):\n"
+            "\u2022 extend to the setpoint on the substrate (contact: zero "
+            "of the heights)\n"
+            "\u2022 then, for each height: a retract segment (to the next "
+            "height) followed by a modulation segment, away from the "
+            "surface\n"
+            "\u2022 several heights, e.g. 6 to 10 from about 50 nm to a few "
+            "\u00b5m, closer together near the surface (b varies as "
+            "1/h)\n"
+            "\u2022 modulations of the same frequency and amplitude as the "
+            "sample (one frequency is enough, several can be used)\n"
+            "Set the piezo correction first: it is also applied to the drag "
+            "measurement.")
         HL_microrheo_drag = QtWidgets.QHBoxLayout()
         HL_microrheo_drag.addWidget(self.IN_microrheo_drag)
         HL_microrheo_drag.addWidget(self.BT_microrheo_drag)
@@ -849,7 +863,19 @@ class ComputeWidget(PYAFWidget):
             "Lag and gain of the piezo measured on the displayed curve, which "
             "must be on a rigid sample (substrate: the deflection follows the "
             "piezo),\nwith the same modulations: the height is corrected at "
-            "each frequency (PyFMRheo, piezo characterization).")
+            "each frequency (PyFMRheo, piezo characterization).\n\n"
+            "Acquisition (JPK force curve or map, with the same cantilever "
+            "and in the same liquid as the sample):\n"
+            "\u2022 on the bare substrate (glass, mica, Petri dish), next to "
+            "the sample, or a curve of the map on the substrate\n"
+            "\u2022 the same program as the sample: extend to the "
+            "setpoint, then the modulation segments in contact, with the "
+            "same frequencies and amplitudes\n"
+            "\u2022 a setpoint high enough for the tip to stay in contact "
+            "during the modulations\n"
+            "Open the file in pyAF, display a curve on the substrate, then "
+            "click here; the correction is used for all the files with "
+            "Apply to all.")
         self.BT_microrheo_piezo_clear = PYAFButton(
             self, "microrheo_piezo_clear", "Clear")
         HL_microrheo_piezo = QtWidgets.QHBoxLayout()

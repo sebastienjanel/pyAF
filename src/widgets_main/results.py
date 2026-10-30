@@ -430,12 +430,6 @@ class ResultsWidget(PYAFWidget):
         self.GL_curves_options.addWidget(self.TG_app_to_all, 6, 3,
                                          QtCore.Qt.AlignLeft)
 
-        # Rows as high as the list of the curve types (first row): the
-        # rows of checkboxes alone are lower, the gaps were uneven
-        row_height = self.list_curves.sizeHint().height()
-        for row in range(5):
-            self.GL_curves_options.setRowMinimumHeight(row, row_height)
-
         self.VL_curves_options.addLayout(self.GL_curves_options)
         self.VL_curves_options.addStretch(1)
 
@@ -502,6 +496,30 @@ class ResultsWidget(PYAFWidget):
 
         self.box_maps.setFont(self.parent.smallfont)
         self.box_curves_options.setFont(self.parent.smallfont)
+        self.even_curves_options()
+
+    def even_curves_options(self):
+        """Checkboxes and radio buttons of the Force curves box with the
+        font of the other tabs (SuperPlots), and rows evenly spaced: all
+        the rows as high as the highest checkbox, the list of the curve
+        types (first row) set to this height."""
+        font = QtWidgets.QApplication.font()
+        buttons = self.box_curves_options.findChildren(
+            QtWidgets.QAbstractButton)
+        buttons = [button for button in buttons if isinstance(
+            button, (QtWidgets.QCheckBox, QtWidgets.QRadioButton))]
+        for button in buttons:
+            button.setFont(font)
+        # Less vertical padding in the list (stylesheet: 0.4ex), so that it
+        # is not higher than the checkboxes
+        self.list_curves.setStyleSheet(
+            "QComboBox { padding-top: 0.1ex; padding-bottom: 0.1ex; }")
+        row_height = max([button.sizeHint().height() for button in buttons]
+                         + [self.list_curves.minimumSizeHint().height()])
+        self.list_curves.setFixedHeight(row_height)
+        self.GL_curves_options.setVerticalSpacing(2)
+        for row in range(5):
+            self.GL_curves_options.setRowMinimumHeight(row, row_height)
 
     def update_widget(self):
         """Update the widget."""
