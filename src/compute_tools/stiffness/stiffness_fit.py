@@ -53,28 +53,24 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
     if model_selected == 0:
         # Hertz with sphere
         fit_model = sm.hertz_sphere
-        fit_model_lmfit = sm.hertz_sphere_lmfit
         div = numpy.sqrt(fit_params["tip_radius"] * 1e-9)
         sm.coeff = (4.0 / 3.0) * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
     elif model_selected == 1:
         # Sneddon (cone)
         fit_model = sm.sneddon_cone
-        fit_model_lmfit = sm.sneddon_cone_lmfit
         div = numpy.tan(fit_params["tip_angle"] * numpy.pi / 180)
         sm.coeff = (2.0 / numpy.pi) * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
     elif model_selected == 2:
         # Barber & Billings (4-sided pyramid)
         fit_model = sm.barber_billings_pyramid
-        fit_model_lmfit = sm.barber_billings_pyramid_lmfit
         div = numpy.tan(fit_params["tip_angle"] * numpy.pi / 180)
         sm.coeff = (1.0 / numpy.sqrt(2)) * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
     elif model_selected == 4:
         # Flat punch
         fit_model = sm.flat_punch
-        fit_model_lmfit = sm.flat_punch_lmfit
         div = fit_params["tip_radius"] * 1e-9
         sm.coeff = 2 * div / (1.0 - fit_params["poisson_ratio"] ** 2)
 
@@ -82,7 +78,6 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         # Thin shell (Reissner): linear, as the flat punch, the radius being
         # the one of the vesicle
         fit_model = sm.flat_punch
-        fit_model_lmfit = sm.flat_punch_lmfit
         sm.coeff = contact_models.power_law(
             model_selected, fit_params["tip_radius"] * 1e-9, 0.0,
             fit_params["poisson_ratio"],
@@ -92,7 +87,6 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         # Sphere (exact), blunted cone and pyramid, needle and nanowire:
         # force per unit modulus of contact_models
         fit_model = sm.tabulated
-        fit_model_lmfit = sm.tabulated_lmfit
         radius = fit_params["tip_radius"] * 1e-9
         angle = fit_params["tip_angle"]
         nu = fit_params["poisson_ratio"]
@@ -130,28 +124,38 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         # A setpoint that later will be used to select the data for the fit is defined
         setpoint = fit_params["trig_threshold"] * dt["deflection_sensitivity"] * dt["spring_constant"]
 
-        data = {"data_to_fit": data_to_fit[stop::], "delta": delta[stop::]}
-        df = pd.DataFrame(data)
-
+        # Fitted points: the baseline of the search of the point of contact,
+        # and a contiguous part of the curve (index range, not a point by
+        # point selection on the noisy force: that kept only the points
+        # with a positive noise near the contact, which biased the point of
+        # contact and the modulus). From the start of the range (force or
+        # indentation) to the first point beyond its stop; with a range
+        # starting at the contact, the points between the baseline window
+        # and the detected point of contact are kept (baseline near the
+        # contact for the fit of the point of contact).
+        n_pts = len(delta)
+        contact = numpy.nonzero(delta >= 0)[0]
+        poc_k = int(contact[0]) if len(contact) else n_pts
+        poc_k = max(poc_k, stop)
         if fit_params["fit_range_type"] == 0:
-
-            # Variables used for selecting the data for the fit based on force range
-            start_f = o_params["force_start"]/100 * setpoint
-            stop_f = o_params["force_stop"]/100 * setpoint
-
-            filtered_df = df[(start_f <= df.data_to_fit) & (df.data_to_fit <= stop_f)]
-
-        elif fit_params["fit_range_type"] == 1:
-
-            # Variables used for selecting the data for the fit based on indentation range
-            start_f = o_params["indentation_start"] * 1e-09   # 0 is the default value.
-            stop_f = o_params["indentation_stop"] * 1e-09
-
-            if stop_f == 0:
-                # No stop: up to the maximum indentation
-                filtered_df = df[start_f <= df.delta]
-            else:
-                filtered_df = df[(start_f <= df.delta) & (df.delta <= stop_f)]
+            # Force range, percentages of the setpoint
+            start_f = o_params["force_start"] / 100 * setpoint
+            stop_f = o_params["force_stop"] / 100 * setpoint
+            values = data_to_fit
+            from_contact = o_params["force_start"] <= 0
+        else:
+            # Indentation range [m], no stop: up to the maximum indentation
+            start_f = o_params["indentation_start"] * 1e-09
+            stop_f = o_params["indentation_stop"] * 1e-09 or numpy.inf
+            values = delta
+            from_contact = o_params["indentation_start"] <= 0
+        after = numpy.nonzero(values[poc_k:] >= start_f)[0]
+        s_k = poc_k + int(after[0]) if len(after) else n_pts
+        beyond = numpy.nonzero(values[s_k:] > stop_f)[0]
+        e_k = s_k + int(beyond[0]) if len(beyond) else n_pts
+        filtered_df = pd.DataFrame({"data_to_fit": data_to_fit[s_k:e_k],
+                                    "delta": delta[s_k:e_k]})
+        near_baseline = slice(stop, s_k) if from_contact else slice(0, 0)
 
         # Indentation reached, in nm (delta is in m): up to the selected stop
         # in indentation range mode, else the end of the fitted range
@@ -162,22 +166,41 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         else:
             indentation_val = filtered_df["delta"].max() * 1e09
 
-        masked_data_to_fit = numpy.r_[data_to_fit[0:stop], filtered_df["data_to_fit"].values]
-        masked_delta = numpy.r_[delta[0:stop], filtered_df["delta"].values]
+        masked_data_to_fit = numpy.r_[data_to_fit[0:stop],
+                                      data_to_fit[near_baseline],
+                                      filtered_df["data_to_fit"].values]
+        masked_delta = numpy.r_[delta[0:stop], delta[near_baseline],
+                                filtered_df["delta"].values]
+
+        # The fit can move the point of contact (delta0_fit is relative to
+        # the detected point of contact): later by a part of the indentation
+        # at most, earlier down to the end of the baseline window. The
+        # detected point is late by construction (threshold above the
+        # noise of the baseline), by much more than this part for the
+        # models whose force rises slowly (cone, pyramid): the earlier
+        # point of contact of the fit has to be accepted
+        window = o_params["fit_poc_window"] / 100.0 * max_indentation
+        earliest = delta[min(stop, len(delta) - 1)] if len(delta) else 0.0
 
         if too_stiff:
             # No free fit of the point of contact (it can not be found by
             # the fit without indentation)
             delta0_fit, e0_fit = numpy.nan, numpy.nan
         else:
-            delta0_fit, e0_fit = fit_tools.do_hertz_fit(
-                fit_model, fit_model_lmfit, masked_delta, masked_data_to_fit)
+            # Global least squares in this range (E linear for each point
+            # of contact)
+            if exponent is None:
+                unit = sm.unit
+            else:
+                unit = lambda d: sm.coeff * numpy.power(  # noqa: E731
+                    numpy.clip(d, 0, None), exponent)
+            delta0_fit, e0_fit = fit_tools.fit_poc_profile(
+                unit, masked_delta, masked_data_to_fit, earliest, window)
 
-        # The fit can move the point of contact by a part of the indentation
-        # (delta0_fit is relative to the detected point of contact)
-        window = o_params["fit_poc_window"] / 100.0 * max_indentation
-
-        if numpy.isnan(e0_fit) or abs(delta0_fit) > window:
+        # A modulus not positive is not a fit of a contact (no contact in
+        # the curve)
+        if numpy.isnan(e0_fit) or not e0_fit > 0 or delta0_fit > window or \
+                delta0_fit < earliest:
             # Too stiff sample, failed fit, or point of contact moved too
             # far: fit of the elasticity only, with the detected point of
             # contact
@@ -189,7 +212,7 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
             else:
                 e_fixed = fit_tools.fit_e_fixed_poc(
                     masked_delta, masked_data_to_fit, sm.coeff, exponent)
-            stiffness = [] if numpy.isnan(e_fixed) else [e_fixed]
+            stiffness = [e_fixed] if e_fixed > 0 else []
             fit_delta0, fit_e, fixed_poc = 0.0, e_fixed, 1.0
         else:
             poc_index_fit = (numpy.abs(delta - delta0_fit)).argmin() + first

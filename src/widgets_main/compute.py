@@ -1644,10 +1644,22 @@ class ComputeWidget(PYAFWidget):
             for i in range(len(no_segment_errors)):
                 item = no_segment_errors[i]
                 if item:
-                    shared.exp.list[item[0]].stiffness_calculated = False
-                    name = shared.exp.list[item[0]].filename
-                    text = "<li>" + name + "</li>"
-                    list_no_segment_errors += text
+                    dt = shared.exp.list[item[0]]
+                    dt.stiffness_calculated = False
+                    text = "<li>" + file_label(dt)
+                    # Baseline window of the point of contact longer than
+                    # the curve: no point of contact, no fit
+                    window = (dt.fitparam_poc_skip_start or 0) + \
+                        (dt.fitparam_poc_fit_length or 0)
+                    if dt.ramp_size and window >= 0.8 * dt.ramp_size:
+                        text += " : the baseline window of the point of " \
+                            "contact (skip + length = " + \
+                            misc_tools.format_number(window) + \
+                            " nm) is longer than the curve (ramp " + \
+                            misc_tools.format_number(dt.ramp_size) + \
+                            " nm): reduce it in the Initial point of " \
+                            "contact box"
+                    list_no_segment_errors += text + "</li>"
                 else:
                     found_error_list[i] = True
 
@@ -1671,9 +1683,9 @@ class ComputeWidget(PYAFWidget):
                         can use is : <ul>" + list_stop_size_error + "</ul>"
 
             if list_no_segment_errors != "":
-                text = "Please chose a smaller step or check your \
-                        start/stop values ! No segment was found. Files : \
-                        <ul>" + list_no_segment_errors + "</ul>"
+                text = "No elasticity value was found (no point of " \
+                    "contact, or no segment: check the start and stop " \
+                    "values). Files :<ul>" + list_no_segment_errors + "</ul>"
 
             if list_smoothing_warnings != "":
                 text = "Some curves seem corrupted and the smoothing was not \

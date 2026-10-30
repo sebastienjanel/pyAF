@@ -213,11 +213,12 @@ def find_fits_around_middle_pos(curve, positions, fit_size):
     curve_x = curve[0]
     curve_y = curve[1]
 
-    # Default length of the fit, could be smaller at the end if the fit is
-    # corrected by the algorithm.
-    length = fit_size
     # Move away 3 points from the middle event position
     step = 3
+    # Default length of the fit, could be smaller at the end if the fit is
+    # corrected by the algorithm (at least two points after the step: a
+    # smaller fit size gave empty fits)
+    length = max(int(fit_size), step + 2)
     fits = []
 
     for k in range(len(positions)):

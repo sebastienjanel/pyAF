@@ -55,9 +55,16 @@ def prepare_data_hertzfit(app, dt, fit_params):
     poc_index_i = poc_index_before
     poc_pos_i = real_poc
 
-    # Calculate force curve
+    # Calculate force curve. Zero of the force on the baseline at the point
+    # of contact (not at the deflection of the detected point, which is on
+    # the baseline shifted by the noise threshold: that offset biased the
+    # point of contact and the modulus, more with more noise)
     k = dt["spring_constant"] * 1e9
-    fcapp = curve_tools.get_force_curves(app[0], app[1], poc_pos_i, k)
+    center = poc_pos_i
+    if poc_found:
+        center = [poc_pos_i[0],
+                  final_fit[0] * poc_pos_i[0] + final_fit[1]]
+    fcapp = curve_tools.get_force_curves(app[0], app[1], center, k)
 
     if poc_found:
         # Baseline of the search of the point of contact (deflection vs
@@ -137,6 +144,57 @@ def fit_e_fixed_poc(delta, force, coeff, exponent):
     if not np.isfinite(norm) or norm <= 0:
         return np.nan
     return float(np.sum(np.asarray(force, float) * g) / norm)
+
+
+def fit_poc_profile(unit, delta, force, low, high, nbr=200):
+    """Point of contact and modulus fitted by least squares, for a model
+    F = E unit(delta - delta0): for each delta0 the modulus is linear
+    (E = sum(F g) / sum(g g)), so the error is a function of delta0 only;
+    its global minimum between low and high is found on a grid then
+    refined (a local optimizer started at delta0 = 0 can stop in a local
+    minimum, far from the contact). unit: function of the indentation
+    (array, 0 for delta <= 0). Returns (delta0, E), nan if no positive
+    modulus is found.
+    """
+    delta = np.asarray(delta, float)
+    force = np.asarray(force, float)
+    if not (np.isfinite(low) and np.isfinite(high)) or high <= low or \
+            len(delta) < 3:
+        return np.nan, np.nan
+
+    def solve(delta0):
+        g = unit(delta - delta0)
+        norm = np.sum(g * g)
+        if not np.isfinite(norm) or norm <= 0:
+            return np.inf, np.nan
+        e = np.sum(force * g) / norm
+        return np.sum((force - e * g) ** 2), e
+
+    grid = np.linspace(low, high, nbr)
+    errors = np.array([solve(x)[0] for x in grid])
+    if not np.any(np.isfinite(errors)):
+        return np.nan, np.nan
+    k = int(np.nanargmin(errors))
+    # Refinement around the best point of the grid (golden section)
+    a = grid[max(k - 1, 0)]
+    b = grid[min(k + 1, nbr - 1)]
+    ratio = (np.sqrt(5) - 1) / 2
+    c, d = b - ratio * (b - a), a + ratio * (b - a)
+    fc, fd = solve(c)[0], solve(d)[0]
+    for _ in range(40):
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - ratio * (b - a)
+            fc = solve(c)[0]
+        else:
+            a, c, fc = c, d, fd
+            d = a + ratio * (b - a)
+            fd = solve(d)[0]
+    delta0 = (a + b) / 2
+    error, e = solve(delta0)
+    if not (np.isfinite(error) and e > 0):
+        return np.nan, np.nan
+    return float(delta0), float(e)
 
 
 def fit_e_fixed_poc_unit(force, unit):

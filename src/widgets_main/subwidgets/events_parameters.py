@@ -56,7 +56,10 @@ class EventsParamsWidget(PYAFWidget):
         # Fit - Size
         self.IN_fit_size = PYAFInput(
             self, "fit_size", "Fit size [pts]", width=80)
-        self.IN_fit_size.input.setValidator(misc_tools.validator("UI"))
+        # At least 5 points (step of 3 points around the event, and 2
+        # fitted points)
+        self.IN_fit_size.input.setValidator(
+            misc_tools.validator("MI", bottom=5))
 
         # Fit - Display events
         self.CB_fit_event = PYAFCheckBox(

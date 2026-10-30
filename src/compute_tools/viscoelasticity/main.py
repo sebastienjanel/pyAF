@@ -180,11 +180,15 @@ def prepare_curve(data, i, j, settings, whole=False):
 
     # Baseline of the search of the point of contact (as in the elasticity
     # fit): its slope is removed, the force is 0 at the contact
-    slope = float(data.fits_poc[i][j][0])
+    slope, intercept = [float(v) for v in data.fits_poc[i][j][:2]]
     if not numpy.isfinite(slope):
         slope = 0.0
     d_app = d_app - slope * (z_app - z_poc)
     d_ret = d_ret - slope * (z_ret - z_poc)
+    # Zero of the force on the baseline at the point of contact (as in the
+    # elasticity fit, see fit_tools.prepare_data_hertzfit)
+    if numpy.isfinite(intercept) and numpy.isfinite(slope):
+        d_poc = slope * z_poc + intercept
 
     # Offset of the retraction baseline (viscous drag): difference of the
     # retraction and the approach far from the contact

@@ -109,10 +109,14 @@ def approach_points(data, i, j):
     d = numpy.asarray(app[1], float)[int(start):int(end)]
     if len(z) < 2:
         return None
-    slope = float(data.fits_poc[i][j][0])
+    slope, intercept = [float(v) for v in data.fits_poc[i][j][:2]]
     if not numpy.isfinite(slope):
         slope = 0.0
     d = d - slope * (z - z_poc)
+    # Zero of the force on the baseline at the point of contact (as in the
+    # elasticity fit, see fit_tools.prepare_data_hertzfit)
+    if numpy.isfinite(intercept) and numpy.isfinite(slope):
+        d_poc = slope * z_poc + intercept
     k = data.used_spring_constant
     if k is None:
         k = data.spring_constant
@@ -122,8 +126,15 @@ def approach_points(data, i, j):
 
 def fit_range_mask(data, delta, force):
     """Points of the fit range of the elasticity fit (force or indentation
-    range), delta in m and force in N."""
-    mask = delta > 0
+    range), delta in m and force in N: a contiguous part of the curve after
+    the point of contact, from the start of the range to the first point
+    beyond its stop (as in stiffness_fit, not a point by point selection on
+    the noisy force)."""
+    delta = numpy.asarray(delta, float)
+    force = numpy.asarray(force, float)
+    n = len(delta)
+    contact = numpy.nonzero(delta > 0)[0]
+    poc_k = int(contact[0]) if len(contact) else n
     range_type = data.get_used_fit_range_type()
     if range_type == 0:
         start = data.used_force_start if data.used_force_start is not None \
@@ -132,12 +143,18 @@ def fit_range_mask(data, delta, force):
             else data.force_stop
         setpoint = data.trig_threshold * data.deflection_sensitivity * \
             data.spring_constant
-        mask &= (force >= start / 100 * setpoint) & \
-            (force <= stop / 100 * setpoint)
-    elif range_type == 1:
-        mask &= delta >= data.used_indentation_start * 1e-9
-        if data.used_indentation_stop != 0:
-            mask &= delta <= data.used_indentation_stop * 1e-9
+        values, low, high = force, start / 100 * setpoint, \
+            stop / 100 * setpoint
+    else:
+        values = delta
+        low = (data.used_indentation_start or 0) * 1e-9
+        high = (data.used_indentation_stop or 0) * 1e-9 or numpy.inf
+    after = numpy.nonzero(values[poc_k:] >= low)[0]
+    s_k = poc_k + int(after[0]) if len(after) else n
+    beyond = numpy.nonzero(values[s_k:] > high)[0]
+    e_k = s_k + int(beyond[0]) if len(beyond) else n
+    mask = numpy.zeros(n, bool)
+    mask[s_k:e_k] = True
     if not numpy.any(mask):
         mask = delta > 0
     return mask
@@ -180,16 +197,14 @@ def fit_elasticity(data, delta, force, height):
     window of the elasticity fit), else with the point of contact fixed,
     for a height [m] of the B.E.C. (None: no correction)."""
 
-    def model(x, delta0, e0):
-        return e0 * unit_force(data, numpy.asarray(x) - delta0, height)
-
-    def model_lmfit(params, x, y):
-        return y - model(x, params["delta0_fit"].value,
-                         params["e0_fit"].value)
-
-    delta0, e0 = fit_tools.do_hertz_fit(model, model_lmfit, delta, force)
+    # As in the elasticity fit: global least squares of the point of
+    # contact, later by a part of the indentation at most, earlier down to
+    # the start of the fitted points
     window = (data.used_fit_poc_window or 0) / 100.0 * numpy.max(delta)
-    if numpy.isfinite(e0) and abs(delta0) <= window:
+    delta0, e0 = fit_tools.fit_poc_profile(
+        lambda x: unit_force(data, x, height), delta, force,
+        numpy.min(delta), window)
+    if numpy.isfinite(e0) and numpy.min(delta) <= delta0 <= window:
         return e0
     # Point of contact of the elasticity fit (E = sum(F g) / sum(g g))
     g = unit_force(data, delta, height)

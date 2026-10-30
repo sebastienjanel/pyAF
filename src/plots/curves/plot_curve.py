@@ -665,6 +665,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
             (self.poc_pos is not None or self.joc1_pos is not None or
              self.data.auto_zoom_in):
             point = None
+            # No curve (corrupted pixel): nothing to zoom on
+            curve_x = []
 
             if self.curve_approach is not None:
                 point = self.poc_pos_indice

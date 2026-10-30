@@ -144,9 +144,12 @@ class GetEvents:
 
                 # Force curve units: nN
 
-                if app is None and ret is None:
-                    # If no curve found (discarded curve for example),
-                    # do not save any event
+                # Valid part of the retraction (corrupted pixels: no point)
+                nbr_valid = len(force_curve[1]) - int(retpos) - 1
+                if (app is None and ret is None) or nbr_valid < 20:
+                    # If no curve found (discarded curve for example, or
+                    # retraction without valid points), do not save any
+                    # event
                     positions = []
 
                 else:

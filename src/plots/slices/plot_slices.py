@@ -357,10 +357,11 @@ class PlotSlices(MainPlot):
             else:
                 self.axes.axis([xmin, xmax, 0, z_height])
 
-        # Scales are inverted when view is from top or left
-        if direct == 0:
+        # Scales are inverted when view is from top or left (no scan size
+        # for the single curves: nothing to invert)
+        if direct == 0 and self.data.scan_size_x:
             self.axes.set_xlim(self.data.scan_size_x / 1000.0, 0)
-        elif direct == 2:
+        elif direct == 2 and self.data.scan_size_y:
             self.axes.set_xlim(self.data.scan_size_y / 1000.0, 0)
 
         # Custom profile, define a special max
