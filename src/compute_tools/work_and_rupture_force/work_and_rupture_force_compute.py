@@ -59,9 +59,10 @@ def main_compute_work(i, j, app, ret, dt, fit_params):
 
 
 def get_surface_and_force(x, y, ind1, ind2, joc1_real, joc2_real, spring_ct):
-    """Computes the surface for the work and the maximum rupture force.
+    """Computes the work and the rupture force, both relative to the line
+    between the two jumps of contact.
 
-    For the moment the surface is only computed with the trapeze's method.
+    The surface is computed with the trapeze's method.
     """
     curve_x, curve_y = x, y
     joc1_indice, joc2_indice = ind1, ind2
@@ -93,11 +94,9 @@ def get_surface_and_force(x, y, ind1, ind2, joc1_real, joc2_real, spring_ct):
     new_curve_x = new_curve_x - new_curve_x[0]
     new_curve_y = new_curve_y - new_curve_y[0]
 
-    # Find distance between joc1 and joc2
-    distx = abs(joc1_real_force_x - joc2_real_force_x)
-    disty = abs(joc1_real_force_y - joc2_real_force_y)
-    if joc2_real_force_y < 0:
-        disty = -disty
+    # Distance between joc1 and joc2 (signed: the line goes through both)
+    distx = joc2_real_force_x - joc1_real_force_x
+    disty = joc2_real_force_y - joc1_real_force_y
 
     # The fit was the line between the two jocs
     a, b = math_tools.find_line_coefs([0.0, 0.0], [distx, disty])
@@ -106,38 +105,13 @@ def get_surface_and_force(x, y, ind1, ind2, joc1_real, joc2_real, spring_ct):
     else:
         return 0, 0
 
-    # Get surfaces
-    # surface_rectangles = 0.0
-    surface_trapezes = 0.0
-    rupture_force1 = 0.0
+    # Work: surface between the line and the curve (trapezes); rupture
+    # force: largest distance between the line and the curve, so that both
+    # use the same reference when the baseline drifts
+    diff = y - new_curve_y
+    # dx is in nm, convert it to m so that the work is in J
+    surface_trapezes = numpy.sum(
+        numpy.diff(new_curve_x) * 1e-9 * (diff[:-1] + diff[1:]) / 2.0)
+    rupture_force1 = max(numpy.max(diff), 0.0) if len(diff) else 0.0
 
-    for k in range(len(new_curve_x) - 1):
-        dx = new_curve_x[k + 1] - new_curve_x[k]
-
-        # Rectangles
-        # dx = new_curve_x[k+1] - new_curve_x[k]
-        # dy = y[k+1] - new_curve_y[k+1]
-        # surface_rectangles = surface_rectangles + dx*dy
-
-        # Get maximum force (rupture force)
-        dy = y[k + 1] - new_curve_y[k + 1]
-        if dy < rupture_force1:
-            rupture_force1 = dy
-
-        # Trapezes
-        dy1 = (y[k] - new_curve_y[k])
-        dy2 = (y[k + 1] - new_curve_y[k + 1])
-        dy = (y[k] - new_curve_y[k]) + (dy2 - dy1) / 2.0
-        # dy is in N
-        # dx is in nm, convert it to m so that work in J
-        surface_trapezes = surface_trapezes + (dx * 1e-9) * dy
-
-    # for k in range(len(new_curve_x)-1, 2, -2):
-    # Simpson
-    # work = work + \
-    # (new_curve_x[k+2]-new_curve_x[k])/6.0*(y[k]+4.0*y[k+1]+y[k+2])
-    #
-    # Get maximum force (rupture force)
-    rupture_force1 = min(new_curve_y)
-
-    return abs(surface_trapezes), abs(rupture_force1)
+    return abs(surface_trapezes), rupture_force1

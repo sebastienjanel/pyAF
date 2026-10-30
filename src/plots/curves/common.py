@@ -300,11 +300,9 @@ class CommonCurveTools:
         joc1_real_force_y = joc1[1] * self.spring_constant
         joc2_real_force_x = joc2[0] - joc2[1]
         joc2_real_force_y = joc2[1] * self.spring_constant
-        distx = abs(joc1_real_force_x - joc2_real_force_x)
-        disty = abs(joc1_real_force_y - joc2_real_force_y)
-
-        # if disty > 0:
-        #    disty = -disty
+        # Signed, as in the computation of the work and rupture force
+        distx = joc2_real_force_x - joc1_real_force_x
+        disty = joc2_real_force_y - joc1_real_force_y
 
         return [distx, disty]
 

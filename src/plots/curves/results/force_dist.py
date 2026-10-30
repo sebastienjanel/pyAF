@@ -149,35 +149,31 @@ class ResultsForceDist(PlotCurve):
 
                 self.setup_lines(params, "ret", "force")
 
-            # Display the maximum force
+            # Display the maximum force: largest distance between the curve
+            # and the line between the two jumps of contact (the curve is
+            # centered on the first one)
             if self.data.display_force:
                 value = self.data.fits_joc[xpos][ypos]
                 params = self.get_params(value, mode="force")
 
                 if params is not None:
-                    [a, b, _] = params
-
-                    # Segment curve
                     joc1_indice = self.data.jocs1_indices[xpos][ypos]
                     joc2_indice = self.data.jocs2_indices[xpos][ypos]
                     segment = slice(joc1_indice, joc2_indice)
-                    new_curve_y = self.curve_retraction[1][segment]
+                    segx = self.curve_retraction[0][segment]
+                    segy = self.curve_retraction[1][segment]
+                    [distx, disty] = self.get_dist_between_jocs()
+                    a, b = math_tools.find_line_coefs(
+                        [0.0, 0.0], [distx, disty])
 
-                    max_force_pos = numpy.argmin(new_curve_y) + joc1_indice
-
-                    xpos0 = self.curve_retraction[0][max_force_pos]
-                    ypos0 = self.curve_retraction[1][max_force_pos]
-
-                    # Get intersection with fit
-                    ypos1 = xpos0 * a
-                    linex = [
-                        xpos0 * self.x_factor,
-                        xpos0 * self.x_factor]
-                    liney = [
-                        ypos0 * self.force_factor,
-                        ypos1 * self.force_factor]
-
-                    self.max_force = [linex, liney]
+                    if len(segy) and a is not None:
+                        line = numpy.polyval([a, b], segx)
+                        k = numpy.argmax(line - segy)
+                        self.max_force = [
+                            [segx[k] * self.x_factor,
+                             segx[k] * self.x_factor],
+                            [segy[k] * self.force_factor,
+                             line[k] * self.force_factor]]
 
             # Display the surface used for the work calculations
             if self.data.display_surface:
