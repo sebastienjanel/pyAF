@@ -1718,6 +1718,24 @@ class SingleFile:
         """R^2 of the elasticity fit (fitted points after the contact)."""
         return self.get_fit_quality(0)
 
+    def poc_detected(self, i, j):
+        """Detected point of contact of a curve (threshold above the noise
+        of the baseline, before the fit) [z, deflection] in nm, from the
+        point of contact of the fit and its shift; None if unknown (not
+        fitted, files computed before)."""
+        if not self.has_fit_quality():
+            return None
+        node = self.get_node("/results/fit_quality")
+        if node.shape[2] < 3:
+            return None
+        shift = float(node[i, j, 2])
+        poc = self.pocs_real[i][j]
+        a, b, error = [float(v) for v in self.fits_poc[i][j][:3]]
+        if not (numpy.isfinite(shift) and numpy.isfinite(poc[0])):
+            return None
+        z = float(poc[0]) - shift
+        return [z, a * z + b + error]
+
     @property
     def fit_poc_fixed(self):
         """1 where the point of contact of the elasticity fit was fixed

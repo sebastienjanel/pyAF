@@ -72,9 +72,14 @@ class PlotCurve(MainPlot, CommonCurveTools):
         # Approach (default empty values, will not be plotted if not filled)
         self.poc_pos_indice = None
         self.poc_pos = None
+        # Detected point of contact (before the fit moves it), displayed
+        # with the point of contact of the fit
+        self.poc_detected_pos = None
         self.fits_lines_poc = None
         self.segments = None
         self.segments_fits = None
+        # Elasticity fit extrapolated beyond the fitted range (dashed)
+        self.segments_fits_extra = None
         self.chisqr = None
         self.residuals = None
         self.max_indentation = None
@@ -426,6 +431,22 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 fontsize=10,
                 verticalalignment="top")
 
+        # Fits for the stiffness (before the legend)
+        if self.segments_fits is not None:
+            self.plot_stiffness_fits()
+
+        # Points of contact (before the legend: labels when both the
+        # detected point and the one of the fit are displayed)
+        if self.poc_detected_pos is not None:
+            self.axes.plot(self.poc_detected_pos[0], self.poc_detected_pos[1],
+                           "o", color="m", mfc="none", markersize=7.0,
+                           label="Original POC")
+        if self.poc_pos is not None:
+            label = "Fit POC" \
+                if self.poc_detected_pos is not None else None
+            self.axes.plot(self.poc_pos[0], self.poc_pos[1], "m.",
+                           markersize=10.0, label=label)
+
         # Display or hide the legend (upper left, loc = 2)
         if shared.exp.display_curve_legend and \
                 (self.curve_approach is not None or
@@ -435,10 +456,6 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
             else:
                 self.axes.legend(loc=2, prop=self.font)
-
-        # Poc
-        if self.poc_pos is not None:
-            self.plot_dot(self.poc_pos[0], self.poc_pos[1], "m.")
 
         # Plot maximum indentation for fit
         if self.max_indentation is not None:
@@ -465,10 +482,6 @@ class PlotCurve(MainPlot, CommonCurveTools):
         if self.segments is not None:
             for seg in self.segments:
                 self.plot_dot(seg[0], seg[1], "r.")
-
-        # Fits for the stiffness
-        if self.segments_fits is not None:
-            self.plot_stiffness_fits()
 
         # Plot residuals
         if self.curve_residuals is not None:
@@ -775,12 +788,19 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
     def plot_stiffness_fits(self):
         """Plot the fits for each stiffness segment."""
-        for seg_fit in self.segments_fits:
-            self.axes.plot(seg_fit[0], seg_fit[1], "k-", linewidth=2)
+        for k, seg_fit in enumerate(self.segments_fits):
+            self.axes.plot(seg_fit[0], seg_fit[1], "k-", linewidth=2,
+                           label="Fit" if k == 0 else None)
+        for k, seg_fit in enumerate(self.segments_fits_extra or []):
+            self.axes.plot(seg_fit[0], seg_fit[1], "k--", linewidth=1,
+                           label="Fit (extrapolated)" if k == 0 else None)
 
     def plot_fit_residuals(self):
+        """Plot the residuals (data - fit) of the fitted points as dots,
+        with the zero line."""
+        self.axes.axhline(0.0, color="grey", linewidth=1, linestyle="--")
         for seg_res in self.residuals:
-            self.axes.plot(seg_res[0], seg_res[1], "g-", linewidth=2)
+            self.axes.plot(seg_res[0], seg_res[1], "g.", markersize=3)
 
     def red_line(self):
         """Display red line for discarded curve."""

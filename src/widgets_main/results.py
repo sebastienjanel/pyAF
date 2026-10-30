@@ -430,6 +430,12 @@ class ResultsWidget(PYAFWidget):
         self.GL_curves_options.addWidget(self.TG_app_to_all, 6, 3,
                                          QtCore.Qt.AlignLeft)
 
+        # Rows as high as the list of the curve types (first row): the
+        # rows of checkboxes alone are lower, the gaps were uneven
+        row_height = self.list_curves.sizeHint().height()
+        for row in range(5):
+            self.GL_curves_options.setRowMinimumHeight(row, row_height)
+
         self.VL_curves_options.addLayout(self.GL_curves_options)
         self.VL_curves_options.addStretch(1)
 

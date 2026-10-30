@@ -108,15 +108,25 @@ class ResultsForceDist(PlotCurve):
             if len(tr[0]) == 0:
                 skip = True
 
-            # Display the point of contact
+            poc = self.data.pocs_real[xpos][ypos]
+
+            # Display the point of contact (of the fit, on the baseline)
             if self.data.display_poc and skip is False:
                 # On the force curve the poc is at 0,0
                 self.poc_pos = [0.0, 0.0]
+                # Detected point of contact, if the fit moved it
+                detected = self.data.poc_detected(xpos, ypos)
+                if detected is not None and \
+                        abs(detected[0] - float(poc[0])) > 1e-3:
+                    x, y = self.force_point(detected, poc)
+                    self.poc_detected_pos = [x * self.x_factor,
+                                             y * self.force_factor]
 
-            # Display the fit used to determine the point of contact
+            # Display the fit used to determine the point of contact (the
+            # baseline and the threshold above its noise)
             if self.data.display_fit_poc and skip is False:
                 value = self.data.fits_poc[xpos][ypos]
-                params = self.get_params(value, mode="force")
+                params = self.force_line_params(value, poc)
                 self.setup_lines(params, "app", "force")
 
             # Get the fits for each segment
@@ -128,6 +138,7 @@ class ResultsForceDist(PlotCurve):
             if skip is False:
                 if self.data.used_perform_fit:
                     self.get_stiffness_lm_fits(tr[0])
+                    self.fits_to_force_distance()
                 else:
                     self.get_stiffness_fits(tr[0])
 
@@ -220,6 +231,53 @@ class ResultsForceDist(PlotCurve):
         self.define_y_scale()
 
         self.plot_fig()
+
+    def fits_to_force_distance(self):
+        """Draw the elasticity fit on the force - distance curve.
+
+        The fit is computed on the indentation curve (baseline slope
+        removed, zero of the force on the baseline at the point of contact,
+        see stiffness.bec.approach_points), while this curve is the raw
+        approach centered on the point of contact: the points of the fit are
+        moved back to the deflection - Z curve, then to the force - distance
+        curve as the data.
+        """
+        if not self.segments_fits:
+            return
+        self.segments_fits = self.to_force_distance(self.segments_fits)
+        if self.segments_fits_extra:
+            self.segments_fits_extra = self.to_force_distance(
+                self.segments_fits_extra)
+
+    def to_force_distance(self, segments):
+        """Fit segments of the indentation curve (displayed units) on the
+        force - distance curve (see fits_to_force_distance)."""
+        dt = self.data
+        i, j = self.xpos, self.ypos
+        z_poc, d_poc_raw = [float(v) for v in dt.pocs_real[i][j][:2]]
+        slope, intercept = [float(v) for v in dt.fits_poc[i][j][:2]]
+        if not numpy.isfinite(slope):
+            slope = 0.0
+        d_poc = d_poc_raw
+        if numpy.isfinite(intercept):
+            d_poc = slope * z_poc + intercept
+        k = dt.used_spring_constant
+        if k is None:
+            k = dt.spring_constant
+        fits = []
+        for fit_x, fit_f in segments:
+            # Indentation [m] and force [N] of the fit
+            delta = numpy.asarray(fit_x) / (1e09 * self.x_factor)
+            force = numpy.asarray(fit_f) / (1e09 * self.force_factor)
+            # Deflection - Z curve [nm] (inverse of approach_points)
+            defl = force / k
+            z = z_poc + delta * 1e09 + defl
+            d = defl + d_poc + slope * (z - z_poc)
+            # Force - distance curve as the data (get_force_curves)
+            x, y = curve_tools.get_force_curves(
+                z, d, [z_poc, d_poc_raw], self.spring_constant)
+            fits.append([x * self.x_factor, y * self.force_factor])
+        return fits
 
     def center_retraction_on_poc(self):
         """Move the retraction curve and its elements to the poc origin.

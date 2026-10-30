@@ -34,7 +34,8 @@
 from ..plot_curve import PlotCurve
 
 class ResultsResiduals(PlotCurve):
-    """Plots the Force - Indentation curve."""
+    """Plots the residuals of the elasticity fit (data - fit) vs the
+    indentation."""
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -44,7 +45,8 @@ class ResultsResiduals(PlotCurve):
             self.xlabel = "Indentation [nm]"
         elif self.data.curve_distance_units == "um":
             self.xlabel = "Indentation [\u03bcm]"
-        self.ylabel = "Force [" + self.data.curve_force_units + "]"
+        self.ylabel = "Residual (data \u2212 fit) [" + \
+            self.data.curve_force_units + "]"
 
         if self.data.curve_force_units == "nN":
             self.force_factor = 1

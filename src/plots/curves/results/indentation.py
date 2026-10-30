@@ -32,8 +32,11 @@
 
 """Plots the indentation curve."""
 
+import numpy
+
 from ..plot_curve import PlotCurve
 from ....tools import curve_tools
+from ....compute_tools.stiffness import bec
 
 
 class ResultsIndentation(PlotCurve):
@@ -58,7 +61,23 @@ class ResultsIndentation(PlotCurve):
         elif self.data.curve_distance_units == "um":
             self.x_factor = 1e-3
 
-        if self.approach is not None:
+        points = None
+        if self.approach is not None and self.data.used_perform_fit:
+            # Same indentation and force as the fit and its residuals
+            # (baseline slope removed, zero of the force on the baseline at
+            # the point of contact)
+            points = bec.approach_points(self.data, self.xpos, self.ypos)
+
+        if points is not None:
+            delta, force, _ = points
+            contact = numpy.nonzero(delta >= 0)[0]
+            first = int(contact[0]) if len(contact) else len(delta)
+            # nm and nN (scaled to the displayed units below)
+            curve_x = delta[first:] * 1e09
+            curve_y = force[first:] * 1e09
+            self.curve_approach = [curve_x, curve_y]
+
+        elif self.approach is not None:
             force_curve = curve_tools.get_force_curves(
                 self.approach[0],
                 self.approach[1],
@@ -78,6 +97,7 @@ class ResultsIndentation(PlotCurve):
 
             self.curve_approach = [curve_x, curve_y]
 
+        if self.approach is not None:
             # Get the fits for each segment
             if self.data.used_perform_fit is False:
                 self.setup_segments()
@@ -95,7 +115,8 @@ class ResultsIndentation(PlotCurve):
 
                 elif self.data.fit_range_type == 1:
 
-                    if self.data.indentation_stop > max(curve_x):
+                    if len(curve_x) and \
+                            self.data.indentation_stop > max(curve_x):
                         self.max_indentation = max(curve_x)
 
                     else:

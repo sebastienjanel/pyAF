@@ -287,6 +287,34 @@ class CommonCurveTools:
         else:
             return None
 
+    def force_line_params(self, params, center):
+        """Coefficients of a line of the deflection - Z curve (d = a z + b,
+        and the line shifted by the noise berror) on the force - distance
+        curve centered on center = [z, d] (see curve_tools.
+        get_force_curves): [slope, intercept, intercept of the shifted
+        line], as get_params with mode="force", for any center (get_params
+        expects the center on the shifted line). None without fit."""
+        if params is None or list(params) == [0, 0, 0]:
+            return None
+        a, b, berror = [float(v) for v in params[:3]]
+        if a == 1:
+            return None
+        zc, dc = float(center[0]), float(center[1])
+        k = self.spring_constant
+
+        def intercept(c):
+            # x = z (1 - a) - c - zc + dc and y = k (a z + c - dc)
+            return k * (a * (c + zc - dc) / (1 - a) + c - dc)
+
+        return [k * a / (1 - a), intercept(b), intercept(b + berror)]
+
+    def force_point(self, point, center):
+        """Point [z, d] of the deflection - Z curve on the force - distance
+        curve centered on center (see curve_tools.get_force_curves)."""
+        x = (point[0] - point[1]) - (center[0] - center[1])
+        y = (point[1] - center[1]) * self.spring_constant
+        return [x, y]
+
     def get_dist_between_jocs(self):
         """Get the distance between joc1 and joc2.
 
@@ -488,15 +516,30 @@ class CommonCurveTools:
             self.residuals.append([res_delta * 1e09 * self.x_factor,
                                    residuals * 1e09 * self.force_factor])
 
-            # Fit drawn on a regular grid from the point of contact (0, 0)
-            # to the end of the fit range: the measured indentation is noisy
-            # and not monotonic, a line through it zigzags
-            x_max = numpy.max(res_delta)
-            if x_max > 0:
-                fit_x = numpy.linspace(0.0, x_max, 500)
-                self.segments_fits.append(
-                    [fit_x * 1e09 * self.x_factor,
-                     fit_force(fit_x) * 1e09 * self.force_factor])
+            # Fit drawn on a regular grid over the fitted range (solid): the
+            # measured indentation is noisy and not monotonic, a line
+            # through it zigzags. Extrapolated (dashed) from the point of
+            # contact (0, 0) to the start of the range, and from its end to
+            # the end of the indentation (if not a few points): where the
+            # data leave the model
+            x_min = max(float(numpy.min(res_delta)), 0.0)
+            x_max = float(numpy.max(res_delta))
+            x_end = float(numpy.max(delta))
+            self.segments_fits_extra = []
+
+            def segment(x0, x1, nbr):
+                fit_x = numpy.linspace(x0, x1, nbr)
+                return [fit_x * 1e09 * self.x_factor,
+                        fit_force(fit_x) * 1e09 * self.force_factor]
+
+            if x_max > x_min:
+                self.segments_fits.append(segment(x_min, x_max, 500))
+                if x_min > 0.02 * x_end:
+                    self.segments_fits_extra.append(
+                        segment(0.0, x_min, 200))
+                if x_end > 1.02 * x_max:
+                    self.segments_fits_extra.append(
+                        segment(x_max, x_end, 300))
 
     def get_chisqr(self, r):
         r"""

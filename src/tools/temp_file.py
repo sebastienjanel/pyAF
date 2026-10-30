@@ -399,15 +399,19 @@ class TempFile:
 
     def create_fit_quality_table(self, unique_id):
         """Creates the table of the quality of the elasticity fit (R^2,
-        and 1 if the point of contact was fixed, 0 if fitted), if it does
+        1 if the point of contact was fixed and 0 if fitted, shift of the
+        point of contact of the fit from the detected one [nm]), if it does
         not exist (files saved before it)."""
         dt = shared.exp.list[int(unique_id)]
         st = "/data/_" + str(unique_id) + "/results"
         if self.file.__contains__(st + "/fit_quality"):
-            return
+            if self.file.get_node(st + "/fit_quality").shape[2] >= 3:
+                return
+            # Saved before the shift of the point of contact
+            self.file.remove_node(st + "/fit_quality")
         self.file.create_carray(
             st, "fit_quality", tables.Float32Atom(dflt=numpy.nan),
-            shape=(dt.nbr_pixels_x, dt.nbr_pixels_y, 2),
+            shape=(dt.nbr_pixels_x, dt.nbr_pixels_y, 3),
             filters=tables.Filters(complevel=9, complib="blosc"))
 
     def create_tables_for_results(

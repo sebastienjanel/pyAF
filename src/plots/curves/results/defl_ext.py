@@ -83,6 +83,12 @@ class ResultsDeflExt(PlotCurve):
                 self.poc_pos_indice = \
                     self.data.pocs_indices[self.xpos][self.ypos]
                 self.poc_pos = self.data.pocs_real[self.xpos][self.ypos]
+                # Detected point of contact, if the fit moved it
+                detected = self.data.poc_detected(self.xpos, self.ypos)
+                if detected is not None and \
+                        abs(detected[0] - float(self.poc_pos[0])) > 1e-3:
+                    self.poc_detected_pos = [detected[0] * self.x_factor,
+                                             detected[1] - self.zero]
                 self.poc_pos[1] = self.poc_pos[1] - self.zero
                 self.poc_pos[0] *= self.x_factor
 

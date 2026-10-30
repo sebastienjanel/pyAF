@@ -264,17 +264,9 @@ def curve(data, i, j, full=False):
         return None
     delta, force, z = points
     # Zero of the force on the baseline line of the fit of the point of
-    # contact, not at the point of contact: it is detected above the noise
-    # band of the baseline, within the brush (its weak force would be lost)
-    poc = data.pocs_real[i][j]
-    slope, intercept = [float(v) for v in data.fits_poc[i][j][:2]]
-    shift = float(poc[1]) - (slope * float(poc[0]) + intercept)
-    if numpy.isfinite(shift):
-        k = data.used_spring_constant
-        if k is None:
-            k = data.spring_constant
-        delta = delta - shift * 1e-9
-        force = force + shift * k
+    # contact (approach_points), not at the detected point of contact: it
+    # is above the noise band of the baseline, within the brush (its weak
+    # force would be lost)
     # Noise of the force: window of the baseline fit of the point of
     # contact (as bec.fit_points)
     skip = data.used_fitparam_poc_skip_start or 0

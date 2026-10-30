@@ -117,7 +117,7 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
         real_poc = poc_pos_i
         stiffness = []
         indentation_val = 0
-        fit_quality = [numpy.nan, numpy.nan]
+        fit_quality = [numpy.nan, numpy.nan, numpy.nan]
 
     else:
 
@@ -205,7 +205,10 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
             # far: fit of the elasticity only, with the detected point of
             # contact
             poc_index_fit = poc_index_i
-            real_poc = poc_pos_i
+            # Point of contact of the fit: the detected one, on the
+            # baseline (zero of the force of the fit)
+            real_poc = [poc_pos_i[0],
+                        final_fit[0] * poc_pos_i[0] + final_fit[1]]
             if exponent is None:
                 e_fixed = fit_tools.fit_e_fixed_poc_unit(
                     masked_data_to_fit, sm.unit(masked_delta))
@@ -216,18 +219,26 @@ def main_fit_stiffness(i, j, app, ret, dt, fit_params, o_params):
             fit_delta0, fit_e, fixed_poc = 0.0, e_fixed, 1.0
         else:
             poc_index_fit = (numpy.abs(delta - delta0_fit)).argmin() + first
-            real_poc = [app[0][poc_index_fit] * 1e09, app[1][poc_index_fit] * 1e09]
+            # Point of contact of the fit: delta is z - z_poc - (d -
+            # baseline(z)) from the detected point (see
+            # prepare_data_hertzfit), so delta0_fit is its shift along z,
+            # with the deflection on the baseline (not a point of the
+            # noisy curve)
+            z_fit = poc_pos_i[0] + delta0_fit * 1e09
+            real_poc = [z_fit, final_fit[0] * z_fit + final_fit[1]]
             stiffness = [e0_fit]
             fit_delta0, fit_e, fixed_poc = delta0_fit, e0_fit, 0.0
 
         # Quality of the fit: R^2 on the fitted points after the contact,
         # and 1 if the point of contact was fixed (fallback), 0 if fitted
-        fit_quality = [numpy.nan, numpy.nan]
+        # and shift of the point of contact of the fit from the detected
+        # one along z [nm] (the detected point is then known for the plots)
+        fit_quality = [numpy.nan, numpy.nan, numpy.nan]
         if stiffness:
             fit_quality = [r_squared(
                 filtered_df["data_to_fit"].values,
                 fit_model(filtered_df["delta"].values, fit_delta0, fit_e)),
-                fixed_poc]
+                fixed_poc, fit_delta0 * 1e09]
 
     # Apply corrections to get the POC corrected value
     piez = dt["piezo_image"]

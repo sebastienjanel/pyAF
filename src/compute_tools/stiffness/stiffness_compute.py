@@ -95,7 +95,7 @@ def main_compute_stiff(i, j, app, ret, dt, fit_params, o_params):
     # No fit quality for the Tomography (slopes of the segments)
     return i, j, poc_index_before, real_poc, final_fit, stiffness_array, \
            poc_corrected, smoothing_error, indentation_val, \
-           [numpy.nan, numpy.nan]
+           [numpy.nan, numpy.nan, numpy.nan]
 
 def get_x_parts(start, stop, step, max_x):
     """Segments the curve in small parts (x axis)
