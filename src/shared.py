@@ -58,9 +58,6 @@ removed file(s).
 
 The layer_list contains all the layers for the 3D view.
 
-The clipboard_layer_positions contains positions of layers (x, y, z) which can
-be saved in the VTK layer.
-
 VTK_first : see description in widgets_vtk/main.py file
 
 """
@@ -76,7 +73,6 @@ files_removed = False
 
 layer_list = None
 
-clipboard_layer_positions = None
 VTK_first = True
 
 # Some basic colors used for the plots

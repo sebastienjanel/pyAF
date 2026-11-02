@@ -39,9 +39,7 @@ from ..load_and_save.save import Save
 from . import export_menu
 from . import tablewidget
 from .export_figure import export_figure
-from ..widgets_vtk.utils.save import save_layers
-from ..widgets_vtk.utils.load import load_layers
-from ..widgets_vtk.utils import menu_actions
+from .. import consts
 from .. import widgets_list
 
 
@@ -76,18 +74,12 @@ def create_menu(parent):
     action.triggered.connect(parent.open_pref_widget)
     file_menu.addAction(action)
 
-    # Misc menu
-    misc_menu = parent.menu.addMenu("Misc")
-
+    # Random curve with the R key (no menu, the tabs have the button)
     action = QtWidgets.QAction("Random Curve", parent)
     action.setShortcut("R")
     w_main = widgets_list.widget_main
     action.triggered.connect(lambda: w_main.change_curve(0, 0, "rand"))
-    misc_menu.addAction(action)
-
-    action = QtWidgets.QAction("Load plugin", parent)
-    action.triggered.connect(parent.open_plugin_window)
-    misc_menu.addAction(action)
+    parent.addAction(action)
 
     # Results menu
     results_menu = parent.menu.addMenu("Plots")
@@ -118,7 +110,7 @@ def create_menu(parent):
     # Figures menu
     figure_menu = parent.menu.addMenu("Figures")
 
-    action = QtWidgets.QAction("Open meshgrid", parent)
+    action = QtWidgets.QAction("Open map", parent)
     action.triggered.connect(lambda: export_figure("meshgrid"))
     figure_menu.addAction(action)
     list_actions["open_meshgrid"] = action
@@ -134,35 +126,6 @@ def create_menu(parent):
     list_actions["open_results"] = action
 
     # VTK (3D) menu
-    vtk_menu = parent.menu.addMenu("3D")
-
-    action = QtWidgets.QAction("Save layers", parent)
-    action.triggered.connect(lambda: save_layers(parent))
-    vtk_menu.addAction(action)
-
-    action = QtWidgets.QAction("Load layers", parent)
-    action.triggered.connect(lambda: load_layers(parent))
-    vtk_menu.addAction(action)
-
-    action = QtWidgets.QAction("Remove layer", parent)
-    action.triggered.connect(menu_actions.remove_layer)
-    vtk_menu.addAction(action)
-
-    action = QtWidgets.QAction("Add AFM layer", parent)
-    action.triggered.connect(menu_actions.ask_user_for_afm_layers)
-    vtk_menu.addAction(action)
-    list_actions["add_afm_layer"] = action
-
-    action = QtWidgets.QAction("Copy", parent)
-    action.setShortcut("Ctrl+C")
-    action.triggered.connect(menu_actions.copy_pos)
-    vtk_menu.addAction(action)
-
-    action = QtWidgets.QAction("Paste", parent)
-    action.setShortcut("Ctrl+V")
-    action.triggered.connect(menu_actions.paste_pos)
-    vtk_menu.addAction(action)
-
     help_menu = parent.menu.addMenu("Help")
 
     action = QtWidgets.QAction("About pyAF", parent)
@@ -187,7 +150,6 @@ def create_menu(parent):
 def open_link(link):
     """Opens a link in the browser."""
     if link == "bugs":
-        webbrowser.open("https://bitbucket.org/adujardin/pyaf/issues/new")
+        webbrowser.open(consts.REPOSITORY + "/issues/new")
     elif link == "docs":
-        # Not defined for the moment
-        pass
+        webbrowser.open(consts.REPOSITORY + "#readme")

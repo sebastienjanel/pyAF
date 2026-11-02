@@ -81,7 +81,17 @@ class OpenglWidget(PYAFWidget):
         self.menu_layer_list.add_position_box(self.menu_options.tab_options)
         self.menu_layer_list.update_widget(index=0)
 
-        HL.addWidget(self.menu_layer_list)
+        # Scrollbar on small screens only
+        scroll_list = QtWidgets.QScrollArea()
+        scroll_list.setWidget(self.menu_layer_list)
+        scroll_list.setWidgetResizable(True)
+        scroll_list.setStyleSheet("QScrollArea { border: none; }")
+        scroll_list.setHorizontalScrollBarPolicy(
+            QtCore.Qt.ScrollBarAlwaysOff)
+        scroll_list.setFixedWidth(
+            self.menu_layer_list.sizeHint().width() +
+            scroll_list.verticalScrollBar().sizeHint().width())
+        HL.addWidget(scroll_list)
         HL.addWidget(self.canvas)
         HL.addWidget(self.menu_options)
 

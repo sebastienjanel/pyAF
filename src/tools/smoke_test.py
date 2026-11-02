@@ -308,6 +308,17 @@ def run(app):
                    format(pixels.max(), ".0f"))
         window.close()
 
+    def projects():
+        # Saved projects: classes saved under the module names of all the
+        # versions, the one of the running code in the applications
+        from . import pickle_tools
+        from .. import experiment
+        for module in ("src.experiment", "pyAF.src.experiment", "experiment"):
+            data = ("c" + module + "\nResultGroup\n.").encode("ascii")
+            if pickle_tools.loads(data) is not experiment.ResultGroup:
+                raise RuntimeError("wrong class for " + module)
+        return "module names of the old versions"
+
     def computation():
         # File given with PYAF_SMOKE_FILE: loaded, and its elasticity
         # computed with the processes of the computations (they re-run the
@@ -351,7 +362,7 @@ def run(app):
     checks = [("resources", resources), ("theme", theme), ("plot", plot),
               ("science", science), ("hdf5", hdf5), ("vtk", vtk),
               ("filters", filters), ("tiff", tiff), ("scene", scene),
-              ("interface", interface)]
+              ("projects", projects), ("interface", interface)]
     if os.environ.get("PYAF_SMOKE_FILE"):
         checks.append(("computation", computation))
     for name, function in checks:

@@ -35,7 +35,9 @@ Check as much as possible results provided vs other software (e.g. JPK DP) to ru
 
 Ready-to-use applications for macOS (Apple Silicon and Intel), Windows and Linux are attached to the releases: https://github.com/sebastienjanel/pyAF/releases (download the file of your system).
 
-- **macOS** (`.dmg`, `AppleSilicon` or `Intel` according to your Mac: Apple menu / About This Mac; macOS 14 or newer): open it and drag pyAF to Applications. The application is not signed by Apple: at the first opening, macOS refuses to open it. Open System Settings / Privacy & Security, then click "Open Anyway" in front of pyAF (or, in a terminal: `xattr -dr com.apple.quarantine /Applications/pyAF.app`).
+Minimum systems (64 bits): macOS 14, Windows 10, Ubuntu 22.04 or another Linux with glibc 2.35. Older systems (e.g. Windows 7 or Ubuntu 18.04 on some AFM control computers) cannot run pyAF: analyze the data on another computer.
+
+- **macOS** (`.dmg`, `AppleSilicon` or `Intel` according to your Mac: Apple menu / About This Mac): open it and drag pyAF to Applications. The application is not signed by Apple: at the first opening, macOS refuses to open it. Open System Settings / Privacy & Security, then click "Open Anyway" in front of pyAF (or, in a terminal: `xattr -dr com.apple.quarantine /Applications/pyAF.app`).
 - **Windows** (`.zip`): unzip it (e.g. in Documents) and run `pyAF.exe` in the `pyAF` folder. The application is not signed: if Windows SmartScreen shows a warning, click "More info", then "Run anyway".
 - **Linux** (`.tar.xz`): extract it (`tar -xJf pyAF-*.tar.xz`) and run `pyAF/pyAF`. Qt may need `libxcb-cursor0` (see Known issues).
 
@@ -45,7 +47,7 @@ To check an installation (applications or sources), run pyAF with the environmen
 
 ## Installation from the sources
 
-pyAF runs on macOS, Windows and Linux with Python 3.11 or newer (3.13 recommended).
+pyAF runs on macOS, Windows and Linux with Python 3.11 or newer (3.13 recommended), on the same minimum systems as the applications.
 
 ### 1. Install Python and Git
 

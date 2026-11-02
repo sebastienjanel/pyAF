@@ -45,6 +45,11 @@ multiprocessing.freeze_support()
 # Can be overridden with the QT_API environment variable.
 os.environ.setdefault("QT_API", "pyside6")
 
+# Linux: VTK draws the 3D view in an X11 window: nothing is displayed under
+# Wayland. X11 through XWayland when available (DISPLAY is set).
+if sys.platform.startswith("linux") and os.environ.get("DISPLAY"):
+    os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+
 if getattr(sys, 'frozen', False):
     # Running in a bundle
     base_path = sys._MEIPASS

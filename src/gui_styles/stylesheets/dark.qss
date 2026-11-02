@@ -914,6 +914,12 @@ QTabWidget::pane:right
 }
 
 
+/* Centered on all the systems (the left on Windows and Linux by default) */
+QTabWidget::tab-bar
+{
+    alignment: center;
+}
+
 QTabBar
 {
     qproperty-drawBase: 0;

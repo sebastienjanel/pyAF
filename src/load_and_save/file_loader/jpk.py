@@ -39,6 +39,7 @@ one approach and one retraction curve per pixel (pauses are allowed).
 """
 
 import numpy
+import re
 from dateutil.parser import parse
 from struct import unpack
 import zipfile
@@ -268,6 +269,9 @@ class LoaderJPK:
         if self.file_type != "JPK (Single File)":
             # For maps and QI, find the informations in
             # shared-data/header.properties
+            # Pixels with data, for each segment (not only the first pixel,
+            # which can be damaged or missing)
+            segment_pixels = pixels_of_segments(self.afm_file)
             for segment_nbr in range(self.nbr_segments):
                 values = self.afm_file.read(
                     "shared-data/header.properties").splitlines()
@@ -278,25 +282,17 @@ class LoaderJPK:
                           ".settings.segment-settings.style"
 
                     if line.find(val) != -1:
-                        # Check if the files exists, at least for the first
-                        # pixel. Sometimes you can have more segments in the
-                        # header (for example 4), but only 2 segments in the
+                        # Check if the files exist, for at least one pixel.
+                        # Sometimes you can have more segments in the header
+                        # (for example 4), but only 2 segments in the
                         # folders. In this case only add the valid segments
-
-                        try:
-                            path = "index/0/segments/" + str(segment_nbr)
-                            valinfo = path + "/channels/vDeflection.dat"
-
-                            # Check if the file is present, this may fail
-                            # (See explanation above)
-                            self.afm_file.getinfo(valinfo)
-
+                        if segment_nbr in segment_pixels:
                             # Do the actual segment type extraction
                             seg = extract_str(line)
                             self.segments_types.append([segment_nbr, seg])
-
-                        except KeyError:
-                            print("The file was loaded but some data may be missing.")
+                        else:
+                            print("The file was loaded but some data may be "
+                                  "missing.")
 
                     val_2 = header_info_path + "duration"
                     if line.find(val_2) != -1:
@@ -418,15 +414,30 @@ class LoaderJPK:
         # Make a list with the file sizes, we cant rely on the headers because
         # there are sometimes errors with the number of points per curve
 
+        # Segments needed for a valid pixel
+        needed = [int(self.segments[key]) for key in
+                  ("extend", "retract", "pause")
+                  if self.segments[key] is not None] + \
+            [int(seg) for seg in self.segments["modulation"]]
+
         for index_nbr in range(self.data.real_nbr_pixels):
             segments_per_pixel = self.nbr_segments
             if self.file_type != "JPK (Single File)":
                 path = "index/" + str(index_nbr) + "/header.properties"
-                afile = self.afm_file.read(path)
+                try:
+                    afile = self.afm_file.read(path)
+                except KeyError:
+                    # Pixel missing in the file
+                    afile = b""
+                    segments_per_pixel = -1
                 for line in afile.splitlines():
                     line = line.decode()
                     if line.find("force-segments.count") != -1:
                         segments_per_pixel = extract_int(line)
+                # Damaged pixel: a deflection file is missing
+                if not all(index_nbr in segment_pixels.get(seg, ())
+                           for seg in needed):
+                    segments_per_pixel = -1
 
             if segments_per_pixel == self.nbr_segments:
                 self.corrupted_pixel.append(1)
@@ -555,10 +566,14 @@ class LoaderJPK:
                         height_channel_found = True  # For working with no height sensor.
 
                     # Check if the channel file is present in the first
-                    # segment of the first pixel, because this is not always
+                    # segment of the first valid pixel, because this is not always
                     # the case ...
                     segment_nbr = "0"  # The first segment
                     if self.file_type != "JPK (Single File)":
+                        # First pixel with data (the first one can be
+                        # damaged)
+                        segment_nbr = str(min(segment_pixels[
+                            int(self.segments["extend"])]))
                         # Look in self.segments["extend"] to find the path
                         # for the extend segment, which is always present.
                         path = (
@@ -1195,6 +1210,39 @@ class LoaderJPK:
                 time_segments["retraction"] = linspace(index, pr)
 
         return time_segments
+
+
+# Deflection file of a segment of a pixel, in maps and QI files
+PIXEL_DEFLECTION = re.compile(
+    r"index/(\d+)/segments/(\d+)/channels/vDeflection\.dat")
+SEGMENT_STYLE = re.compile(
+    r"force-segment-header-info\.(\d+)\.settings\.segment-settings\.style="
+    r"(.*)")
+
+
+def pixels_of_segments(afm_file):
+    """Pixels of a map or QI file with data, for each segment number:
+    {segment: set of pixel indices} (from the deflection files)."""
+    pixels = {}
+    for name in afm_file.namelist():
+        match = PIXEL_DEFLECTION.fullmatch(name)
+        if match:
+            pixels.setdefault(int(match.group(2)), set()).add(
+                int(match.group(1)))
+    return pixels
+
+
+def has_force_curves(afm_file):
+    """True if a map or QI file has approach and retract curves in at least
+    one pixel (see check_single_file)."""
+    pixels = pixels_of_segments(afm_file)
+    styles = {}
+    for line in afm_file.read("shared-data/header.properties").splitlines():
+        match = SEGMENT_STYLE.match(line.decode())
+        if match:
+            styles[int(match.group(1))] = match.group(2).strip()
+    with_data = {styles.get(segment) for segment in pixels}
+    return "extend" in with_data and "retract" in with_data
 
 
 def extract_str(string):

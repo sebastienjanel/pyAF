@@ -37,13 +37,10 @@ import tables
 
 from ... import consts
 import logging
-try:
-    import pickle as pickle
-except ImportError:
-    import pickle
 from ... import widgets_list
 from ... import shared
 from ...tools import misc_tools
+from ...tools import pickle_tools
 from ...tools import event_filter_tools
 
 class LoaderPYAF:
@@ -114,7 +111,7 @@ class LoaderPYAF:
         general_prefs = inputfile.read(globaloffset)
 
         try:
-            general_prefs = pickle.loads(general_prefs, encoding=consts.ENCODING)
+            general_prefs = pickle_tools.loads(general_prefs, encoding=consts.ENCODING)
 
         except ImportError:
             # In previous versions of pyAF, when you pickle dump the general
@@ -131,7 +128,7 @@ class LoaderPYAF:
             from ... import experiment
             import sys
             sys.modules["experiment"] = experiment
-            general_prefs = pickle.loads(general_prefs, encoding=consts.ENCODING)
+            general_prefs = pickle_tools.loads(general_prefs, encoding=consts.ENCODING)
 
         if not self.load_more:
             # Load general prefs (only for the first load)
@@ -225,7 +222,7 @@ class LoaderPYAF:
             # Load single prefs in the datasets
             value = inputfile.read(single_offsets[i - more_offset])
 
-            single_prefs = pickle.loads(value, encoding=consts.ENCODING)
+            single_prefs = pickle_tools.loads(value, encoding=consts.ENCODING)
 
             skip = False
             for key in single_prefs:

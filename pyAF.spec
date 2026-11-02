@@ -66,8 +66,11 @@ a = Analysis(
 
 def used(entry):
     """False for the parts of Qt not used by pyAF, that nothing needed links
-    to (they come with the hooks of PySide6)."""
+    to (they come with the hooks of PySide6), and for the libraries to take
+    from the system."""
     name = entry[0].replace("\\", "/")
+    if name in SYSTEM_LIBRARIES:
+        return False
     return not any(part in name for part in UNUSED_QT)
 
 
@@ -81,6 +84,12 @@ UNUSED_QT += ["Qt6" + module for module in
 UNUSED_QT += ["plugins/tls/", "plugins/networkinformation/", "tuiotouch",
               "qtvirtualkeyboard", "imageformats/libqpdf",
               "imageformats/qpdf"]
+# Linux: the graphics driver comes from the system and needs its C++ library:
+# with the older one of the system of the build, the driver can not be loaded
+# and the 3D view crashes (seen on Ubuntu 26.04). All the supported systems
+# have one at least as recent as the system of the build.
+SYSTEM_LIBRARIES = ["libstdc++.so.6", "libgcc_s.so.1"] \
+    if sys.platform.startswith("linux") else []
 a.binaries = [entry for entry in a.binaries if used(entry)]
 a.datas = [entry for entry in a.datas if used(entry)]
 

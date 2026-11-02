@@ -108,7 +108,6 @@ if multiprocessing.current_process().name == "MainProcess":
     from . import widgets_list as wl
     from . import shared
     from .load_and_save.pre_check import CheckFiles
-    from .widgets.plugins import PluginsWidget
     from .widgets.preferences import PreferencesWidget
     from .utils import discarding
     from .gui_styles.theme_handler import theme_handler, saved_theme
@@ -449,21 +448,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # Close progressbar
             wl.widget_progressbar.close()
-
-    def open_plugin_window(self):
-        """Opens the plugins widget.
-
-        Is called from the menu. See the plugins widget for more
-        details (widgets/plugins.py).
-        """
-        self.logger.debug("Opening plugin window")
-
-        if wl.widget_plugins is None:
-            PluginsWidget(self)
-            wl.widget_plugins.show()
-        else:
-            wl.widget_plugins.activateWindow()
-            wl.widget_plugins.raise_()
 
     def change_curve_by_key(self, key):
         """Changes the curve upon a call by the arrow keys."""
@@ -961,6 +945,16 @@ class MainWindow(QtWidgets.QMainWindow):
             self.list_actions["row_color"].setEnabled(True)
             text = "Change color of row (Replicates)"
             self.list_actions["row_color"].setText(text)
+
+        elif self.tabs.currentIndex() == 5:
+            # SuperPlots tab (no table)
+            self.list_actions["open_meshgrid"].setEnabled(False)
+            self.list_actions["open_curve"].setEnabled(False)
+            self.list_actions["open_results"].setEnabled(True)
+            self.list_actions["rename_row"].setEnabled(False)
+            self.list_actions["duplicate_row"].setEnabled(False)
+            self.list_actions["remove_row"].setEnabled(False)
+            self.list_actions["row_color"].setEnabled(False)
 
         # Plots tabs, coming from the other tabs: recompute the values (the
         # curves, the ROIs or the computations may have changed)

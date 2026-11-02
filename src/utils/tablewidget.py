@@ -165,6 +165,9 @@ def change_color():
         tw = widgets_list.widget_results_single.tableWidget
     elif tab == 4:
         tw = widgets_list.widget_results_groups.tableWidget
+    else:
+        # No table in the other tabs
+        return
 
     # Allow only one row
     if (len(tw.selectionModel().selectedRows())) > 1:
@@ -174,7 +177,7 @@ def change_color():
         QtWidgets.QMessageBox.warning(widget, "Error", text)
     elif (len(tw.selectionModel().selectedRows())) == 0:
         # Tell the user to select at least one row
-        text = "Select at least on row please"
+        text = "Select at least one row please"
         widget = widgets_list.widget_results_groups
         QtWidgets.QMessageBox.warning(widget, "Error", text)
 

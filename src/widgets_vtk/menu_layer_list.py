@@ -37,7 +37,10 @@ from .. import consts
 from qtpy import QtCore, QtWidgets
 from ..tools import gui_tools
 from ..tools import misc_tools
+from .utils import menu_actions
 from .utils.create_layer import create_layer
+from .utils.load import load_layers
+from .utils.save import save_layers
 from .utils.glass_choser import VTKGlassChoserWidget
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFToggle
@@ -49,6 +52,8 @@ from .utils.resample import resample_images
 
 # Space between the two buttons of a line
 PAIR_SPACING = 6
+# Margins of the content of the boxes of the column
+GROUP_MARGINS = (6, 6, 6, 6)
 
 
 class MenuLayerListWidget(QtWidgets.QWidget):
@@ -96,22 +101,24 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         self.tableWidget.cellClicked.connect(self.tableWidget_clicked)
         self.tableWidget.itemSelectionChanged.connect(self.keep_selection)
 
-        self.VL.addWidget(self.tableWidget)
+        box_items = QtWidgets.QGroupBox("Items")
+        self.VL_items = QtWidgets.QVBoxLayout()
+        self.VL_items.setContentsMargins(*GROUP_MARGINS)
+        self.VL_items.addWidget(self.tableWidget)
+        box_items.setLayout(self.VL_items)
+        self.VL.addWidget(box_items)
 
         # --- Switches, aligned (same width of the labels) -------------
-        self.TG_colorscale = PYAFToggle(self, "colorscale", "Color scale")
+        self.TG_colorscale = PYAFToggle(self, "colorscale", "Color bar")
         self.TG_colorscale.setToolTip("Displays the color scale of the map "
                                       "of the selected file")
         self.TG_colorscale.toggle.setChecked(
             shared.exp.list[0].opengl_display_colorbar)
-        self.TG_autospin = PYAFToggle(self, "autospin", "Let it spin !")
+        self.TG_autospin = PYAFToggle(self, "autospin", "Spin !")
         self.TG_autospin.setToolTip("Turns the camera around the scene")
-        self.TG_profiles = PYAFToggle(self, "profiles", "Display Profiles")
+        self.TG_profiles = PYAFToggle(self, "profiles", "Profiles")
         self.TG_profiles.setToolTip(
             "Draws the profiles of the maps on the AFM surfaces")
-        for toggle in (self.TG_colorscale, self.TG_autospin,
-                       self.TG_profiles):
-            toggle.label.setFixedWidth(110)
 
         self.BT_screenshot = PYAFButton(self, "screenshot", "Screenshot")
         self.BT_screenshot.setToolTip("Saves the 3D view as a PNG image")
@@ -124,18 +131,43 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         self.BT_background.setToolTip("Black or white background")
         self.update_color_buttons()
 
-        self.BT_load = PYAFButton(self, "load", "Load tiffs")
-        self.BT_load.setToolTip(
-            "Adds 2D images (tiff, e.g. optical microscopy) as layers, to "
-            "be aligned with the AFM maps")
-        self.BT_load_stack = PYAFButton(self, "load_stack", "Load Stack")
-        self.BT_load_stack.setToolTip(
-            "Adds a 3D stack of images (tiff, e.g. confocal microscopy) as "
-            "a volume layer")
-        self.BT_add_glass = PYAFButton(self, "add_glass", "Add substrate")
-        self.BT_add_glass.setToolTip(
-            "Adds the plane of a substrate ROI (ROI manager) of an AFM map "
-            "as a layer")
+        # Everything that adds an item to the view, in one menu
+        self.BT_add = PYAFButton(self, "add", "Add \u25be")
+        # The arrow in the text: the indicator of the style sheets is tiny
+        self.BT_add.setStyleSheet(
+            "QPushButton::menu-indicator { image: none; width: 0; }")
+        self.BT_add.setToolTip("Adds an item to the 3D view")
+        self.menu_add = QtWidgets.QMenu(self.BT_add)
+        self.menu_add.setToolTipsVisible(True)
+        self.menu_add_action("afm", "AFM map...",
+                             "Adds another computed AFM map")
+        self.menu_add_action("load", "Image (TIFF)...",
+                             "Adds 2D images (tiff, e.g. optical microscopy), "
+                             "to be aligned with the AFM maps")
+        if consts.ADVANCED:
+            self.menu_add_action("load_stack", "Stack (TIFF)...",
+                                 "Adds a 3D stack of images (tiff, e.g. "
+                                 "confocal microscopy)")
+        self.menu_add_action("add_glass", "Substrate...",
+                             "Adds the plane of a substrate ROI (ROI manager) "
+                             "of an AFM map")
+        if consts.ADVANCED:
+            self.action_isosurface = self.menu_add_action(
+                "isosurface", "Isosurface of the stack",
+                "Surface of the selected stack at a threshold of intensity "
+                "(binary threshold). Select a stack first")
+            # Can only be enabled for stacks
+            self.action_isosurface.setEnabled(False)
+        self.BT_add.setMenu(self.menu_add)
+        self.BT_remove = PYAFButton(self, "remove", "Remove")
+        self.BT_remove.setToolTip("Removes the selected item from the 3D view")
+        self.BT_save = PYAFButton(self, "save", "Save...")
+        self.BT_save.setToolTip(
+            "Saves all the items of the 3D view and their positions in a "
+            "folder")
+        self.BT_load_view = PYAFButton(self, "load_view", "Load...")
+        self.BT_load_view.setToolTip(
+            "Loads the items of a 3D view saved in a folder")
         self.BT_fiducials = PYAFButton(self, "fiducials", "Fiducials")
         self.BT_fiducials.setToolTip(
             "Aligns a layer on another with pairs of points picked on both "
@@ -149,33 +181,49 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             "then be loaded on the map")
         # Can only be enabled for 2D images
         self.BT_resample.setEnabled(False)
-        self.BT_isosurface = PYAFButton(self, "isosurface", "New Isosurface")
-        self.BT_isosurface.setToolTip(
-            "Surface of the selected stack at a threshold of intensity "
-            "(binary threshold), as a new layer")
-        # Can only be enabled for stacks
-        self.BT_isosurface.setEnabled(False)
+        self.add_pair(self.BT_add, self.BT_remove, self.VL_items)
 
-        self.VL.addWidget(self.TG_colorscale)
-        self.VL.addWidget(self.TG_autospin)
-        self.VL.addWidget(self.TG_profiles)
-        self.add_pair(self.BT_screenshot, self.BT_lock_top)
-        self.add_pair(self.BT_scales, self.BT_background)
-        self.add_pair(self.BT_load,
-                      self.BT_load_stack if consts.ADVANCED else None)
-        self.add_pair(self.BT_add_glass, self.BT_fiducials)
-        if consts.ADVANCED:
-            self.add_pair(self.BT_resample, self.BT_isosurface)
+        box_view = QtWidgets.QGroupBox("View")
+        VL_view = QtWidgets.QVBoxLayout()
+        VL_view.setContentsMargins(*GROUP_MARGINS)
+        HL_toggles = QtWidgets.QHBoxLayout()
+        HL_toggles.setContentsMargins(0, 0, 0, 0)
+        HL_toggles.addWidget(self.TG_colorscale)
+        HL_toggles.addStretch(1)
+        HL_toggles.addWidget(self.TG_autospin)
+        HL_toggles.addStretch(1)
+        HL_toggles.addWidget(self.TG_profiles)
+        VL_view.addLayout(HL_toggles)
+        self.add_pair(self.BT_lock_top, self.BT_screenshot, VL_view)
+        self.add_pair(self.BT_scales, self.BT_background, VL_view)
+        box_view.setLayout(VL_view)
+        self.VL.addWidget(box_view)
+
+        box_alignment = QtWidgets.QGroupBox("Alignment")
+        VL_alignment = QtWidgets.QVBoxLayout()
+        VL_alignment.setContentsMargins(*GROUP_MARGINS)
+        self.add_pair(self.BT_fiducials,
+                      self.BT_resample if consts.ADVANCED else None,
+                      VL_alignment)
+        box_alignment.setLayout(VL_alignment)
+        self.VL.addWidget(box_alignment)
+
+        box_saved = QtWidgets.QGroupBox("Saved view")
+        VL_saved = QtWidgets.QVBoxLayout()
+        VL_saved.setContentsMargins(*GROUP_MARGINS)
+        self.add_pair(self.BT_save, self.BT_load_view, VL_saved)
+        box_saved.setLayout(VL_saved)
+        self.VL.addWidget(box_saved)
         self.VL.addStretch(1)
 
         # All the buttons with the width of the largest text (with the two
         # labels of the color buttons), the list as wide as two buttons
         texts = ["Black scales", "White scales", "Black background",
                  "White background"]
-        buttons = [self.BT_screenshot, self.BT_lock_top, self.BT_scales,
-                   self.BT_background, self.BT_load, self.BT_load_stack,
-                   self.BT_add_glass, self.BT_fiducials, self.BT_resample,
-                   self.BT_isosurface]
+        buttons = [self.BT_add, self.BT_remove, self.BT_screenshot,
+                   self.BT_lock_top, self.BT_scales, self.BT_background,
+                   self.BT_fiducials, self.BT_resample, self.BT_save,
+                   self.BT_load_view]
         metrics = self.BT_scales.fontMetrics()
         width = max(metrics.horizontalAdvance(text) + 3 * metrics.xHeight()
                     for text in texts + [b.text() for b in buttons]) + 16
@@ -186,7 +234,15 @@ class MenuLayerListWidget(QtWidgets.QWidget):
 
         self.setLayout(self.VL)
 
-    def add_pair(self, left, right):
+    def menu_add_action(self, name, text, tooltip):
+        """A choice of the Add menu (see button_clicked)."""
+        action = self.menu_add.addAction(text)
+        action.setToolTip(tooltip)
+        action.triggered.connect(
+            lambda _=False, n=name: self.button_clicked(n))
+        return action
+
+    def add_pair(self, left, right, layout):
         """Two buttons on a line."""
         HL = QtWidgets.QHBoxLayout()
         HL.setContentsMargins(0, 0, 0, 0)
@@ -195,7 +251,7 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         if right is not None:
             HL.addWidget(right)
         HL.addStretch(1)
-        self.VL.addLayout(HL)
+        layout.addLayout(HL)
 
     def keep_selection(self):
         """A layer is always selected (the options act on it): the current
@@ -206,8 +262,10 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             table.selectRow(max(table.currentRow(), 0))
 
     def add_position_box(self, box):
-        """Position box (of the options menu) below the list, as wide."""
-        box.setFixedWidth(self.tableWidget.maximumWidth())
+        """Position box (of the options menu) below the list, as wide as
+        the other boxes."""
+        box.setMinimumWidth(0)
+        box.setMaximumWidth(16777215)  # Qt's value for no maximum
         self.VL.insertWidget(1, box)
 
     def resize_table(self):
@@ -215,7 +273,12 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         rows."""
         rows = min(max(self.tableWidget.rowCount(), 4), 12)
         table_width = self.tableWidget.horizontalHeader().length()
-        self.tableWidget.setFixedSize(table_width, rows * 25 + 25)
+        # Height of the rows and of the header: no scrollbar up to 12 rows
+        table = self.tableWidget
+        height = rows * table.verticalHeader().defaultSectionSize() + \
+            table.horizontalHeader().sizeHint().height() + \
+            2 * table.frameWidth() + 2
+        table.setFixedSize(table_width, height)
 
     def update_color_buttons(self):
         """Labels of the scales and background buttons: the color they
@@ -272,7 +335,7 @@ class MenuLayerListWidget(QtWidgets.QWidget):
             roi_id = layer.roi_id
             nm = shared.exp.list[layer.afm_id].filename
             label_name.setText("Glass (Roi " + str(roi_id) + " , " + nm + ")")
-        elif layer_type == "stack":
+        elif layer_type in ("stack", "isosurface"):
             label_name.setText(shared.layer_list[i].filename)
         cw = gui_tools.CenteredCellwidget(label_name)
         self.tableWidget.setCellWidget(i, 2, cw)
@@ -324,7 +387,10 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         layer = shared.layer_list[index]
 
         self.BT_resample.setEnabled(layer.type == "single_image")
-        self.BT_isosurface.setEnabled(layer.type == "stack")
+        if consts.ADVANCED:
+            self.action_isosurface.setEnabled(layer.type == "stack")
+        # The last item can not be removed
+        self.BT_remove.setEnabled(len(shared.layer_list) > 1)
 
         if widgets_list.widget_vtk_binary_threshold is not None:
             widgets_list.widget_vtk_binary_threshold.update_widget()
@@ -336,7 +402,19 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         """Called when a button is clicked."""
         index = widgets_list.widget_vtk.get_current_layer()
 
-        if button == "screenshot":
+        if button == "afm":
+            menu_actions.ask_user_for_afm_layers()
+
+        elif button == "remove":
+            menu_actions.remove_layer()
+
+        elif button == "save":
+            save_layers(self)
+
+        elif button == "load_view":
+            load_layers(self)
+
+        elif button == "screenshot":
             # Get saved path
             settings_path = misc_tools.get_user_path(self.settings)
 

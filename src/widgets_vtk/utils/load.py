@@ -32,12 +32,12 @@
 
 """Import saved layers in VTK."""
 
-import pickle
 from qtpy import QtCore, QtWidgets
 
 from ... import shared
 from ... import widgets_list
 from ...tools import misc_tools
+from ...tools import pickle_tools
 from ...widgets_vtk.utils.create_layer import create_layer
 
 
@@ -64,7 +64,7 @@ def load_layers(parent, path=None):
 
         # Gloabl parameters
         global_params_file = open(path + "/global_params.txt", "rb")
-        global_params = pickle.loads(global_params_file.read())
+        global_params = pickle_tools.loads(global_params_file.read())
         global_params_file.close()
         camera = widgets_list.widget_vtk.canvas.renderer.GetActiveCamera()
         camera.SetPosition(global_params["camera_pos"])
@@ -84,7 +84,7 @@ def load_layers(parent, path=None):
         # Read each layer file
         for i in range(nbr_layers):
             with open(str(path) + "/layer_" + str(i) + ".txt", "rb") as fi:
-                layer_prefs = pickle.loads(fi.read())
+                layer_prefs = pickle_tools.loads(fi.read())
 
             layer_type = layer_prefs["type"]
             nbr_before = len(shared.layer_list)

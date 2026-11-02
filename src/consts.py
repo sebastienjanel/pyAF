@@ -52,7 +52,8 @@ constant and the TEST_PATH, and set AUTOLOAD to True.
 import os
 from .tools import git_tools
 
-MAINVERSION = "2.0.0"
+MAINVERSION = "5.0"
+REPOSITORY = "https://github.com/sebastienjanel/pyAF"
 branch, short_sha = git_tools.get_git_info()
 if short_sha is None:
     VERSION = MAINVERSION

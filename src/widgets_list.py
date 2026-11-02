@@ -87,7 +87,6 @@ widget_indentation = None
 widget_vtk = None
 widget_curve_mod = None
 widget_tilt_check = None
-widget_plugins = None
 widget_slicing = None
 widget_fiducials = None
 widget_vtk_entry = None

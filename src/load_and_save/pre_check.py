@@ -35,14 +35,11 @@ import os
 import logging
 import zipfile
 
-try:
-    import pickle as pickle
-except ImportError:
-    import pickle
 from .. import consts
+from ..tools import pickle_tools
 from .. import widgets_list
 from .file_loader.nanoscope import extract_text, extract_num
-from .file_loader.jpk import extract_int
+from .file_loader.jpk import extract_int, has_force_curves
 from ..widgets.progressbar import Progressbar
 
 encodings = ["latin1", "ASCII", "utf-8"]
@@ -195,6 +192,12 @@ def check_single_file(path):
                     result["enabled"] = True
                     result["checked"] = True
 
+                # No curve at all (damaged file, or no deflection saved)
+                if not has_force_curves(jpkfile):
+                    result["error"] = "No force curves in the file"
+                    result["enabled"] = False
+                    result["checked"] = False
+
                 jpkfile.close()
 
         if file_type == "pyAF":
@@ -237,7 +240,7 @@ def check_single_file(path):
 
             for i in range(len(encodings)):
                 try:
-                    general_prefs = pickle.loads(general_prefs, encoding=encodings[i])
+                    general_prefs = pickle_tools.loads(general_prefs, encoding=encodings[i])
                     consts.ENCODING = encodings[i]
                     break
 
@@ -256,7 +259,7 @@ def check_single_file(path):
                     from .. import experiment
                     import sys
                     sys.modules["experiment"] = experiment
-                    general_prefs = pickle.loads(general_prefs, encoding=encodings[i])
+                    general_prefs = pickle_tools.loads(general_prefs, encoding=encodings[i])
                     consts.ENCODING = encodings[i]
                     break
 

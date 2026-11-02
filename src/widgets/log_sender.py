@@ -36,6 +36,7 @@ import logging
 import webbrowser
 import traceback
 from qtpy import QtWidgets
+from .. import consts
 from ..tools import misc_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.PYAFWidget import PYAFWidget
@@ -99,13 +100,11 @@ class LogSenderWidget(PYAFWidget):
         elif button == "create_issue":
             clipboard = QtWidgets.QApplication.clipboard()
 
-            # Format the text for the bitbucket markdown
-            text = self.error.toPlainText()
-            text = text.replace("\n", "\r\n\r\n")
-            text = "```\r\n\r\n#!python\r\n\r\n" + text + "```"
+            # Format the text for the markdown of GitHub
+            text = "```python\n" + self.error.toPlainText() + "\n```"
 
             clipboard.setText(str(text))
 
-            webbrowser.open("https://bitbucket.org/adujardin/pyaf/issues/new")
+            webbrowser.open(consts.REPOSITORY + "/issues/new")
 
             self.close()

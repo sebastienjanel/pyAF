@@ -49,18 +49,27 @@ class AboutWidget(PYAFWidget):
 
         self.VL = QtWidgets.QVBoxLayout()
 
-        label_version = QtWidgets.QLabel("pyAF version " + consts.VERSION)
-        label_authors1 = QtWidgets.QLabel("<b>Michka Popoff<b/>")
-        label_authors2 = QtWidgets.QLabel(
-            "Sebastien Janel, Simone Bovio, Yann Ciczora, Vincent Dupres, Antoine Dujardin, Javier Lopez-Alonso, Nuno Duarte")
-        label_authors3 = QtWidgets.QLabel("Frank Lafont")
-        label_website = QtWidgets.QLabel("https://bitbucket.org/cmip/pyaf-advanced/")
-
-        self.VL.addWidget(label_version)
-        self.VL.addWidget(label_authors1)
-        self.VL.addWidget(label_authors2)
-        self.VL.addWidget(label_authors3)
-        self.VL.addWidget(label_website)
+        link = consts.REPOSITORY.replace("https://", "")
+        label = QtWidgets.QLabel(
+            "<h3>pyAF " + consts.VERSION + "</h3>"
+            "<p>AFM force curve analysis software dedicated to biologists.<br>"
+            "CMPI lab (<a style='color: #3b8eea' href='https://cmpi.cnrs.fr'>cmpi.cnrs.fr</a>)</p>"
+            "<p><b>Michka Popoff</b> (main initial coding), Antoine Dujardin, "
+            "Javier Lopez-Alonso,<br>Simone Bovio, Nuno Duarte, "
+            "<b>S\u00e9bastien Janel</b> (maintainer)<br>"
+            "Contributors: Yann Ciczora, Vincent Dupres, Frank Lafont</p>"
+            "<p>When using pyAF, cite: Stiffness tomography of eukaryotic "
+            "intracellular compartments<br>by atomic force microscopy, "
+            "Nanoscale, 2019, 11, 10320-10328, "
+            "<a style='color: #3b8eea' href='https://doi.org/10.1039/C8NR08955H'>"
+            "doi:10.1039/C8NR08955H</a></p>"
+            "<p>Lab-developed software, not a commercial one: check its "
+            "results against other software.<br>CeCILL license "
+            "(<a style='color: #3b8eea' href='http://www.cecill.info'>cecill.info</a>). Source code "
+            "and bug reports:<br><a style='color: #3b8eea' href='" + consts.REPOSITORY + "'>" + link +
+            "</a></p>")
+        label.setOpenExternalLinks(True)
+        self.VL.addWidget(label)
         self.VL.addStretch(1)
 
         self.setLayout(self.VL)
