@@ -35,6 +35,12 @@ import sys
 import os
 import logging
 
+# Child processes of the application built with PyInstaller (computations,
+# resource tracker of multiprocessing) re-run this script: they must be
+# handled before importing pyAF, whose import starts multiprocessing
+# objects (else each child starts a new one, in a loop)
+multiprocessing.freeze_support()
+
 # Qt binding used through QtPy: "pyqt5", "pyqt6" or "pyside6".
 # Can be overridden with the QT_API environment variable.
 os.environ.setdefault("QT_API", "pyside6")
@@ -59,10 +65,6 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     logger.debug("Starting main.py")
-
-    # Add support for multiprocessing in frozen app
-    # See http://docs.python.org/3/library/multiprocessing.html
-    multiprocessing.freeze_support()
 
     logger.debug("Calling pyaf_main")
     pyaf_main()

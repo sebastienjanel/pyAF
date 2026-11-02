@@ -1,0 +1,141 @@
+# Standalone applications of pyAF for macOS, Windows and Linux, built with
+# PyInstaller (pyAF.spec) on each system, checked (tools/smoke_test.py),
+# then attached to the GitHub release of the tag (v5.0, v5.1, ...).
+# Can also be started by hand (Actions tab, Run workflow): the applications
+# are then in the artifacts of the run.
+
+name: Build applications
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            system: macOS-AppleSilicon
+          # The last Intel runner of GitHub (supported until August 2027)
+          - os: macos-15-intel
+            system: macOS-Intel
+          - os: windows-latest
+            system: Windows
+          - os: ubuntu-22.04
+            system: Linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      APP: pyAF
+      PACKAGE: pyAF-${{ matrix.system }}
+
+    steps:
+      # Checked out in a folder named pyAF (pyAF imports itself under this
+      # name, see main.py)
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
+          echo "PYAF_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Libraries of Qt and VTK (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libglu1-mesa libxkbcommon0 \
+            libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 \
+            libxcb-shape0 libxcb-xinerama0 libfontconfig1 libdbus-1-3 \
+            libxrender1 libxi6 libsm6
+
+      - name: Packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller==6.22.3
+
+      - name: Build
+        run: pyinstaller --noconfirm pyAF.spec
+
+      # Results also in a file: no console output for the Windows
+      # application; time limit: an error would open a dialog on Windows
+      - name: Check the application
+        shell: bash
+        timeout-minutes: 10
+        env:
+          PYAF_SMOKE_TEST: "1"
+          PYAF_SMOKE_LOG: smoke.log
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          case "$RUNNER_OS" in
+            macOS) EXE="dist/$APP.app/Contents/MacOS/pyAF" ;;
+            Windows) EXE="dist/$APP/pyAF.exe" ;;
+            *) EXE="dist/$APP/pyAF" ;;
+          esac
+          STATUS=0
+          "$EXE" || STATUS=$?
+          cat smoke.log || true
+          exit $STATUS
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir dmg
+          cp -R "dist/$APP.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "$APP" -srcfolder dmg -ov -format ULMO \
+            "$PACKAGE-$PYAF_VERSION.dmg"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -LiteralPath "dist/$env:APP" -DestinationPath "$env:PACKAGE-$env:PYAF_VERSION.zip"
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          XZ_OPT=-T0 tar -C dist -cJf "$PACKAGE-$PYAF_VERSION.tar.xz" "$APP"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pyAF-${{ matrix.system }}
+          path: |
+            pyAF-*.dmg
+            pyAF-*.zip
+            pyAF-*.tar.xz
+          retention-days: 14
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: apps
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: apps/*
+          draft: true
+          body: |
+            Standalone applications of pyAF (no Python needed): download
+            the file of your system, see the README (Applications) for the
+            first opening.

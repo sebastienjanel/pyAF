@@ -55,10 +55,14 @@ from ..experiment import ResultGroup, Result
 
 
 def get_app_path():
-    """Gets the current path of the app.
+    """Gets the current path of the app (src folder).
 
     Split the current's file path and go back 2 levels, to be in main folder.
+    In the application built with PyInstaller (see pyAF.spec), the folder
+    of the bundle, where the resources have the same layout as in src.
     """
+    if hasattr(sys, "_MEIPASS"):
+        return sys._MEIPASS
     # (keeps the drive letter on Windows)
     tools_folder = os.path.dirname(os.path.realpath(__file__))
     return os.path.dirname(tools_folder)
@@ -816,25 +820,20 @@ def z_label(data, unit="nm"):
 
 
 def get_font_path():
-    """Path of the font of the plots (in the application bundle if
-    frozen, see main_macOS.spec)."""
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, "fonts", PLOT_FONT_FILE)
+    """Path of the font of the plots."""
     return os.path.join(get_app_path(), "fonts", PLOT_FONT_FILE)
 
 
+# Folders of the resources (relative to src, same layout in the application
+# built with PyInstaller), by file extension
+RESOURCE_FOLDERS = {".png": "images",
+                    ".mplstyle": os.path.join("gui_styles", "plot_styles"),
+                    ".qss": os.path.join("gui_styles", "stylesheets")}
+
+
 def get_resource_path(relative_path):
-
+    """Path of an image (.png) or a style file (.mplstyle, .qss), from the
+    folder of the code (not the current folder)."""
     extension = os.path.splitext(relative_path)[1]
-
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-
-    elif extension == ".png":
-        return os.path.join(os.path.abspath("."), "src/images", relative_path)
-
-    elif extension == ".mplstyle":
-        return os.path.join(os.path.abspath("."), "src/gui_styles/plot_styles", relative_path)
-
-    elif extension == ".qss":
-        return os.path.join(os.path.abspath("."), "src/gui_styles/stylesheets", relative_path)
+    return os.path.join(get_app_path(), RESOURCE_FOLDERS[extension],
+                        relative_path)

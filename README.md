@@ -31,6 +31,18 @@ DOI	https://doi.org/10.1039/C8NR08955H
 DISCLAIMER: pyAF is a lab-developed software, it is not a commercial software.
 Check as much as possible results provided vs other software (e.g. JPK DP) to rule out any no supported edge cases! And please report to us any wrong results.
 
+## Applications (no Python needed)
+
+Ready-to-use applications for macOS (Apple Silicon and Intel), Windows and Linux are attached to the releases: https://github.com/sebastienjanel/pyAF/releases (download the file of your system).
+
+- **macOS** (`.dmg`, `AppleSilicon` or `Intel` according to your Mac: Apple menu / About This Mac; macOS 14 or newer): open it and drag pyAF to Applications. The application is not signed by Apple: at the first opening, macOS refuses to open it. Open System Settings / Privacy & Security, then click "Open Anyway" in front of pyAF (or, in a terminal: `xattr -dr com.apple.quarantine /Applications/pyAF.app`).
+- **Windows** (`.zip`): unzip it (e.g. in Documents) and run `pyAF.exe` in the `pyAF` folder. The application is not signed: if Windows SmartScreen shows a warning, click "More info", then "Run anyway".
+- **Linux** (`.tar.xz`): extract it (`tar -xJf pyAF-*.tar.xz`) and run `pyAF/pyAF`. Qt may need `libxcb-cursor0` (see Known issues).
+
+The applications take about 0.5 GB once installed (Qt and VTK for the 3D view) and a few seconds to start.
+
+To check an installation (applications or sources), run pyAF with the environment variable `PYAF_SMOKE_TEST=1`: it loads its libraries and resources, prints the results and quits.
+
 ## Installation from the sources
 
 pyAF runs on macOS, Windows and Linux with Python 3.11 or newer (3.13 recommended).
@@ -67,7 +79,7 @@ Windows (PowerShell):
 
 If PowerShell refuses to run the activation script, run once `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-The packages take about 3 GB (Qt, VTK and ITK for the 3D rendering).
+The packages take about 2 GB (Qt and VTK for the 3D view).
 
 ### 4. Run pyAF
 

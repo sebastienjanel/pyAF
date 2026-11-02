@@ -33,12 +33,12 @@
 """Tiff stack layer."""
 
 import os
-import itk
-import vtk
+from .. import vtk_api as vtk
 from ... import shared
 from .layer import Layer
 from ..utils.common import fill_image_sizes
 from ...tools import misc_tools
+from ..utils.stack_filters import binary_threshold, discrete_gaussian
 from ..utils.vtk_image import get_actor_plane, image_source, read_frames
 
 
@@ -56,15 +56,14 @@ class LayerStack(Layer):
         self.bind = True
 
         # 8 or 16 bits, gray or color: pixels to display, and their gray
-        # levels (for the LUT, the filters and the isosurfaces, as an ITK
-        # image)
+        # levels (for the LUT, the filters and the isosurfaces)
         images = read_frames(path)
         if images is None:
             # The image was not recognized
             self.load_error = True
             return None
         self.pixels, self.gray = images
-        self.input_image_orig = itk.image_from_array(self.gray)
+        self.input_image_orig = self.gray
         self.input_image = self.input_image_orig
 
         frames, rows, cols = self.gray.shape
@@ -87,7 +86,7 @@ class LayerStack(Layer):
         lut = self.get_current_lut_options()
         filtered = self.use_binary_thresholding or self.smooth_gaussian > 0
         if lut["use"] or filtered:
-            images = itk.array_from_image(self.input_image)
+            images = self.input_image
         else:
             images = self.pixels
 
@@ -149,29 +148,13 @@ class LayerStack(Layer):
     def filter_image(self):
         """Applies the filters (binary threshold, then smoothing) to the
         image."""
-        it = itk.Image[itk.UC, 3]
         self.input_image = self.input_image_orig
 
         if self.use_binary_thresholding:
-            filter_type = itk.BinaryThresholdImageFilter[it, it]
-            threshold_filter = filter_type.New()
-
-            threshold_filter.SetInput(self.input_image)
-            threshold_filter.SetLowerThreshold(self.lower_thresh)
-            threshold_filter.SetUpperThreshold(self.upper_thresh)
-            threshold_filter.SetOutsideValue(self.lower_thresh_value)
-            threshold_filter.SetInsideValue(self.upper_thresh_value)
-
-            self.input_image = threshold_filter.GetOutput()
-            self.input_image.Update()
+            self.input_image = binary_threshold(
+                self.input_image, self.lower_thresh, self.upper_thresh,
+                self.lower_thresh_value, self.upper_thresh_value)
 
         if self.smooth_gaussian > 0:
-            filter_type = itk.DiscreteGaussianImageFilter[it, it]
-            smooth_filter = filter_type.New()
-
-            smooth_filter.SetInput(self.input_image)
-            # Standard deviation in pixels
-            smooth_filter.SetVariance(self.smooth_gaussian ** 2)
-
-            self.input_image = smooth_filter.GetOutput()
-            self.input_image.Update()
+            self.input_image = discrete_gaussian(self.input_image,
+                                                 self.smooth_gaussian)

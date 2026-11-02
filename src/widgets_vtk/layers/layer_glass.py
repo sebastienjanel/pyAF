@@ -32,7 +32,7 @@
 
 """Layer (substrate)"""
 
-import vtk
+from .. import vtk_api as vtk
 from ... import shared
 from .layer import Layer
 from ...tools import planefit

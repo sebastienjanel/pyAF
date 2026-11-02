@@ -34,7 +34,7 @@
 
 from .layer import Layer
 import numpy
-import vtk
+from .. import vtk_api as vtk
 from vtkmodules.util import numpy_support
 from ... import widgets_list
 from ... import shared

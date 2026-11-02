@@ -131,10 +131,7 @@ class MenuLayerListWidget(QtWidgets.QWidget):
         self.BT_load_stack = PYAFButton(self, "load_stack", "Load Stack")
         self.BT_load_stack.setToolTip(
             "Adds a 3D stack of images (tiff, e.g. confocal microscopy) as "
-            "a volume layer (needs ITK)")
-        # Only allowed if itk is imported
-        if consts.ALLOW_ITK is False:
-            self.BT_load_stack.setEnabled(False)
+            "a volume layer")
         self.BT_add_glass = PYAFButton(self, "add_glass", "Add substrate")
         self.BT_add_glass.setToolTip(
             "Adds the plane of a substrate ROI (ROI manager) of an AFM map "

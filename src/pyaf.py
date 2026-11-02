@@ -45,21 +45,8 @@ QtGui has to be loaded everytime because the MainWindow class subclasses
 a QtWidgets.QMainWindow.
 """
 
-from src import consts
+from . import consts
 
-
-class FetchStderr:
-    """Utilitary class to hide ITK warnings at load.
-
-    Should be removed once ITK warnings are fixed. The warnings can be
-    displayed when in DEBUG mode.
-    """
-
-    def write(self, err):
-        """Writes the error to stdout."""
-        # pylint: disable=R0201
-        if consts.DEBUG:
-            sys.stdout.write(err)
 
 import multiprocessing
 
@@ -86,65 +73,45 @@ if multiprocessing.current_process().name == "MainProcess":
     import matplotlib
     matplotlib.use("QtAgg")
 
-    # Check for the versions. See PEP 386 for the check
-    # [AD: deprecated under PEP 386 (!)]
-    from packaging.version import Version
-    from src.tools.utils import module_exists
+    # Check for the version of VTK
+    from .tools.utils import module_exists
 
-    if module_exists("vtk"):
-        import vtk
-        if vtk.VTK_MAJOR_VERSION <= 5:
-            val = str(vtk.VTK_MAJOR_VERSION)
+    if module_exists("vtkmodules"):
+        from vtkmodules.vtkCommonCore import VTK_MAJOR_VERSION
+        if VTK_MAJOR_VERSION <= 5:
+            val = str(VTK_MAJOR_VERSION)
             message = "VTK's version is " + val + ". Version 6.x is needed."
             print(message)
-            del vtk
         else:
             consts.ALLOW_VTK = True
-    if module_exists("itk"):
-        original_stderr = sys.stderr  # Keep a reference to STDERR
-        sys.stderr = FetchStderr()  # Redirect the real STDERR
-        import itk
-        try:
-            if Version(itk.Version.GetITKVersion()) < Version("4.5.0"):
-                val = str(itk.Version.GetITKVersion())
-                message = "ITK's version is " + \
-                    val + ". Version 4.5.x is needed."
-                print(message)
-                del itk
-            else:
-                consts.ALLOW_ITK = True
-        except ImportError:
-            message = "ITK is installed but seems misconfigured."
-            consts.ALLOW_ITK = False
-        sys.stderr = original_stderr  # Set back STDERR
 
-    from src.utils import menu
-    from src.widgets_main.data import DataWidget
-    from src.widgets_main.compute import ComputeWidget
-    from src.widgets_main.results import ResultsWidget
-    from src.widgets_main.results_single import ResultsSingleWidget
-    from src.widgets_main.results_groups import ResultsGroupsWidget
-    from src.widgets_main.results_experiment import ResultsExperimentWidget
-    from src.widgets.entry import EntryWidget
-    from src.widgets.log_sender import LogSenderWidget
-    from src.widgets.about import AboutWidget
-    from src.tools import apply_to_all
-    from src.tools import misc_tools
-    from src.tools import gui_tools
-    from src.tools import math_tools as mt
-    from src.tools import temp_file
-    from src.widgets.progressbar import Progressbar
-    from src.experiment import Experiment
-    from src.load_and_save.load import Load
+    from .utils import menu
+    from .widgets_main.data import DataWidget
+    from .widgets_main.compute import ComputeWidget
+    from .widgets_main.results import ResultsWidget
+    from .widgets_main.results_single import ResultsSingleWidget
+    from .widgets_main.results_groups import ResultsGroupsWidget
+    from .widgets_main.results_experiment import ResultsExperimentWidget
+    from .widgets.entry import EntryWidget
+    from .widgets.log_sender import LogSenderWidget
+    from .widgets.about import AboutWidget
+    from .tools import apply_to_all
+    from .tools import misc_tools
+    from .tools import gui_tools
+    from .tools import math_tools as mt
+    from .tools import temp_file
+    from .widgets.progressbar import Progressbar
+    from .experiment import Experiment
+    from .load_and_save.load import Load
     import random
     random.seed()  # Will use current system time
-    from src import widgets_list as wl
-    from src import shared
-    from src.load_and_save.pre_check import CheckFiles
-    from src.widgets.plugins import PluginsWidget
-    from src.widgets.preferences import PreferencesWidget
-    from src.utils import discarding
-    from src.gui_styles.theme_handler import theme_handler, saved_theme
+    from . import widgets_list as wl
+    from . import shared
+    from .load_and_save.pre_check import CheckFiles
+    from .widgets.plugins import PluginsWidget
+    from .widgets.preferences import PreferencesWidget
+    from .utils import discarding
+    from .gui_styles.theme_handler import theme_handler, saved_theme
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -1179,8 +1146,18 @@ def main(app=None, files=None):
     # Init the GUI for the main window
     if app is None:
         app = QtWidgets.QApplication(["pyAF"])
+        # On macOS, the icon of the application (with the margins of the Dock)
+        if sys.platform != "darwin":
+            app.setWindowIcon(
+                QtGui.QIcon(misc_tools.get_resource_path("icon.png")))
         # Theme of the preferences (dark at the first launch)
         theme_handler(saved_theme())
+
+    # Check of the installation or of the application, without the windows
+    # (see tools/smoke_test.py)
+    if os.environ.get("PYAF_SMOKE_TEST"):
+        from .tools import smoke_test
+        sys.exit(smoke_test.run(app))
 
     if not consts.AUTOLOAD:
         value = True

@@ -32,29 +32,38 @@
 
 """Makes an isosurface from a stack."""
 
-import vtk
-import itk
+import numpy
+from vtkmodules.util import numpy_support
+from .. import vtk_api as vtk
 from .common import center_data
 
 
+def vtk_image_from_array(values, origin):
+    """vtkImageData of an array (frames, rows, cols)."""
+    scalars = numpy_support.numpy_to_vtk(values.reshape(-1), deep=True)
+    scalars.SetName("Scalars")
+    data = vtk.vtkImageData()
+    data.GetPointData().SetScalars(scalars)
+    data.SetOrigin(origin)
+    data.SetDimensions(values.shape[2], values.shape[1], values.shape[0])
+    return data
+
+
 def get_isosurface(input_image, sizes, res, color, flip):
-    """Uses Marching cubes."""
-    image_type = itk.Image[itk.UC, 3]
-
-    # Flip the image if needed
-    if flip != [0, 0, 0]:
-        flip_filter = itk.FlipImageFilter[image_type].New()
-        flip_filter.SetInput(input_image)
-        flip_filter.SetFlipAxes(flip)
-        image = flip_filter.GetOutput()
-    else:
-        image = input_image
-
-    if flip != [0, 0, 0]:
-        flip_filter.Update()
+    """Uses Marching cubes. input_image: gray levels (frames, rows, cols);
+    flip: flags for x, y, z."""
+    # Flip the image if needed: about its center, the origin moved in pixels
+    # (x, y, z are the axes 2, 1, 0 of the array)
+    image = input_image
+    origin = [0.0, 0.0, 0.0]
+    for index, flipped in enumerate(flip):
+        if flipped:
+            axis = 2 - index
+            image = numpy.flip(image, axis=axis)
+            origin[index] = -(input_image.shape[axis] - 1.0)
 
     imageData = vtk.vtkImageData()
-    imageData.DeepCopy(itk.vtk_image_from_image(image))
+    imageData.DeepCopy(vtk_image_from_array(image, origin))
     # Spacing = 1, 1, 1 by default
     imageData.SetSpacing(res[0], res[1], res[2])
 

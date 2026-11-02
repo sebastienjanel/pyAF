@@ -114,7 +114,7 @@ def install_group_box_titles(app):
 def get_icons_path():
     """Folder of the icons used in the stylesheets (url(pyaf:name.svg))."""
     if hasattr(sys, "_MEIPASS"):
-        # Bundled application (see main_macOS.spec)
+        # Application built with PyInstaller (see pyAF.spec)
         return os.path.join(sys._MEIPASS, "gui_styles", "icons")
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
 

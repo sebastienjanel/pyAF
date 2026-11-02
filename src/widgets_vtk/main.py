@@ -40,7 +40,7 @@ from .utils.load import load_layers
 from ..tools.PYAFWidget import PYAFWidget
 from .. import widgets_list
 from .. import shared
-import vtk
+from . import vtk_api as vtk
 from ..tools import map_values
 from .utils import vtk_afm
 from .utils.common import use_app_font

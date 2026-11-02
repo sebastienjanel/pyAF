@@ -34,7 +34,7 @@
 
 import matplotlib
 import numpy
-import vtk
+from .. import vtk_api as vtk
 from PIL import Image
 from vtkmodules.util import numpy_support
 

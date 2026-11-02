@@ -1,5 +1,4 @@
 # Python >= 3.11 (3.13 recommended)
-itk==5.4.7
 lmfit==1.3.4
 matplotlib==3.11.2
 numpy==2.5.4

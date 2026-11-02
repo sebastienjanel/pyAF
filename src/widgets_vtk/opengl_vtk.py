@@ -32,10 +32,9 @@
 
 """The 3D canvas."""
 
-import vtk
+from . import vtk_api as vtk
 import math
 from .. import shared
-from .. import consts
 import qtpy
 from qtpy import QtCore, QtWidgets
 import vtkmodules.qt
@@ -47,9 +46,8 @@ from .layers.layer_single_image import LayerSingleImage
 from .layers.layer_glass import LayerGlass
 from .. import widgets_list
 
-if consts.ALLOW_ITK:
-    from .layers.layer_stack import LayerStack
-    from .layers.layer_isosurface import LayerIsoSurface
+from .layers.layer_stack import LayerStack
+from .layers.layer_isosurface import LayerIsoSurface
 
 
 class VTKWidget(QtWidgets.QWidget):

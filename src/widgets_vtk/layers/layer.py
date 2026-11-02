@@ -32,7 +32,7 @@
 
 """Main vtk layer."""
 
-import vtk
+from .. import vtk_api as vtk
 import numpy
 from ... import shared
 from ... import widgets_list

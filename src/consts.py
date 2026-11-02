@@ -78,7 +78,6 @@ ADVANCED = True  # Special options, True on develop branch
 
 # Some packages wich are difficult to install an not mandatory
 ALLOW_VTK = True
-ALLOW_ITK = True
 
 # Test files
 TEST_PATH = os.path.expanduser("~") + "/"

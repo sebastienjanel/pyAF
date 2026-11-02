@@ -32,7 +32,7 @@
 
 """Creates the vtk actors for the tomographies."""
 
-import vtk
+from .. import vtk_api as vtk
 import numpy
 from ... import widgets_list
 from ...tools.colortables import ColorTables

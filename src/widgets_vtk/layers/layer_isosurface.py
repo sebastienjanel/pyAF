@@ -31,13 +31,10 @@
 
 """Isosurface layer."""
 
-from ... import consts
 from ... import shared
 from .layer import Layer
 from ..utils.vtk_isosurface import get_isosurface
-
-if consts.ALLOW_ITK:
-    import itk
+from ..utils.vtk_image import read_frames
 
 
 class LayerIsoSurface(Layer):
@@ -60,11 +57,7 @@ class LayerIsoSurface(Layer):
             self.input_image = self.original_layer.input_image
         else:
             # Load from a saved tiff file
-            image_type = itk.Image[itk.UC, 3]
-            reader = itk.ImageFileReader[image_type].New()
-            reader.SetFileName(str(iso_file))
-            reader.Update()
-            self.input_image = reader.GetOutput()
+            self.input_image = read_frames(str(iso_file))[1]
 
         self.size_x = self.original_layer.size_x
         self.size_y = self.original_layer.size_y

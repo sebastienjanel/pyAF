@@ -33,7 +33,7 @@
 """Common tools."""
 
 import os
-import vtk
+from .. import vtk_api as vtk
 from ...tools import misc_tools
 
 
