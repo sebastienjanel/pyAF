@@ -826,13 +826,13 @@ def get_font_path():
 
 # Folders of the resources (relative to src, same layout in the application
 # built with PyInstaller), by file extension
-RESOURCE_FOLDERS = {".png": "images",
+RESOURCE_FOLDERS = {".png": "images", ".icns": "images",
                     ".mplstyle": os.path.join("gui_styles", "plot_styles"),
                     ".qss": os.path.join("gui_styles", "stylesheets")}
 
 
 def get_resource_path(relative_path):
-    """Path of an image (.png) or a style file (.mplstyle, .qss), from the
+    """Path of an image (.png, .icns) or a style file (.mplstyle, .qss), from the
     folder of the code (not the current folder)."""
     extension = os.path.splitext(relative_path)[1]
     return os.path.join(get_app_path(), RESOURCE_FOLDERS[extension],

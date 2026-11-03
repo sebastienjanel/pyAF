@@ -1140,10 +1140,15 @@ def main(app=None, files=None):
     # Init the GUI for the main window
     if app is None:
         app = QtWidgets.QApplication(["pyAF"])
-        # On macOS, the icon of the application (with the margins of the Dock)
+        # On macOS, the icon of the application is the one of its bundle (with
+        # the margins of the Dock); from the sources, the bundle is the one of
+        # Python: same icon, instead of the icon of Python in the Dock
         if sys.platform != "darwin":
             app.setWindowIcon(
                 QtGui.QIcon(misc_tools.get_resource_path("icon.png")))
+        elif not getattr(sys, "frozen", False):
+            app.setWindowIcon(
+                QtGui.QIcon(misc_tools.get_resource_path("icon.icns")))
         # Theme of the preferences (dark at the first launch)
         theme_handler(saved_theme())
 
