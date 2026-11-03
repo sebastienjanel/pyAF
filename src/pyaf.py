@@ -159,7 +159,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.default_font = QtWidgets.QApplication.font()
         self.default_font_name = self.default_font.defaultFamily()
         self.smallfont = QtWidgets.QApplication.font()  # Default font
-        self.smallfont.setPointSize(12)
+        self.smallfont.setPointSize(gui_tools.small_size(12))
         self.canvas_resolution = 72
         self.update_results = False
 
@@ -1140,6 +1140,12 @@ def main(app=None, files=None):
     # Init the GUI for the main window
     if app is None:
         app = QtWidgets.QApplication(["pyAF"])
+        if sys.platform == "win32":
+            # As on Linux: the style of Windows 11 has tall items in the lists
+            # of the selectors (higher than the screen for the maps), and the
+            # lists opened with an animation which flickers
+            app.setStyle("Fusion")
+            app.setEffectEnabled(QtCore.Qt.UI_AnimateCombo, False)
         # On macOS, the icon of the application is the one of its bundle (with
         # the margins of the Dock); from the sources, the bundle is the one of
         # Python: same icon, instead of the icon of Python in the Dock

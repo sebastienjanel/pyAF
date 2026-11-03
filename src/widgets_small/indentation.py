@@ -33,6 +33,7 @@
 """Small widget with a list used to change the indentation depth."""
 
 from qtpy import QtCore, QtWidgets
+from ..tools import gui_tools
 from ..tools.gui_tools import PYAFComboBox
 from .. import widgets_list
 from ..tools import apply_to_all
@@ -52,7 +53,7 @@ class WidgetIndentation(PYAFWidget):
         self.data_id = None
 
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(10)
+        self.smallfont.setPointSize(gui_tools.small_size(10))
 
         self.VL = QtWidgets.QVBoxLayout()
 

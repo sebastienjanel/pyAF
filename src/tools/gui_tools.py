@@ -55,9 +55,9 @@ class BoxData(QtWidgets.QWidget):
         self.data_id = i
         data = shared.exp.list[self.data_id]
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(10)
+        self.smallfont.setPointSize(small_size(10))
         self.smallfontbold = QtWidgets.QApplication.font()
-        self.smallfontbold.setPointSize(10)
+        self.smallfontbold.setPointSize(small_size(10))
         self.smallfontbold.setBold(True)
 
         self.VL = QtWidgets.QVBoxLayout()
@@ -721,8 +721,17 @@ def no_wrap_items(details):
     return re.sub(r"<li>", '<li style="white-space:pre">', details)
 
 
+def small_size(size):
+    """Point size of a small text: at most the size of the default font of
+    the system (13 points on macOS, 9 on Windows, usually 10 or 11 on Linux):
+    a fixed size is larger than the other texts on some systems."""
+    default = QtWidgets.QApplication.font().pointSize()
+    return min(size, default) if default > 0 else size
+
+
 def font_of_size(size):
-    """The default font of the application, with the given point size."""
+    """The default font of the application, with the given point size (at
+    most its default size)."""
     font = QtGui.QFont()
-    font.setPointSize(size)
+    font.setPointSize(small_size(size))
     return font

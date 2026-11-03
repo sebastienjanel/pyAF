@@ -73,7 +73,7 @@ class DFSWidget(PYAFWidget):
         super().__init__(parent, "widget_dfs")
 
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(12)
+        self.smallfont.setPointSize(gui_tools.small_size(12))
 
         self.VL = QtWidgets.QVBoxLayout()
 

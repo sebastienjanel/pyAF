@@ -131,4 +131,10 @@ def switch_theme(path):
     file = QFile(path)
     file.open(QFile.ReadOnly | QFile.Text)
     stream = QTextStream(file)
-    app.setStyleSheet(stream.readAll())
+    style = stream.readAll()
+    if sys.platform == "win32":
+        # Simple lists for the selectors (compact, the unavailable items in
+        # gray, nothing cut; as a menu with Fusion: the maps of the Results
+        # tab could not be told apart in the light theme)
+        style += "\nQComboBox { combobox-popup: 0; }\n"
+    app.setStyleSheet(style)

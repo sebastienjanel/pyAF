@@ -1226,6 +1226,12 @@ QComboBox QAbstractItemView::item:!selected:hover
     padding: 1px 4px;
 }
 
+QComboBox QAbstractItemView::item:disabled
+{
+    color: #A0A4A8;
+    background-color: #FCFCFC;
+}
+
 QSlider::groove:horizontal
 {
     border: 0.1ex solid #D0D3D7;

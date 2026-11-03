@@ -79,9 +79,9 @@ class DataWidget(PYAFWidget):
         self.list_unsel_styles = None
 
         self.smallfont = QtWidgets.QApplication.font()
-        self.smallfont.setPointSize(12)
+        self.smallfont.setPointSize(gui_tools.small_size(12))
         self.smallfontbold = QtWidgets.QApplication.font()
-        self.smallfontbold.setPointSize(12)
+        self.smallfontbold.setPointSize(gui_tools.small_size(12))
         self.smallfontbold.setBold(True)
 
         self.VL = QtWidgets.QVBoxLayout()
