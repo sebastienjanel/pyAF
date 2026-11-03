@@ -100,23 +100,24 @@ def prepare_data_hertzfit(app, dt, fit_params):
     if first > start:
         stop_m = app[0][first] + fit_len_m
 
+    # End of the baseline window, as an index of delta and data_to_fit (they
+    # begin at first)
+    poc_index_data = max(poc_index_i - first, 0)
+
     for ii in range(len(app[0])):
         # If first + ii exceed the length of the approach curve, use the inital poc position as stop
         if first + ii >= len(app[0]):
-            stop = poc_index_i
+            stop = poc_index_data
             break
         elif app[0][first + ii] >= stop_m:
             stop = ii - 1
             break
         else:
-            stop = poc_index_i
+            stop = poc_index_data
 
-    stop = stop - first
-
-    # If first and stop are the same value or stop is smaller than first.
-    # In that case use the initial poc position as stop.
-    if stop <= first:
-        stop = poc_index_i
+    # Empty window: use the initial poc position as stop.
+    if stop <= 0:
+        stop = poc_index_data
 
     delta = fcapp[0][first::]
     data_to_fit = fcapp[1][first::]

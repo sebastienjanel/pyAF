@@ -61,9 +61,24 @@ class Progressbar(PYAFWidget):
         self.last_events = 0.0
         self.progressbar.setRange(0, 0)
         self.adjustSize()
+        self.attach_to_window()
         self.show()
         # Center once shown, when the size of the title bar is known
         self.center_window()
+
+    def attach_to_window(self):
+        """Dialog of the current window (else of the main window, if it is
+        displayed), not an independent window: a new independent window at
+        each computation is announced by some systems ("pyAF is ready" with
+        GNOME). The window manager only is told (no Qt parent): the
+        progressbar does not depend on the life of that window."""
+        self.setWindowFlags(QtCore.Qt.Dialog)
+        window = QtWidgets.QApplication.activeWindow()
+        if window is None or not window.isVisible():
+            window = widgets_list.widget_main
+        if window is not None and window.isVisible():
+            self.winId()
+            self.windowHandle().setTransientParent(window.windowHandle())
 
     def center_window(self):
         """Center on the main window if it is displayed, else on the screen."""

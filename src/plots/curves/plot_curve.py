@@ -75,6 +75,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
         # Detected point of contact (before the fit moves it), displayed
         # with the point of contact of the fit
         self.poc_detected_pos = None
+        # The point of contact of the fit was not moved (fallback of the fit)
+        self.poc_fixed = False
         self.fits_lines_poc = None
         self.segments = None
         self.segments_fits = None
@@ -442,8 +444,11 @@ class PlotCurve(MainPlot, CommonCurveTools):
                            "o", color="m", mfc="none", markersize=7.0,
                            label="Original POC")
         if self.poc_pos is not None:
-            label = "Fit POC" \
-                if self.poc_detected_pos is not None else None
+            label = None
+            if self.poc_fixed:
+                label = "POC (fixed)"
+            elif self.poc_detected_pos is not None:
+                label = "Fit POC"
             self.axes.plot(self.poc_pos[0], self.poc_pos[1], "m.",
                            markersize=10.0, label=label)
 

@@ -34,7 +34,7 @@
 Widget used to do some clean up on curves.
 
 Curves can be replaced by another. This is useful when you have a missing
-pixel. A list of corrupted curves is also displayed.
+pixel. A list of the curves too short to be fitted is also displayed.
 
 """
 
@@ -60,7 +60,7 @@ class CleanUpWidget(PYAFWidget):
         self.VL = QtWidgets.QVBoxLayout()
 
         # BOX corrupted curves ------------------------------------------------
-        self.box_corrupted_curves = QtWidgets.QGroupBox("Corrupted curves")
+        self.box_corrupted_curves = QtWidgets.QGroupBox("Short curves")
         self.VL_labels = QtWidgets.QVBoxLayout()
 
         self.gridlayout_box_labels = QtWidgets.QGridLayout()

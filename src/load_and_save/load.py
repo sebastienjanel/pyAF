@@ -52,6 +52,8 @@ from .. import consts
 # Maps of the viscoelasticity with the same color scale in all the files at
 # load (the moduli, as the elasticity, keep the scale of each file)
 VISCO_MAPS = ("visco_fluidity", "visco_tan_delta")
+# Maximum number of files listed in the message about the short curves
+MAX_LISTED_FILES = 10
 
 
 class Load:
@@ -98,6 +100,9 @@ class Load:
         # Store the old length
         offset = len(shared.exp.list)
 
+        # Files loaded here with curves too short to be fitted
+        self.files_short_curves = []
+
         # Go through the list of files
         for i in range(len(files_info)):
             self.load_single_file(files_info[i])
@@ -143,28 +148,29 @@ class Load:
         shared.exp.meshgrid_click_xpos = 0
         shared.exp.meshgrid_click_ypos = 0
 
-        # Check for corrupted curves and display a message
-        str_corrupted = ""
-        count = 0
-        for i in range(len(files_info)):
-            ftype = files_info[i]["file_type"]
-            if files_info[i]["checked"] and ftype != "pyAF":
-                data = shared.exp.list[offset + count]
-                if data.corrupted_curves is not None:
-                    # Short name (as in the plots)
-                    from ..experiment import auto_short_name
-                    name = auto_short_name(os.path.basename(
-                        str(shared.exp.list[offset + count].filename)))
-                    str_corrupted = str_corrupted + "<li> " + name + "</li>"
-                    count += 1
+        # Display a message if some curves are too short to be fitted
+        lines = ""
+        for data in self.files_short_curves[:MAX_LISTED_FILES]:
+            # Short name (as in the plots)
+            from ..experiment import auto_short_name
+            name = auto_short_name(os.path.basename(str(data.filename)))
+            total = data.nbr_pixels_x * data.nbr_pixels_y
+            lines += "<li>" + name + " : " + \
+                str(len(data.corrupted_curves)) + " of " + str(total) + \
+                " curves</li>"
+        others = len(self.files_short_curves) - MAX_LISTED_FILES
+        if others > 0:
+            lines += "<li>... and " + str(others) + " other file" + \
+                ("s" if others > 1 else "") + "</li>"
 
-        if str_corrupted != "" and consts.UNIT_TESTING is False:
-            text = "The following files have corrupted curves: <ul>"\
-                + str_corrupted + "</ul>Please use the clean up widget to "\
-                "see which curves are corrupted."
+        if lines != "" and consts.UNIT_TESTING is False:
+            text = "Some curves are shorter than the baseline window of " \
+                "the point of contact, or have no data, and may not be " \
+                "fitted: <ul>" + lines + "</ul>The other curves are not " \
+                "affected. The Clean up widget lists these curves."
 
             # Warning (orange sign, as the other messages)
-            gui_tools.show_success(None, "Corrupted curves", details=text,
+            gui_tools.show_success(None, "Short curves", details=text,
                                    warning=True)
 
         # Check files with missmatch in the number of segments described in the header and the segments found
@@ -190,7 +196,8 @@ class Load:
             msg_corr.exec_()
 
         # Reset focus to main window
-        self.parent.activateWindow()
+        if self.parent.isVisible() and not self.parent.isActiveWindow():
+            self.parent.activateWindow()
 
         self.logger.debug("Loading successful")
 
@@ -279,35 +286,45 @@ class Load:
         shared.exp.update_global_values()
 
         if file_type != "pyAF":
-            # Check for errors in the files. Somes curves can be corrupted.
-            # (Bruker and JPK files). Two limits are set, if more than 1/4 of
-            # a curve is missing, it is considered corrupted. The corrupted
-            # curves can be cleaned with the clean up tool in the software.
+            # Curves too short to be fitted, listed to be discarded with the
+            # clean up tool: shorter than the baseline window of the point of
+            # contact (height range of the valid points), or without data. The number of points of a curve is
+            # not a criterion: JPK curves can have far fewer points than the
+            # longest one and be complete.
 
             data_set = shared.exp.list[offset]
 
-            # Define the two limits
-            limit_start = data_set.nbr_points_per_curve_approach / 4.0
-            limit_end = data_set.nbr_points_per_curve_approach - 10
+            # Baseline window, at most half of the ramp: with a window longer
+            # than the ramp (default values, short ramp), all the curves would
+            # be listed, and the window has to be changed for the file.
+            limit = (data_set.fitparam_poc_skip_start +
+                     data_set.fitparam_poc_fit_length)
+            if data_set.ramp_size:
+                limit = min(limit, abs(data_set.ramp_size) / 2.0)
 
-            # List of corrupted curves
+            # List of curves too short
             corrupted_curves = []
 
-            # Check for corrupted curves. Positions are determined
-            # in the respective loading class. These are the positions of
-            # the first and last valid values in the curves.
+            # Positions are determined in the respective loading class. These
+            # are the positions of the first and last valid values in the
+            # curves.
+            positions = data_set.approach_positions
             for i in range(data_set.nbr_pixels_x):
+                heights = data_set.curves_approach[i, :, 0, :]
                 for j in range(data_set.nbr_pixels_y):
-                    app_start = data_set.approach_positions[i][j][0]
-                    app_end = data_set.approach_positions[i][j][1]
-                    if app_start > limit_start or app_end < limit_end:
+                    app_start = int(positions[i][j][0])
+                    app_end = int(positions[i][j][1])
+                    if app_end - app_start < 2 or \
+                            abs(heights[j][app_end - 1] -
+                                heights[j][app_start]) < limit:
                         corrupted_curves.append([i, j])
 
-            # Store the corrupted curves in a list
+            # Store the curves in a list
             if corrupted_curves == []:
                 data_set.corrupted_curves = None
             else:
                 data_set.corrupted_curves = corrupted_curves
+                self.files_short_curves.append(data_set)
 
             # Create tables to store results (Already done for .pyaf files)
             shared.exp.temp_file.create_tables_for_results(offset, "all")

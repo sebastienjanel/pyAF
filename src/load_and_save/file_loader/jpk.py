@@ -369,6 +369,18 @@ class LoaderJPK:
         # print(self.segment_durations)
         # print(self.segment_freqs)
         # print(self.segment_amps)
+        if self.file_type != "JPK (Single File)":
+            # Labels of the segments, from the data if they are the wrong way
+            # (the approach would be analyzed as the retraction)
+            styles = {item[1]: item[0] for item in self.segments_types}
+            if "extend" in styles and "retract" in styles and \
+                    swapped_segments(self.afm_file, segment_pixels,
+                                     styles["extend"], styles["retract"]):
+                for item in self.segments_types:
+                    if item[1] in ("extend", "retract"):
+                        item[1] = "retract" if item[1] == "extend" \
+                            else "extend"
+
         for item in self.segments_types:
             if item[1] == "extend":
                 self.segments[item[1]] = str(item[0])
@@ -1230,6 +1242,36 @@ def pixels_of_segments(afm_file):
             pixels.setdefault(int(match.group(2)), set()).add(
                 int(match.group(1)))
     return pixels
+
+
+def swapped_segments(afm_file, segment_pixels, extend, retract):
+    """True if the segments of a map or QI file are labelled the wrong way:
+    in some QI files, the "retract" segment is first, its height rises and its
+    deflection ends high (at the setpoint), and the "extend" segment does the
+    opposite. Checked on a pixel with both segments (see fetch_header)."""
+    both = segment_pixels.get(extend, set()) & segment_pixels.get(retract,
+                                                                  set())
+    if not both:
+        return False
+
+    def trends(segment):
+        # Height rising, and deflection ending higher than it starts
+        values = []
+        for channel in ("height", "vDeflection"):
+            path = "index/" + str(min(both)) + "/segments/" + str(segment) + \
+                "/channels/" + channel + ".dat"
+            try:
+                raw = afm_file.read(path)
+            except KeyError:
+                return None
+            data = numpy.array(unpack(">" + str(len(raw) // 4) + "i", raw),
+                               dtype=float)
+            part = max(len(data) // 10, 1)
+            values.append(data[-part:].mean() > data[:part].mean())
+        return values
+
+    return trends(extend) == [False, False] and \
+        trends(retract) == [True, True]
 
 
 def has_force_curves(afm_file):

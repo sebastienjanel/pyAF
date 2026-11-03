@@ -1736,6 +1736,13 @@ class SingleFile:
         z = float(poc[0]) - shift
         return [z, a * z + b + error]
 
+    def poc_is_fixed(self, i, j):
+        """True if the point of contact of the fit of a curve was fixed
+        (fallback): the detected point, not moved by the fit."""
+        if not self.has_fit_quality():
+            return False
+        return float(self.get_node("/results/fit_quality")[i, j, 1]) == 1
+
     @property
     def fit_poc_fixed(self):
         """1 where the point of contact of the elasticity fit was fixed

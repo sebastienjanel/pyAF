@@ -114,6 +114,7 @@ class ResultsForceDist(PlotCurve):
             if self.data.display_poc and skip is False:
                 # On the force curve the poc is at 0,0
                 self.poc_pos = [0.0, 0.0]
+                self.poc_fixed = self.data.poc_is_fixed(xpos, ypos)
                 # Detected point of contact, if the fit moved it
                 detected = self.data.poc_detected(xpos, ypos)
                 if detected is not None and \

@@ -304,4 +304,5 @@ class Save:
             shared.exp.temp_file.open_file()
 
         # Reset focus to main window
-        parent.activateWindow()
+        if parent.isVisible() and not parent.isActiveWindow():
+            parent.activateWindow()

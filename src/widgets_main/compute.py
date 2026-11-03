@@ -83,6 +83,26 @@ def file_label(data):
     return experiment.auto_short_name(os.path.basename(str(data.filename)))
 
 
+def curves_lines(curves_by_file, max_files=10, max_curves=10):
+    """List of the curves in a message, one line by file (list of [short
+    name, positions of the curves]), limited so that the message stays
+    smaller than the screen: the curves without value are visible on the
+    maps."""
+    lines = ""
+    for name, curves in curves_by_file[:max_files]:
+        line = name + " : " + str(len(curves)) + \
+            (" curves : " if len(curves) > 1 else " curve : ") + \
+            ", ".join(curves[:max_curves])
+        if len(curves) > max_curves:
+            line += ", ..."
+        lines += "<li>" + line + "</li>"
+    others = len(curves_by_file) - max_files
+    if others > 0:
+        lines += "<li>... and " + str(others) + " other file" + \
+            ("s" if others > 1 else "") + "</li>"
+    return lines
+
+
 class ComputeWidget(PYAFWidget):
     """Main compute widget.
 
@@ -1689,20 +1709,24 @@ class ComputeWidget(PYAFWidget):
                 else:
                     found_error_list[i] = True
 
-            list_smoothing_warnings = ""
-            list_fit_warnings = ""
+            smoothing_curves = []
+            fit_curves = []
             text = ""
             for item in smoothing_warnings:
                 if item:
-                    name = shared.exp.list[item[0]].filename
-                    for values in item[1]:
-                        # values[0] is "smoothing_error" or "fit_error"
-                        # the curves are stored in values[1]
-                        line = "<li>" + name + " : " + values[1] + "</li>"
-                        if values[0] == "fit_error":
-                            list_fit_warnings += line
-                        else:
-                            list_smoothing_warnings += line
+                    name = file_label(shared.exp.list[item[0]])
+                    # values[0] is "smoothing_error" or "fit_error"
+                    # the curves are stored in values[1]
+                    fits = [values[1] for values in item[1]
+                            if values[0] == "fit_error"]
+                    others = [values[1] for values in item[1]
+                              if values[0] != "fit_error"]
+                    if fits:
+                        fit_curves.append([name, fits])
+                    if others:
+                        smoothing_curves.append([name, others])
+            list_smoothing_warnings = curves_lines(smoothing_curves)
+            list_fit_warnings = curves_lines(fit_curves)
 
             if list_stop_size_error != "":
                 text = "The 'stop' value is too big ! The maximum value you \
@@ -1721,9 +1745,9 @@ class ComputeWidget(PYAFWidget):
 
             if list_fit_warnings != "":
                 fit_text = "The fit failed for some curves (no contact or \
-                        not enough points in the fit range). No stiffness \
-                        value was stored for these curves (displayed as \
-                        NaN).<br><br>The following curves had a problem : \
+                        not enough points in the fit range). No elasticity \
+                        or stiffness value was stored for these curves \
+                        (displayed as NaN).<br><br>The following curves had a problem : \
                         <ul>" + list_fit_warnings + "</ul>"
                 if list_smoothing_warnings != "":
                     text += "<br>" + fit_text

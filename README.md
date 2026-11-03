@@ -39,7 +39,7 @@ Minimum systems (64 bits): macOS 14, Windows 10, Ubuntu 22.04 or another Linux w
 
 - **macOS** (`.dmg`, `AppleSilicon` or `Intel` according to your Mac: Apple menu / About This Mac): open it and drag pyAF to Applications. The application is not signed by Apple: at the first opening, macOS refuses to open it. Open System Settings / Privacy & Security, then click "Open Anyway" in front of pyAF (or, in a terminal: `xattr -dr com.apple.quarantine /Applications/pyAF.app`).
 - **Windows** (`.zip`): unzip it (e.g. in Documents) and run `pyAF.exe` in the `pyAF` folder. The application is not signed: if Windows SmartScreen shows a warning, click "More info", then "Run anyway".
-- **Linux** (`.tar.xz`): extract it (`tar -xJf pyAF-*.tar.xz`) and run `pyAF/pyAF`. Qt may need `libxcb-cursor0` (see Known issues).
+- **Linux** (`.tar.xz`): extract it where you want to keep it (`tar -xJf pyAF-*.tar.xz`), then add pyAF to the applications menu once with `pyAF/install.sh` (no administrator rights needed; run it again if you move the folder, `pyAF/install.sh --uninstall` removes the launcher). You can also run `pyAF/pyAF` directly. Qt may need `libxcb-cursor0` (see Known issues).
 
 The applications take about 0.5 GB once installed (Qt and VTK for the 3D view) and a few seconds to start.
 

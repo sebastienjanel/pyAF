@@ -50,14 +50,14 @@ def add_discard_actions_to_menu(parent, menu):
         single_curve = "Discard curve"
 
     if data.discard_corrupted_curves_applied:
-        single_file = "Keep corrupted (this file)"
+        single_file = "Keep short curves (this file)"
     else:
-        single_file = "Discard corrupted (this file)"
+        single_file = "Discard short curves (this file)"
 
     if shared.exp.discard_corrupted_curves_applied_all:
-        all_files = "Keep corrupted (all files)"
+        all_files = "Keep short curves (all files)"
     else:
-        all_files = "Discard corrupted (all files)"
+        all_files = "Discard short curves (all files)"
 
     # Change curve's status (discarded or not)
     action = QtWidgets.QAction(single_curve, parent)

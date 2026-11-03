@@ -114,6 +114,8 @@ jobs:
           if find "dist/$APP" -name "libstdc++.so*" -o -name "libgcc_s.so*" | grep .; then
             exit 1
           fi
+          # Script adding pyAF to the applications menu
+          install -m 755 packaging/linux/install.sh "dist/$APP/install.sh"
           XZ_OPT=-T0 tar -C dist -cJf "$PACKAGE-$PYAF_VERSION.tar.xz" "$APP"
 
       - uses: actions/upload-artifact@v4
