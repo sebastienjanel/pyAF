@@ -741,6 +741,15 @@ class GetResults:
 
         Filtering can be done by slope or distance limit.
         """
+        # No event: the curve is not needed (most of the curves of a map)
+        if len(self.data.events_forces[i][j]) == 0:
+            if type_of_data == "events_per_curve" or \
+                    type_of_data == "events_rupture_force":
+                return 0
+            if type_of_data == "loading_rates":
+                return [], []
+            return []
+
         _, retraction, _, _,  _, _ = \
             curve_tools.get_curve(self.data, [i, j], mode="results_sorting")
 
@@ -758,12 +767,12 @@ class GetResults:
             elif type_of_data == "loading_rates":
                 return [], []
 
-        joc2_real = self.data.events_jocs2_real[i][j]
+        joc2_real = self.data.events_jocs2_real[i, j]
 
         re = curve_tools.get_force_curves(retraction[0], retraction[1],
                                           joc2_real, self.data.spring_constant)
 
-        ret_pos = self.data.retraction_positions[i][j][0]
+        ret_pos = self.data.retraction_positions[i, j][0]
 
         # Get distance between two points on the curve
         xdist = math_tools.get_x_dist(re[0], ret_pos)

@@ -32,9 +32,7 @@
 
 """Tool used to correct the stiffness by different models."""
 
-import concurrent.futures
 import os
-import sys
 import numpy
 import logging
 from .. import shared
@@ -43,9 +41,6 @@ from ..widgets.progressbar import Progressbar
 from . import multiproc
 from .stiffness import bec
 from .stiffness import contact_models
-
-# Number of curves sent at once to a process
-CURVES_PER_TASK = 32
 
 
 class StiffnessCorrection:
@@ -162,31 +157,13 @@ class StiffnessCorrection:
         reads the curves."""
         nx, ny = data.nbr_pixels_x, data.nbr_pixels_y
         factors = numpy.ones((nx, ny))
-        settings = bec.fit_settings(data)
-
-        nbr_workers = max(1, min(shared.exp.cores, nx * ny))
-        if sys.platform == "win32":
-            # Maximum number of processes of a pool on Windows
-            nbr_workers = min(nbr_workers, 61)
-        executor = multiproc.get_executor(nbr_workers) \
-            if nbr_workers > 1 else None
-
-        futures = []
 
         def store(results):
             for i, j, factor in results:
                 factors[i, j] = factor
             widgets_list.widget_progressbar.update(len(results))
 
-        def submit(curves):
-            task = {"settings": settings, "curves": curves}
-            if executor is None:
-                store(bec.correction_factors(task))
-            else:
-                futures.append(executor.submit(bec.correction_factors, task))
-
-        try:
-            curves = []
+        def curves():
             for i in range(nx):
                 for j in range(ny):
                     height = heights[i, j]
@@ -199,22 +176,8 @@ class StiffnessCorrection:
                     if points is None:
                         widgets_list.widget_progressbar.update()
                         continue
-                    curves.append((i, j, points[0], points[1], height))
-                    if len(curves) == CURVES_PER_TASK:
-                        submit(curves)
-                        curves = []
-                    # Results of the finished tasks
-                    for future in [f for f in futures if f.done()]:
-                        futures.remove(future)
-                        store(future.result())
-            if curves:
-                submit(curves)
-            for future in concurrent.futures.as_completed(futures):
-                store(future.result())
-        except BaseException:
-            for future in futures:
-                future.cancel()
-            multiproc.shutdown_pool(wait=False)
-            widgets_list.widget_progressbar.close()
-            raise
+                    yield i, j, points[0], points[1], height
+
+        multiproc.compute_curves(bec.correction_factors, bec.fit_settings(data),
+                                 curves(), store, nx * ny)
         return factors

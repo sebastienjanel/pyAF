@@ -93,6 +93,55 @@ def get_executor(nbr_workers):
     return _EXECUTOR
 
 
+def compute_curves(function, common, curves, store, nbr_curves,
+                   curves_per_task=32):
+    """Computes curves on the processes of the pool, read by the main process.
+
+    function: called in the processes, with the task {"common": common,
+    "curves": list of curves}, returns the results of the curves of the task.
+    curves: iterable of the curves to compute (read when they are needed).
+    store: called in the main process with the results of each task.
+    nbr_curves: number of curves of the map, to choose the number of processes.
+    """
+    nbr_workers = max(1, min(shared.exp.cores, nbr_curves))
+    if sys.platform == "win32":
+        # Maximum number of processes of a pool on Windows
+        nbr_workers = min(nbr_workers, 61)
+    executor = get_executor(nbr_workers) if nbr_workers > 1 else None
+
+    futures = []
+
+    def submit(part):
+        task = {"common": common, "curves": part}
+        if executor is None:
+            store(function(task))
+        else:
+            futures.append(executor.submit(function, task))
+
+    try:
+        part = []
+        for curve in curves:
+            part.append(curve)
+            if len(part) == curves_per_task:
+                submit(part)
+                part = []
+            # Results of the finished tasks
+            for future in [f for f in futures if f.done()]:
+                futures.remove(future)
+                store(future.result())
+        if part:
+            submit(part)
+        for future in concurrent.futures.as_completed(futures):
+            store(future.result())
+    except BaseException:
+        # Error in a process (or process stopped): stop the computation
+        for future in futures:
+            future.cancel()
+        shutdown_pool(wait=False)
+        widgets_list.widget_progressbar.close()
+        raise
+
+
 def shutdown_pool(wait=True):
     """Stops the processes of the pool (at the end of the application, or
     after an error)."""

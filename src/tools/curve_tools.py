@@ -113,14 +113,18 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
         # print(time_segments)
 
         # Used for the plots, or the details widget, results_sorting
-        curve_x_app = data.curves_approach[i][j][0]
-        curve_y_app = data.curves_approach[i][j][1]
-        curve_x_ret = data.curves_retraction[i][j][0]
-        curve_y_ret = data.curves_retraction[i][j][1]
+        # Read once, and only this curve (node[i] reads a whole column of the
+        # map)
+        curve_app = data.curves_approach[i, j]
+        curve_ret = data.curves_retraction[i, j]
+        curve_x_app = curve_app[0]
+        curve_y_app = curve_app[1]
+        curve_x_ret = curve_ret[0]
+        curve_y_ret = curve_ret[1]
 
         if get_time_segments_flag:
-            curve_x_time_app = data.curves_approach[i][j][2]
-            curve_x_time_ret = data.curves_retraction[i][j][2]
+            curve_x_time_app = curve_app[2]
+            curve_x_time_ret = curve_ret[2]
         elif mode in ("curve_dataa", "curve_datab"):
             # Time plots of the data tab: time computed for the Nanoscope
             # files
@@ -130,11 +134,12 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
                 curve_x_time_app, curve_x_time_ret = times
 
         if data.nbr_points_per_pause_curve is not None:
-            curve_x_pause = data.curves_pause[i][j][0]
-            curve_y_pause = data.curves_pause[i][j][1]
+            curve_pause = data.curves_pause[i, j]
+            curve_x_pause = curve_pause[0]
+            curve_y_pause = curve_pause[1]
 
             if get_time_segments_flag:
-                curve_x_time_pause = data.curves_pause[i][j][2]
+                curve_x_time_pause = curve_pause[2]
 
         # The modulation segments are read with get_modulation_segments
         # (several segments, not needed by the other computations)
@@ -229,8 +234,8 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
         if curve_x_ret is not None:
             ind_offset_ret = dt["retraction_position"]
     else:
-        ind_offset_app = data.approach_positions[i][j]
-        ind_offset_ret = data.retraction_positions[i][j]
+        ind_offset_app = data.approach_positions[i, j]
+        ind_offset_ret = data.retraction_positions[i, j]
 
     app = None
     ret = None

@@ -42,6 +42,7 @@ from ..tools import breakthrough_tools
 from ..tools import curve_tools
 from ..tools import misc_tools
 from ..widgets.progressbar import Progressbar
+from . import multiproc
 
 
 def compute(calc_id):
@@ -61,26 +62,36 @@ def compute(calc_id):
     widgets_list.widget_progressbar.set_label("Breakthroughs")
     widgets_list.widget_progressbar.set_range(0, nx * ny)
 
-    found = 0
-    for i in range(nx):
-        for j in range(ny):
-            if data.discarded_curves[i][j] == 0:
+    found = [0]
+
+    def store(curves):
+        for i, j, events in curves:
+            for k, (force, thickness, peak, end) in enumerate(events):
+                # Force in N
+                results[i, j, k] = (force * 1e-9, thickness, peak, end)
+            found[0] += bool(events)
+        widgets_list.widget_progressbar.update(len(curves))
+
+    def curves():
+        for i in range(nx):
+            for j in range(ny):
+                if data.discarded_curves[i][j] != 0:
+                    widgets_list.widget_progressbar.update()
+                    continue
                 approach, _, _, _, _, _ = curve_tools.get_curve(
                     data, [i, j], mode="curve_results")
-                events = breakthrough_tools.detect(
-                    approach[0], approach[1], spring_constant,
-                    n_sigma=data.breakthrough_n_sigma,
-                    min_thickness=data.breakthrough_min_thickness,
-                    min_force=data.breakthrough_min_force,
-                    max_events=max_events)
-                for k, (force, thickness, peak, end) in enumerate(events):
-                    # Force in N
-                    results[i, j, k] = (force * 1e-9, thickness, peak, end)
-                found += bool(events)
-            widgets_list.widget_progressbar.update()
+                yield i, j, approach[0], approach[1]
+
+    options = {"spring_constant": spring_constant,
+               "n_sigma": data.breakthrough_n_sigma,
+               "min_thickness": data.breakthrough_min_thickness,
+               "min_force": data.breakthrough_min_force,
+               "max_events": max_events}
+    multiproc.compute_curves(breakthrough_tools.detect_curves, options,
+                             curves(), store, nx * ny)
 
     data.breakthrough_results = results
     data.breakthrough_calculated = True
     data.update()
     widgets_list.widget_progressbar.close()
-    return found
+    return found[0]

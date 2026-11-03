@@ -162,3 +162,11 @@ def detect(z, deflection, spring_constant, n_sigma=6.0, min_thickness=1.0,
             continue
         i += 1
     return events
+
+
+def detect_curves(task):
+    """Breakthroughs of curves, in a process of the computation (see
+    multiproc.compute_curves). task: options of detect and list of (i, j, z,
+    deflection). Returns the list of (i, j, events)."""
+    return [(i, j, detect(z, deflection, **task["common"]))
+            for i, j, z, deflection in task["curves"]]

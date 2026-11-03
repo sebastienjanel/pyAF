@@ -243,8 +243,8 @@ def correction_factor(settings, delta, force, height):
 
 
 def correction_factors(task):
-    """Factors of curves, in a process of the computation. task: settings
-    and list of (i, j, delta, force, height). Returns the list of (i, j,
-    factor)."""
-    return [(i, j, correction_factor(task["settings"], delta, force, height))
+    """Factors of curves, in a process of the computation (see
+    multiproc.compute_curves). task: settings and list of (i, j, delta, force,
+    height). Returns the list of (i, j, factor)."""
+    return [(i, j, correction_factor(task["common"], delta, force, height))
             for i, j, delta, force, height in task["curves"]]

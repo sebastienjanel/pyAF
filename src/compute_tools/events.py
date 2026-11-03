@@ -134,7 +134,7 @@ class GetEvents:
                 # Postion of the jump of contact
                 # Needed for the stop value. Beyond the joc no event will be
                 # searched. Can also be used to filter the events by distance.
-                retpos = data.retraction_positions[i][j][0]
+                retpos = data.retraction_positions[i, j][0]
                 joc2_i, joc2_r, fit_joc, _ = \
                     search_joc2_events.get_JOC_events(ret, retpos, fit_params)
 
