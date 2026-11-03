@@ -306,13 +306,20 @@ class TempFile:
         comp = tables.Filters(complevel=9, complib="blosc")
         fi = self.file
 
+        # One chunk for each curve: the curves are written one at a time, and
+        # a chunk shared by several curves is compressed again at each write
+        # (most of the loading time: 2 to 8 times longer on large files)
+        def curve_chunks(shape):
+            return (1, 1) + shape[2:]
+
         # Curves (approach)
         shape = (dt.nbr_pixels_x,
                  dt.nbr_pixels_y,
                  n,
                  dt.nbr_points_per_curve_approach)
         fi.create_carray(st + "/curves", "approach", tables.Float32Atom(),
-                         shape=shape, filters=comp)
+                         shape=shape, filters=comp,
+                         chunkshape=curve_chunks(shape))
 
         # Curves (retraction)
         shape = (dt.nbr_pixels_x,
@@ -320,7 +327,8 @@ class TempFile:
                  n,
                  dt.nbr_points_per_curve_retraction)
         fi.create_carray(st + "/curves", "retraction", tables.Float32Atom(),
-                         shape=shape, filters=comp)
+                         shape=shape, filters=comp,
+                         chunkshape=curve_chunks(shape))
 
         # Curves (pause)
         if dt.nbr_points_per_pause_curve is not None:
@@ -330,7 +338,8 @@ class TempFile:
                 n,
                 dt.nbr_points_per_pause_curve)
             fi.create_carray(st + "/curves", "pause", tables.Float32Atom(),
-                             shape=shape, filters=comp)
+                             shape=shape, filters=comp,
+                             chunkshape=curve_chunks(shape))
 
         # Curves (modulation): all the modulation segments of each pixel,
         # padded to the longest one (see data.modulation_nbr_points)
@@ -342,7 +351,8 @@ class TempFile:
                 n,
                 dt.nbr_points_per_modulation_curve)
             fi.create_carray(st + "/curves", "modulation", tables.Float32Atom(),
-                             shape=shape, filters=comp)
+                             shape=shape, filters=comp,
+                             chunkshape=curve_chunks(shape))
 
         # Piezo image
         fi.create_carray(st + "/piezo_image", "piezo_image",
