@@ -33,6 +33,7 @@
 """Some tools for the graphical interface of PYAF."""
 
 import logging
+import sys
 import os
 import re
 from .. import shared
@@ -726,7 +727,12 @@ def small_size(size):
     the system (13 points on macOS, 9 on Windows, usually 10 or 11 on Linux):
     a fixed size is larger than the other texts on some systems."""
     default = QtWidgets.QApplication.font().pointSize()
-    return min(size, default) if default > 0 else size
+    if default <= 0:
+        return size
+    # On Linux, one point less: the default font looks larger
+    if sys.platform.startswith("linux"):
+        default -= 1
+    return min(size, default)
 
 
 def font_of_size(size):
