@@ -1436,6 +1436,14 @@ QHeaderView
     border-radius: 10px;
 }
 
+/* Lists of the selectors: compact (without the margins of the lists above) */
+QComboBox QAbstractItemView::item,
+QComboBox QAbstractItemView::item:!selected:hover
+{
+    margin: 0px;
+    padding: 1px 4px;
+}
+
 QTableView::item:pressed,
 QListView::item:pressed,
 QTreeView::item:pressed

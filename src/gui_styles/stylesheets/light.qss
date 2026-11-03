@@ -1218,6 +1218,14 @@ QTreeView::item:!selected:hover
     padding: 0.3ex;
 }
 
+/* Lists of the selectors: compact (without the margins of the lists above) */
+QComboBox QAbstractItemView::item,
+QComboBox QAbstractItemView::item:!selected:hover
+{
+    margin: 0px;
+    padding: 1px 4px;
+}
+
 QSlider::groove:horizontal
 {
     border: 0.1ex solid #D0D3D7;
