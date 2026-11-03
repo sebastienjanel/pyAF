@@ -56,6 +56,12 @@ from ..compute_tools.stiffness import contact_models
 SCHEMA = 1
 
 
+def result_type_name(name):
+    """Name of a result or map type in the exported files."""
+    return str(name).replace("stiffness_corr", "elasticity_bec").replace(
+        "stiffness", "elasticity")
+
+
 def jsonable(value):
     """Value for JSON: numpy numbers and arrays as Python ones, NaN and
     infinities as null."""
@@ -319,6 +325,11 @@ SETTINGS = {
     "calibration": ("spring_constant", "deflection_sensitivity"),
 }
 
+# Names in the exported files of the settings named after the stiffness
+# (the exported files from before are still read, see tools.params_import)
+EXPORT_NAMES = {"stiffness_model_selected": "elasticity_model_selected",
+                "stiffness_mode": "elasticity_mode"}
+
 # Computations of the parts (their settings are given if computed)
 COMPUTED = {"elasticity": "stiffness_calculated",
             "viscoelasticity": "visco_calculated",
@@ -345,7 +356,7 @@ def settings(data):
                 # used_spring_constant is in N/nm (property)
                 value = value * 1e9 if value is not None else None
             if value is not None:
-                values[name] = value
+                values[EXPORT_NAMES.get(name, name)] = value
         result[part] = values or None
     return result
 
@@ -414,8 +425,7 @@ def build(export, file_name, data_ids=None, rows=None, options=None):
                      timespec="seconds"),
                  "export": export,
                  "file": os.path.basename(file_name) if file_name else None},
-        "result": {"type": shared.exp.results_type,
-                   "remove_values_le_0": bool(shared.exp.hist_remove_zeros)},
+        "result": {"remove_values_le_0": bool(shared.exp.hist_remove_zeros)},
         "files": [file_params(shared.exp.list[i]) for i in data_ids]}
     if options:
         params["result"].update(options)

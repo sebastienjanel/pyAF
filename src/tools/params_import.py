@@ -35,7 +35,7 @@ with the loaded settings."""
 
 import json
 
-from .params_export import SETTINGS
+from .params_export import EXPORT_NAMES, SETTINGS
 
 # Parts of the settings, in the order of the dialog: (key, name)
 PARTS = (("elasticity", "Elasticity"),
@@ -112,9 +112,14 @@ def apply(data, settings, parts):
     for part in parts:
         values = settings.get(part) or {}
         for name in SETTINGS[part]:
-            if name not in values:
+            # Name in the exported files, or in the files from before
+            label = EXPORT_NAMES.get(name, name)
+            if label in values:
+                new = values[label]
+            elif name in values:
+                new = values[name]
+            else:
                 continue
-            new = values[name]
             if part == "calibration" and name == "spring_constant":
                 # Stored in N/m, the property gives N/nm
                 old = data.spring_constant * 1e9
@@ -126,6 +131,6 @@ def apply(data, settings, parts):
                     new.is_integer():
                 new = int(new)
             if old != new:
-                changes.append((name, old, new))
+                changes.append((label, old, new))
                 setattr(data, name, new)
     return changes

@@ -342,15 +342,17 @@ def export_superplot(path):
         files.append(tests_path)
     control = next((c.name for c in shared.exp.conditions_list[1:]
                     if c.condition_id == options["control"]), None)
+    superplot = {
+        "control": "all pairs"
+        if options["control"] == superplot_tools.ALL_PAIRS else control,
+        "replicates": "paired" if options["paired"] else "unpaired",
+        "test": "mixed model" if options["test"] == "mixed"
+        else "replicate means",
+        "log_scale": bool(options["log"])}
     files.append(params_export.write_sidecar(
         path, "SuperPlot values and tests", rows=superplot_rows(),
-        options={"superplot": {
-            "control": "all pairs"
-            if options["control"] == superplot_tools.ALL_PAIRS else control,
-            "replicates": "paired" if options["paired"] else "unpaired",
-            "test": "mixed model" if options["test"] == "mixed"
-            else "replicate means",
-            "log_scale": bool(options["log"])}}))
+        options={"type": map_type_name(str(shared.exp.results_type)),
+                 "superplot": superplot}))
     return files
 
 
@@ -412,8 +414,7 @@ def export_dfs_fits(path, mode=None):
 
 def map_type_name(map_type):
     """Short name of a map for the file names."""
-    return map_type.replace("stiffness_corr", "elasticity_bec").replace(
-        "stiffness", "elasticity")
+    return params_export.result_type_name(map_type)
 
 
 def map_lut(data, map_type):
@@ -453,7 +454,8 @@ def export_map(path, data_id, map_type):
     pixel_y = data.scan_size_y / data.nbr_pixels_y / 1000.0
     info = params_export.tiff_description(
         "Map " + map_values.label(data, map_type), path, [data_id],
-        options={"map": map_type, "unit": map_values.label(data, map_type),
+        options={"map": map_type_name(map_type),
+                 "unit": map_values.label(data, map_type),
                  "pixel_size_um": [pixel_x, pixel_y]})
     tifffile.imwrite(
         path, image, imagej=True,
@@ -485,7 +487,7 @@ def export_map_figure(path, data_id, dpi=300):
     data = shared.exp.list[data_id]
     json_path = params_export.write_sidecar(
         path, "Map figure", data_ids=[data_id],
-        options={"map": data.meshgrid_type})
+        options={"map": map_type_name(data.meshgrid_type)})
     return [path, json_path]
 
 

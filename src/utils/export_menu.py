@@ -101,8 +101,8 @@ def ask_path(parent, title, name, file_filter):
 
 
 def base_name():
-    """Name of the exports: results type of the plots."""
-    return str(shared.exp.results_type)
+    """Name of the exports of one result: results type of the plots."""
+    return export.map_type_name(str(shared.exp.results_type))
 
 
 def plots_ready(parent):
@@ -125,12 +125,12 @@ def export_clicked(parent, key):
     if key == "data_table":
         if plots_ready(parent):
             path = ask_path(parent, "Export the data table",
-                            base_name() + "_data.csv", csv_filter)
+                            "pyAF_data_table.csv", csv_filter)
             files = path and export.export_data_table(path)
     elif key == "summary":
         if plots_ready(parent):
             path = ask_path(parent, "Export the summary",
-                            base_name() + "_summary.csv", csv_filter)
+                            "pyAF_summary.csv", csv_filter)
             files = path and export.export_summary(path)
     elif key == "superplot":
         files = export_superplot(parent)
@@ -196,7 +196,7 @@ def export_all(parent):
     """Everything in a new folder (or an existing one, after asking).
     Returns the written files."""
     path = ask_path(parent, "Name of the folder of the export",
-                    "pyAF_export_" + base_name(), "Folder (*)")
+                    "pyAF_export", "Folder (*)")
     if not path:
         return None
     if os.path.isfile(path):
