@@ -160,18 +160,34 @@ def fit_range_mask(data, delta, force):
     return mask
 
 
+def fit_settings(data):
+    """Settings of the fits of the B.E.C. (no data object: they are sent to
+    the processes of the computation)."""
+    return {"model": data.used_stiffness_model_selected,
+            "radius": data.used_tip_radius * 1e-9,
+            "tip_angle": data.used_tip_angle,
+            "poisson_ratio": data.used_poisson_ratio,
+            "shell_thickness": data.get_used_shell_thickness() * 1e-9,
+            "poc_window": data.used_fit_poc_window or 0}
+
+
+def settings_unit_force(settings, delta, height=None):
+    """Force per unit modulus of the model of the settings, with the B.E.C.
+    factor for a height [m] (none if None or nan)."""
+    model, radius = settings["model"], settings["radius"]
+    g = contact_models.unit_force(model, radius, settings["tip_angle"],
+                                  settings["poisson_ratio"], delta,
+                                  settings["shell_thickness"])
+    if height is not None and numpy.isfinite(height):
+        g = g * contact_models.bec_factor(delta, model, radius,
+                                          settings["tip_angle"], height)
+    return g
+
+
 def unit_force(data, delta, height=None):
     """Force per unit modulus of the model used for the elasticity, with the
     B.E.C. factor for a height [m] (none if None or nan)."""
-    model = data.used_stiffness_model_selected
-    radius = data.used_tip_radius * 1e-9
-    g = contact_models.unit_force(model, radius, data.used_tip_angle,
-                                  data.used_poisson_ratio, delta,
-                                  data.get_used_shell_thickness() * 1e-9)
-    if height is not None and numpy.isfinite(height):
-        g = g * contact_models.bec_factor(delta, model, radius,
-                                          data.used_tip_angle, height)
-    return g
+    return settings_unit_force(fit_settings(data), delta, height)
 
 
 def fit_points(data, i, j):
@@ -192,7 +208,7 @@ def fit_points(data, i, j):
     return delta[keep], force[keep]
 
 
-def fit_elasticity(data, delta, force, height):
+def fit_elasticity(settings, delta, force, height):
     """Elasticity fitted with the point of contact free (delta0, within the
     window of the elasticity fit), else with the point of contact fixed,
     for a height [m] of the B.E.C. (None: no correction)."""
@@ -200,35 +216,35 @@ def fit_elasticity(data, delta, force, height):
     # As in the elasticity fit: global least squares of the point of
     # contact, later by a part of the indentation at most, earlier down to
     # the start of the fitted points
-    window = (data.used_fit_poc_window or 0) / 100.0 * numpy.max(delta)
+    window = settings["poc_window"] / 100.0 * numpy.max(delta)
     delta0, e0 = fit_tools.fit_poc_profile(
-        lambda x: unit_force(data, x, height), delta, force,
+        lambda x: settings_unit_force(settings, x, height), delta, force,
         numpy.min(delta), window)
     if numpy.isfinite(e0) and numpy.min(delta) <= delta0 <= window:
         return e0
     # Point of contact of the elasticity fit (E = sum(F g) / sum(g g))
-    g = unit_force(data, delta, height)
+    g = settings_unit_force(settings, delta, height)
     norm = numpy.sum(g * g)
     return numpy.sum(force * g) / norm if norm > 0 else numpy.nan
 
 
-def correction_factor(data, i, j, height):
+def correction_factor(settings, delta, force, height):
     """Factor of the elasticity of a pixel for the B.E.C. (<= 1): ratio of
     the elasticities fitted with and without the B.E.C. on the points of
-    the elasticity fit (point of contact fitted again).
-
-    height in nm; 1 if there is no height (nan: below the noise floor), nan
+    the elasticity fit (point of contact fitted again), height in nm; nan
     if the curve can not be fitted.
     """
-    if not numpy.isfinite(height):
-        return 1.0
-    points = fit_points(data, i, j)
-    if points is None:
-        return numpy.nan
-    delta, force = points
-    e = fit_elasticity(data, delta, force, None)
-    e_bec = fit_elasticity(data, delta, force, height * 1e-9)
+    e = fit_elasticity(settings, delta, force, None)
+    e_bec = fit_elasticity(settings, delta, force, height * 1e-9)
     if not (numpy.isfinite(e) and numpy.isfinite(e_bec)) or e <= 0 or \
             e_bec <= 0:
         return numpy.nan
     return float(e_bec / e)
+
+
+def correction_factors(task):
+    """Factors of curves, in a process of the computation. task: settings
+    and list of (i, j, delta, force, height). Returns the list of (i, j,
+    factor)."""
+    return [(i, j, correction_factor(task["settings"], delta, force, height))
+            for i, j, delta, force, height in task["curves"]]
