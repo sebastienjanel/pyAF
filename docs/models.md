@@ -145,7 +145,7 @@ $$G^*(f) = \frac{1-\nu}{4\sqrt{R\delta_0}}\left[H(f) - i 2\pi f b(0)\right]$$
 
 Viscous drag (Alcaraz et al. [25]), measured above the surface at several heights and extrapolated to the surface:
 
-$$b(h) = \frac{\operatorname{Im}(F/\delta)}{2\pi f}, \qquad b(h) = \frac{6\pi\eta a_{\text{eff}}^2}{h + h_{\text{eff}}}, \qquad b(0) = \frac{6\pi\eta a_{\text{eff}}^2}{h_{\text{eff}}}$$
+$$b(h) = \frac{\mathrm{Im}(F/\delta)}{2\pi f}, \qquad b(h) = \frac{6\pi\eta a_{\text{eff}}^2}{h + h_{\text{eff}}}, \qquad b(0) = \frac{6\pi\eta a_{\text{eff}}^2}{h_{\text{eff}}}$$
 
 For the four-sided pyramid, Alcaraz et al. [24] use $F = \frac{3E\tan\theta}{4(1-\nu^2)}\delta^2$ (their eq. 1) and $G^* = \frac{1-\nu}{3\delta_0\tan\theta}\left[H - i2\pi f b(0)\right]$ (their eq. 6). pyAF uses the coefficient of section 3, $1/\sqrt{2}$ instead of $3/4$, which gives moduli about 6 % higher.
 
@@ -159,7 +159,7 @@ Both are measured from the line through the two jumps of contact of the retract 
 ## 10. Unbinding events
 
 - **Kernel**: convolution of the curve with a step kernel, normalized on the noise, with an optional adaptive threshold (a Savitzky-Golay smoothing of the convolution is subtracted).
-- **MSF**: in a sliding window, comparison of a step fit and of a single line, $d = (\text{res}_{\text{line}} - \text{res}_{\text{step}}) \Delta y / \text{norm}$.
+- **MSF**: in a sliding window, comparison of a step fit and of a single line: the difference of their residuals, multiplied by the height of the step and normalized.
 - **Force of an event**: $|y_1 - y_2|$, the fit through the step crossing the linear fits on each side.
 - **Loading rate**: $r = \frac{dF}{dz} v$, slope over the rise of the force after the event, up to a fraction of the force of the event.
 
