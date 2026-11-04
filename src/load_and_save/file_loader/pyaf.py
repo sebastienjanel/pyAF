@@ -33,7 +33,6 @@
 """Loads .pyaf files."""
 
 import os
-import tables
 
 from ... import consts
 import logging
@@ -41,7 +40,6 @@ from ... import widgets_list
 from ... import shared
 from ...tools import misc_tools
 from ...tools import pickle_tools
-from ...tools import event_filter_tools
 
 class LoaderPYAF:
     """Class used to load pyAF files."""
@@ -110,33 +108,13 @@ class LoaderPYAF:
         # Load main prefs (experiment class)
         general_prefs = inputfile.read(globaloffset)
 
-        try:
-            general_prefs = pickle_tools.loads(general_prefs, encoding=consts.ENCODING)
-
-        except ImportError:
-            # In previous versions of pyAF, when you pickle dump the general
-            # preferences, you dump also some objects linked to classes in
-            # the experiment module. (for example groups or results).
-            # The imports were then changed during 1.4 dev to use relative
-            # paths, meaning that the module name is now src.experiment.
-            # In this case we get an import error as pickle is looking for the
-            # module name "experiment". We can "fake" the module name by adding
-            # an experiment module to the sys.modules keys. This will allow the
-            # loading of old files. See error #343
-            # Could be removed for pyAF version 1.6 as this is a dirty hack
-            # to get this working.
-            from ... import experiment
-            import sys
-            sys.modules["experiment"] = experiment
-            general_prefs = pickle_tools.loads(general_prefs, encoding=consts.ENCODING)
+        general_prefs = pickle_tools.loads(general_prefs)
 
         if not self.load_more:
             # Load general prefs (only for the first load)
             # In load more, the preferences from the first .pyAF file are kept.
             # The theme is a preference of the application, not of the file
             do_not_copy = ["filenames_list", "results_list", "current_theme"]
-            # Some times while decoding general_pref they can be decoded into bytes.
-            # This will cause an error.
             for key in list(general_prefs.keys()):
                 # Do not copy some stuff, those are updated separatly because
                 # we don't want to overwrite those lists.
@@ -154,15 +132,8 @@ class LoaderPYAF:
         old_list = shared.exp.groups_list
         group_max_id = len(old_list)
 
-        for i in old_list:
-            misc_tools.add_attributes(i)
-
-
         # Add to results
         for i in range(len(new_list)):
-
-            misc_tools.add_attributes(new_list[i])
-            event_filter_tools.convert_old_filters(new_list[i])
 
             # Append the result
             shared.exp.results_list.append(new_list[i])
@@ -197,8 +168,6 @@ class LoaderPYAF:
 
                 value = general_prefs["groups_list"][i]
 
-                misc_tools.add_attributes(value)
-
                 shared.exp.groups_list.append(value)
 
                 # Update the name before adding the row to the tablewidget
@@ -222,125 +191,14 @@ class LoaderPYAF:
             # Load single prefs in the datasets
             value = inputfile.read(single_offsets[i - more_offset])
 
-            single_prefs = pickle_tools.loads(value, encoding=consts.ENCODING)
+            single_prefs = pickle_tools.loads(value)
 
-            skip = False
             for key in single_prefs:
-                value = single_prefs[key]
-                # COMPATIBILITY MODE 11/06/14
-                if key == "nbr_points_x":
-                    key = "nbr_pixels_x"
-                if key == "nbr_points_y":
-                    key = "nbr_pixels_y"
-                # COMPATIBILITY MODE 10/07/14
-                if key == "force_samples_per_pause":
-                    key = "nbr_points_per_pause_curve"
-                if key == "force_samples_per_curve":
-                    key = "nbr_points_per_curve_approach"
-                    # Add also the retraction with the same value
-                    misc_tools.setattr_special(
-                        shared.exp.list[i],
-                        "nbr_points_per_curve_retraction",
-                        value)
-                if key == "force_samples_per_curve_real":
-                    key = "nbr_points_per_curve_approach_real"
-                    # Add also the retraction with the same value
-                    misc_tools.setattr_special(
-                        shared.exp.list[i],
-                        "nbr_points_per_curve_retraction_real",
-                        value)
-                # COMPATIBILITY MODE 21/08/14
-                if key == "used_spring_constant":
-                    misc_tools.setattr_special(
-                        shared.exp.list[i],
-                        "_used_spring_constant",
-                        value)
-                    skip = True
-                # ---------------------------
-                if key != "dontsave" and skip is False:
-                    # dontsave key was added to the dontsave list during
-                    # 1.5 development. For all the files before, the dontsave
-                    # list was saved and would overwrite the new one.
-                    # So don't overwrite it. This if statement can be removed
-                    # for the 1.6 release.
-                    misc_tools.setattr_special(shared.exp.list[i], key, value)
-                # Reset skip
-                skip = False
+                misc_tools.setattr_special(shared.exp.list[i], key,
+                                           single_prefs[key])
 
             # Update the id
-            data = shared.exp.list[i]
-            data.unique_id = i
-
-            # Distance filter of the files saved before 2026
-            event_filter_tools.convert_old_filters(data)
-
-            # COMPATIBILITY MODE 17/01/14 add new vtk values
-            try:
-                _ = data.vtk_smoothing_type
-            except AttributeError:
-                data.vtk_smoothing_type = None
-                data.vtk_smoothing_iterations = 1
-                data.vtk_decimate_target_reduction = 0.2
-
-        # COMPATIBILITY MODE 09/04/14 change pocs_corrected to topography
-        for i in range(more_offset, more_offset + nbr_files, 1):
-            # Check if node exists
-            fi = shared.exp.temp_file
-            st = "/data/_" + str(i) + "/results/"
-            try:
-                fi.file.get_node(st + "topography")
-            except tables.exceptions.NoSuchNodeError:
-                # Rename node
-                fi.file.rename_node(st + "pocs_corrected", "topography")
-
-        # COMPATIBILITY MODE 12/08/14 add events joc fits
-        for i in range(more_offset, more_offset + nbr_files, 1):
-            # Check if node exists
-            fi = shared.exp.temp_file
-            st = "/data/_" + str(i) + "/results/"
-            try:
-                fi.file.get_node(st + "events_fits_joc")
-            except tables.exceptions.NoSuchNodeError:
-                # Rename node
-                fi.file.create_carray(
-                    st, "events_fits_joc",
-                    tables.Float32Atom(),
-                    shape=(data.nbr_pixels_x, data.nbr_pixels_y, 3),
-                    filters = tables.Filters(complevel=9, complib="blosc"))
-                values = fi.file.get_node(st + "events_fits_joc")
-                # Fill with empty values, the user will have to recompute
-                for i in range(data.nbr_pixels_x):
-                    for j in range(data.nbr_pixels_y):
-                        values[i, j] = [0, 0, 0]
-
-        # COMPATIBILITY MODE 22/02/14 add color to results and groups
-        i = 0
-        for res in shared.exp.results_list:
-            try:
-                _ = res.color
-            except AttributeError:
-                res.color = shared.colors_list[i]
-            if i < len(shared.colors_list) - 1:
-                i = i + 1
-            else:
-                i = 0
-        # First "None" group
-        try:
-            _ = shared.exp.groups_list[0].color
-        except AttributeError:
-            shared.exp.groups_list[0].color = None
-        # The other groups
-        i = 0
-        for group_id in range(1, len(shared.exp.groups_list)):
-            group = shared.exp.groups_list[group_id]
-            try:
-                _ = group.color
-            except AttributeError:
-                group.color = shared.colors_list[i]
-            if i < len(shared.colors_list) - 1:
-                i = i + 1
-            else:
-                i = 0
+            shared.exp.list[i].unique_id = i
 
         # Close the inputfile
         inputfile.close()

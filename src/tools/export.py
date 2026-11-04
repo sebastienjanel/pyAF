@@ -372,7 +372,7 @@ def export_dfs_fits(path, mode=None):
     ("groups"): model, parameters with their standard errors, R2, and their
     points (_points.csv). Returns the written files, empty without fit."""
     mode = mode or shared.exp.dfs_mode
-    fits = [f for f in dfs_tools.get_fits(mode) if f.get("method") != "old"]
+    fits = dfs_tools.get_fits(mode)
     if not fits:
         return []
     path = csv_path(path)

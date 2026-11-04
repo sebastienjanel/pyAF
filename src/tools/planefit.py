@@ -44,9 +44,9 @@ from . import math_tools
 def get_planefit_roi(data):
     """Substrate ROI used for the planefit of a file (None if the planefit
     is not applied, or if the ROI is no longer a substrate)."""
-    if not getattr(data, "planefit_applied", False):
+    if not data.planefit_applied:
         return None
-    index = getattr(data, "planefit_roi", None)
+    index = data.planefit_roi
     if index is None or not 0 <= index < len(data.roi_list):
         return None
     roi = data.roi_list[index]

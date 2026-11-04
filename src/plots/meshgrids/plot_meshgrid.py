@@ -344,7 +344,7 @@ class PlotMeshGrid(MainPlot):
         mesh = self.mesh_type
         if mesh is None or not (str(mesh).startswith("stiffness") or
                                 mesh in MODULUS_MAPS) or \
-                not getattr(self.data, "stiffness_color_log", False) or \
+                not self.data.stiffness_color_log or \
                 self.data_meshgrid is None:
             return None
         vmax = self.colortable_max_value * self.factor

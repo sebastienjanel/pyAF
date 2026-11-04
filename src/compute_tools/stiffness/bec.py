@@ -136,7 +136,7 @@ def fit_range_mask(data, delta, force):
     n = len(delta)
     contact = numpy.nonzero(delta > 0)[0]
     poc_k = int(contact[0]) if len(contact) else n
-    range_type = data.get_used_fit_range_type()
+    range_type = data.used_fit_range_type
     if range_type == 0:
         start = data.used_force_start if data.used_force_start is not None \
             else data.force_start
@@ -168,7 +168,7 @@ def fit_settings(data):
             "radius": data.used_tip_radius * 1e-9,
             "tip_angle": data.used_tip_angle,
             "poisson_ratio": data.used_poisson_ratio,
-            "shell_thickness": data.get_used_shell_thickness() * 1e-9,
+            "shell_thickness": data.used_shell_thickness * 1e-9,
             "poc_window": data.used_fit_poc_window or 0}
 
 

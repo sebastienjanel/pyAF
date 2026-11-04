@@ -40,22 +40,17 @@ PACKAGE = __name__.rsplit(".tools.", 1)[0]
 
 class ProjectUnpickler(pickle.Unpickler):
     """The classes are saved with their module name, which depends on how
-    pyAF was started and on its version: src.experiment or
-    pyAF.src.experiment, and experiment for the oldest files. They are looked
-    for in the package of the running code: the applications built with
-    PyInstaller only have pyAF.src."""
+    pyAF was started: src.experiment or pyAF.src.experiment. They are looked
+    for in the package of the running code."""
 
     def find_class(self, module, name):
         for old in ("pyAF.src", "src"):
             if module == old or module.startswith(old + "."):
                 module = PACKAGE + module[len(old):]
                 break
-        else:
-            if module == "experiment":
-                module = PACKAGE + ".experiment"
         return super().find_class(module, name)
 
 
-def loads(data, encoding="ASCII"):
+def loads(data):
     """As pickle.loads, for the data of the saved projects."""
-    return ProjectUnpickler(io.BytesIO(data), encoding=encoding).load()
+    return ProjectUnpickler(io.BytesIO(data)).load()

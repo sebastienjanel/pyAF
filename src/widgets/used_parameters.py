@@ -293,7 +293,7 @@ class UsedParametersWidget(PYAFWidget):
                     dt.used_tip_angle) + "\u00b0")
             if val in contact_models.USES_THICKNESS:
                 tip.append("shell thickness " + misc_tools.format_number(
-                    dt.get_used_shell_thickness()) + " nm")
+                    dt.used_shell_thickness) + " nm")
             # Thin shell: radius of the vesicle
             what = "Vesicle : " if val == contact_models.THIN_SHELL \
                 else "Tip : "
@@ -304,7 +304,7 @@ class UsedParametersWidget(PYAFWidget):
             fitting = dt.used_perform_fit
             self.LB_method.setText(
                 "Method : " + ("Fitting" if fitting else "Tomography"))
-            if dt.get_used_fit_range_type() == 1:
+            if dt.used_fit_range_type == 1:
                 stop = dt.used_indentation_stop
                 fit_range = str(dt.used_indentation_start) + " to " + \
                     (str(stop) + " nm" if stop else "end of the curve") + \

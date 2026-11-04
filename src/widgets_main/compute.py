@@ -1208,7 +1208,7 @@ class ComputeWidget(PYAFWidget):
             self.IN_visco_beta.changeValue(data.visco_beta_init)
             # Frequency of E' and E'': within the time scales of the curves
             # (window measured by the computation)
-            window = getattr(data, "visco_frequency_window", None)
+            window = data.visco_frequency_window
             label = "Frequency of E\u2032, E\u2033 [Hz]"
             if window is not None:
                 label += " (" + "\u2013".join(
@@ -1222,7 +1222,7 @@ class ComputeWidget(PYAFWidget):
                     misc_tools.validator("PF"))
             self.IN_visco_frequency.label.setText("  " + label)
             self.IN_visco_frequency.changeValue(
-                float("%.3g" % getattr(data, "visco_frequency", 1.0)))
+                float("%.3g" % (data.visco_frequency)))
             self.IN_visco_beta.setEnabled(not data.visco_beta_auto)
             # The elasticity fit is needed (and a height for the B.E.C.)
             reason = visco_main.check_file(data)
@@ -1248,7 +1248,7 @@ class ComputeWidget(PYAFWidget):
                 bool(data.microrheo_piezo_amplitude))
             self.CB_microrheo_piezo_amplitude.setEnabled(bool(piezo))
             self.TG_microrheo_raw.setChecked(
-                bool(getattr(data, "microrheo_preview_raw", False)))
+                bool(data.microrheo_preview_raw))
             self.TG_microrheo_raw.setEnabled(microrheology.available(data))
             # Modulation segments and the elasticity fit are needed
             reason = microrheology.check_file(data)

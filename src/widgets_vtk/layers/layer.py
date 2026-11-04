@@ -103,8 +103,7 @@ class Layer:
         self.lut_invert = False
         self.lut_min_color = [0.0, 0.0, 0.0, 1.0]  # Black RGBA
         self.lut_max_color = [1.0, 1.0, 1.0, 1.0]  # White RGBA
-        # Name of the LUT (see LUTS in menu_options), custom colors in the
-        # layers saved before
+        # Name of the LUT (see LUTS in menu_options)
         self.lut_name = "Custom"
 
         # Thresholding

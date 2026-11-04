@@ -553,7 +553,7 @@ class PlotOptionsWidget(PYAFWidget):
         self.CB_nan_transp.setChecked(data.nan_color_transparent)
 
         # Log scale only for the elasticity and E0 maps
-        self.CB_log.setChecked(getattr(data, "stiffness_color_log", False))
+        self.CB_log.setChecked(data.stiffness_color_log)
         self.CB_log.setEnabled(mt in ("stiffness", "stiffness_slice",
                                       "stiffness_corr",
                                       "stiffness_corr_slice", "visco_e0",

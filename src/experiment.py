@@ -269,9 +269,7 @@ class Experiment:
         # DFS
         self.dfs_mode = "single"
         self.list_dfs_single_fits = []
-        self.list_dfs_single_results = []
         self.list_dfs_groups_fits = []
-        self.list_dfs_groups_results = []
 
         # Units
         self.infowidget_threshold_units = "nN"
@@ -401,23 +399,9 @@ def default_violin_options():
 
 
 def get_violin_options(exp, mode="single"):
-    """Options of a violin plot of an experiment (the defaults for the
-    missing ones, e.g. for the files saved before they were added).
-
-    mode is "single" (plots tab) or "groups" (grouped plots tab).
-    """
-    attribute = "violin_" + mode
-    saved = getattr(exp, attribute, None)
-    options = default_violin_options()
-    if saved is None:
-        # Files saved before the violins: keep the colors of the files
-        options["palette"] = palettes.CUSTOM
-    options.update(saved or {})
-    # Names of the first versions
-    options["points"] = {"Strip": "Jitter", "Swarm": "Beeswarm"}.get(
-        options["points"], options["points"])
-    setattr(exp, attribute, options)
-    return options
+    """Options of a violin plot of an experiment. mode is "single" (plots
+    tab) or "groups" (grouped plots tab)."""
+    return getattr(exp, "violin_" + mode)
 
 
 def get_plotted_items(exp, mode="single"):

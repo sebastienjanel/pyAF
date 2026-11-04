@@ -286,7 +286,7 @@ class PlotSingleResults(PlotResults):
         number = 0
         for fit in dfs_tools.get_fits(self.MODE):
             number += 1
-            if not fit.get("display") or fit["method"] == "old":
+            if not fit.get("display"):
                 continue
             r = numpy.array(fit["points_r"])
             line_r = numpy.logspace(numpy.log10(r.min()),

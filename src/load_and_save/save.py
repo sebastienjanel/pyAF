@@ -59,8 +59,9 @@ class Save:
     The file is copied piecewise (100000 bytes at once) to be able to
     have a progressbar during the save.
 
-    A .pyaf file starts with at least these 3 lines ::
-        Version=xxx (this line doesn't exist for 1.0.x versions)
+    A .pyaf file starts with at least these lines ::
+        Format=[consts.PROJECT_FORMAT]
+        Version=xxx
         Nbr_of_files=[int]
         Global_Prefs_Offset=[int bytes]
         Single_Prefs_Offset=[int bytes]
@@ -111,8 +112,7 @@ class Save:
         global_prefs_experiment = shared.exp.__dict__
         global_prefs_to_save = {}
         for key in list(global_prefs_experiment.keys()):
-            if not (math_tools.in_list(shared.exp.dontsave, key)
-                    and key != "dontsave"):
+            if not math_tools.in_list(shared.exp.dontsave, key):
                 global_prefs_to_save[key] = global_prefs_experiment[key]
 
         newlist = []
@@ -127,8 +127,7 @@ class Save:
             id_list.append(dataset.unique_id)
             datasets_prefs = {}
             for key in list(dataset.__dict__.keys()):
-                if not (math_tools.in_list(dataset.dontsave, key)
-                        and key != "dontsave"):
+                if not math_tools.in_list(dataset.dontsave, key):
                     datasets_prefs[key] = dataset.__dict__[key]
             prefs_single.append(datasets_prefs)
 
@@ -185,7 +184,9 @@ class Save:
             os.mkdir(tmp_dir_path)
             headerfile = open(tmp_dir_path + "/header.txt", "wb")
 
-            # Save version number
+            # Save format and version number
+            headerfile.write(str.encode(
+                "Format=" + consts.PROJECT_FORMAT + "\n"))
             headerfile.write(str.encode("Version=" + consts.VERSION + "\n"))
 
             # Save the header

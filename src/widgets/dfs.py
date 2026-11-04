@@ -225,9 +225,6 @@ class DFSWidget(PYAFWidget):
             fits = dfs_tools.get_fits(mode)
             for row in rows:
                 del fits[row]
-                olds = getattr(shared.exp, "list_dfs_" + mode + "_results")
-                if row < len(olds):
-                    del olds[row]
             self.update_widget()
             self.update_plot()
 
@@ -264,14 +261,10 @@ class DFSWidget(PYAFWidget):
             cb = gui_tools.CenteredCellCheckbox(self, "display_fit", i)
             self.tableWidget.setCellWidget(i, 0, cb)
             cb.checkbox.setChecked(bool(fit.get("display")))
-            cb.setEnabled(fit["method"] != "old")
 
-            if fit["method"] == "old":
-                name = "Old fit (not drawn)"
-            else:
-                name = dfs_tools.MODELS[fit.get("model", "bell")][0]
-                if fit["method"] == "binned":
-                    name += ", " + str(fit["nbr_bins"]) + " bins"
+            name = dfs_tools.MODELS[fit.get("model", "bell")][0]
+            if fit["method"] == "binned":
+                name += ", " + str(fit["nbr_bins"]) + " bins"
                 if fit.get("bell_limit"):
                     name += " = Bell-Evans"
                 elif self.fit_warning(fit):
@@ -312,8 +305,6 @@ class DFSWidget(PYAFWidget):
     @staticmethod
     def fit_warning(fit):
         """Text if the fit does not describe the data (empty if fine)."""
-        if fit.get("method") == "old":
-            return ""
         if fit.get("model", "bell") == "bell" and fit.get("a", 1) <= 0:
             return ("The force does not increase with the loading rate: no "
                     "Bell-Evans parameters.")
@@ -335,10 +326,6 @@ class DFSWidget(PYAFWidget):
     @staticmethod
     def tooltip(fit):
         """Details of a fit."""
-        if fit["method"] == "old":
-            return ("Fit of an older version of pyAF (its forces and loading "
-                    "rates were sorted separately: the values are not "
-                    "reliable).")
         temps = fit["temperatures"]
         temp = number(fit["temperature"] - 273.15) + " °C"
         if temps[1] - temps[0] > 0.01:
@@ -356,9 +343,6 @@ class DFSWidget(PYAFWidget):
                 text += ("x and koff fitted with the exact median of the "
                          "Bell-Evans distribution\n(F = kBT/x ln(1 + ln2 "
                          "r x / (kBT koff)); the line gives koff / ln 2)\n")
-            elif fit.get("koff_corrected"):
-                text += ("Fit of an older version: koff corrected for the "
-                         "median forces (x ln 2)\n")
             text += "x = " + x + " nm\nkoff = " + koff + " s⁻¹\n"
         elif model in dfs_tools.NU:
             text = ("DHS, \u03bd = %.3g, fitted on the median forces "

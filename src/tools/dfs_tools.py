@@ -340,7 +340,7 @@ def model_force(fit_result, r):
         if fit_result.get("median_exact") and numpy.isfinite(fit_result["x"]):
             return median_force(r * 1e-12, fit_result["x"],
                                 fit_result["koff"], kbt) * 1e12
-        # Line of the older fits
+        # Line of the fit
         return (fit_result["a"] * numpy.log(r * 1e-12) +
                 fit_result["b"]) * 1e12
     if model in NU:
@@ -440,24 +440,5 @@ def fit_model(model, points_r, points_f, temperature):
 
 def get_fits(mode):
     """The fits of the plots tab (mode "single") or of the grouped plots tab
-    (mode "groups"). The fits of the old files (lists) are converted: their
-    line was not the Bell-Evans fit and is not drawn."""
-    exp = shared.exp
-    name = "list_dfs_" + mode + "_fits"
-    fits = getattr(exp, name)
-    olds = getattr(exp, "list_dfs_" + mode + "_results", [])
-    for i, item in enumerate(fits):
-        if isinstance(item, dict):
-            if "model" not in item and item.get("method") != "old":
-                # Bell-Evans fit of an older version: koff of the median
-                # forces, corrected (x ln 2, see the top)
-                item["model"] = "bell"
-                item["koff"] *= numpy.log(2)
-                item["skoff"] *= numpy.log(2)
-                item["koff_corrected"] = True
-            continue
-        x, koff = olds[i] if i < len(olds) else (numpy.nan, numpy.nan)
-        fits[i] = {"method": "old", "x": x, "koff": koff, "display": False,
-                   "nbr_points": numpy.nan, "r2": numpy.nan,
-                   "sx": numpy.nan, "skoff": numpy.nan}
-    return fits
+    (mode "groups")."""
+    return getattr(shared.exp, "list_dfs_" + mode + "_fits")

@@ -463,14 +463,9 @@ def map_statistics(data):
 
 def map_label(data):
     """Modulation segment of the maps of the file (one of shown_labels, the
-    first one by default; files saved with the frequency as a number)."""
+    first one by default)."""
     names = shown_labels(data)
     label = data.microrheo_frequency
-    if isinstance(label, (int, float)):
-        label = format(label, "g") + " Hz"
-        if label not in names:
-            # Repeated frequency: its first application
-            label += " (1)"
     if label not in names:
         label = names[0] if names else None
     data.microrheo_frequency = label

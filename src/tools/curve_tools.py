@@ -340,9 +340,6 @@ def get_modulation_segments(data, i, j):
             data.nbr_points_per_modulation_curve is None:
         return None
     curves = numpy.asarray(data.curves_modulation[i, j], dtype=float)
-    if curves.ndim != 3:
-        # File loaded with a previous version of pyAF (one segment)
-        return None
     sensitivity = data.deflection_sensitivity
     segments = []
     for k, (freq, nbr) in enumerate(zip(data.modulation_frequencies,

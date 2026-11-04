@@ -51,7 +51,6 @@ from qtpy import QtCore
 import tempfile
 from .. import widgets_list
 from .. import shared
-from packaging.version import Version
 
 
 class TempFile:
@@ -250,9 +249,7 @@ class TempFile:
             self.cp_node(st2 + "fits_poc", st1)
             self.cp_node(st2 + "indentation", st1)
             self.cp_node(st2 + "stiffness_array", st1)
-            # Not in the files computed before the fit quality
-            if self.file.__contains__(st2 + "fit_quality"):
-                self.cp_node(st2 + "fit_quality", st1)
+            self.cp_node(st2 + "fit_quality", st1)
             # self.cp_node(st2 + "yf", st1)
 
         if data.work_and_rupture_force1_calculated:
@@ -381,8 +378,7 @@ class TempFile:
             self.file.remove_node(st + "/results/fits_poc")
             self.file.remove_node(st + "/results/indentation")
             self.file.remove_node(st + "/results/stiffness_array")
-            if self.file.__contains__(st + "/results/fit_quality"):
-                self.file.remove_node(st + "/results/fit_quality")
+            self.file.remove_node(st + "/results/fit_quality")
         if tabletypes == "all" or tabletypes == "work":
             self.file.remove_node(st + "/results/jocs1_indices")
             self.file.remove_node(st + "/results/jocs2_indices")
@@ -410,15 +406,9 @@ class TempFile:
     def create_fit_quality_table(self, unique_id):
         """Creates the table of the quality of the elasticity fit (R^2,
         1 if the point of contact was fixed and 0 if fitted, shift of the
-        point of contact of the fit from the detected one [nm]), if it does
-        not exist (files saved before it)."""
+        point of contact of the fit from the detected one [nm])."""
         dt = shared.exp.list[int(unique_id)]
         st = "/data/_" + str(unique_id) + "/results"
-        if self.file.__contains__(st + "/fit_quality"):
-            if self.file.get_node(st + "/fit_quality").shape[2] >= 3:
-                return
-            # Saved before the shift of the point of contact
-            self.file.remove_node(st + "/fit_quality")
         self.file.create_carray(
             st, "fit_quality", tables.Float32Atom(dflt=numpy.nan),
             shape=(dt.nbr_pixels_x, dt.nbr_pixels_y, 3),
@@ -608,16 +598,8 @@ def display_close_file_message(verbose=False):
     if verbose and are_open_files:
         sys.stderr.write("Closing remaining open files:")
 
-    if Version(tables.__version__) >= Version("3.1.0"):
-        # make a copy of the open_files.handlers container for the iteration
-        handlers = list(open_files.handlers)
-    else:
-        # for older versions of pytables, setup the handlers list from the
-        # keys
-        keys = list(open_files.keys())
-        handlers = []
-        for key in keys:
-            handlers.append(open_files[key])
+    # A copy of the open_files.handlers container for the iteration
+    handlers = list(open_files.handlers)
 
     for fileh in handlers:
         if verbose:

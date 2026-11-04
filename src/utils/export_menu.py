@@ -135,8 +135,7 @@ def export_clicked(parent, key):
     elif key == "superplot":
         files = export_superplot(parent)
     elif key == "dfs":
-        if not [f for f in export.dfs_tools.get_fits(shared.exp.dfs_mode)
-                if f.get("method") != "old"]:
+        if not export.dfs_tools.get_fits(shared.exp.dfs_mode):
             QtWidgets.QMessageBox.information(
                 parent, "Export", "No fit in the DFS window (files or "
                 "speeds, as selected in it).")

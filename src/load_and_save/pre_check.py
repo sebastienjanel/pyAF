@@ -33,6 +33,7 @@
 
 import os
 import logging
+import pickle
 import zipfile
 
 from .. import consts
@@ -41,8 +42,6 @@ from .. import widgets_list
 from .file_loader.nanoscope import extract_text, extract_num
 from .file_loader.jpk import extract_int, has_force_curves
 from ..widgets.progressbar import Progressbar
-
-encodings = ["latin1", "ASCII", "utf-8"]
 
 
 class CheckFiles:
@@ -201,77 +200,21 @@ def check_single_file(path):
                 jpkfile.close()
 
         if file_type == "pyAF":
-            # Read the first line and check if there is a version number
-            # If not, then the file could be corrupted (happens sometimes
-            # while using USB sticks to transfer files, or due to bad
-            # transfers through networks. The filesize can be exactly the
-            # same but the content can be messed up. This results in the
-            # fact that you can't read the version number from the file.)
+            # The first line gives the format of the project. A file of the
+            # current format that can not be read could be corrupted (happens
+            # sometimes while using USB sticks to transfer files, or due to
+            # bad transfers through networks).
             pyaffile = open(path, "rb")
-            line = pyaffile.readline().decode()
-
-            if line.split("=")[0] != "Version":
-                result["error"] = "Corrupted file"
-
-            # Check if the HDF5 part of the file can be unpickled correctly.
-            while line.find("Nbr_of_files=") != 0:
-                line = pyaffile.readline().decode()
-            nbr_files = int(line.split("=")[1].splitlines()[0])
-            while line.find("Global_Prefs_Offset=") != 0:
-                line = pyaffile.readline().decode()
-            globaloffset = int(line.split("=")[1].splitlines()[0])
-
-            # Get the offsets for each prefs
-            single_offsets = []
-            singleoffset_total = 0
-            for i in range(nbr_files):
-                line = pyaffile.readline().decode()
-                offset = int(line.split("=")[1].splitlines()[0])
-                single_offsets.append(offset)
-                singleoffset_total += offset
-            offset_prefs = pyaffile.tell()  # Get the current position
-
-            # Go back to the prefs part
-            pyaffile.seek(offset_prefs)
-
-            general_prefs = pyaffile.read(globaloffset)
-
-            pyaffile.close()
-
-            for i in range(len(encodings)):
+            line = pyaffile.readline()
+            if line != str.encode("Format=" + consts.PROJECT_FORMAT + "\n"):
+                result["error"] = consts.OLD_PROJECT_ERROR
+            else:
                 try:
-                    general_prefs = pickle_tools.loads(general_prefs, encoding=encodings[i])
-                    consts.ENCODING = encodings[i]
-                    break
-
-                except ImportError:
-                    # In previous versions of pyAF, when you pickle dump the general
-                    # preferences, you dump also some objects linked to classes in
-                    # the experiment module. (for example groups or results).
-                    # The imports were then changed during 1.4 dev to use relative
-                    # paths, meaning that the module name is now src.experiment.
-                    # In this case we get an import error as pickle is looking for the
-                    # module name "experiment". We can "fake" the module name by adding
-                    # an experiment module to the sys.modules keys. This will allow the
-                    # loading of old files. See error #343
-                    # Could be removed for pyAF version 1.6 as this is a dirty hack
-                    # to get this working.
-                    from .. import experiment
-                    import sys
-                    sys.modules["experiment"] = experiment
-                    general_prefs = pickle_tools.loads(general_prefs, encoding=encodings[i])
-                    consts.ENCODING = encodings[i]
-                    break
-
-                except UnicodeDecodeError:
-                    if i + 1 < len(encodings):
-                        # Go through supported encodings.
-                        continue
-
-                    else:
-                        # If there are no more encodings, raise the error.
-                        result["error"] = "Decode error"
-
+                    check_project(pyaffile)
+                except (ValueError, IndexError, EOFError, ImportError,
+                        AttributeError, pickle.UnpicklingError):
+                    result["error"] = "Corrupted file"
+            pyaffile.close()
 
         if result["error"] == "":
             # If no error is found, enable the loading of this file and
@@ -281,6 +224,20 @@ def check_single_file(path):
 
         result["nbrcurves"] = nbrcurves
         return result
+
+
+def check_project(pyaffile):
+    """Reads the header and the general preferences of a project, after its
+    first line (exceptions if the file can not be read)."""
+    line = pyaffile.readline().decode()
+    while line.find("Nbr_of_files=") != 0:
+        line = pyaffile.readline().decode()
+    nbr_files = int(line.split("=")[1].splitlines()[0])
+    line = pyaffile.readline().decode()
+    globaloffset = int(line.split("=")[1].splitlines()[0])
+    for _ in range(nbr_files):
+        int(pyaffile.readline().decode().split("=")[1].splitlines()[0])
+    pickle_tools.loads(pyaffile.read(globaloffset))
 
 
 def get_file_type(path):
@@ -303,9 +260,7 @@ def get_file_type(path):
     # (JPK has these strange filenames for example)
     extension = splitted_name[-1]
 
-    if extension == "fva" or extension == "pyaf":
-        # fva was the old extension, was changed during the 1.3 to 1.4
-        # development.
+    if extension == "pyaf":
         file_type = "pyAF"
     elif extension == "jpk-force":
         file_type = "JPK (Single File)"

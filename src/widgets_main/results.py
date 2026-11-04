@@ -674,7 +674,7 @@ class ResultsWidget(PYAFWidget):
                 else:
                     self.BT_profiles.setEnabled(False)
                 # Slices of the elasticity in depth: only with segments
-                # (Tomography, or files computed with segments before)
+                # (Tomography)
                 _, step, tomography = data.get_used_indentation()
                 depth = data.stiffness_calculated and (
                     not data.used_perform_fit or (tomography and step))

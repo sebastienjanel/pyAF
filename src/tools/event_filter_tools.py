@@ -81,24 +81,3 @@ def slope_filter_text(slope_min, slope_max):
         return "None"
     return format_number(slope_min) + "–" + format_number(slope_max) + \
         " nN/nm"
-
-
-def convert_old_filters(obj):
-    """Convert the distance filter of an old file (dataset or result).
-
-    The old filters had a left and a right limit on the distance axis of the
-    curve, where the events are at negative values, and removed the events
-    between the limits unless keep middle was checked. The new ones are
-    distances from the jump of contact: the meaning is kept.
-    """
-    for old, new in (("events_results_filter_dist", "events_results_filter"),
-                     ("filter_dist", "filter")):
-        left = old + "_left"
-        if left not in obj.__dict__:
-            continue
-        right = obj.__dict__.pop(old + "_right", 0)
-        left = obj.__dict__.pop(left)
-        keep = obj.__dict__.pop(old + "_keep_middle", False)
-        setattr(obj, new + "_dist_min", 0 - right)
-        setattr(obj, new + "_dist_max", 0 - left)
-        setattr(obj, new + "_dist_keep", keep)

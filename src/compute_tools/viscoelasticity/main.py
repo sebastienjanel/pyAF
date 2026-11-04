@@ -322,7 +322,7 @@ def set_frequency_window(data, contact_times, steps):
         data.visco_frequency_window = None
         return
     data.visco_frequency_window = [low, high]
-    if getattr(data, "visco_frequency_user", False) and \
+    if data.visco_frequency_user and \
             low <= data.visco_frequency <= high:
         return
     # 1 / contact time rounded up to 2 significant digits (in the window)
@@ -333,8 +333,8 @@ def set_frequency_window(data, contact_times, steps):
 
 def clamp_frequency(data, frequency):
     """Frequency of E' and E'' within the window of the file (no limit
-    without window: files computed before)."""
-    window = getattr(data, "visco_frequency_window", None)
+    without window)."""
+    window = data.visco_frequency_window
     if window is None:
         return frequency
     return min(max(frequency, window[0]), window[1])

@@ -362,9 +362,8 @@ class PlotResults(MainPlot):
         """Plot the fit for the DFS experiment."""
         if self.lr_fits is not None and self.lr_fits:
             for fit in self.lr_fits:
-                # Fits of dfs_tools, the old ones are not drawn
-                if not isinstance(fit, dict) or not fit.get("display") or \
-                        fit["method"] == "old":
+                # Fits of dfs_tools
+                if not fit.get("display"):
                     continue
                 r = numpy.array(fit["points_r"])
                 x = numpy.logspace(numpy.log10(r.min()),

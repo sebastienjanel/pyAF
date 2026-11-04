@@ -76,8 +76,7 @@ def read(path):
              if isinstance(f, dict) and isinstance(f.get("settings"), dict)]
     if not files:
         raise ParametersError(
-            "This parameters file has no settings to load (exported by an "
-            "older version of pyAF).")
+            "This parameters file has no settings to load.")
     # The files with a computation (the others have no settings of
     # analysis, only their calibration and curves)
     computed = [(name, settings) for name, settings in files
@@ -112,14 +111,10 @@ def apply(data, settings, parts):
     for part in parts:
         values = settings.get(part) or {}
         for name in SETTINGS[part]:
-            # Name in the exported files, or in the files from before
             label = EXPORT_NAMES.get(name, name)
-            if label in values:
-                new = values[label]
-            elif name in values:
-                new = values[name]
-            else:
+            if label not in values:
                 continue
+            new = values[label]
             if part == "calibration" and name == "spring_constant":
                 # Stored in N/m, the property gives N/nm
                 old = data.spring_constant * 1e9

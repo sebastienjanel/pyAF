@@ -179,7 +179,7 @@ def elasticity(data):
         if model == contact_models.THIN_SHELL else None,
         "tip_half_angle_deg": data.used_tip_angle
         if model in contact_models.USES_ANGLE else None,
-        "shell_thickness_nm": data.get_used_shell_thickness()
+        "shell_thickness_nm": data.used_shell_thickness
         if model in contact_models.USES_THICKNESS else None,
         "poisson_ratio": data.used_poisson_ratio,
         "method": "Fitting" if data.used_perform_fit else "Tomography",
@@ -326,7 +326,6 @@ SETTINGS = {
 }
 
 # Names in the exported files of the settings named after the stiffness
-# (the exported files from before are still read, see tools.params_import)
 EXPORT_NAMES = {"stiffness_model_selected": "elasticity_model_selected",
                 "stiffness_mode": "elasticity_mode"}
 

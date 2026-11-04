@@ -52,7 +52,7 @@ constant and the TEST_PATH, and set AUTOLOAD to True.
 import os
 from .tools import git_tools
 
-MAINVERSION = "5.0"
+MAINVERSION = "5.0.1"
 REPOSITORY = "https://github.com/sebastienjanel/pyAF"
 branch, short_sha = git_tools.get_git_info()
 if short_sha is None:
@@ -85,5 +85,7 @@ TEST_PATH = os.path.expanduser("~") + "/"
 LOAD_FILE = None
 # LOAD_FILE = "test.pyaf"
 
-# Pyaf file Encoding
-ENCODING = "latin1"
+# Format of the saved projects (first line of a .pyaf file): the projects of
+# the previous formats can not be opened
+PROJECT_FORMAT = "5"
+OLD_PROJECT_ERROR = "Saved with a previous version of pyAF: not supported"

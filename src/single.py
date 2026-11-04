@@ -128,11 +128,7 @@ class SingleFile:
                          "temp_file",
                          "datadict",
                          "_rupture_force2",
-                         "_events_per_curve",
-                         "nbr_points_x",  # For retrocompatibility
-                         "nbr_points_y"]  # For retrocompatibility
-
-        # Note, the retrocompatibility lines can be removed for 1.6 release.
+                         "_events_per_curve"]
 
         self.parent = parent
         self.temp_file = temp_file
@@ -195,7 +191,7 @@ class SingleFile:
         self.x_size = None
         self.y_size = None
         # True if the z values come from a height sensor, False if they are
-        # calculated from the piezo (None for the old .pyaf files)
+        # calculated from the piezo
         self.zsensor_used = None
         # Note, z_size is not defined as it can be different for each pixel
         # in JPK files. Access this value by using the get_x_dist function
@@ -451,7 +447,7 @@ class SingleFile:
         self.used_deflection_sensitivity = None
         self.used_stiffness_model_selected = None
         # Tomography or Fitting, and fit range type (see
-        # used_perform_fit and get_used_fit_range_type)
+        # used_perform_fit and used_fit_range_type)
         self.used_stiffness_mode = None
         self.used_fit_range_type = None
         self.used_tip_radius = None
@@ -625,7 +621,7 @@ class SingleFile:
         self.opengl_height = "topo"
 
         # Smoothing of vtk tomographies (off by default)
-        # Type : None, "loop" ("butterfly" in files saved before)
+        # Type : None or "loop"
         self.vtk_smoothing_type = None
         self.vtk_smoothing_iterations = 1
         self.vtk_decimate_target_reduction = 0.2
@@ -1145,36 +1141,11 @@ class SingleFile:
             return self.perform_fit
         return self.used_stiffness_mode == 1
 
-    def get_used_fit_range_type(self):
-        """Returns the fit range type used for the stiffness computation.
-
-        Falls back on the current value for the files saved before this
-        value was stored.
-        """
-        if self.used_fit_range_type is None:
-            return self.fit_range_type
-        return self.used_fit_range_type
-
     def get_used_indentation(self):
         """Returns the (start, step, tomography) used for the stiffness
-        computation, to describe the computed segments.
-
-        Falls back on the current parameters for the files saved before these
-        values were stored.
-        """
-        start = self.used_indentation_start
-        step = self.used_indentation_step
-        tomography = self.used_tomography
-        return (self.indentation_start if start is None else start,
-                self.indentation_step if step is None else step,
-                self.tomography if tomography is None else tomography)
-
-    def get_used_shell_thickness(self):
-        """Thickness of the shell used for the elasticity [nm] (thin shell
-        model), the current one for the files saved before it was stored."""
-        if self.used_shell_thickness is None:
-            return self.shell_thickness
-        return self.used_shell_thickness
+        computation, to describe the computed segments."""
+        return (self.used_indentation_start, self.used_indentation_step,
+                self.used_tomography)
 
     def reset_discarded(self):
         """Method used to reset the discarded curve array."""
@@ -1318,66 +1289,6 @@ class SingleFile:
                     self.max_rupture_force2 / 2.0
 
     @property
-    def nbr_points_x(self):
-        """Old nbr_points_x getter.
-
-        To be removed in 1.5 version
-        """
-        print(
-            "DeprecationWarning: nbr_points_x is deprecated. "
-            "Please use data.nbr_pixels_x.")
-
-        return self.nbr_pixels_x
-
-    @property
-    def nbr_points_y(self):
-        """Old nbr_points_y getter.
-
-        To be removed in 1.5 version
-        """
-        print(
-            "DeprecationWarning: nbr_points_y is deprecated. "
-            "Please use data.nbr_pixels_y.")
-
-        return self.nbr_pixels_y
-
-    @property
-    def array_curves_approach(self):
-        """Old array_curves_approach getter.
-
-        To be removed in 1.5 version
-        """
-        print(
-            "DeprecationWarning: array_curves_approach is deprecated. "
-            "Please use data.curves_approach.")
-
-        return self.curves_approach
-
-    @property
-    def array_curves_retraction(self):
-        """Old array_curves_retraction getter.
-
-        To be removed in 1.5 version
-        """
-        print(
-            "DeprecationWarning: array_curves_retraction is deprecated. "
-            "Please use data.curves_retraction.")
-
-        return self.curves_retraction
-
-    @property
-    def array_curves_pause(self):
-        """Old array_curves_pause getter.
-
-        To be removed in 1.5 version
-        """
-        print(
-            "DeprecationWarning: array_curves_pause is deprecated. "
-            "Please use data.curves_pause.")
-
-        return self.curves_pause
-
-    @property
     def calculated(self):
         """Checks if at least one computation has been done on the dataset."""
         if self.stiffness_calculated or self.events_calculated or \
@@ -1477,55 +1388,6 @@ class SingleFile:
     def rupture_force2(self):
         """Getter for the rupture_force2 array."""
         return self._rupture_force2
-
-    @property
-    def pocs_corrected(self):
-        """Getter for the topography array. Deprecated.
-
-        To be removed for 1.6 release.
-        """
-        print (
-            "DeprecationWarning: pocs_corrected is deprecated. "
-            "Please use data.topography.")
-        if self.stiffness_calculated:
-            return self.topography
-        else:
-            return None
-
-    @property
-    def force_samples_per_curve(self):
-        """Getter for the number of points per curve. Deprecated.
-
-        To be removed for 1.6 release.
-        """
-        print (
-            "DeprecationWarning: force_samples_per_curve is deprecated. "
-            "Please use data.nbr_points_per_curve_approach or "
-            "data.nbr_points_per_curve_retraction.")
-        return self.nbr_points_per_curve_approach
-
-    @property
-    def force_samples_per_curve_real(self):
-        """Getter for the real number of points per curve. Deprecated.
-
-        To be removed for 1.6 release.
-        """
-        print (
-            "DeprecationWarning: force_samples_per_curve_real is deprecated. "
-            "Please use data.nbr_points_per_curve_approach_real or "
-            "data.nbr_points_per_curve_retraction_real.")
-        return self.nbr_points_per_curve_approach_real
-
-    @property
-    def force_samples_per_pause(self):
-        """Getter for the force_samples_per_pause. Deprecated.
-
-        To be removed for 1.6 release.
-        """
-        print (
-            "DeprecationWarning: force_samples_per_pause is deprecated. "
-            "Please use data.nbr_points_per_pause_curve.")
-        return self.nbr_points_per_pause_curve
 
     def get_visco_result(self, name):
         """Map of a result of the viscoelasticity fit (nan if not
@@ -1697,7 +1559,7 @@ class SingleFile:
     def get_fit_quality(self, index):
         """Map of the quality of the elasticity fit: R^2 (index 0), or 1 if
         the point of contact was fixed and 0 if fitted (index 1); nan if
-        not computed (Tomography, files computed before)."""
+        not computed (Tomography)."""
         values = numpy.full((self.nbr_pixels_x, self.nbr_pixels_y),
                             numpy.nan)
         if self.stiffness_calculated and self.has_fit_quality():
@@ -1706,12 +1568,8 @@ class SingleFile:
         return values
 
     def has_fit_quality(self):
-        """True if the quality of the elasticity fit is stored (Fitting,
-        computed with this version)."""
-        if not self.stiffness_calculated or not self.used_perform_fit:
-            return False
-        return self.temp_file.file.__contains__(
-            "/data/_" + str(self.unique_id) + "/results/fit_quality")
+        """True if the quality of the elasticity fit is stored (Fitting)."""
+        return bool(self.stiffness_calculated and self.used_perform_fit)
 
     @property
     def fit_r2(self):
@@ -1722,13 +1580,10 @@ class SingleFile:
         """Detected point of contact of a curve (threshold above the noise
         of the baseline, before the fit) [z, deflection] in nm, from the
         point of contact of the fit and its shift; None if unknown (not
-        fitted, files computed before)."""
+        fitted)."""
         if not self.has_fit_quality():
             return None
-        node = self.get_node("/results/fit_quality")
-        if node.shape[2] < 3:
-            return None
-        shift = float(node[i, j, 2])
+        shift = float(self.get_node("/results/fit_quality")[i, j, 2])
         poc = self.pocs_real[i][j]
         a, b, error = [float(v) for v in self.fits_poc[i][j][:3]]
         if not (numpy.isfinite(shift) and numpy.isfinite(poc[0])):

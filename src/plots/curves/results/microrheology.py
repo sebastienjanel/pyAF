@@ -65,7 +65,7 @@ class ResultsMicrorheology(PlotCurve):
             if self.statistics is None:
                 self.message = "No microrheology for this file"
         elif not self.used and \
-                getattr(self.data, "microrheo_preview_raw", False) and \
+                self.data.microrheo_preview_raw and \
                 microrheology.available(self.data):
             # Compute tab: the oscillations (raw data)
             self.segments = curve_tools.get_modulation_segments(

@@ -103,7 +103,6 @@ class Stiffness:
         data.update()
 
         # Tomography: slope of each segment. Fitting: a Hertz type model
-        # (files saved with the previous Calculus mode)
         if not data.perform_fit:
             data.stiffness_model_selected = 3
             data.tomography = 1
@@ -137,8 +136,6 @@ class Stiffness:
         if data.stiffness_calculated:
             self.temp_file.delete_tables_for_results(calc_id, "stiffness")
             self.temp_file.create_tables_for_results(calc_id, "stiffness")
-        # Files saved before the fit quality
-        self.temp_file.create_fit_quality_table(calc_id)
 
         # Calculate the coefficients only once for all curves
         if data.stiffness_model_selected == 0:

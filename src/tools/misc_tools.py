@@ -50,7 +50,6 @@ from .. import shared
 import psutil
 from . import git_tools
 from . import events_tools
-from ..experiment import ResultGroup, Result
 
 
 
@@ -187,17 +186,6 @@ def setattr_special(obj, name, value):
     for attr in parts[:-1]:
         obj = getattr(obj, attr)
     setattr(obj, parts[-1], copy.deepcopy(value))
-
-
-def add_attributes(obj):
-    """Method used for adding new attributes to old specific pickled objects,
-     making them compatible with new features.
-     """
-
-    # Add condition attribute to old Result and ResultGroup classes.
-    if not hasattr(obj, 'condition') and (isinstance(obj, ResultGroup) or isinstance(obj, Result)):
-        default = 0
-        setattr(obj, 'condition', default)
 
 
 def save_used_params(data, mode):

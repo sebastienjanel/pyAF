@@ -330,7 +330,8 @@ class EntryWidget(QtWidgets.QDialog):
         error = info["error"]
 
         if error == "Not a valid AFM file" or error == "Corrupted file" \
-                or error == "Permission denied" or error == "IOError":
+                or error == "Permission denied" or error == "IOError" \
+                or error == consts.OLD_PROJECT_ERROR:
             color = ("color : red")
 
         elif error == "Nanoscope version error" or error == "Incomplete file"\

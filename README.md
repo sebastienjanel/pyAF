@@ -45,6 +45,8 @@ Minimum systems (64 bits): macOS 14, Windows 10, Ubuntu 22.04 or another Linux w
 
 The applications take about 0.5 GB once installed (Qt and VTK for the 3D view) and a few seconds to start.
 
+Projects (.pyaf) saved with versions before pyAF 5 cannot be opened: load the AFM files again and compute them.
+
 To check an installation (applications or sources), run pyAF with the environment variable `PYAF_SMOKE_TEST=1`: it loads its libraries and resources, prints the results and quits.
 
 ## Installation from the sources
