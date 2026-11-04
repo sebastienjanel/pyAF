@@ -33,7 +33,7 @@
 
 """Viscoelasticity: Ting fit of the approach and the retraction curves.
 
-The power-law rheology of the sample (modulus E0 at 1 s and fluidity) is
+The power-law rheology of the sample (scaling modulus E0 and fluidity) is
 fitted on the approach and the retraction (Efremov et al.; Tejedor &
 Garcia, Adv. Intell. Syst. 2025, with the bottom effect correction), see
 ting.py.

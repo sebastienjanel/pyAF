@@ -31,12 +31,14 @@
 
 """Ting model of a power-law viscoelastic material.
 
-The relaxation modulus of the material is a power law (Efremov et al.,
-Sci. Rep. 2017, Soft Matter 2020):
+The relaxation modulus of the material is a power law (Tejedor & Garcia,
+Adv. Intell. Syst. 2025, eq. 12; Efremov et al., Sci. Rep. 2017, Soft Matter
+2020, without the gamma function):
 
-    E(t) = E0 * (t / t0) ** -beta        (t0 = 1 s)
+    E(t) = E0 / Gamma(1 - beta) * (t / t0) ** -beta        (t0 = 1 s)
 
-where beta is the fluidity (0: elastic solid, 1: viscous liquid). The
+where beta is the fluidity (0: elastic solid, 1: viscous liquid) and E0 the
+scaling modulus (modulus |E*| at w = 1 / t0, see single.visco_modulus). The
 force during the approach and the retraction is given by Ting's solution
 (Ting, J. Appl. Mech. 1966):
 
@@ -67,6 +69,7 @@ import warnings
 import numpy
 from scipy.optimize import least_squares
 from scipy.special import beta as beta_function
+from scipy.special import gamma as gamma_function
 from scipy.special import hyp2f1
 
 from ..stiffness import contact_models
@@ -165,6 +168,8 @@ class TingModel:
 
     def evaluate(self, curve, e0, tc, beta, f0, velocities=None):
         """Force of the model at the times of the curve."""
+        # Modulus in front of (t / t0) ** -beta
+        e0 = e0 / gamma_function(1 - beta)
         if self.solver == "analytical":
             vt, vr = velocities if velocities is not None else \
                 get_velocities(curve, tc)
@@ -184,6 +189,7 @@ class TingModel:
             return force
         pref = self.coeff * e0 * T0 ** beta * vt ** n
 
+        # e0: modulus in front of (t / t0) ** -beta (see evaluate)
         # Approach: F = C E0 t0^b vt^n n B(n, 1 - b) t^(n - b)
         app = (time > 0) & (numpy.arange(len(time)) <= curve.idx_tm)
         force[app] = pref * n * beta_function(n, 1 - beta) * \
@@ -357,8 +363,9 @@ def fit_ting(curve, model, e_init, tc_init, f0_init, beta_init=None,
         beta_init = 0.05 if e_init > 10e3 else 0.25
     beta_init = min(max(beta_init, BETA_MIN), BETA_MAX)
 
-    # Bounds of E0 (at t0 = 1 s: E(t) = E0 (t / t0)^-b, the Hertz modulus
-    # corresponds to the duration of the indentation)
+    # The fit is done on the modulus in front of (t / t0) ** -b (not on E0,
+    # which depends on b): bounds with the Hertz modulus, which corresponds
+    # to the duration of the indentation
     e0_ref = e_init * ((tm - tc_init) / T0) ** beta_init
     e0_min, e0_max = e0_ref / 1000, e0_ref * 1000
     f0_min, f0_max = f0_init - f0_range, f0_init + f0_range
@@ -380,7 +387,8 @@ def fit_ting(curve, model, e_init, tc_init, f0_init, beta_init=None,
             return nan
 
     def linear_part(x):
-        g = model.evaluate(curve, 1.0, x[0], x[1], 0.0, velocities)
+        g = model.evaluate(curve, gamma_function(1 - x[1]), x[0], x[1], 0.0,
+                           velocities)
         return g, solve_linear(g, force, f0_min, f0_max, e0_min, e0_max)
 
     def residuals(x):
@@ -410,7 +418,8 @@ def fit_ting(curve, model, e_init, tc_init, f0_init, beta_init=None,
     ss_tot = numpy.sum((force - numpy.mean(force)) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else numpy.nan
 
-    return {"e0": float(e0), "tc": float(tc), "beta": float(beta),
+    return {"e0": float(e0 * gamma_function(1 - beta)), "tc": float(tc),
+            "beta": float(beta),
             "f0": float(f0), "r2": float(r2),
             "tan_delta": float(math.tan(math.pi * beta / 2)),
             "success": True}

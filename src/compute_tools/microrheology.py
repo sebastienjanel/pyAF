@@ -82,9 +82,11 @@ MIN_INDENTATION = 10e-9
 # response, no value at this frequency)
 MAX_AMPLITUDE_RATIO = 0.8
 
-# Models of the elasticity fit without microrheology (no contact model, or
-# not the indentation of the sample)
-UNSUPPORTED_MODELS = (contact_models.SLOPE, contact_models.THIN_SHELL)
+# Models of the elasticity fit without microrheology: no contact model, not
+# the indentation of the sample, or no published use (penetration and friction
+# along the side of the needle and of the nanowire are not in the model)
+UNSUPPORTED_MODELS = (contact_models.SLOPE, contact_models.THIN_SHELL,
+                      contact_models.NEEDLE, contact_models.NANOWIRE)
 
 
 def in_contact(data):

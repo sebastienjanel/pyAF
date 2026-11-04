@@ -182,8 +182,9 @@ class ResultsWidget(PYAFWidget):
             "& Garcia).",
             "stiffness_corr_slice": "Elastic: elasticity of one "
             "indentation segment, corrected for the substrate.",
-            "visco_e0": "Viscoelastic: modulus at 1 s of the "
-            "power-law relaxation E(t) = E\u2080 (t / 1 s)^-\u03b2\n(Ting fit "
+            "visco_e0": "Viscoelastic: scaling modulus of the power-law "
+            "relaxation E(t) = E\u2080 / \u0393(1 - \u03b2) (t / 1 s)^-\u03b2"
+            "\n(Ting fit "
             "of the approach and the retraction).",
             "visco_fluidity": "Viscoelastic: exponent \u03b2 of "
             "the power law, 0 elastic solid, 1 viscous liquid (cells: about "

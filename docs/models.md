@@ -35,7 +35,7 @@ $$F = \frac{2}{\pi}\frac{E}{1-\nu^2}\tan\theta \delta^2$$
 
 $$F = \frac{2\tan\theta}{n\sin(\pi/n)}\frac{E}{1-\nu^2} \delta^2 = \frac{1}{\sqrt{2}}\frac{E}{1-\nu^2}\tan\theta \delta^2$$
 
-Within 6 % of the numerical solution of Bilodeau [6, 7], see also section 8.
+Within 6 % of the solution of Bilodeau [6, 7], $C = 1.4906/2 = 0.7453$ instead of $1/\sqrt{2} = 0.7071$ (value given in [20]), see also section 8.
 
 **Flat punch** (Sneddon [3]):
 
@@ -115,9 +115,11 @@ $L$ is the brush length and $N$ the grafting density. The prefactor is the one o
 
 ## 7. Viscoelasticity: Ting fit
 
-Power-law relaxation modulus (Efremov et al. [19, 20]), $t_0 = 1$ s, with fluidity $\beta$:
+Power-law relaxation modulus (Tejedor & Garcia [22], eq. 12), $t_0 = 1$ s, with fluidity $\beta$ and $\Gamma$ the gamma function:
 
-$$E(t) = E_0\left(\frac{t}{t_0}\right)^{-\beta}, \qquad \tan\delta_{\text{loss}} = \tan\frac{\pi\beta}{2}$$
+$$E(t) = \frac{E_0}{\Gamma(1-\beta)}\left(\frac{t}{t_0}\right)^{-\beta}, \qquad E^*(\omega) = E_0 (i\omega t_0)^\beta, \qquad \tan\delta_{\text{loss}} = \tan\frac{\pi\beta}{2}$$
+
+$E_0$ depends on the definition of the power law, so values cannot be compared directly between papers: Garcia et al. [31] use $E_0 (t/t_0)^{-\beta}$ (so $E_0$ here is theirs multiplied by $\Gamma(1-\beta)$: 7 % for $\beta = 0.1$, 16 % for 0.2, 30 % for 0.3), and Efremov et al. [19] use $E_0 (1 + t/t')^{-\beta}$ with a small $t'$ (instantaneous modulus).
 
 Ting's solution [21], with $F = C E \delta^n$ for an elastic sample and $U = \delta^n$:
 
@@ -127,11 +129,22 @@ $$\int_{t_1}^{t} E(t-t')\frac{d\delta}{dt'} dt' = 0$$
 
 At constant velocities $v_t$ and $v_r$, with $B$ the beta function and ${}_2F_1$ the hypergeometric function, $t_m$ the end of the approach:
 
-$$F = C E_0 t_0^\beta v_t^n n B(n, 1-\beta) t^{n-\beta} \quad \text{(approach)}$$
+$$F = \frac{C E_0}{\Gamma(1-\beta)} t_0^\beta v_t^n n B(n, 1-\beta) t^{n-\beta} \quad \text{(approach)}$$
 
-$$F = C E_0 t_0^\beta v_t^n t_1^n t^{-\beta} {}_2F_1\left(\beta, n; n+1; \frac{t_1}{t}\right), \quad t_1 = t - \left(1+\frac{v_r}{v_t}\right)^{1/(1-\beta)}(t-t_m) \quad \text{(retraction)}$$
+$$F = \frac{C E_0}{\Gamma(1-\beta)} t_0^\beta v_t^n t_1^n t^{-\beta} {}_2F_1\left(\beta, n; n+1; \frac{t_1}{t}\right), \quad t_1 = t - \left(1+\frac{v_r}{v_t}\right)^{1/(1-\beta)}(t-t_m) \quad \text{(retraction)}$$
 
-Otherwise the integrals are computed on the measured indentation. With the bottom effect correction, $U$ is multiplied by $\varphi$ (Tejedor & Garcia [22]). The fit routine follows TingFit of PyFMRheo [23].
+Otherwise the integrals are computed on the measured indentation. With the bottom effect correction, $U$ is multiplied by $\varphi$ (Garcia et al. [31], Tejedor & Garcia [22]). The fit routine follows TingFit of PyFMRheo [23].
+
+**Status of the tips.** The theory is for axisymmetric tips (Efremov et al. [19]); the pyramid is therefore an approximation. "Published" means found in the references above, and other papers may exist.
+
+| Tip | Ting fit | Ting fit with bottom effect correction |
+|---|---|---|
+| Paraboloid | Published [19] | Discussed: [19] uses another correction, [31] questions it |
+| Cone | Published [22, 31] | Published [22, 31] |
+| Four-sided pyramid | Not found, theory only | Not found, cone factors |
+| Flat punch | Not found, theory only | Not found, theory only |
+| Sphere, blunted cone, blunted pyramid | Not found, theory only | Not available |
+| Needle, nanowire, thin shell, slope | Not available | Not available |
 
 ## 8. Microrheology
 
@@ -148,6 +161,8 @@ Viscous drag (Alcaraz et al. [25]), measured above the surface at several height
 $$b(h) = \frac{\mathrm{Im}(F/\delta)}{2\pi f}, \qquad b(h) = \frac{6\pi\eta a_{\text{eff}}^2}{h + h_{\text{eff}}}, \qquad b(0) = \frac{6\pi\eta a_{\text{eff}}^2}{h_{\text{eff}}}$$
 
 For the four-sided pyramid, Alcaraz et al. [24] use $F = \frac{3E\tan\theta}{4(1-\nu^2)}\delta^2$ (their eq. 1) and $G^* = \frac{1-\nu}{3\delta_0\tan\theta}\left[H - i2\pi f b(0)\right]$ (their eq. 6). pyAF uses the coefficient of section 3, $1/\sqrt{2}$ instead of $3/4$, which gives moduli about 6 % higher.
+
+**Available tips.** The formula above applies to any contact model with a slope $g'$. Published: pyramid [24], sphere and paraboloid. Blunted pyramid: proposed by Ding & Kumar [32]. Cone, flat punch, sphere (exact) and blunted cone: theory only. Not available: needle and nanowire (no published use found, and penetration and friction along their side are not in the model), thin shell, slope. The bottom effect correction is not applied.
 
 ## 9. Adhesion
 
@@ -224,3 +239,5 @@ See Gumí-Audenis & Giannotti [30]. A breakthrough is a jump of the separation $
 28. Dudko OK, Hummer G, Szabo A. Intrinsic rates and activation free energies from single-molecule pulling experiments. *Phys. Rev. Lett.* 96:108101 (2006). [doi:10.1103/PhysRevLett.96.108101](https://doi.org/10.1103/PhysRevLett.96.108101)
 29. Friddle RW, Noy A, De Yoreo JJ. Interpreting the widespread nonlinear force spectra of intermolecular bonds. *Proc. Natl. Acad. Sci. USA* 109:13573–13578 (2012). [doi:10.1073/pnas.1202946109](https://doi.org/10.1073/pnas.1202946109)
 30. Gumí-Audenis B, Giannotti MI. Structural and mechanical characterization of supported model membranes by AFM. In *Biomimetic Lipid Membranes: Fundamentals, Applications, and Commercialization*, pp. 1–27. Springer (2019). [doi:10.1007/978-3-030-11596-8_1](https://doi.org/10.1007/978-3-030-11596-8_1)
+31. Garcia PD, Guerrero CR, Garcia R. Nanorheology of living cells measured by AFM-based force-distance curves. *Nanoscale* 12:9133–9143 (2020). [doi:10.1039/C9NR10316C](https://doi.org/10.1039/C9NR10316C)
+32. Ding EA, Kumar S. Frequency-dependent cellular microrheology with pyramidal atomic force microscopy probes. *Biophys. J.* 125:3087–3094 (2025).

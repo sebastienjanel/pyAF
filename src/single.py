@@ -56,7 +56,6 @@ current temporary hdf5 file. See the src/tools/temp_file.py for more details.
 """
 
 import numpy
-from scipy import special
 from . import widgets_list
 from .tools import results_sorting
 from .tools.breakthrough_tools import EVENT_VALUES
@@ -1538,7 +1537,8 @@ class SingleFile:
 
     @property
     def visco_e0(self):
-        """Modulus E0 of the power law (at t0 = 1 s) [Pa]."""
+        """Scaling modulus E0 of the power law [Pa]: E(t) = E0 / Gamma(1 - b)
+        (t / t0)^-b, t0 = 1 s (Tejedor & Garcia 2025)."""
         return self.get_visco_result("e0")
 
     @property
@@ -1553,11 +1553,11 @@ class SingleFile:
 
     def visco_modulus(self):
         """Complex modulus of the power law at visco_frequency [Pa]:
-        E*(w) = E0 Gamma(1 - b) (i w t0) ** b (t0 = 1 s), derived from E0
-        and the fluidity b (no measure at this frequency)."""
+        E*(w) = E0 (i w t0) ** b (t0 = 1 s), derived from E0 and the fluidity
+        b (no measure at this frequency)."""
         beta = self.visco_fluidity
-        omega = 2 * numpy.pi * getattr(self, "visco_frequency", 1.0)
-        return self.visco_e0 * special.gamma(1 - beta) * omega ** beta
+        omega = 2 * numpy.pi * self.visco_frequency
+        return self.visco_e0 * omega ** beta
 
     @property
     def visco_storage(self):
