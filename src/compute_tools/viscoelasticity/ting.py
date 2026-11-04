@@ -32,7 +32,7 @@
 """Ting model of a power-law viscoelastic material.
 
 The relaxation modulus of the material is a power law (Efremov et al.,
-Sci. Rep. 2017, Soft Matter 2019):
+Sci. Rep. 2017, Soft Matter 2020):
 
     E(t) = E0 * (t / t0) ** -beta        (t0 = 1 s)
 

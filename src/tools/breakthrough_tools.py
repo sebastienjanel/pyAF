@@ -29,8 +29,8 @@
 # knowledge of the CeCILL license and that you accept its terms.
 
 """Breakthrough of supported lipid bilayers on the approach curves (see
-Gumi-Audenis & Giannotti, in Biomembrane Simulations: Computational
-Studies of Biological Membranes, 2019).
+Gumi-Audenis & Giannotti, in Biomimetic Lipid Membranes: Fundamentals,
+Applications, and Commercialization, 2019).
 
 The tip compresses the bilayer elastically, then punctures it: the
 separation (tip-sample distance, z - deflection) jumps by the thickness of
