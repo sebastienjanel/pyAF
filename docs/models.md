@@ -6,7 +6,7 @@ Notation: $F$ force, $\delta$ indentation, $E$ Young's modulus, $\nu$ Poisson ra
 
 ## 1. Force curves
 
-$$\delta = (z - z_0) - (d - d_0), \qquad F = k\,(d - d_0)$$
+$$\delta = (z - z_0) - (d - d_0), \qquad F = k (d - d_0)$$
 
 $(z_0, d_0)$ is the point of contact. The baseline is a straight line fitted on the non-contact part and subtracted.
 
@@ -15,9 +15,9 @@ Optional corrections: tilt (line fitted between two limits and subtracted) and s
 ## 2. Point of contact
 
 - **Detected**: last point of the curve below the baseline shifted by a threshold (residual noise of the baseline fit × a multiplier, 5 by default). The baseline can be fitted again just before the contact.
-- **Fitted**: for a model $F = E\,g(\delta - \delta_0)$, $E$ has a closed form for each $\delta_0$:
+- **Fitted**: for a model $F = E g(\delta - \delta_0)$, $E$ has a closed form for each $\delta_0$:
 
-$$E(\delta_0) = \frac{\sum F\,g}{\sum g^2}$$
+$$E(\delta_0) = \frac{\sum F g}{\sum g^2}$$
 
 The $\delta_0$ with the lowest error is searched on a grid, then refined (golden section). If the fit fails, the detected point is kept ("fixed point of contact").
 
@@ -25,21 +25,21 @@ The $\delta_0$ with the lowest error is searched on a grid, then refined (golden
 
 **Paraboloid** (Hertz [2]), for $\delta \ll R$:
 
-$$F = \frac{4}{3}\frac{E}{1-\nu^2}\sqrt{R}\,\delta^{3/2}$$
+$$F = \frac{4}{3}\frac{E}{1-\nu^2}\sqrt{R} \delta^{3/2}$$
 
 **Cone** (Sneddon [3]):
 
-$$F = \frac{2}{\pi}\frac{E}{1-\nu^2}\tan\theta\,\delta^2$$
+$$F = \frac{2}{\pi}\frac{E}{1-\nu^2}\tan\theta \delta^2$$
 
 **Four-sided pyramid** (Barber & Billings [4], Rico et al. [5]), general form for $n$ sides with $n = 4$:
 
-$$F = \frac{2\tan\theta}{n\sin(\pi/n)}\frac{E}{1-\nu^2}\,\delta^2 = \frac{1}{\sqrt{2}}\frac{E}{1-\nu^2}\tan\theta\,\delta^2$$
+$$F = \frac{2\tan\theta}{n\sin(\pi/n)}\frac{E}{1-\nu^2} \delta^2 = \frac{1}{\sqrt{2}}\frac{E}{1-\nu^2}\tan\theta \delta^2$$
 
 Within 6 % of the numerical solution of Bilodeau [6, 7], see also section 8.
 
 **Flat punch** (Sneddon [3]):
 
-$$F = 2R\frac{E}{1-\nu^2}\,\delta$$
+$$F = 2R\frac{E}{1-\nu^2} \delta$$
 
 **Sphere** (Sneddon [3]), with $a$ the contact radius:
 
@@ -57,15 +57,15 @@ $$F = \frac{2E}{1-\nu^2}\left[\delta a - \frac{ca^2}{2\tan\theta}\left(\frac{\pi
 
 **Needle** (Garcia & Garcia [9], eq. 18): flat punch capped with a cone, with $\delta_c = \pi R/(2\tan\theta)$:
 
-$$F = \frac{2}{\pi}\frac{E}{1-\nu^2}\tan\theta\,\delta^2 \quad (\delta \le \delta_c), \qquad F = \frac{2}{\pi}\frac{E}{1-\nu^2}\tan\theta\,\delta_c^2 + 2R\frac{E}{1-\nu^2}(\delta-\delta_c) \quad (\delta > \delta_c)$$
+$$F = \frac{2}{\pi}\frac{E}{1-\nu^2}\tan\theta \delta^2 \quad (\delta \le \delta_c), \qquad F = \frac{2}{\pi}\frac{E}{1-\nu^2}\tan\theta \delta_c^2 + 2R\frac{E}{1-\nu^2}(\delta-\delta_c) \quad (\delta > \delta_c)$$
 
 **Nanowire** (Garcia & Garcia [9], eq. 17): flat punch capped with a hemisphere:
 
-$$F = \frac{4}{3}\frac{E}{1-\nu^2}\sqrt{R}\,\delta^{3/2} \quad (\delta \le R), \qquad F = \frac{4}{3}\frac{E}{1-\nu^2}R^2 + 2R\frac{E}{1-\nu^2}(\delta-R) \quad (\delta > R)$$
+$$F = \frac{4}{3}\frac{E}{1-\nu^2}\sqrt{R} \delta^{3/2} \quad (\delta \le R), \qquad F = \frac{4}{3}\frac{E}{1-\nu^2}R^2 + 2R\frac{E}{1-\nu^2}(\delta-R) \quad (\delta > R)$$
 
 **Thin shell** (Reissner [10]; Calò et al. [11]; Vorselen et al. [12]): point load on a shell of radius $R$ (the vesicle) and thickness $h$:
 
-$$F = \frac{4Eh^2}{R\sqrt{3(1-\nu^2)}}\,\delta$$
+$$F = \frac{4Eh^2}{R\sqrt{3(1-\nu^2)}} \delta$$
 
 ## 4. Stiffness tomography (Slope)
 
@@ -75,16 +75,29 @@ Stiffness tomography (Roduit et al. [13], as used in Janel et al. [14]): slope $
 
 Garcia & Garcia [9], eqs. 12, 14 and 16 to 18, sample bonded to a rigid support of height $h$:
 
-$$F = E\,g(\delta)\,\varphi(\chi)$$
+$$F = E g(\delta) \varphi(\chi)$$
 
 - Paraboloid, $\chi = \sqrt{R\delta}/h$: $\varphi = 1 + 1.133\chi + 1.497\chi^2 + 1.469\chi^3 + 0.755\chi^4$
 - Cone and pyramid, $\chi = \delta\tan\theta/h$: $\varphi = 1 + 0.721\chi + 0.650\chi^2 + 0.491\chi^3 + 0.225\chi^4$
 - Flat punch, $\chi = R/h$: $\varphi = 1 + 1.133\chi + 1.283\chi^2 + 0.598\chi^3 - 0.291\chi^4$
-- Nanowire (eq. 17) and needle (eq. 18): the cap with its correction up to $\delta_c$ (nanowire: paraboloid, $\delta_c = R$; needle: cone, $\delta_c = \pi R/(2\tan\theta)$), then the flat punch:
 
-$$F = F_{\text{cap}}(\delta_c)\,\varphi_{\text{cap}}(\delta_c) + F_{\text{punch}}(\delta - \delta_c)\,\varphi_{\text{punch}}(R/h) \qquad (\delta > \delta_c)$$
+**Nanowire** (eq. 17) and **needle** (eq. 18): the correction of the cap is applied up to the critical indentation $\delta_c$, where the contact radius reaches $R$, then the correction of the flat punch of radius $R$, with $\chi = R/h$ (constant).
 
-The force is continuous at $\delta_c$, but not its slope.
+Nanowire, paraboloid cap, $\delta_c = R$:
+
+$$F = E g_{\text{par}}(\delta) \varphi_{\text{par}}(\delta) \quad (\delta \le R)$$
+
+$$F = E g_{\text{par}}(R) \varphi_{\text{par}}(R) + 2R\frac{E}{1-\nu^2}(\delta - R) \varphi_{\text{punch}} \quad (\delta > R)$$
+
+Needle, conical cap, $\delta_c = \pi R/(2\tan\theta)$:
+
+$$F = E g_{\text{cone}}(\delta) \varphi_{\text{cone}}(\delta) \quad (\delta \le \delta_c)$$
+
+$$F = E g_{\text{cone}}(\delta_c) \varphi_{\text{cone}}(\delta_c) + 2R\frac{E}{1-\nu^2}(\delta - \delta_c) \varphi_{\text{punch}} \quad (\delta > \delta_c)$$
+
+$g_{\text{par}}$ and $g_{\text{cone}}$ are the force per unit modulus of the paraboloid and of the cone (section 3), and $\varphi_{\text{par}}$, $\varphi_{\text{cone}}$ and $\varphi_{\text{punch}}$ the polynomials above. The force is continuous at $\delta_c$, but not its slope. The influence of the support is small for thin tips: $\varphi_{\text{punch}} = 1.011$ for $R = 50$ nm and $h = 5$ µm.
+
+The polynomials are expansions in the ratio of the contact radius to the height, and become unreliable when this ratio approaches 1.
 
 The elasticity and the point of contact are fitted again with $\varphi$ in the model. The height is entered by hand, or is the topography above the plane of a substrate ROI.
 
@@ -96,7 +109,7 @@ $$h = \delta_s + \delta_{\text{body}}(F) - \delta$$
 
 The brush force is fitted for $0.1 < h/L < 0.8$ (linear fit of $\ln F$ against $h$, iterated):
 
-$$F = 100\,k_BT\,R\,N^{3/2}L\,\exp\left(-\frac{2\pi h}{L}\right)$$
+$$F = 100 k_BT R N^{3/2}L \exp\left(-\frac{2\pi h}{L}\right)$$
 
 $L$ is the brush length and $N$ the grafting density. The prefactor is the one of Makarova et al. [17]; Guz et al. [18] use 50. No length is given for $R^2 < 0.8$.
 
@@ -106,17 +119,17 @@ Power-law relaxation modulus (Efremov et al. [19, 20]), $t_0 = 1$ s, with fluidi
 
 $$E(t) = E_0\left(\frac{t}{t_0}\right)^{-\beta}, \qquad \tan\delta_{\text{loss}} = \tan\frac{\pi\beta}{2}$$
 
-Ting's solution [21], with $F = C\,E\,\delta^n$ for an elastic sample and $U = \delta^n$:
+Ting's solution [21], with $F = C E \delta^n$ for an elastic sample and $U = \delta^n$:
 
-$$F(t) = C\int_0^{t} E(t-t')\frac{dU}{dt'}\,dt' \quad \text{(approach)}, \qquad F(t) = C\int_0^{t_1(t)} E(t-t')\frac{dU}{dt'}\,dt' \quad \text{(retraction)}$$
+$$F(t) = C\int_0^{t} E(t-t')\frac{dU}{dt'} dt' \quad \text{(approach)}, \qquad F(t) = C\int_0^{t_1(t)} E(t-t')\frac{dU}{dt'} dt' \quad \text{(retraction)}$$
 
-$$\int_{t_1}^{t} E(t-t')\frac{d\delta}{dt'}\,dt' = 0$$
+$$\int_{t_1}^{t} E(t-t')\frac{d\delta}{dt'} dt' = 0$$
 
 At constant velocities $v_t$ and $v_r$, with $B$ the beta function and ${}_2F_1$ the hypergeometric function, $t_m$ the end of the approach:
 
-$$F = C E_0 t_0^\beta v_t^n\, n\, B(n, 1-\beta)\, t^{n-\beta} \quad \text{(approach)}$$
+$$F = C E_0 t_0^\beta v_t^n n B(n, 1-\beta) t^{n-\beta} \quad \text{(approach)}$$
 
-$$F = C E_0 t_0^\beta v_t^n\, t_1^n\, t^{-\beta}\, {}_2F_1\left(\beta, n; n+1; \frac{t_1}{t}\right), \quad t_1 = t - \left(1+\frac{v_r}{v_t}\right)^{1/(1-\beta)}(t-t_m) \quad \text{(retraction)}$$
+$$F = C E_0 t_0^\beta v_t^n t_1^n t^{-\beta} {}_2F_1\left(\beta, n; n+1; \frac{t_1}{t}\right), \quad t_1 = t - \left(1+\frac{v_r}{v_t}\right)^{1/(1-\beta)}(t-t_m) \quad \text{(retraction)}$$
 
 Otherwise the integrals are computed on the measured indentation. With the bottom effect correction, $U$ is multiplied by $\varphi$ (Tejedor & Garcia [22]). The fit routine follows TingFit of PyFMRheo [23].
 
@@ -124,15 +137,15 @@ Otherwise the integrals are computed on the measured indentation. With the botto
 
 Alcaraz et al. [24], PyFMRheo [23]. With $H(f) = F(f)/\delta(f)$, by FFT or sine fit, optionally corrected with a piezo characterization, and the contact model linearized around the working indentation $\delta_0$:
 
-$$G^*(f) = G'(f) + iG''(f) = \frac{H(f) - i\,2\pi f\,b(0)}{2(1+\nu)\,g'(\delta_0)}$$
+$$G^*(f) = G'(f) + iG''(f) = \frac{H(f) - i 2\pi f b(0)}{2(1+\nu) g'(\delta_0)}$$
 
 For a paraboloid:
 
-$$G^*(f) = \frac{1-\nu}{4\sqrt{R\delta_0}}\left[H(f) - i\,2\pi f\,b(0)\right]$$
+$$G^*(f) = \frac{1-\nu}{4\sqrt{R\delta_0}}\left[H(f) - i 2\pi f b(0)\right]$$
 
 Viscous drag (Alcaraz et al. [25]), measured above the surface at several heights and extrapolated to the surface:
 
-$$b(h) = \frac{\operatorname{Im}(F/\delta)}{2\pi f}, \qquad b(h) = \frac{6\pi\eta\,a_{\text{eff}}^2}{h + h_{\text{eff}}}, \qquad b(0) = \frac{6\pi\eta\,a_{\text{eff}}^2}{h_{\text{eff}}}$$
+$$b(h) = \frac{\operatorname{Im}(F/\delta)}{2\pi f}, \qquad b(h) = \frac{6\pi\eta a_{\text{eff}}^2}{h + h_{\text{eff}}}, \qquad b(0) = \frac{6\pi\eta a_{\text{eff}}^2}{h_{\text{eff}}}$$
 
 For the four-sided pyramid, Alcaraz et al. [24] use $F = \frac{3E\tan\theta}{4(1-\nu^2)}\delta^2$ (their eq. 1) and $G^* = \frac{1-\nu}{3\delta_0\tan\theta}\left[H - i2\pi f b(0)\right]$ (their eq. 6). pyAF uses the coefficient of section 3, $1/\sqrt{2}$ instead of $3/4$, which gives moduli about 6 % higher.
 
@@ -146,9 +159,9 @@ Both are measured from the line through the two jumps of contact of the retract 
 ## 10. Unbinding events
 
 - **Kernel**: convolution of the curve with a step kernel, normalized on the noise, with an optional adaptive threshold (a Savitzky-Golay smoothing of the convolution is subtracted).
-- **MSF**: in a sliding window, comparison of a step fit and of a single line, $d = (\text{res}_{\text{line}} - \text{res}_{\text{step}})\,\Delta y\,/\,\text{norm}$.
+- **MSF**: in a sliding window, comparison of a step fit and of a single line, $d = (\text{res}_{\text{line}} - \text{res}_{\text{step}}) \Delta y / \text{norm}$.
 - **Force of an event**: $|y_1 - y_2|$, the fit through the step crossing the linear fits on each side.
-- **Loading rate**: $r = \frac{dF}{dz}\,v$, slope over the rise of the force after the event, up to a fraction of the force of the event.
+- **Loading rate**: $r = \frac{dF}{dz} v$, slope over the rise of the force after the event, up to a fraction of the force of the event.
 
 ## 11. Dynamic force spectroscopy
 
@@ -156,15 +169,15 @@ See Mesbah et al. [26]. All models are fitted on median forces.
 
 **Bell-Evans** (Evans & Ritchie [27]):
 
-$$F = \frac{k_BT}{x}\ln\left(1 + \ln 2\,\frac{r\,x}{k_BT\,k_{\text{off}}}\right)$$
+$$F = \frac{k_BT}{x}\ln\left(1 + \ln 2 \frac{r x}{k_BT k_{\text{off}}}\right)$$
 
 **Dudko-Hummer-Szabo** [28], $\nu = 1/2$ (cusp) or $2/3$ (linear-cubic):
 
-$$F = \frac{\Delta G}{\nu x}\left(1 - \left[1 - \frac{k_BT}{\Delta G}\ln\left(1 + \ln 2\,\frac{r\,x}{k_BT\,k_{\text{off}}}\right)\right]^{\nu}\right)$$
+$$F = \frac{\Delta G}{\nu x}\left(1 - \left[1 - \frac{k_BT}{\Delta G}\ln\left(1 + \ln 2 \frac{r x}{k_BT k_{\text{off}}}\right)\right]^{\nu}\right)$$
 
 **Friddle-Noy-De Yoreo** [29], with rebinding:
 
-$$F = f_{eq} + \frac{k_BT}{x}\ln\left(1 + \ln 2\,\frac{r\,x}{k(f_{eq})\,k_BT}\right), \quad k(f_{eq}) = k_{\text{off}}\,e^{f_{eq}x/k_BT}, \quad f_{eq} = \sqrt{2k_c\Delta G_{bu}}$$
+$$F = f_{eq} + \frac{k_BT}{x}\ln\left(1 + \ln 2 \frac{r x}{k(f_{eq}) k_BT}\right), \quad k(f_{eq}) = k_{\text{off}} e^{f_{eq}x/k_BT}, \quad f_{eq} = \sqrt{2k_c\Delta G_{bu}}$$
 
 The original formulas use the mean force; pyAF uses $\ln 2$ for the median force.
 
