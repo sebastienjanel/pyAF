@@ -179,7 +179,7 @@ $$F = \frac{\Delta G}{\nu x}\left(1 - \left[1 - \frac{k_BT}{\Delta G}\ln\left(1 
 
 $$F = f_{eq} + \frac{k_BT}{x}\ln\left(1 + \ln 2 \frac{r x}{k(f_{eq}) k_BT}\right), \quad k(f_{eq}) = k_{\text{off}} e^{f_{eq}x/k_BT}, \quad f_{eq} = \sqrt{2k_c\Delta G_{bu}}$$
 
-The original formulas use the mean force; pyAF uses $\ln 2$ for the median force.
+The original formulas give the most probable force (Bell-Evans) or the mean force (Dudko-Hummer-Szabo, Friddle-Noy-De Yoreo). pyAF fits median forces, less affected by multiple bonds and nonspecific adhesions, so it uses the corresponding expression, with $\ln 2$.
 
 ## 12. Breakthrough of lipid bilayers
 
