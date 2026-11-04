@@ -996,6 +996,29 @@ class ResultsSingleWidget(PYAFWidget):
 
         self.schedule_refresh()
 
+    def batch_bec_change(self, action):
+        """Use or not the bottom effect correction for the selected rows
+        (rows without correction stay on False)."""
+        index = action.data()
+        column = self.columns.get_column("B.E.C.")
+        skipped = []
+        for item in self.tableWidget.selectionModel().selectedRows():
+            row_index = item.row()
+            result = shared.exp.results_list[row_index]
+            data = shared.exp.list[result.data_id]
+            if index and not data.stiffness_corrected:
+                skipped.append(str(row_index + 1))
+                continue
+            result.sub_type = index
+            if column.visibility:
+                cell = self.tableWidget.cellWidget(row_index, column.position)
+                cell.list.setCurrentIndex(index)
+        if skipped and not consts.UNIT_TESTING:
+            QtWidgets.QMessageBox.warning(
+                self, "Information",
+                "No B.E.C. computed for row(s) " + ", ".join(skipped) + ".")
+        self.schedule_refresh()
+
     def batch_events_change(self):
         """Change selected events."""
         # Get the mode which was selected
@@ -1094,6 +1117,20 @@ class ResultsSingleWidget(PYAFWidget):
                 self.submenu_slices.addAction(subaction)
             self.submenu_slices.triggered.connect(self.batch_slices_change)
             action.setMenu(self.submenu_slices)
+
+        # Batch change bottom effect correction
+        if rt == "stiffness":
+            action = QtWidgets.QAction("Change selected B.E.C.", self)
+            action.setEnabled(any(
+                data.stiffness_corrected for data in shared.exp.list))
+            menu.addAction(action)
+            self.submenu_bec = QtWidgets.QMenu()
+            for index, name in enumerate(("False", "True")):
+                subaction = QtWidgets.QAction(name, self)
+                subaction.setData(index)
+                self.submenu_bec.addAction(subaction)
+            self.submenu_bec.triggered.connect(self.batch_bec_change)
+            action.setMenu(self.submenu_bec)
 
         # Batch change rois (ROIs are None, 1, 2, ...)
         action = QtWidgets.QAction("Change selected ROI'S", self)
