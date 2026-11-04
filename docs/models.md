@@ -162,7 +162,7 @@ $$b(h) = \frac{\mathrm{Im}(F/\delta)}{2\pi f}, \qquad b(h) = \frac{6\pi\eta a_{\
 
 For the four-sided pyramid, Alcaraz et al. [24] use $F = \frac{3E\tan\theta}{4(1-\nu^2)}\delta^2$ (their eq. 1) and $G^* = \frac{1-\nu}{3\delta_0\tan\theta}\left[H - i2\pi f b(0)\right]$ (their eq. 6). pyAF uses the coefficient of section 3, $1/\sqrt{2}$ instead of $3/4$, which gives moduli about 6 % higher.
 
-**Available tips.** The formula above applies to any contact model with a slope $g'$. Published: pyramid [24], sphere and paraboloid. Blunted pyramid: proposed by Ding & Kumar [32]. Cone, flat punch, sphere (exact) and blunted cone: theory only. Not available: needle and nanowire (no published use found, and penetration and friction along their side are not in the model), thin shell, slope. The bottom effect correction is not applied.
+**Available tips.** The formula above applies to any contact model with a slope $g'$. Published: pyramid [24], sphere and paraboloid. Blunted pyramid: same Rico expressions and numerical linearization as Ding & Kumar [32], who use $b = R\cos\theta$ where pyAF uses $b = cR/\tan\theta$; not validated on data in [32]. Cone, flat punch, sphere (exact) and blunted cone: theory only. Not available: needle and nanowire (no published use found, and penetration and friction along their side are not in the model), thin shell, slope. The bottom effect correction is not applied.
 
 ## 9. Adhesion
 
@@ -240,4 +240,4 @@ See Gumí-Audenis & Giannotti [30]. A breakthrough is a jump of the separation $
 29. Friddle RW, Noy A, De Yoreo JJ. Interpreting the widespread nonlinear force spectra of intermolecular bonds. *Proc. Natl. Acad. Sci. USA* 109:13573–13578 (2012). [doi:10.1073/pnas.1202946109](https://doi.org/10.1073/pnas.1202946109)
 30. Gumí-Audenis B, Giannotti MI. Structural and mechanical characterization of supported model membranes by AFM. In *Biomimetic Lipid Membranes: Fundamentals, Applications, and Commercialization*, pp. 1–27. Springer (2019). [doi:10.1007/978-3-030-11596-8_1](https://doi.org/10.1007/978-3-030-11596-8_1)
 31. Garcia PD, Guerrero CR, Garcia R. Nanorheology of living cells measured by AFM-based force-distance curves. *Nanoscale* 12:9133–9143 (2020). [doi:10.1039/C9NR10316C](https://doi.org/10.1039/C9NR10316C)
-32. Ding EA, Kumar S. Frequency-dependent cellular microrheology with pyramidal atomic force microscopy probes. *Biophys. J.* 125:3087–3094 (2025).
+32. Ding EA, Kumar S. Frequency-dependent cellular microrheology with pyramidal atomic force microscopy probes. *Biophys. J.* 125:3087–3094 (2026). [doi:10.1016/j.bpj.2025.10.037](https://doi.org/10.1016/j.bpj.2025.10.037)
