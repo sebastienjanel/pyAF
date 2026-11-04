@@ -150,9 +150,15 @@ DEFAULT_ANGLE = {CONE: 15, PYRAMID: 35, BLUNTED_CONE: 15,
                  BLUNTED_PYRAMID: 35, NEEDLE: 15}
 
 # Models with a bottom effect correction (Garcia & Garcia, Biophys. J.
-# 2018: paraboloid, cone, cylinder; the cone factors are used for the
-# pyramid)
-HAS_BEC = (PARABOLOID, CONE, PYRAMID, FLAT_PUNCH)
+# 2018: paraboloid, cone, cylinder, needle, nanowire; the cone factors are
+# used for the pyramid)
+HAS_BEC = (PARABOLOID, CONE, PYRAMID, FLAT_PUNCH, NEEDLE, NANOWIRE)
+
+# Coefficients of the polynomials of the bottom effect correction (Garcia &
+# Garcia 2018, eqs. 12, 14 and 16), from the first order
+BEC_PARABOLOID = (1.133, 1.497, 1.469, 0.755)
+BEC_CONE = (0.721, 0.650, 0.491, 0.225)
+BEC_PUNCH = (1.133, 1.283, 0.598, -0.291)
 
 # Models whose validity is limited by the radius of the tip (the paraboloid
 # needs delta << R)
@@ -286,9 +292,45 @@ def _table_force(model, tip_radius, tip_angle, d):
     return values
 
 
+def bec_polynomial(x, coeffs):
+    """Polynomial of the bottom effect correction for the ratio x."""
+    return 1.0 + sum(c * x ** (k + 1) for k, c in enumerate(coeffs))
+
+
+def staged_bec_factor(delta, model, tip_radius, tip_angle, height):
+    """Bottom effect correction of the needle and of the nanowire (Garcia &
+    Garcia 2018, eqs. 17 and 18): cap with its correction up to delta_c (the
+    value at delta_c beyond), then flat punch with its correction. Returns
+    the ratio to the force without correction (1 for delta = 0)."""
+    out = numpy.ones_like(delta)
+    pos = delta > 0
+    d = delta[pos]
+    if model == NEEDLE:
+        tan = math.tan(math.radians(tip_angle))
+        delta_c = math.pi * tip_radius / (2.0 * tan)
+        cap_coeff = 2.0 / math.pi * tan
+        cap_exponent = 2.0
+        cap_x = lambda value: value * tan / height  # noqa: E731
+        cap_terms = BEC_CONE
+    else:
+        delta_c = tip_radius
+        cap_coeff = 4.0 / 3.0 * math.sqrt(tip_radius)
+        cap_exponent = 1.5
+        cap_x = lambda value: numpy.sqrt(  # noqa: E731
+            value * tip_radius) / height
+        cap_terms = BEC_PARABOLOID
+    capped = numpy.minimum(d, delta_c)
+    punch = 2.0 * tip_radius * (d - capped)
+    cap = cap_coeff * capped ** cap_exponent
+    corrected = cap * bec_polynomial(cap_x(capped), cap_terms) + \
+        punch * bec_polynomial(tip_radius / height, BEC_PUNCH)
+    out[pos] = corrected / (cap + punch)
+    return out
+
+
 def bec_factor(delta, model, tip_radius, tip_angle, height):
     """Bottom effect correction of Garcia & Garcia (Biophys. J. 2018, eqs.
-    12, 14 and 16, cell bonded to the substrate): factor (>= 1) of the
+    12, 14 and 16 to 18, cell bonded to the substrate): factor (>= 1) of the
     force of a layer of thickness height, for the models of HAS_BEC (the
     cone factors are used for the pyramid).
 
@@ -298,19 +340,21 @@ def bec_factor(delta, model, tip_radius, tip_angle, height):
     delta = numpy.clip(numpy.asarray(delta, dtype=float), 0, None)
     if height is None or not height > 0:
         return numpy.ones_like(delta)
+    if model in (NEEDLE, NANOWIRE):
+        return staged_bec_factor(delta, model, tip_radius, tip_angle, height)
     if model == PARABOLOID:
         x = numpy.sqrt(delta * tip_radius) / height
-        coeffs = (1.133, 1.497, 1.469, 0.755)
+        coeffs = BEC_PARABOLOID
     elif model in (CONE, PYRAMID):
         x = delta * math.tan(math.radians(tip_angle)) / height
-        coeffs = (0.721, 0.650, 0.491, 0.225)
+        coeffs = BEC_CONE
     elif model == FLAT_PUNCH:
         x = numpy.full_like(delta, tip_radius / height)
-        coeffs = (1.133, 1.283, 0.598, -0.291)
+        coeffs = BEC_PUNCH
     else:
         raise ValueError("No bottom effect correction for the model " +
                          str(model))
-    return 1.0 + sum(c * x ** (k + 1) for k, c in enumerate(coeffs))
+    return bec_polynomial(x, coeffs)
 
 
 def unit_force(model, tip_radius, tip_angle, poisson_ratio, delta,

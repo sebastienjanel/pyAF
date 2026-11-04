@@ -73,13 +73,18 @@ Stiffness tomography (Roduit et al. [13], as used in Janel et al. [14]): slope $
 
 ## 5. Bottom effect correction
 
-Garcia & Garcia [9], eqs. 12, 14 and 16, sample bonded to a rigid support of height $h$:
+Garcia & Garcia [9], eqs. 12, 14 and 16 to 18, sample bonded to a rigid support of height $h$:
 
 $$F = E\,g(\delta)\,\varphi(\chi)$$
 
 - Paraboloid, $\chi = \sqrt{R\delta}/h$: $\varphi = 1 + 1.133\chi + 1.497\chi^2 + 1.469\chi^3 + 0.755\chi^4$
 - Cone and pyramid, $\chi = \delta\tan\theta/h$: $\varphi = 1 + 0.721\chi + 0.650\chi^2 + 0.491\chi^3 + 0.225\chi^4$
 - Flat punch, $\chi = R/h$: $\varphi = 1 + 1.133\chi + 1.283\chi^2 + 0.598\chi^3 - 0.291\chi^4$
+- Nanowire (eq. 17) and needle (eq. 18): the cap with its correction up to $\delta_c$ (nanowire: paraboloid, $\delta_c = R$; needle: cone, $\delta_c = \pi R/(2\tan\theta)$), then the flat punch:
+
+$$F = F_{\text{cap}}(\delta_c)\,\varphi_{\text{cap}}(\delta_c) + F_{\text{punch}}(\delta - \delta_c)\,\varphi_{\text{punch}}(R/h) \qquad (\delta > \delta_c)$$
+
+The force is continuous at $\delta_c$, but not its slope.
 
 The elasticity and the point of contact are fitted again with $\varphi$ in the model. The height is entered by hand, or is the topography above the plane of a substrate ROI.
 

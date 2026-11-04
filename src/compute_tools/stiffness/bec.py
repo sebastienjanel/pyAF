@@ -65,7 +65,8 @@ def check_file(data):
     if data.used_stiffness_model_selected not in contact_models.HAS_BEC:
         return "no bottom effect correction for the model " + \
             contact_models.MODEL_NAMES[data.used_stiffness_model_selected] + \
-            " (Garcia & Garcia 2018: paraboloid, cone, pyramid, flat punch)"
+            " (Garcia & Garcia 2018: paraboloid, cone, pyramid, flat punch, " \
+            "needle, nanowire)"
     if data.user_h is not None and data.user_h != 0:
         return None
     if data.roi_glass_id == 0:
