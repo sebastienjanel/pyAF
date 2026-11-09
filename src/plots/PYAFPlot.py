@@ -162,6 +162,10 @@ class PYAFPlot(FigureCanvasQTAgg):
 
         super().__init__(self.fig)
 
+        # Size asked at the creation (see sizeHint)
+        self.initial_size = QtCore.QSize(int(round(sizes[0] * sizes[2])),
+                                         int(round(sizes[1] * sizes[2])))
+
         # Refresh delay for the resizeEvent
         self.timeout = 150  # ms
         self.resize_timer = QtCore.QTimer(self)
@@ -429,6 +433,14 @@ class PYAFPlot(FigureCanvasQTAgg):
             delta = dx if abs(dx) > abs(dy) else dy
             hbar.setValue(int(round(hbar.value() - delta)))
         event.accept()
+
+    def sizeHint(self):
+        """Size asked at the creation, not the current size (matplotlib):
+        with the size policies of the plots, the size hint is the minimum
+        size, so a plot which grew (a curve alone without the map of a
+        single file) could not shrink again (when a map is displayed next
+        to it), and the window would grow instead."""
+        return self.initial_size
 
     def resizeEvent(self, ev):
         """Reimplement resizeEvent to manage plot redrawing."""
