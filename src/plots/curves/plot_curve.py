@@ -391,9 +391,10 @@ class PlotCurve(MainPlot, CommonCurveTools):
                     curve_x = self.curve_retraction[0]
                     curve_y = self.curve_retraction[1]
 
-            # Get distance between two points on the curve
+            # Get distance between two points on the curve (from the first
+            # valid point of the curve drawn)
             if curve_x is not None:
-                xdist = math_tools.get_x_dist(curve_x, self.ret_pos[0])
+                xdist = math_tools.get_x_dist(curve_x, positions[0])
             else:
                 xdist = None
 

@@ -48,6 +48,7 @@ from ..tools import gui_tools
 from ..tools import misc_tools
 from ..tools import math_tools
 from ..tools import curve_tools
+from ..tools import plant_tools
 from ..tools import events_refresher
 from ..utils import meshgrid_menu
 from ..tools.gui_tools import PYAFInput
@@ -357,6 +358,19 @@ class DataWidget(PYAFWidget):
         x = str(round(data.scan_size_x / 1000.0, 4))
         y = str(round(data.scan_size_y / 1000.0, 4))
         self.LB_scan_size.setText("Scan size : " + x + " x " + y + " \u03bcm")
+        self.LB_scan_size.setToolTip("")
+        if data.is_single:
+            # Position of the curve on a loaded map (plant cells)
+            on_map = plant_tools.map_of_curve(data)
+            if on_map is not None:
+                index, map_data, position = on_map
+                self.LB_scan_size.setText(
+                    "On map : file " + str(index + 1) + ", pixel (" +
+                    str(position["i"] + 1) + ", " + str(position["j"] + 1) +
+                    ")")
+                self.LB_scan_size.setToolTip(
+                    map_data.filename + "\nx = %.2f µm, y = %.2f µm" % (
+                        position["x"] / 1000.0, position["y"] / 1000.0))
         self.LB_nbr_points.setText("XY samples : "
                                    + str(data.nbr_pixels_x)
                                    + " x " + str(data.nbr_pixels_y))

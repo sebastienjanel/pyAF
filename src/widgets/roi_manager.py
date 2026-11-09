@@ -40,6 +40,7 @@ from qtpy import QtCore, QtWidgets
 from ..tools import gui_tools
 from ..tools import math_tools
 from ..tools import planefit
+from ..tools import plant_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFButtonGroup
@@ -119,6 +120,12 @@ class RoiManagerWidget(PYAFWidget):
             "selected substrate ROI, over the whole map. Define the ROI as\n"
             "substrate first.")
 
+        self.BT_cell = PYAFButton(self, "cell", "Cell geometry")
+        self.BT_cell.setToolTip(
+            "Plant cells: size, axes and curvatures of the cell drawn as the\n"
+            "selected ROI (quadratic surface fitted on its heights), at its\n"
+            "centre and at the single curves recorded inside it.")
+
         self.VL_options.addWidget(self.input_size)
         self.VL_options.addWidget(self.radiobutton_square)
         self.VL_options.addWidget(self.radiobutton_circle)
@@ -130,6 +137,7 @@ class RoiManagerWidget(PYAFWidget):
         self.VL_options.addWidget(self.BT_glass)
         self.VL_options.addWidget(self.BT_planefit)
         self.VL_options.addWidget(self.BT_volume)
+        self.VL_options.addWidget(self.BT_cell)
         self.VL_options.addStretch(1)
 
         self.HL.addWidget(self.TW)
@@ -333,6 +341,9 @@ class RoiManagerWidget(PYAFWidget):
                 self.set_planefit(data, rows[0])
             self.update_GUI("BT_glass")
 
+        elif button == "cell":
+            self.show_cell_geometry(data)
+
         elif button == "discard":
             # Discard (or keep again) the curves of the selected ROI
             rows = [item.row()
@@ -358,6 +369,75 @@ class RoiManagerWidget(PYAFWidget):
             widgets_list.widget_data.meshgrid.update_plot()
             widgets_list.widget_results.update_MPL("MPL_canvas1")
             self.update_results()
+
+    def show_cell_geometry(self, data):
+        """Geometry of the cell drawn as the selected ROI (see
+        plant_tools.cell_geometry), at its centre and at the single curves
+        recorded inside it."""
+        rows = [item.row() for item in self.TW.selectionModel().selectedRows()]
+        if not rows:
+            return
+        roi = data.roi_list[rows[0]]
+        inside = {(int(i), int(j)) for i, j in roi.values}
+        curves = [(index, position) for index, _, position
+                  in plant_tools.curves_on_map(data)
+                  if (position["i"], position["j"]) in inside]
+        geometry = plant_tools.cell_geometry(
+            data, roi.values, [[p["x"], p["y"]] for _, p in curves])
+        title = "Cell geometry - ROI " + str(rows[0] + 1)
+        if geometry is None:
+            QtWidgets.QMessageBox.warning(
+                self, title, "Draw the cell as a ROI first (at least 6 "
+                "pixels).")
+            return
+
+        def number(value, digits=4):
+            return "%.*g" % (digits, value)
+
+        names = ["Centre"] + ["File " + str(index + 1) for index, _ in curves]
+        rows_html = ""
+        saddle = False
+        for name, point in zip(names, geometry["points"]):
+            saddle |= not point["dome"]
+            radii = ["%.1f" % (1.0 / value) if value > 0 else "-"
+                     for value in (point["k_major"], point["k_minor"])]
+            rows_html += (
+                "<tr><td>" + name + "</td><td>" +
+                number(point["x"] / 1000.0, 3) + ", " +
+                number(point["y"] / 1000.0, 3) + "</td><td>" +
+                number(point["k_major"] * 1e3) + "</td><td>" +
+                number(point["k_minor"] * 1e3) + "</td><td>" +
+                radii[0] + ", " + radii[1] + "</td><td>" +
+                number(point["kM"] * 1e3) + "</td><td>" +
+                number(point["kG"] * 1e6) + "</td><td>" +
+                number(point["f"], 3) + "</td><td>" +
+                ("dome" if point["dome"] else "<b>saddle</b>") +
+                "</td></tr>")
+        text = (
+            "<p>" + data.filename + "<br>Heights: " + geometry["heights"] +
+            " (without flatten)</p>"
+            "<p>Area: " + number(geometry["area"]) + " µm² (" +
+            str(geometry["pixels"]) + " pixels)<br>"
+            "Major axis: " + number(geometry["angle"], 3) + "° from x<br>"
+            "Half-lengths (centre to edge): L<sub>major</sub> = " +
+            number(geometry["L_major"]) + " µm, L<sub>minor</sub> = " +
+            number(geometry["L_minor"]) + " µm<br>"
+            "Quadratic surface fit: RMS " + number(geometry["rms"], 3) +
+            " nm</p>"
+            "<table cellspacing='6'><tr><th></th><th>x, y [µm]</th>"
+            "<th>κ<sub>major</sub> [1/mm]</th><th>κ<sub>minor</sub> [1/mm]"
+            "</th><th>Radii [µm]</th><th>κ<sub>M</sub> [1/mm]</th>"
+            "<th>κ<sub>G</sub> [1/mm²]</th><th>f</th><th></th></tr>" +
+            rows_html + "</table>")
+        if saddle:
+            text += ("<p>Saddle: the surface is not a dome there (junction "
+                     "between cells?), the shell models do not apply.</p>")
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle(title)
+        box.setText(title)
+        box.setInformativeText(text)
+        box.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        box.exec()
 
     def set_planefit(self, data, roi_index):
         """Apply the planefit with a substrate ROI (None: remove it), then

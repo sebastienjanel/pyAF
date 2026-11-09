@@ -685,6 +685,13 @@ class SingleFile:
         # These pixels have no curve, and are always discarded.
         self.outside_region = None
 
+        # Plant cells (see tools/plant_tools): positions of the stage and of
+        # the scanners (JPK files), position of a single curve on the sample
+        # [x, y] (m), and grid of a map on the sample
+        self.frame = None
+        self.sample_position = None
+        self.sample_grid = None
+
     def update_events_per_curve(self):
         """Fills the self._events_per_curve array with values.
 
