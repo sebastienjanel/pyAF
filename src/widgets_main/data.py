@@ -890,7 +890,7 @@ class DataWidget(PYAFWidget):
                 QtWidgets.QMessageBox.warning(
                     self,
                     "Info",
-                    "You should recalculate the stiffness.")
+                    "You should recompute the results.")
         elif field == "defl_sens":
             value = self.IN_defl_sens.get_str_value(True)
             if value != str(round(data.deflection_sensitivity, 2)):
