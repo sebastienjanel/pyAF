@@ -42,7 +42,7 @@ from .. import shared
 
 
 class FlattenWidget(PYAFWidget):
-    """Allows to flatten the piezo image with order 1, 2, 3."""
+    """Allows to flatten the piezo image with order 0, 1, 2."""
 
     def __init__(self, parent):
         super().__init__(parent, "widget_flatten")
@@ -91,26 +91,29 @@ class FlattenWidget(PYAFWidget):
 
         self.label_radiobuttons_order = QtWidgets.QLabel()
         self.label_radiobuttons_order.setText("Order : ")
+        self.RV_flatten_order0 = QtWidgets.QRadioButton()
         self.RV_flatten_order1 = QtWidgets.QRadioButton()
         self.RV_flatten_order2 = QtWidgets.QRadioButton()
-        self.RV_flatten_order3 = QtWidgets.QRadioButton()
+        self.RV_flatten_order0.setText("0")
         self.RV_flatten_order1.setText("1")
         self.RV_flatten_order2.setText("2")
-        self.RV_flatten_order3.setText("3")
+        self.RV_flatten_order0.setToolTip("Offset of each line")
+        self.RV_flatten_order1.setToolTip("Slope")
+        self.RV_flatten_order2.setToolTip("Slope and curvature")
         self.update_GUI("radiobuttons_flatten_order")
+        self.RV_flatten_order0.clicked.connect(
+            lambda: self.button_clicked("radiobutton_flatten_order0"))
         self.RV_flatten_order1.clicked.connect(
             lambda: self.button_clicked("radiobutton_flatten_order1"))
         self.RV_flatten_order2.clicked.connect(
             lambda: self.button_clicked("radiobutton_flatten_order2"))
-        self.RV_flatten_order3.clicked.connect(
-            lambda: self.button_clicked("radiobutton_flatten_order3"))
 
         self.flatten_buttons_HL.addWidget(self.BT_apply_flatten)
         self.flatten_buttons_HL.addWidget(self.BT_remove_flatten)
         self.flatten_buttons_HL.addWidget(self.label_radiobuttons_order)
+        self.flatten_buttons_HL.addWidget(self.RV_flatten_order0)
         self.flatten_buttons_HL.addWidget(self.RV_flatten_order1)
         self.flatten_buttons_HL.addWidget(self.RV_flatten_order2)
-        self.flatten_buttons_HL.addWidget(self.RV_flatten_order3)
         self.flatten_buttons_HL.addStretch(1)
 
         self.VL_box_flatten.addLayout(self.HL_flatten_canvas)
@@ -146,7 +149,7 @@ class FlattenWidget(PYAFWidget):
             if shared.exp.flatten_correction_all:
                 for i in range(len(shared.exp.list)):
                     shared.exp.list[i].applied_flatten_order = None
-                    data.flatten_applied = False
+                    shared.exp.list[i].flatten_applied = False
             else:
                 data.applied_flatten_order = None
                 data.flatten_applied = False
@@ -155,16 +158,16 @@ class FlattenWidget(PYAFWidget):
             self.BT_remove_flatten.setEnabled(False)
             self.BT_apply_flatten.setEnabled(True)
 
+        elif name == "radiobutton_flatten_order0":
+            shared.exp.selected_flatten_order = 0
+            self.update_MPL("MPL_canvas_flatten")
+
         elif name == "radiobutton_flatten_order1":
             shared.exp.selected_flatten_order = 1
             self.update_MPL("MPL_canvas_flatten")
 
         elif name == "radiobutton_flatten_order2":
             shared.exp.selected_flatten_order = 2
-            self.update_MPL("MPL_canvas_flatten")
-
-        elif name == "radiobutton_flatten_order3":
-            shared.exp.selected_flatten_order = 3
             self.update_MPL("MPL_canvas_flatten")
 
     def checkbox_clicked(self, name):
@@ -198,12 +201,12 @@ class FlattenWidget(PYAFWidget):
             order = shared.exp.selected_flatten_order
 
         if what == "radiobuttons_flatten_order":
-            if order == 1 or order is None:
-                self.RV_flatten_order1.setChecked(True)
+            if order == 0:
+                self.RV_flatten_order0.setChecked(True)
             elif order == 2:
                 self.RV_flatten_order2.setChecked(True)
-            elif order == 3:
-                self.RV_flatten_order3.setChecked(True)
+            else:
+                self.RV_flatten_order1.setChecked(True)
 
         elif what == "buttons_flatten":
             if shared.exp.current_data.flatten_applied is False:

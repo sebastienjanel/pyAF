@@ -118,45 +118,24 @@ def compute_noises(curve_x, curve_y):
 
 
 def flatten(data, order=1):
-    """Flatten a meshgrid.
+    """Flatten a meshgrid along its lines.
 
-    You can define 3 orders, and there is only one flattening direction for the
-    moment (Y).
+    Order 0 removes the median of each line. Orders 1 and 2 fit each line,
+    average the coefficients over the lines and remove that slope (and
+    curvature) from every line; the offsets of the lines are kept.
     """
-    vect_x = numpy.arange(data.shape[1])
-    m_slope1 = 0
-    m_slope2 = 0
-    m_slope3 = 0
-    # Determine the slope of the drift.
-    if order == 1:
-        slope1 = [numpy.polyfit(vect_x, line, 1)[0] for line in data]
-        m_slope1 = numpy.mean(slope1)
-        # Correct the image with the average slope.
-        new_data = [line - m_slope1 * vect_x for line in data]
-    elif order == 2:
-        slope1 = [numpy.polyfit(vect_x, line, 2)[0] for line in data]
-        m_slope1 = numpy.mean(slope1)
-        slope2 = [numpy.polyfit(vect_x, line, 2)[1] for line in data]
-        m_slope2 = numpy.mean(slope2)
-        # Correct the image with the average slope(s).
-        new_data = [line - m_slope1 * vect_x ** 2 - m_slope2 * vect_x
-                    for line in data]
-    elif order == 3:
-        slope1 = [numpy.polyfit(vect_x, line, 3)[0] for line in data]
-        m_slope1 = numpy.mean(slope1)
-        slope2 = [numpy.polyfit(vect_x, line, 3)[1] for line in data]
-        m_slope2 = numpy.mean(slope2)
-        slope3 = [numpy.polyfit(vect_x, line, 3)[2] for line in data]
-        m_slope3 = numpy.mean(slope3)
-        # Correct the image with the average slope(s).
-        new_data = [line - m_slope1 * vect_x ** 3 - m_slope2 * vect_x ** 2
-                    - m_slope3 * vect_x for line in data]
+    data = numpy.asarray(data, dtype=float)
+    if order == 0:
+        new_data = data - numpy.median(data, axis=1)[:, None]
+    else:
+        vect_x = numpy.arange(data.shape[1])
+        coefs = numpy.polyfit(vect_x, data.T, order).mean(axis=1)
+        coefs[-1] = 0
+        new_data = data - numpy.polyval(coefs, vect_x)
 
     # Go to zero after flatten
-    minimum = numpy.amin(new_data)
-    new_data = new_data - minimum
+    return new_data - numpy.amin(new_data)
 
-    return numpy.array(new_data)
 
 def correct_tilt(approach, retraction, limit_1, limit_2, mode,
                  approach_pos, retraction_pos):
