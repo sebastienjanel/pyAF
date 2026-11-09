@@ -177,6 +177,7 @@ class SingleFile:
         # JPK (Single File)
         # JPK (Force Map)
         # JPK (QI)
+        # JPK (Smart Mapping)
 
         self.microscope_name = None
         self.version = None
@@ -679,6 +680,10 @@ class SingleFile:
         self.roi_glass_id = 0
 
         self.discarded_curves = None
+        # Pixels outside of the region of the map (JPK Smart Mapping: region
+        # drawn by hand), 1 outside, None if the whole map was recorded.
+        # These pixels have no curve, and are always discarded.
+        self.outside_region = None
 
     def update_events_per_curve(self):
         """Fills the self._events_per_curve array with values.
@@ -1148,9 +1153,35 @@ class SingleFile:
                 self.used_tomography)
 
     def reset_discarded(self):
-        """Method used to reset the discarded curve array."""
+        """Method used to reset the discarded curve array (the pixels
+        outside of the region of the map stay discarded)."""
         empty = numpy.zeros((self.nbr_pixels_x, self.nbr_pixels_y))
+        if self.outside_region is not None:
+            empty[numpy.asarray(self.outside_region) != 0] = 1
         self.discarded_curves = empty
+
+    def is_outside(self, i, j):
+        """True if the pixel (i, j) is outside of the region of the map."""
+        return self.outside_region is not None and \
+            bool(self.outside_region[i][j])
+
+    def inside_region(self):
+        """Pixels of the region of the map (boolean array), None if the
+        whole map was recorded."""
+        if self.outside_region is None:
+            return None
+        return numpy.asarray(self.outside_region) == 0
+
+    def nearest_inside(self, i, j):
+        """Pixel of the region of the map nearest to the pixel (i, j)."""
+        if not self.is_outside(i, j):
+            return i, j
+        inside = numpy.argwhere(numpy.asarray(self.outside_region) == 0)
+        if len(inside) == 0:
+            return i, j
+        nearest = numpy.argmin((inside[:, 0] - i) ** 2 +
+                               (inside[:, 1] - j) ** 2)
+        return int(inside[nearest][0]), int(inside[nearest][1])
 
     def update(self, color=True):
         """Updates the color options and resets the datadict.

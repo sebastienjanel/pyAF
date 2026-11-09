@@ -49,6 +49,7 @@ import numpy
 import tables
 from qtpy import QtCore
 import tempfile
+from .. import consts
 from .. import widgets_list
 from .. import shared
 
@@ -292,7 +293,7 @@ class TempFile:
         dt = shared.exp.list[int(unique_id)]
         st = "/data/_" + str(unique_id)
 
-        if dt.file_type in ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)"):
+        if dt.file_type in consts.JPK_FILE_TYPES:
             n = 3
 
         else:

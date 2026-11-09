@@ -44,6 +44,7 @@ from ..tools import stat_tools
 from ..load_and_save.file_loader.pyaf import LoaderPYAF
 from ..load_and_save.file_loader.nanoscope import LoaderNanoscope
 from ..load_and_save.file_loader.jpk import LoaderJPK
+from ..load_and_save.file_loader.jpk_smart import LoaderJPKSmart
 from ..tools import events_refresher
 from .. import widgets_list
 from .. import shared
@@ -102,6 +103,9 @@ class Load:
 
         # Files loaded here with curves too short to be fitted
         self.files_short_curves = []
+        # Files loaded here with curves whose position is not in their pixel
+        # ([file name, number of curves])
+        self.files_misplaced = []
 
         # Go through the list of files
         for i in range(len(files_info)):
@@ -147,6 +151,10 @@ class Load:
         # second file. So it's safer to reset the current position to 0,0
         shared.exp.meshgrid_click_xpos = 0
         shared.exp.meshgrid_click_ypos = 0
+        # (in the region of the map of the selected file)
+        if shared.exp.list:
+            shared.exp.meshgrid_click_xpos, shared.exp.meshgrid_click_ypos = \
+                shared.exp.current_data.nearest_inside(0, 0)
 
         # Display a message if some curves are too short to be fitted
         lines = ""
@@ -172,6 +180,21 @@ class Load:
             # Warning (orange sign, as the other messages)
             gui_tools.show_success(None, "Short curves", details=text,
                                    warning=True)
+
+        # Display a message if the position of some curves is not in their
+        # pixel of the map
+        if self.files_misplaced and consts.UNIT_TESTING is False:
+            from ..experiment import auto_short_name
+            lines = "".join(
+                "<li>" + auto_short_name(name) + " : " + str(nbr) +
+                " curves</li>"
+                for name, nbr in self.files_misplaced[:MAX_LISTED_FILES])
+            text = "The position of some curves recorded by the " \
+                "microscope is not in their pixel of the map: <ul>" + \
+                lines + "</ul>The curves are placed with their index on " \
+                "the map. Check the maps of these files."
+            gui_tools.show_success(None, "Positions of the curves",
+                                   details=text, warning=True)
 
         # Check files with missmatch in the number of segments described in the header and the segments found
         # while loading the file.
@@ -249,7 +272,14 @@ class Load:
         elif file_type == "JPK (Force Map)" or\
                 file_type == "JPK (QI)" or\
                 file_type == "JPK (Single File)":
-            LoaderJPK(file_info, offset)
+            loader = LoaderJPK(file_info, offset)
+            if loader.misplaced:
+                self.files_misplaced.append([filename, loader.misplaced])
+
+        elif file_type == "JPK (Smart Mapping)":
+            loader = LoaderJPKSmart(file_info, offset)
+            if loader.misplaced:
+                self.files_misplaced.append([filename, loader.misplaced])
 
         elif file_type == "Nanoscope (Peak Force)" or\
                 file_type == "Nanoscope (Force Volume)" or\
@@ -312,6 +342,9 @@ class Load:
             for i in range(data_set.nbr_pixels_x):
                 heights = data_set.curves_approach[i, :, 0, :]
                 for j in range(data_set.nbr_pixels_y):
+                    # No curve outside of the region of the map
+                    if data_set.is_outside(i, j):
+                        continue
                     app_start = int(positions[i][j][0])
                     app_end = int(positions[i][j][1])
                     if app_end - app_start < 2 or \

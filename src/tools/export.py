@@ -442,6 +442,9 @@ def export_map(path, data_id, map_type):
     data = shared.exp.list[data_id]
     factor = map_values.factor(data, map_type)
     values = map_values.values(data, map_type) * factor
+    # No value outside of the region of the map
+    if data.inside_region() is not None:
+        values = np.where(data.inside_region(), values, np.nan)
     # Rows of the image: y, from the top
     image = np.ascontiguousarray(np.flipud(values.T), dtype=np.float32)
     opts = data.get_color_opts(map_type)

@@ -166,7 +166,8 @@ class Stiffness:
             numpy.zeros([data.nbr_pixels_x, data.nbr_pixels_y], float)
         if data.flatten_applied:
             piezo_image = math_tools.flatten(data.piezo_image,
-                                             data.applied_flatten_order)
+                                             data.applied_flatten_order,
+                                             data.inside_region())
         else:
             piezo_image[:, :] = data.piezo_image
 

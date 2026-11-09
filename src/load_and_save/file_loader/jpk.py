@@ -56,8 +56,7 @@ class LoaderJPK:
         self.path = file_info["path"]
         self.file_type = file_info["file_type"]
         self.file_name = file_info["filename"]
-        self.afm_file = zipfile.ZipFile(self.path, "r")
-        # print(self.afm_file.namelist())
+        self.open_file()
 
         # Some empty values
         self.vDeflection_base_multiplier = 1.0
@@ -96,10 +95,19 @@ class LoaderJPK:
         self.segment_z = {}
         self.modulation_seg_count = 0
 
-        # Pixels positions and way of parsing the data
-        self.pos_x = 0
-        self.pos_y = 0
-        self.go_right = True
+        # Grid of the map (see check_position), the position index and the
+        # position [x, y] (in m) of each curve, from the headers of the
+        # curves, and the pixel (i, j) of each curve on the map
+        self.grid = {}
+        self.position_indexes = []
+        self.positions = []
+        self.pixels = []
+        # Numbering of the curves on the grid (see grid_pixel)
+        self.numbering = "back-and-forth"
+        if self.file_type == "JPK (QI)":
+            self.numbering = "line-by-line"
+        # Number of curves whose position is not in their pixel
+        self.misplaced = 0
 
         # The data
         self.data = shared.exp.list[self.unique_id]
@@ -108,6 +116,10 @@ class LoaderJPK:
         self.fetch_header()
         shared.exp.temp_file.create_data_tables(self.unique_id)
         self.fetch_curves()
+
+    def open_file(self):
+        """Opens the file (zip file)."""
+        self.afm_file = zipfile.ZipFile(self.path, "r")
 
     def fetch_header(self):
         """Saves all the informations in the header."""
@@ -164,6 +176,10 @@ class LoaderJPK:
                 self.data.date = extract_jpk_date(line)
             if line.find(prefix + ".position-pattern.grid.theta") != -1:
                 self.data.scan_angle = extract_float(line)
+                self.grid["theta"] = self.data.scan_angle
+            for key in ("xcenter", "ycenter", "ulength", "vlength"):
+                if line.find(prefix + ".position-pattern.grid." + key) != -1:
+                    self.grid[key] = extract_float(line)
             if line.find(prefix + ".position-pattern.grid.ilength") != -1:
                 self.data.nbr_pixels_x = extract_int(line)
             if line.find(prefix + ".position-pattern.grid.jlength") != -1:
@@ -434,6 +450,10 @@ class LoaderJPK:
 
         for index_nbr in range(self.data.real_nbr_pixels):
             segments_per_pixel = self.nbr_segments
+            # Position index and position of the curve (the index of the
+            # folder, and no position, for a missing pixel)
+            position_index = index_nbr
+            position = [None, None]
             if self.file_type != "JPK (Single File)":
                 path = "index/" + str(index_nbr) + "/header.properties"
                 try:
@@ -446,10 +466,18 @@ class LoaderJPK:
                     line = line.decode()
                     if line.find("force-segments.count") != -1:
                         segments_per_pixel = extract_int(line)
+                    elif ".header.position-index=" in line:
+                        position_index = extract_int(line)
+                    elif ".header.position.x=" in line:
+                        position[0] = extract_float(line)
+                    elif ".header.position.y=" in line:
+                        position[1] = extract_float(line)
                 # Damaged pixel: a deflection file is missing
                 if not all(index_nbr in segment_pixels.get(seg, ())
                            for seg in needed):
                     segments_per_pixel = -1
+            self.position_indexes.append(position_index)
+            self.positions.append(position)
 
             if segments_per_pixel == self.nbr_segments:
                 self.corrupted_pixel.append(1)
@@ -506,6 +534,9 @@ class LoaderJPK:
                 if self.segments["pause"] is not None:
                     self.nbr_points_array_pause.append(1)
 
+
+        # Pixel of each curve on the map
+        self.place_curves()
 
         max_approach = numpy.amax(self.nbr_points_array_approach)
         max_retraction = numpy.amax(self.nbr_points_array_retraction)
@@ -818,6 +849,27 @@ class LoaderJPK:
         # Scan rate
         self.data.scan_rate = 1.0 / (time_approach + time_retraction)
 
+    def place_curves(self):
+        """Pixel (i, j) of each curve on the map, from its position index
+        (see grid_pixel). The position of the curve has to be in its pixel
+        (see check_position): the curves which are not are counted in
+        self.misplaced, and are kept in the pixel of their index."""
+        nbr_x = self.data.nbr_pixels_x
+        nbr_y = self.data.nbr_pixels_y
+        self.grid["ilength"] = nbr_x
+        self.grid["jlength"] = nbr_y
+        self.pixels = []
+        for index, position in zip(self.position_indexes, self.positions):
+            pixel = grid_pixel(index, nbr_x, self.numbering)
+            if not (0 <= pixel[0] < nbr_x and 0 <= pixel[1] < nbr_y):
+                raise ValueError("Position index " + str(index) +
+                                 " outside of the map")
+            if check_position(position, pixel, self.grid) is False:
+                self.misplaced += 1
+            self.pixels.append(pixel)
+        if len(set(self.pixels)) != len(self.pixels):
+            raise ValueError("Several curves at the same position")
+
     def pad_curve(self, ext, defl, fill_value=0):
         """
         Ensure that curve data has three rows.
@@ -830,20 +882,21 @@ class LoaderJPK:
         return padded
 
     def fetch_curves(self):
-        """Loads the curves from the zip file to the tmp hdf5 file.
+        """Loads the curves from the file to the tmp hdf5 file.
 
-        Curves indexes are stored like this in jpk files::
+        Curves indexes (position indexes) are numbered like this in jpk
+        files (back-and-forth numbering)::
             6 7 8
             5 4 3
             0 1 2
 
-        Curves indexes are stored like this in jpk QI files::
+        And like this in jpk QI files::
             6 7 8
             3 4 5
             0 1 2
 
         I store them as (i, j) values in the curves_approach and
-        curves_retraction nodes of the hdf5 file::
+        curves_retraction nodes of the hdf5 file (see grid_pixel)::
             (2, 0)     (2, 1)     (2, 2)
             (1, 0)     (1, 1)     (1, 2)
             (0, 0)     (0, 1)     (0, 2)
@@ -872,23 +925,17 @@ class LoaderJPK:
         if self.max_nbr_points_modulation is not None:
             curves_modulation = tf.get_node(dt + "/curves", "modulation")
 
-        shape = [self.data.nbr_pixels_x, self.data.nbr_pixels_y, 1]
+        shape = (self.data.nbr_pixels_x, self.data.nbr_pixels_y)
         temp_piezo_image = numpy.zeros(shape, numpy.float64)
-
-        ch_1 = "channels/" + self.height_channel_name + ".dat"
-        ch_2 = "channels/vDeflection.dat"
+        # Pixels with a curve (for the piezo_image)
+        filled = numpy.zeros(shape, bool)
 
         time_segments = self.get_time_segments()
 
         for index_nbr in range(self.data.real_nbr_pixels):
-            if self.file_type != "JPK (Single File)":
-                seg_path = "index/" + str(index_nbr) + "/segments/"
-            else:
-                seg_path = "segments/"
+            pos_x, pos_y = self.pixels[index_nbr]
 
             # Approach ----------------------------
-            segment_path = seg_path + self.segments["extend"] + "/"
-
             max_nbr_points = self.data.nbr_points_per_curve_approach
 
             nbr_points = self.nbr_points_array_approach[index_nbr]
@@ -898,40 +945,26 @@ class LoaderJPK:
             approach_startpos = startpos
 
             if self.corrupted_pixel[index_nbr]:
-                sc_approach[0][startpos:] = unpack(
-                    ">" + str(nbr_points) + "i",
-                    self.afm_file.read(segment_path + ch_1))
-
-                sc_approach[1][startpos:] = unpack(
-                    ">" + str(nbr_points) + "i",
-                    self.afm_file.read(segment_path + ch_2))
+                height, defl = self.read_segment(
+                    index_nbr, self.segments["extend"], nbr_points)
+                sc_approach[0][startpos:] = height
+                sc_approach[1][startpos:] = defl
 
                 # Conversion of the values
-                base_val = (sc_approach[0] * self.enc_capSensHeight_mult +
-                            self.enc_capSensHeight_offset)
-                absolute_val = (base_val * self.capSensHeight_abs_mult +
-                                self.capSensHeight_abs_offset)
-
-                sc_approach[0] = (absolute_val * self.capSensHeight_nom_mult +
-                                  self.capSensHeight_nom_offset) * 1e9
+                sc_approach[0] = self.convert_height(sc_approach[0])
 
                 # No multiplication through
                 # self.vDeflection_distance_multiplier
                 # (defl sensitivity).
                 # This is done during the displaying of the
                 # curves, and during the calculations
-                sc_approach[1] = (
-                        sc_approach[1] * self.encoder_vDeflection_multiplier +
-                        self.encoder_vDeflection_offset +
-                        self.vDeflection_distance_offset)
+                sc_approach[1] = self.convert_deflection(sc_approach[1])
 
                 approach_startpos = startpos
 
                 sc_approach[2] = time_segments["approach"]
 
             # Retraction ----------------------------
-            segment_path = seg_path + self.segments["retract"] + "/"
-
             max_nbr_points = self.data.nbr_points_per_curve_retraction
 
             nbr_points = self.nbr_points_array_retraction[index_nbr]
@@ -941,31 +974,20 @@ class LoaderJPK:
             retraction_startpos = startpos
 
             if self.corrupted_pixel[index_nbr]:
-                sc_retraction[0][:nbr_points] = unpack(
-                    ">" + str(nbr_points) + "i",
-                    self.afm_file.read(segment_path + ch_1))
-                sc_retraction[1][:nbr_points] = unpack(
-                    ">" + str(nbr_points) + "i",
-                    self.afm_file.read(segment_path + ch_2))
+                height, defl = self.read_segment(
+                    index_nbr, self.segments["retract"], nbr_points)
+                sc_retraction[0][:nbr_points] = height
+                sc_retraction[1][:nbr_points] = defl
 
                 # Conversion of the values
-                base_val2 = (sc_retraction[0] * self.enc_capSensHeight_mult +
-                             self.enc_capSensHeight_offset)
-                absolute_val2 = (base_val2 * self.capSensHeight_abs_mult +
-                                 self.capSensHeight_abs_offset)
-
-                sc_retraction[0] = (absolute_val2 * self.capSensHeight_nom_mult +
-                                    self.capSensHeight_nom_offset) * 1e9
+                sc_retraction[0] = self.convert_height(sc_retraction[0])
 
                 # No multiplication through
                 # self.vDeflection_distance_multiplier
                 # (defl sensitivity).
                 # This is done during the displaying of the
                 # curves, and during the calculations
-                sc_retraction[1] = (
-                        sc_retraction[1] * self.encoder_vDeflection_multiplier +
-                        self.encoder_vDeflection_offset +
-                        self.vDeflection_distance_offset)
+                sc_retraction[1] = self.convert_deflection(sc_retraction[1])
 
                 # Turn the retraction curve around to store it the right way
                 sc_retraction[0] = sc_retraction[0][::-1]
@@ -973,37 +995,20 @@ class LoaderJPK:
 
                 sc_retraction[2] = time_segments["retraction"]
 
-                # print(sc_approach[0])
-
             # Pause segment ----------------------------
             if self.max_nbr_points_pause is not None:
-                segment_path = seg_path + self.segments["pause"] + "/"
-
                 sc_pause = numpy.zeros([3, self.max_nbr_points_pause])
                 nbr_points = self.nbr_points_array_pause[index_nbr]
 
                 if self.corrupted_pixel[index_nbr]:
-                    # Capacitive Sensor Height
-                    sc_pause[0][:nbr_points] = unpack(
-                        ">" + str(nbr_points) + "i",
-                        self.afm_file.read(segment_path + ch_1))
-                    # V deflection
-                    sc_pause[1][:nbr_points] = unpack(
-                        ">" + str(nbr_points) + "i",
-                        self.afm_file.read(segment_path + ch_2))
+                    height, defl = self.read_segment(
+                        index_nbr, self.segments["pause"], nbr_points)
+                    sc_pause[0][:nbr_points] = height
+                    sc_pause[1][:nbr_points] = defl
 
                     # Conversion of the values
-                    base_val2 = (sc_pause[0] * self.enc_capSensHeight_mult +
-                                 self.enc_capSensHeight_offset)
-                    absolute_val2 = (base_val2 * self.capSensHeight_abs_mult +
-                                     self.capSensHeight_abs_offset)
-                    sc_pause[0] = (absolute_val2 * self.capSensHeight_nom_mult +
-                                   self.capSensHeight_nom_offset) * 1e9
-
-                    val_mult = self.encoder_vDeflection_multiplier
-                    sc_pause[1] = (sc_pause[1] * val_mult +
-                                   self.encoder_vDeflection_offset +
-                                   self.vDeflection_distance_offset)
+                    sc_pause[0] = self.convert_height(sc_pause[0])
+                    sc_pause[1] = self.convert_deflection(sc_pause[1])
 
                     sc_pause[2] = time_segments["pause"]
 
@@ -1016,34 +1021,17 @@ class LoaderJPK:
                     [nbr_mod, 3, self.max_nbr_points_modulation])
 
                 for i in range(nbr_mod):
-                    segment_path = seg_path + self.segments["modulation"][i] + "/"
-
                     nbr_points = self.nbr_points_array_modulation[i]
                     sc_modulation = numpy.zeros([3, nbr_points])
 
                     if self.corrupted_pixel[index_nbr]:
-                        # Capacitive Sensor Height
-                        sc_modulation[0][:nbr_points] = unpack(
-                            ">" + str(nbr_points) + "i",
-                            self.afm_file.read(segment_path + ch_1))
-
-                        # V deflection
-                        sc_modulation[1][:nbr_points] = unpack(
-                            ">" + str(nbr_points) + "i",
-                            self.afm_file.read(segment_path + ch_2))
+                        height, defl = self.read_segment(
+                            index_nbr, self.segments["modulation"][i],
+                            nbr_points)
 
                         # Conversion of the values
-                        base_val2 = (sc_modulation[0] * self.enc_capSensHeight_mult +
-                                     self.enc_capSensHeight_offset)
-                        absolute_val2 = (base_val2 * self.capSensHeight_abs_mult +
-                                         self.capSensHeight_abs_offset)
-                        sc_modulation[0] = (absolute_val2 * self.capSensHeight_nom_mult +
-                                            self.capSensHeight_nom_offset) * 1e9
-
-                        val_mult = self.encoder_vDeflection_multiplier
-                        sc_modulation[1] = (sc_modulation[1] * val_mult +
-                                            self.encoder_vDeflection_offset +
-                                            self.vDeflection_distance_offset)
+                        sc_modulation[0] = self.convert_height(height)
+                        sc_modulation[1] = self.convert_deflection(defl)
 
                         sc_modulation[2] = time_segments["modulation"][i]
 
@@ -1053,7 +1041,6 @@ class LoaderJPK:
             # Store data ----------------------------
             # Check redundant x positions at start of the curve
             # Some points which are also not at the rigth place (x(i) < x(i+1))
-            # print(sc_approach[0])
             i = approach_startpos
             if i < len(sc_approach[0]) - 1:
                 while sc_approach[0][i] <= sc_approach[0][i + 1]:
@@ -1061,7 +1048,6 @@ class LoaderJPK:
                     i += 1
                     if i == len(sc_approach[0]) - 1:
                         break
-            # print(approach_startpos)
             # Check redundant x positions at start of the retraction curve
             i = retraction_startpos
             if i < len(sc_retraction[0]) - 1:
@@ -1071,14 +1057,16 @@ class LoaderJPK:
                     if i == len(sc_retraction[0]) - 1:
                         break
 
-            app_positions[self.pos_x, self.pos_y, :] = \
+            app_positions[pos_x, pos_y, :] = \
                 [approach_startpos, len(sc_approach[0])]
-            ret_positions[self.pos_x, self.pos_y, :] = \
+            ret_positions[pos_x, pos_y, :] = \
                 [retraction_startpos, len(sc_retraction[0])]
 
             # Store piezo_image (last extend position)
-            temp_piezo_image[self.pos_x, self.pos_y] = \
-                sc_approach[0][len(sc_approach[0]) - 1]
+            if self.corrupted_pixel[index_nbr]:
+                temp_piezo_image[pos_x, pos_y] = \
+                    sc_approach[0][len(sc_approach[0]) - 1]
+                filled[pos_x, pos_y] = True
 
             # Xzero is substracted from the curves, so that they are correctly
             # displayed (with positive values)
@@ -1088,16 +1076,16 @@ class LoaderJPK:
             # Also for the modulation segments (xzero is changed for the
             # pause below)
             xzero_curves = xzero
-            curves_approach[self.pos_x, self.pos_y, :, :] = \
+            curves_approach[pos_x, pos_y, :, :] = \
                 [xzero - sc_approach[0], sc_approach[1], sc_approach[2]]
-            curves_retraction[self.pos_x, self.pos_y, :, :] = \
+            curves_retraction[pos_x, pos_y, :, :] = \
                 [xzero - sc_retraction[0], sc_retraction[1], sc_retraction[2]]
             if self.max_nbr_points_pause is not None:
                 # For pause segments we consider that there are no corrupted
                 # parts (but this may be wrong, it was not tested with a lot
                 # of files for the moment)
                 xzero = sc_pause[0][0]
-                curves_pause[self.pos_x, self.pos_y, :, :] = \
+                curves_pause[pos_x, pos_y, :, :] = \
                     [xzero - sc_pause[0], sc_pause[1], sc_pause[2]]
 
             if self.max_nbr_points_modulation is not None and \
@@ -1109,81 +1097,81 @@ class LoaderJPK:
                         enumerate(self.nbr_points_array_modulation):
                     modulation_segments[i, 0, :nbr_points] = \
                         xzero_curves - modulation_segments[i, 0, :nbr_points]
-                curves_modulation[self.pos_x, self.pos_y] = \
-                    modulation_segments
+                curves_modulation[pos_x, pos_y] = modulation_segments
 
-            self.update_positions()
+            # Write to disk after each line of the map
+            if (index_nbr + 1) % self.data.nbr_pixels_x == 0:
+                shared.exp.temp_file.flush_file()
 
             # Update progressbar every curve
             widgets_list.widget_progressbar.update()
 
-        # Fill empty curves with zeros
-        max_curves = self.data.nbr_pixels_x * self.data.nbr_pixels_y
+        # Fill the pixels without curve (incomplete files, or outside of the
+        # region of the map) with zeros
+        empty = numpy.ones(shape, bool)
+        for pixel in self.pixels[:self.data.real_nbr_pixels]:
+            empty[pixel] = False
 
-        for index_nbr in range(self.data.real_nbr_pixels, max_curves):
+        for pos_x, pos_y in numpy.argwhere(empty):
             # The number of points is updated for apporach and
             # retraction in order to account for the case in which the
             # sampling frequency and or the velocity is different in
             # approach and retraction.
 
             # Approach
-            nbr_points = self.nbr_points_array_approach[index_nbr]
+            nbr_points = self.data.nbr_points_per_curve_approach
             defl = numpy.zeros(nbr_points).tolist()
             ext = list(range(nbr_points))
-            # print(f"curves_approach shape: {curves_approach.shape}")
             padded_approach = self.pad_curve(ext, defl, fill_value=0)
-            curves_approach[self.pos_x, self.pos_y, :, :] = padded_approach
-
-            # curves_approach[self.pos_x, self.pos_y, :, :] = [ext, defl]
+            curves_approach[pos_x, pos_y, :, :] = padded_approach
 
             # Retraction
-            nbr_points = self.nbr_points_array_retraction[index_nbr]
+            nbr_points = self.data.nbr_points_per_curve_retraction
             defl = numpy.zeros(nbr_points).tolist()
             ext = list(range(nbr_points))
-            # curves_retraction[self.pos_x, self.pos_y, :, :] = [ext, defl]
             padded_retraction = self.pad_curve(ext, defl, fill_value=0)
-            curves_retraction[self.pos_x, self.pos_y, :, :] = padded_retraction
+            curves_retraction[pos_x, pos_y, :, :] = padded_retraction
 
-            self.update_positions()
-
-        # Go to 0 in z for piezo_image
-        piezo_min = numpy.amin(temp_piezo_image)
-        for pos_x in range(self.data.nbr_pixels_x):
-            for pos_y in range(self.data.nbr_pixels_y):
-                piezo_image[pos_x, pos_y] = \
-                    temp_piezo_image[pos_x][pos_y] - piezo_min
+        # Go to 0 in z for piezo_image (the pixels without curve are at 0)
+        if filled.any():
+            piezo_min = numpy.amin(temp_piezo_image[filled])
+        else:
+            piezo_min = 0.0
+        temp_piezo_image[~filled] = piezo_min
+        piezo_image[:, :] = temp_piezo_image - piezo_min
 
         # Force write to disk
         shared.exp.temp_file.flush_file()
 
-    def update_positions(self):
-        """Update the x and y pixel positions."""
-        # Go to next curve
-        if self.file_type == "JPK (Force Map)":
-            # Move on to next curve (x axis)
-            if self.go_right:
-                self.pos_x = self.pos_x + 1
-            else:
-                self.pos_x = self.pos_x - 1
-            # Move on to next line
-            if self.pos_x == self.data.nbr_pixels_x and self.go_right:
-                shared.exp.temp_file.flush_file()
-                self.pos_x = self.pos_x - 1
-                self.pos_y = self.pos_y + 1
-                self.go_right = False
-            elif self.pos_x < 0 and self.go_right is False:
-                self.pos_x = 0
-                self.pos_y = self.pos_y + 1
-                self.go_right = True
-        elif self.file_type == "JPK (QI)":
-            if self.pos_x <= self.data.nbr_pixels_x - 1:
-                # Move on to next curve (x axis)
-                self.pos_x = self.pos_x + 1
-            # Move on to next line
-            if self.pos_x > self.data.nbr_pixels_x - 1:
-                shared.exp.temp_file.flush_file()
-                self.pos_x = 0
-                self.pos_y = self.pos_y + 1
+    def read_segment(self, index_nbr, segment, nbr_points):
+        """Raw values of the height and of the deflection of a segment of
+        a curve (see convert_height and convert_deflection)."""
+        if self.file_type != "JPK (Single File)":
+            path = "index/" + str(index_nbr) + "/segments/"
+        else:
+            path = "segments/"
+        path += segment + "/channels/"
+        values = []
+        for channel in (self.height_channel_name, "vDeflection"):
+            values.append(numpy.array(unpack(
+                ">" + str(nbr_points) + "i",
+                self.afm_file.read(path + channel + ".dat")), float))
+        return values
+
+    def convert_height(self, values):
+        """Height [nm] from the raw values of the height channel."""
+        base_val = values * self.enc_capSensHeight_mult + \
+            self.enc_capSensHeight_offset
+        absolute_val = base_val * self.capSensHeight_abs_mult + \
+            self.capSensHeight_abs_offset
+        return (absolute_val * self.capSensHeight_nom_mult +
+                self.capSensHeight_nom_offset) * 1e9
+
+    def convert_deflection(self, values):
+        """Deflection [V] from the raw values of the vDeflection channel."""
+        return (values * self.encoder_vDeflection_multiplier +
+                self.encoder_vDeflection_offset +
+                self.vDeflection_distance_offset)
 
     def get_time_segments(self):
         """Time of the points of the segments [s], from the durations of
@@ -1222,6 +1210,37 @@ class LoaderJPK:
                 time_segments["retraction"] = linspace(index, pr)
 
         return time_segments
+
+
+def grid_pixel(index, nbr_x, numbering):
+    """Pixel (i, j) of the curve with this position index on the map.
+
+    The curves are numbered line by line from the bottom line, and from left
+    to right; with the back-and-forth numbering (force maps), every other
+    line goes from right to left (see LoaderJPK.fetch_curves)."""
+    j, i = divmod(index, nbr_x)
+    if numbering == "back-and-forth" and j % 2 == 1:
+        i = nbr_x - 1 - i
+    return i, j
+
+
+def check_position(position, pixel, grid):
+    """True if the position [x, y] (in m) of a curve is in its pixel (i, j)
+    of the grid (dict with the xcenter, ycenter, ulength, vlength, ilength,
+    jlength and theta of the grid in the header), False if not. None if it
+    can not be checked: position or grid not known, or rotated grid (the
+    direction of the rotation is not known)."""
+    keys = ("xcenter", "ycenter", "ulength", "vlength", "ilength", "jlength")
+    if None in position or any(key not in grid for key in keys) or \
+            abs(grid.get("theta", 0.0)) > 1e-9:
+        return None
+    size_x = grid["ulength"] / grid["ilength"]
+    size_y = grid["vlength"] / grid["jlength"]
+    if size_x <= 0 or size_y <= 0:
+        return None
+    i = (position[0] - grid["xcenter"]) / size_x + (grid["ilength"] - 1) / 2
+    j = (position[1] - grid["ycenter"]) / size_y + (grid["jlength"] - 1) / 2
+    return round(i) == pixel[0] and round(j) == pixel[1]
 
 
 # Deflection file of a segment of a pixel, in maps and QI files

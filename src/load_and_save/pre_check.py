@@ -41,6 +41,7 @@ from ..tools import pickle_tools
 from .. import widgets_list
 from .file_loader.nanoscope import extract_text, extract_num
 from .file_loader.jpk import extract_int, has_force_curves
+from .file_loader.jpk_smart import check_smart_mapping
 from ..widgets.progressbar import Progressbar
 
 
@@ -199,6 +200,11 @@ def check_single_file(path):
 
                 jpkfile.close()
 
+        if file_type == "JPK (Smart Mapping)":
+            # Pixels outside of the region of the map have no curve: not an
+            # incomplete file
+            result["error"], nbrcurves = check_smart_mapping(path)
+
         if file_type == "pyAF":
             # The first line gives the format of the project. A file of the
             # current format that can not be read could be corrupted (happens
@@ -268,6 +274,8 @@ def get_file_type(path):
         file_type = "JPK (Force Map)"
     elif extension == "jpk-qi-data":
         file_type = "JPK (QI)"
+    elif extension == "h5-jpk":
+        file_type = "JPK (Smart Mapping)"
     elif extension == "pfc":
         file_type = "Nanoscope (Peak Force)"
     else:

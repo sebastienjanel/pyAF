@@ -89,3 +89,7 @@ LOAD_FILE = None
 # the previous formats can not be opened
 PROJECT_FORMAT = "5"
 OLD_PROJECT_ERROR = "Saved with a previous version of pyAF: not supported"
+
+# JPK files (with the time of the points and the region of the map)
+JPK_FILE_TYPES = ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)",
+                  "JPK (Smart Mapping)")

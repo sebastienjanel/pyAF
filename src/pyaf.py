@@ -458,25 +458,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
         data = shared.exp.current_data
 
-        change = False
-        if key == "left":
-            if current_xpos - 1 != -1:
-                shared.exp.meshgrid_click_xpos -= 1
-                change = True
-        elif key == "right":
-            if current_xpos + 1 != data.nbr_pixels_x:
-                shared.exp.meshgrid_click_xpos += 1
-                change = True
-        elif key == "up":
-            if current_ypos + 1 != data.nbr_pixels_y:
-                shared.exp.meshgrid_click_ypos += 1
-                change = True
-        elif key == "down":
-            if current_ypos - 1 != -1:
-                shared.exp.meshgrid_click_ypos -= 1
-                change = True
+        # Next pixel in the direction of the key, jumping over the pixels
+        # outside of the region of the map
+        step_x, step_y = {"left": (-1, 0), "right": (1, 0), "up": (0, 1),
+                          "down": (0, -1)}[key]
+        xpos, ypos = current_xpos + step_x, current_ypos + step_y
+        while 0 <= xpos < data.nbr_pixels_x and \
+                0 <= ypos < data.nbr_pixels_y and data.is_outside(xpos, ypos):
+            xpos, ypos = xpos + step_x, ypos + step_y
 
-        if change:
+        if 0 <= xpos < data.nbr_pixels_x and 0 <= ypos < data.nbr_pixels_y:
+            shared.exp.meshgrid_click_xpos = xpos
+            shared.exp.meshgrid_click_ypos = ypos
             self.change_curve(None, None, None)
 
     def change_curve(self, xpos, ypos, rand=None,
@@ -516,8 +509,15 @@ class MainWindow(QtWidgets.QMainWindow):
             nbr_pixels_x = data.nbr_pixels_x
             nbr_pixels_y = data.nbr_pixels_y
 
+            def outside(x, y):
+                # Pixel (user coordinates) outside of the region of the map
+                return data.is_outside(x - 1, y - 1)
+
             xpos = random.randint(1, nbr_pixels_x)
             ypos = random.randint(1, nbr_pixels_y)
+            while outside(xpos, ypos):
+                xpos = random.randint(1, nbr_pixels_x)
+                ypos = random.randint(1, nbr_pixels_y)
 
             string = "Go to rand curve %s, %s"
             self.logger.debug(string, str(xpos), str(ypos))
@@ -533,11 +533,14 @@ class MainWindow(QtWidgets.QMainWindow):
                     # random, this could take very long until the script
                     # finds the last curves ...
                     nbr_of_curves_total = nbr_pixels_x * nbr_pixels_y
+                    if data.outside_region is not None:
+                        nbr_of_curves_total -= int(
+                            (data.outside_region != 0).sum())
                     limit = int((nbr_of_curves_total / 2.0))
 
-                    if len(list_curves) == nbr_of_curves_total:
+                    if len(list_curves) >= nbr_of_curves_total:
                         shared.exp.parsed_random_curves = []
-                        self.change_curve(1, 1)
+                        self.change_curve(xpos, ypos)
                         return
 
                     elif len(list_curves) > nbr_of_curves_total - limit:
@@ -545,7 +548,8 @@ class MainWindow(QtWidgets.QMainWindow):
                         # from 1)
                         for i in range(1, nbr_pixels_x + 1):
                             for j in range(1, nbr_pixels_y + 1):
-                                if mt.in_list(list_curves, [i, j]) is False:
+                                if mt.in_list(list_curves, [i, j]) is False \
+                                        and not outside(i, j):
                                     self.change_curve(i, j, save_rand=True)
                                     return
 
@@ -556,7 +560,8 @@ class MainWindow(QtWidgets.QMainWindow):
                             xpos = random.randint(1, nbr_pixels_x)
                             ypos = random.randint(1, nbr_pixels_y)
 
-                            if mt.in_list(list_curves, [xpos, ypos]) is False:
+                            if mt.in_list(list_curves, [xpos, ypos]) is \
+                                    False and not outside(xpos, ypos):
                                 notfound = False
 
                         self.change_curve(xpos, ypos, rand="rand")
@@ -566,6 +571,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if xpos is not None and ypos is not None:
             xpos = min(max(int(xpos), 1), data.nbr_pixels_x)
             ypos = min(max(int(ypos), 1), data.nbr_pixels_y)
+            # No curve outside of the region of the map
+            if data.is_outside(xpos - 1, ypos - 1):
+                return
 
         if rand == "rand" or save_rand and random_control:
             shared.exp.parsed_random_curves.append([xpos, ypos])
@@ -701,6 +709,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 new_pos = [shared.exp.meshgrid_click_xpos + 1, 1]
             else:
                 new_pos[1] = 1
+
+        # Pixel of the region of the map (no curve outside of the region)
+        pos = new_pos or [shared.exp.meshgrid_click_xpos + 1,
+                          shared.exp.meshgrid_click_ypos + 1]
+        if data.is_outside(pos[0] - 1, pos[1] - 1):
+            i, j = data.nearest_inside(pos[0] - 1, pos[1] - 1)
+            new_pos = [i + 1, j + 1]
 
         # Change the position if needed
         if new_pos is not None:

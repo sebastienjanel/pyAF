@@ -48,7 +48,8 @@ class PlotSmallMeshGridCompute(PlotMeshGrid):
         if self.data.flatten_applied:
             self.temp_array[:] = math_tools.flatten(
                 self.data.piezo_image,
-                self.data.applied_flatten_order)
+                self.data.applied_flatten_order,
+                self.data.inside_region())
         else:
             self.temp_array[:] = self.data.piezo_image
 

@@ -52,6 +52,7 @@ import sys
 
 import numpy
 
+from ... import consts
 from ... import shared
 from ... import widgets_list
 from ...single import VISCO_RESULTS
@@ -92,8 +93,7 @@ def check_file(data):
     if data.file_type == "Nanoscope (Peak Force)" and not data.pft_freq:
         return "PeakForce frequency unknown (file loaded with a previous " \
             "version of pyAF: load the .spm file again)"
-    has_time = data.file_type in ("JPK (Single File)", "JPK (Force Map)",
-                                  "JPK (QI)")
+    has_time = data.file_type in consts.JPK_FILE_TYPES
     if not has_time and curve_tools.get_nanoscope_times(data, 2, 2) is None:
         return "no time and no ramp velocities in the file"
     return None
@@ -107,8 +107,7 @@ def get_time(data, i, j, nbr_app, nbr_ret):
     JPK files: time of the file. Nanoscope files: computed as in PyFMReader
     (see curve_tools.get_nanoscope_times). None if the time is not known.
     """
-    if data.file_type in ("JPK (Single File)", "JPK (Force Map)",
-                          "JPK (QI)"):
+    if data.file_type in consts.JPK_FILE_TYPES:
         t_app = numpy.asarray(data.curves_approach[i][j][2], float)
         t_ret = numpy.asarray(data.curves_retraction[i][j][2], float)
         if len(t_app) < 2 or len(t_ret) < 2:

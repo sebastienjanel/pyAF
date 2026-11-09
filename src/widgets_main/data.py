@@ -60,7 +60,7 @@ from ..widgets.progressbar import Progressbar
 
 
 # File types with the time plots (deflection and z position vs time)
-JPK_FILE_TYPES = ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)")
+JPK_FILE_TYPES = consts.JPK_FILE_TYPES
 
 
 class DataWidget(PYAFWidget):

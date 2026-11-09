@@ -35,6 +35,7 @@
 # pylint: disable=E1103, W0702
 
 import numpy
+from .. import consts
 from ..tools import math_tools
 
 
@@ -108,7 +109,7 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
 
     else:
 
-        get_time_segments_flag = data.file_type in ("JPK (Single File)", "JPK (Force Map)", "JPK (QI)")
+        get_time_segments_flag = data.file_type in consts.JPK_FILE_TYPES
 
         # print(time_segments)
 

@@ -63,6 +63,10 @@ def get_coeffs(data, array, roi):
     pixels = numpy.array(roi.values, dtype=int)
     z = numpy.asarray(array, dtype=float)[pixels[:, 0], pixels[:, 1]]
     finite = numpy.isfinite(z)
+    # Not the pixels outside of the region of the map (no curve)
+    inside = data.inside_region()
+    if inside is not None:
+        finite &= inside[pixels[:, 0], pixels[:, 1]]
     if numpy.count_nonzero(finite) < 3:
         return None
     x = pixels[finite, 0] * x_size
@@ -111,7 +115,8 @@ def piezo_map(data, flatten=True):
     flatten is True, and the planefit)."""
     if flatten and data.flatten_applied:
         array = math_tools.flatten(data.piezo_image,
-                                   data.applied_flatten_order)
+                                   data.applied_flatten_order,
+                                   data.inside_region())
     else:
         array = data.piezo_image
     return apply_planefit(data, numpy.array(array, dtype=float))
@@ -130,12 +135,19 @@ def reset_color_scales(data):
         for array, opts in ((piezo_map(data), data.color_opts_piezo),
                             (topo_map(data) if data.stiffness_calculated
                              else None, data.color_opts_topo)):
-            if array is None or not numpy.isfinite(array).any():
+            if array is None:
                 continue
-            low, high = numpy.nanmin(array), numpy.nanmax(array)
+            values = numpy.asarray(array, dtype=float)
+            if data.inside_region() is not None:
+                values = values[data.inside_region()]
+            if not numpy.isfinite(values).any():
+                continue
+            low, high = numpy.nanmin(values), numpy.nanmax(values)
             opts[1], opts[2], opts[3] = low, high, (low + high) / 2.0
     else:
         piezo = numpy.asarray(data.piezo_image, dtype=float)
+        if data.inside_region() is not None:
+            piezo = piezo[data.inside_region()]
         high = numpy.median(piezo) + 3 * numpy.std(piezo)
         opts = data.color_opts_piezo
         opts[1], opts[2], opts[3] = 0, high, high / 2.0

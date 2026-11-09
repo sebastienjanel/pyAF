@@ -117,24 +117,54 @@ def compute_noises(curve_x, curve_y):
     return rms, std, determination, sem
 
 
-def flatten(data, order=1):
+def flatten(data, order=1, inside=None):
     """Flatten a meshgrid along its lines.
 
     Order 0 removes the median of each line. Orders 1 and 2 fit each line,
     average the coefficients over the lines and remove that slope (and
     curvature) from every line; the offsets of the lines are kept.
+
+    inside: pixels used (boolean array, the region of the map), None for all
+    the pixels. The other pixels are set to the minimum.
     """
     data = numpy.asarray(data, dtype=float)
+    vect_x = numpy.arange(data.shape[1])
+    if inside is None:
+        if order == 0:
+            new_data = data - numpy.median(data, axis=1)[:, None]
+        else:
+            coefs = numpy.polyfit(vect_x, data.T, order).mean(axis=1)
+            coefs[-1] = 0
+            new_data = data - numpy.polyval(coefs, vect_x)
+
+        # Go to zero after flatten
+        return new_data - numpy.amin(new_data)
+
+    # Only the pixels inside, line by line (lines with too few pixels are
+    # not used for the fit)
+    inside = numpy.asarray(inside, dtype=bool)
+    new_data = data.copy()
+    all_coefs = []
+    for line, used in zip(data, inside):
+        if order == 0:
+            continue
+        if numpy.count_nonzero(used) > order:
+            all_coefs.append(numpy.polyfit(vect_x[used], line[used], order))
     if order == 0:
-        new_data = data - numpy.median(data, axis=1)[:, None]
-    else:
-        vect_x = numpy.arange(data.shape[1])
-        coefs = numpy.polyfit(vect_x, data.T, order).mean(axis=1)
+        for k in range(len(data)):
+            if inside[k].any():
+                new_data[k] -= numpy.median(data[k][inside[k]])
+    elif all_coefs:
+        coefs = numpy.mean(all_coefs, axis=0)
         coefs[-1] = 0
         new_data = data - numpy.polyval(coefs, vect_x)
 
     # Go to zero after flatten
-    return new_data - numpy.amin(new_data)
+    if not inside.any():
+        return new_data - numpy.amin(new_data)
+    minimum = numpy.amin(new_data[inside])
+    new_data[~inside] = minimum
+    return new_data - minimum
 
 
 def correct_tilt(approach, retraction, limit_1, limit_2, mode,

@@ -255,6 +255,15 @@ class PlotMeshGrid(MainPlot):
         # Map drawn (colors of the erased ROI pixels, see draw_roi)
         self.mesh = mesh
 
+        # Pixels outside of the region of the map: no curve, left blank
+        outside = getattr(self.data, "outside_region", None)
+        if outside is not None and mesh is not None:
+            positions = numpy.argwhere(numpy.asarray(outside) != 0)
+            background = self.axes.get_facecolor()
+            self.axes.add_collection(PolyCollection(
+                self.pixel_squares(positions), facecolors=background,
+                edgecolors=background, linewidths=linewidth))
+
         # Set the ranges
         self.axes.axis([0, self.x_range[-1], 0, self.y_range[-1]])
 
@@ -596,8 +605,12 @@ class PlotMeshGrid(MainPlot):
         artists = []
         if (self.data.discarded_curves is not None
                 and shared.exp.meshgrid_display_discarded):
-            positions = numpy.argwhere(
-                numpy.asarray(self.data.discarded_curves) != 0)
+            # Not the pixels outside of the region of the map (blank)
+            discarded = numpy.asarray(self.data.discarded_curves) != 0
+            outside = getattr(self.data, "outside_region", None)
+            if outside is not None:
+                discarded &= numpy.asarray(outside) == 0
+            positions = numpy.argwhere(discarded)
             if len(positions):
                 squares = self.pixel_squares(positions)
                 crosses = []

@@ -45,7 +45,8 @@ class PlotFlattenMeshGrid(PlotMeshGrid):
         if self.plot_type == "small_meshgrid_for_correction":
             self.title = "Flattened"
             fo = shared.exp.selected_flatten_order
-            self.temp_array[:] = math_tools.flatten(self.data.piezo_image, fo)
+            self.temp_array[:] = math_tools.flatten(
+                self.data.piezo_image, fo, self.data.inside_region())
         elif self.plot_type == "small_meshgrid_for_correction_original":
             self.title = "Original"
             self.temp_array[:] = self.data.piezo_image

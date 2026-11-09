@@ -77,6 +77,9 @@ def change_single_curve_status():
     data = shared.exp.list[shared.exp.id_selected]
     xpos = shared.exp.meshgrid_click_xpos
     ypos = shared.exp.meshgrid_click_ypos
+    # No curve outside of the region of the map
+    if data.is_outside(xpos, ypos):
+        return
     if data.discarded_curves[xpos][ypos] == 1:
         data.discarded_curves[xpos][ypos] = 0
     else:
