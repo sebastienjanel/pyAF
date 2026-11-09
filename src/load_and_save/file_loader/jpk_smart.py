@@ -56,6 +56,7 @@ import numpy
 import tables
 from dateutil.parser import parse
 
+from ...tools import plant_tools
 from .jpk import LoaderJPK
 
 MAP = "/Measurement_000/Map"
@@ -363,6 +364,13 @@ class LoaderJPKSmart(LoaderJPK):
         # General data
         self.data.x_size = self.data.scan_size_x / self.data.nbr_pixels_x
         self.data.y_size = self.data.scan_size_y / self.data.nbr_pixels_y
+
+        # Positions of the stage and of the scanners, grid on the sample
+        frame = plant_tools.frame_from_header(header)
+        self.data.frame = frame
+        self.data.sample_grid = plant_tools.map_grid(
+            {key: self.grid[key] for key in
+             ("xcenter", "ycenter", "ulength", "vlength", "theta")}, frame)
 
         # Pixel of each curve on the map, and the region of the map (the
         # pixels without curve)

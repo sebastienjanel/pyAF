@@ -96,6 +96,17 @@ class BoxData(QtWidgets.QWidget):
                 data_id=self.data_id)
         else:
             self.meshgrid = None
+            # Number of the file in the list, as on the maps where the
+            # single curves are recorded (see plot_meshgrid)
+            self.number = QtWidgets.QLabel(str(i + 1), self.canvas)
+            self.number.setGeometry(0, 0, 72, 72)
+            self.number.setAlignment(QtCore.Qt.AlignCenter)
+            # (stylesheet: the font of the application style sheet would be
+            # used otherwise)
+            self.number.setStyleSheet("font-size: 26px; font-weight: bold;")
+            self.number.setToolTip(
+                "Number of the file, shown on the map at the position of "
+                "the curve")
 
         self.VL_canvas.addWidget(self.canvas)
         self.VL_canvas.addStretch(1)

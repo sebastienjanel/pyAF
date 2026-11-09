@@ -46,6 +46,7 @@ import zipfile
 
 from ... import widgets_list
 from ... import shared
+from ...tools import plant_tools
 
 
 class LoaderJPK:
@@ -849,6 +850,40 @@ class LoaderJPK:
         # Scan rate
         self.data.scan_rate = 1.0 / (time_approach + time_retraction)
 
+        self.fetch_frame()
+
+    def fetch_frame(self):
+        """Positions of the stage and of the scanners, and position on the
+        sample of the curve (single file) or of the grid (map), see
+        plant_tools."""
+        header = properties(self.afm_file.read("header.properties"))
+        if self.file_type == "JPK (Single File)":
+            # The scanners are in the header of the segments
+            path = "segments/" + self.segments["extend"] + \
+                "/segment-header.properties"
+            try:
+                header.update(properties(self.afm_file.read(path)))
+            except KeyError:
+                pass
+        frame = plant_tools.frame_from_header(header)
+        self.data.frame = frame
+        if self.file_type == "JPK (Single File)":
+            tip = frame["tip"]
+            if tip is None:
+                tip = plant_tools.frame_from_header(
+                    {key.replace("header.position.", "tip-scanner."
+                                 "scanner-displacement."): value
+                     for key, value in header.items()
+                     if ".header.position." in key})["tip"]
+            if tip is not None:
+                self.data.sample_position = \
+                    plant_tools.sample_position(tip, frame)
+        elif all(key in self.grid for key in
+                 ("xcenter", "ycenter", "ulength", "vlength")):
+            grid = dict(self.grid)
+            grid.setdefault("theta", 0.0)
+            self.data.sample_grid = plant_tools.map_grid(grid, frame)
+
     def place_curves(self):
         """Pixel (i, j) of each curve on the map, from its position index
         (see grid_pixel). The position of the curve has to be in its pixel
@@ -949,6 +984,10 @@ class LoaderJPK:
                     index_nbr, self.segments["extend"], nbr_points)
                 sc_approach[0][startpos:] = height
                 sc_approach[1][startpos:] = defl
+                # Points before the curve (shorter than the longest one):
+                # its first values, not 0 (far from the curve once converted)
+                sc_approach[0][:startpos] = height[0]
+                sc_approach[1][:startpos] = defl[0]
 
                 # Conversion of the values
                 sc_approach[0] = self.convert_height(sc_approach[0])
@@ -978,6 +1017,9 @@ class LoaderJPK:
                     index_nbr, self.segments["retract"], nbr_points)
                 sc_retraction[0][:nbr_points] = height
                 sc_retraction[1][:nbr_points] = defl
+                # Points after the curve: its last values (see the approach)
+                sc_retraction[0][nbr_points:] = height[-1]
+                sc_retraction[1][nbr_points:] = defl[-1]
 
                 # Conversion of the values
                 sc_retraction[0] = self.convert_height(sc_retraction[0])
@@ -1005,6 +1047,8 @@ class LoaderJPK:
                         index_nbr, self.segments["pause"], nbr_points)
                     sc_pause[0][:nbr_points] = height
                     sc_pause[1][:nbr_points] = defl
+                    sc_pause[0][nbr_points:] = height[-1]
+                    sc_pause[1][nbr_points:] = defl[-1]
 
                     # Conversion of the values
                     sc_pause[0] = self.convert_height(sc_pause[0])
@@ -1304,6 +1348,16 @@ def has_force_curves(afm_file):
             styles[int(match.group(1))] = match.group(2).strip()
     with_data = {styles.get(segment) for segment in pixels}
     return "extend" in with_data and "retract" in with_data
+
+
+def properties(text):
+    """Keys and values of a .properties file of the JPK files."""
+    values = {}
+    for line in text.decode(errors="replace").splitlines():
+        if "=" in line and not line.startswith("#"):
+            key, value = line.split("=", 1)
+            values[key] = value.replace("\\", "")
+    return values
 
 
 def extract_str(string):

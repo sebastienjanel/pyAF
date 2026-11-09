@@ -43,6 +43,7 @@ import matplotlib.font_manager as fm
 from matplotlib.collections import PolyCollection, LineCollection
 from ...tools.colortables import ColorTables
 from ...tools import misc_tools
+from ...tools import plant_tools
 from ...single import ELASTICITY_PERCENTILES
 
 # Viscoelastic moduli maps (log scale and first color below the scale, as
@@ -263,6 +264,11 @@ class PlotMeshGrid(MainPlot):
             self.axes.add_collection(PolyCollection(
                 self.pixel_squares(positions), facecolors=background,
                 edgecolors=background, linewidths=linewidth))
+
+        # Single curves recorded on the map (numbers of the files)
+        if mesh is not None and self.plot_type in ("meshgrid",
+                                                   "meshgrid_data"):
+            self.draw_curves_on_map()
 
         # Set the ranges
         self.axes.axis([0, self.x_range[-1], 0, self.y_range[-1]])
@@ -596,6 +602,37 @@ class PlotMeshGrid(MainPlot):
             x1, y1 = x0 + self.x_size, y0 + self.y_size
             squares.append([(x1, y1), (x1, y0), (x0, y0), (x0, y1)])
         return squares
+
+    def draw_curves_on_map(self):
+        """Marks the positions of the single curves recorded on the map
+        (see plant_tools.locate), with the numbers of their files in the
+        list of files."""
+        if self.data is None or self.data.is_single or \
+                not self.data.scan_size_x:
+            return
+        # Files at each position (several curves at the same place)
+        positions = {}
+        for index, _, position in plant_tools.curves_on_map(self.data):
+            key = (round(position["x"]), round(position["y"]))
+            positions.setdefault(key, []).append(index + 1)
+        unit = self.scan_size_x / self.data.scan_size_x
+        for (x, y), numbers in positions.items():
+            self.axes.plot(x * unit, y * unit, "o", markersize=7,
+                           markerfacecolor="none", markeredgecolor="w",
+                           markeredgewidth=1.5)
+            self.axes.plot(x * unit, y * unit, "o", markersize=9,
+                           markerfacecolor="none", markeredgecolor="k",
+                           markeredgewidth=0.6)
+            if len(numbers) > 1 and numbers == list(
+                    range(numbers[0], numbers[-1] + 1)):
+                label = str(numbers[0]) + "-" + str(numbers[-1])
+            else:
+                label = ", ".join(str(number) for number in numbers)
+            self.axes.annotate(
+                label, (x * unit, y * unit), xytext=(6, 6),
+                textcoords="offset points", fontsize=8, color="w",
+                bbox={"boxstyle": "round,pad=0.15", "fc": "k",
+                      "ec": "none", "alpha": 0.6})
 
     def draw_corrupted(self):
         """Draws a sign on the meshgrid when a curve is discarded.
