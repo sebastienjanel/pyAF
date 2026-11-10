@@ -59,7 +59,7 @@ def has_height(data):
 
 def mark_outdated(data):
     """The substrate or the sample height of a file changed: its corrected
-    maps no longer correspond (see the B.E.C. tab)."""
+    maps no longer correspond (see the B.E.C. box of the elasticity)."""
     if data.stiffness_corrected:
         data.bec_outdated = True
 

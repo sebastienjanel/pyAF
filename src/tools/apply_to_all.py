@@ -242,6 +242,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.poisson_ratio = cur.poisson_ratio
                 dt.brush_model = cur.brush_model
                 dt.brush_threshold_pct = cur.brush_threshold_pct
+                # Sample height of the B.E.C. (box of the elasticity tab)
+                dt.user_h = cur.user_h
                 # Tomography or Fitting (perform_fit follows)
                 dt.stiffness_mode = cur.stiffness_mode
                 dt.fit_range_type = cur.fit_range_type
@@ -268,13 +270,6 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.stretch_len_ret = cur.stretch_len_ret
                 dt.stretch_applied_app = cur.stretch_applied_app
                 dt.stretch_applied_ret = cur.stretch_applied_ret
-
-        if exp.compute_type == "stiffness_corr" or mode == "all":
-            for i in range(len(exp.list)):
-                dt = exp.list[i]
-                cur = exp.list[oldid]
-                dt.user_h = cur.user_h
-                dt.bec_with_elasticity = cur.bec_with_elasticity
 
         if exp.compute_type == "viscoelasticity" or mode == "all":
             cur = exp.list[oldid]
@@ -362,14 +357,9 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
 
                 dt.display_fit_event = cur.display_fit_event
                 dt.display_fit_event_seg = cur.display_fit_event_seg
+                # Loading rates (box of the events tab)
+                dt.lr_coef = cur.lr_coef
 
-        if exp.compute_type == "loading_rate" or mode == "all":
-            for i in range(len(exp.list)):
-                dt = exp.list[i]
-                cur = exp.list[oldid]
-
-                if dt.is_single is False:
-                    dt.lr_coef = cur.lr_coef
 
     if exp.tilt_correction_all and (mode == "tilt_all" or mode == "all"):
         for i in range(len(exp.list)):

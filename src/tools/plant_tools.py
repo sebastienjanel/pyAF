@@ -450,6 +450,41 @@ def stiffness_force_range(delta, force, start=75.0, stop=100.0):
             "delta": d, "force": f, "fit": fit}
 
 
+def stiffness_of_curves(curves, method=0, window=0.05, start=75.0,
+                        stop=100.0):
+    """Apparent stiffness of the loading and of the unloading (curves, see
+    force_indentation): {"approach", "retraction", "k_as"} (see
+    apparent_stiffness)."""
+    results = {}
+    for name, (delta, force) in zip(("approach", "retraction"), curves):
+        if method == 0:
+            results[name] = stiffness_derivative(delta, force, window)
+        else:
+            results[name] = stiffness_force_range(delta, force, start, stop)
+    found = [results[name]["k_as"] for name in ("approach", "retraction")
+             if results[name] is not None]
+    results["k_as"] = float(numpy.mean(found)) if found else float("nan")
+    return results
+
+
+def stiffness_task(task):
+    """Apparent stiffness of curves, in a process of the computation (see
+    multiproc.compute_curves). task: settings of stiffness_of_curves
+    ("common") and list of (i, j, curves) ("curves"). Returns the list of
+    (i, j, values): k_as, k and R^2 of the approach and of the
+    retraction (nan when not found)."""
+    results = []
+    for i, j, curves in task["curves"]:
+        result = stiffness_of_curves(curves, **task["common"])
+        values = [result["k_as"]]
+        for key in ("k_as", "r2"):
+            for name in ("approach", "retraction"):
+                part = result[name]
+                values.append(part[key] if part else float("nan"))
+        results.append((i, j, values))
+    return results
+
+
 def apparent_stiffness(data, i, j, method=0, window=0.05, start=75.0,
                        stop=100.0):
     """Apparent stiffness of the curve (i, j), loading and unloading (see
@@ -460,15 +495,7 @@ def apparent_stiffness(data, i, j, method=0, window=0.05, start=75.0,
     curves = force_indentation(data, i, j)
     if curves is None:
         return None
-    results = {}
-    for name, (delta, force) in zip(("approach", "retraction"), curves):
-        if method == 0:
-            results[name] = stiffness_derivative(delta, force, window)
-        else:
-            results[name] = stiffness_force_range(delta, force, start, stop)
-    found = [results[name]["k_as"] for name in ("approach", "retraction")
-             if results[name] is not None]
-    results["k_as"] = float(numpy.mean(found)) if found else float("nan")
+    results = stiffness_of_curves(curves, method, window, start, stop)
     results["curves"] = curves
     return results
 

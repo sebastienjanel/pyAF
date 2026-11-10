@@ -68,8 +68,8 @@ class CurveModWidget(PYAFWidget):
             self.un_st2 = "QWidget#widget_stretch { background-color: #31363b; }"
 
         elif shared.exp.current_theme == "Light":
-            self.un_st1 = "QWidget#widget_tilt { background-color: #D0D3D7; }"
-            self.un_st2 = "QWidget#widget_stretch { background-color: #D0D3D7; }"
+            self.un_st1 = "QWidget#widget_tilt { background-color: #eceef1; }"
+            self.un_st2 = "QWidget#widget_stretch { background-color: #eceef1; }"
 
         self.gridLayout = QtWidgets.QGridLayout()
 

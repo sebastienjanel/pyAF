@@ -701,7 +701,15 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 curve_x = self.curve_retraction[0]
                 curve_y = self.curve_retraction[1]
 
-                if shared.exp.compute_type == "events":
+                if shared.exp.compute_type == "events" and \
+                        self.data.events_curve_type == "loading_rates":
+                    # Loading rates of the events: zoom on the events, then
+                    # on the joc
+                    points = self.loading_rates_zoom_points
+                    if points:
+                        point = points[shared.zoomed_in_element % len(points)]
+
+                elif shared.exp.compute_type == "events":
                     if self.events_preview is not None and \
                             self.events_preview:
                         if shared.zoomed_in_element < len(self.events_preview):
@@ -721,11 +729,6 @@ class PlotCurve(MainPlot, CommonCurveTools):
                     else:
                         point = self.joc2_indice
 
-                elif shared.exp.compute_type == "loading_rates":
-                    # Zoom on the events, then on the joc
-                    points = self.loading_rates_zoom_points
-                    if points:
-                        point = points[shared.zoomed_in_element % len(points)]
 
             if self.no_fit_found:
                 # If no fit has been found, do not zoom

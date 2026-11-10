@@ -595,6 +595,9 @@ def export_all(folder):
     os.makedirs(maps, exist_ok=True)
     os.makedirs(figures, exist_ok=True)
     for data_id, data in enumerate(shared.exp.list):
+        if data.is_single:
+            # A single curve has no map (its values are in the tables)
+            continue
         base = os.path.splitext(os.path.basename(str(data.filename)))[0]
         displayed = data.meshgrid_type
         try:

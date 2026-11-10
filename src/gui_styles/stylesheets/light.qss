@@ -45,7 +45,7 @@ QToolTip
 QWidget
 {
     color: #31363B;
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     selection-background-color:#3b8eea;
     selection-color: #31363B;
     background-clip: border;
@@ -231,7 +231,7 @@ QRadioButton::indicator:unchecked:disabled
 
 QMenuBar
 {
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     color: #31363B;
 }
 
@@ -343,12 +343,12 @@ QWidget:disabled
 {
     /* Dimmed but readable (texts of the disabled controls) */
     color: #9a9ea4;
-    background-color: #D0D3D7;
+    background-color: #eceef1;
 }
 
 QAbstractItemView
 {
-    alternate-background-color: #D0D3D7;
+    alternate-background-color: #eceef1;
     color: #31363B;
     border: 0.1ex solid 3A3939;
     border-radius: 0.2ex;
@@ -389,12 +389,12 @@ QLineEdit:disabled {
 QGroupBox
 {
     /* Soft: the tint of the boxes separates them */
-    border: 1px solid #c2c5ca;
+    border: 1px solid #d6d9dd;
     border-radius: 6px;
     padding-top: 1ex;
     margin-top: 1ex;
     /* A tint lighter than the window: the groups of controls stand out */
-    background-color: #dcdfe2;
+    background-color: #f6f7f9;
 }
 
 /* Texts and buttons without background inside the boxes: on the color of
@@ -581,14 +581,14 @@ QScrollBar::sub-page:vertical
 
 QTextEdit
 {
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     color: #31363B;
     border: 0.1ex solid #BAB9B8;
 }
 
 QPlainTextEdit
 {
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     color: #31363B;
     border-radius: 0.2ex;
     border: 0.1ex solid #BAB9B8;
@@ -596,10 +596,10 @@ QPlainTextEdit
 
 QHeaderView::section
 {
-    background-color: #BAB9B8;
+    background-color: #e4e6e9;
     color: #31363B;
     padding: 0.5ex;
-    border: 0.1ex solid #BAB9B8;
+    border: 0.1ex solid #e4e6e9;
 }
 
 QSizeGrip
@@ -611,7 +611,7 @@ QSizeGrip
 
 QMainWindow::separator
 {
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     color: white;
     padding-left: 0.4ex;
     spacing: 0.2ex;
@@ -647,7 +647,7 @@ QFrame[frameShape="6"]  /* QFrame::StyledPanel == 0x0006 */
     border-width: 0.1ex;
     padding: 0.1ex;
     border-style: solid;
-    border-color: #D0D3D7;
+    border-color: #eceef1;
     background-color: #bcbfc2;
     border-radius: 0.5ex;
 }
@@ -660,7 +660,7 @@ QStackedWidget
 QToolBar
 {
     border: 0.1ex transparent #393838;
-    background: 0.1ex solid #D0D3D7;
+    background: 0.1ex solid #eceef1;
     font-weight: bold;
 }
 
@@ -704,8 +704,9 @@ QPushButton {
 
 QPushButton:disabled
 {
-    background-color: #f0f1f2;
-    border: 1px solid #d0d3d7;
+    /* Visible on the window and the boxes, clearly inactive */
+    background-color: #e3e5e8;
+    border: 1px solid #d0d3d8;
     color: #9a9ea4;
 }
 
@@ -761,7 +762,7 @@ QPlainTextEdit:hover:pressed,
 QAbstractView:hover:pressed,
 QTreeView:hover:pressed
 {
-    background-color: #D0D3D7;
+    background-color: #eceef1;
 }
 
 QComboBox:on
@@ -978,7 +979,7 @@ QTabBar::tab:bottom
     border: 0.1ex transparent black;
     border-left: 0.1ex solid #BAB9B8;
     border-bottom: 0.1ex solid #BAB9B8;
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     padding: 0.5ex;
     border-bottom-left-radius: 0.2ex;
     border-bottom-right-radius: 0.2ex;
@@ -993,7 +994,7 @@ QTabBar::tab:bottom:only-one
     border-left: 0.1ex solid #BAB9B8;
     border-right: 0.1ex solid #BAB9B8;
     border-bottom: 0.1ex solid #BAB9B8;
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     padding: 0.5ex;
     border-bottom-left-radius: 0.2ex;
     border-bottom-right-radius: 0.2ex;
@@ -1039,7 +1040,7 @@ QTabBar::tab:left
     border: 0.1ex transparent black;
     border-top: 0.1ex solid #BAB9B8;
     border-right: 0.1ex solid #BAB9B8;
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     padding: 0.5ex;
     border-top-right-radius: 0.2ex;
     border-bottom-right-radius: 0.2ex;
@@ -1054,7 +1055,7 @@ QTabBar::tab:left:only-one
     border-top: 0.1ex solid #BAB9B8;
     border-bottom: 0.1ex solid #BAB9B8;
     border-right: 0.1ex solid #BAB9B8;
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     padding: 0.5ex;
     border-top-right-radius: 0.2ex;
     border-bottom-right-radius: 0.2ex;
@@ -1158,7 +1159,7 @@ QTabBar QToolButton::left-arrow:disabled
 
 QDockWidget
 {
-    background: #D0D3D7;
+    background: #eceef1;
     border: 0.1ex solid #403F3F;
     titlebar-close-icon: url(:/light/transparent.svg);
     titlebar-normal-icon: url(:/light/transparent.svg);
@@ -1268,7 +1269,7 @@ QComboBox QAbstractItemView::item:disabled
 
 QSlider::groove:horizontal
 {
-    border: 0.1ex solid #D0D3D7;
+    border: 0.1ex solid #eceef1;
     height: 0.4ex;
     background: #9CA0A4;
     margin: 0px;
@@ -1287,7 +1288,7 @@ QSlider::handle:horizontal
 
 QSlider::groove:vertical
 {
-    border: 0.1ex solid #D0D3D7;
+    border: 0.1ex solid #eceef1;
     width: 0.4ex;
     background: #9CA0A4;
     margin: 0ex;
@@ -1405,16 +1406,17 @@ QPushButton::menu-indicator
 
 QTableView
 {
-    border: 0.1ex solid #BAB9B8;
-    gridline-color: #BAB9B8;
-    background-color: #FCFCFC;
+    /* As in the dark theme: no grid, rounded */
+    border: none;
+    gridline-color: #ffffff;
+    background-color: #ffffff;
 }
 
 
 QTableView,
 QHeaderView
 {
-    border-radius: 0px;
+    border-radius: 10px;
 }
 
 QTableView::item:pressed
@@ -1459,43 +1461,37 @@ QTreeView::item:selected:hover
 
 QHeaderView
 {
-    background-color: #D0D3D7;
-    border: 0.1ex transparent;
-    border-radius: 0px;
+    background-color: #ffffff;
+    border: none;
     margin: 0px;
     padding: 0px;
-
 }
 
+/* As in the dark theme: no dividers, a line below, rounded */
 QHeaderView::section
 {
-    background-color: #D0D3D7;
+    background-color: #e4e6e9;
     color: #31363B;
     padding: 0.5ex;
-    border: 0.1ex solid #BAB9B8;
-    border-radius: 0px;
+    border: none;
+    border-bottom: 2px solid #d0d3d8;
     text-align: center;
-}
-
-QHeaderView::section::vertical::first,
-QHeaderView::section::vertical::only-one
-{
-    border-top: 0.1ex solid #BAB9B8;
-}
-
-QHeaderView::section::vertical
-{
-    border-top: transparent;
-}
-
-QHeaderView::section::horizontal::first, QHeaderView::section::horizontal::only-one
-{
-    border-left: 0.1ex solid #BAB9B8;
 }
 
 QHeaderView::section::horizontal
 {
     border-left: transparent;
+}
+
+QHeaderView::section::horizontal::first
+{
+    border-top-left-radius: 10px;
+}
+
+QHeaderView::section::horizontal::last
+{
+    border-top-right-radius: 10px;
+    border-right: none;
 }
 
 
@@ -1519,7 +1515,7 @@ QHeaderView::up-arrow
 
 QTableCornerButton::section
 {
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     border: 0.1ex transparent #BAB9B8;
     border-radius: 0px;
 }
@@ -1532,7 +1528,7 @@ QToolBox
 
 QToolBox:selected
 {
-    background-color: #D0D3D7;
+    background-color: #eceef1;
     border-color: #3b8eea;
 }
 
@@ -1570,7 +1566,7 @@ QSplitter::handle:vertical
 QProgressBar:horizontal
 {
     background-color: #BABEC2;
-    border: 0.1ex solid #D0D3D7;
+    border: 0.1ex solid #eceef1;
     border-radius: 0.3ex;
     height: 0.5ex;
     text-align: right;
@@ -1589,7 +1585,7 @@ QProgressBar::chunk:horizontal
 
 QAbstractSpinBox
 {
-    background-color: #D0D3D7;
+    background-color: #eceef1;
 }
 
 QSpinBox,
@@ -1710,8 +1706,9 @@ QPushButton#primaryButton:pressed
 
 QPushButton#primaryButton:disabled
 {
-    background-color: #f0f1f2;
-    border: 1px solid #d0d3d7;
+    /* Visible on the window and the boxes, clearly inactive */
+    background-color: #e3e5e8;
+    border: 1px solid #d0d3d8;
     color: #9a9ea4;
 }
 

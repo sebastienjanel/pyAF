@@ -50,6 +50,7 @@ from .. import widgets_list
 from ..tools import misc_tools
 from ..tools import plant_tools
 from ..widgets.progressbar import Progressbar
+from . import multiproc
 
 # Values of each curve, stored (nan when not found): k_as [N/m] (mean of
 # the approach and retraction), fit of each one, elasticity of the Hertz
@@ -262,27 +263,33 @@ def compute(calc_id):
     widgets_list.widget_progressbar.set_label("Plant cells")
     widgets_list.widget_progressbar.set_range(0, nx * ny)
     current = settings(data, used=True)
-    for i in range(nx):
-        for j in range(ny):
-            widgets_list.widget_progressbar.update()
-            if data.discarded_curves[i][j] != 0:
-                continue
-            counts["curves"] += 1
-            result = plant_tools.apparent_stiffness(
-                data, i, j, current["method"], current["smoothing"] / 100.0,
-                current["force_start"], current["force_stop"])
-            if result is None:
-                continue
-            values = [result["k_as"]]
-            for name in ("approach", "retraction"):
-                part = result[name]
-                values.append(part["k_as"] if part else numpy.nan)
-            for name in ("approach", "retraction"):
-                part = result[name]
-                values.append(part["r2"] if part else numpy.nan)
-            values.append(elasticity(data, i, j))
-            results[i, j] = values
-            counts["k_as"] += bool(numpy.isfinite(result["k_as"]))
+
+    def curves():
+        # Force vs indentation of the curves (read in this process), fitted
+        # in the processes of the pool
+        for i in range(nx):
+            for j in range(ny):
+                if data.discarded_curves[i][j] != 0:
+                    widgets_list.widget_progressbar.update()
+                    continue
+                counts["curves"] += 1
+                parts = plant_tools.force_indentation(data, i, j)
+                if parts is None:
+                    widgets_list.widget_progressbar.update()
+                    continue
+                yield i, j, parts
+
+    def store(found):
+        for i, j, values in found:
+            results[i, j] = values + [elasticity(data, i, j)]
+            counts["k_as"] += bool(numpy.isfinite(values[0]))
+        widgets_list.widget_progressbar.update(len(found))
+
+    options = {"method": current["method"],
+               "window": current["smoothing"] / 100.0,
+               "start": current["force_start"], "stop": current["force_stop"]}
+    multiproc.compute_curves(plant_tools.stiffness_task, options, curves(),
+                             store, nx * ny)
 
     data.plant_results = results
     data.plant_calculated = True

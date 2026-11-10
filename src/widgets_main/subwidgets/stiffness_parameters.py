@@ -106,9 +106,9 @@ class StiffnessParamsWidget(PYAFWidget):
         # Stacked widget
         self.STK_data_selection = QtWidgets.QStackedWidget(self)
 
-        # Force range selection
+        # Force range selection: start and stop on one line
         self.force_selection = QtWidgets.QWidget(None)
-        self.VL_force_selection = QtWidgets.QVBoxLayout()
+        self.VL_force_selection = QtWidgets.QHBoxLayout()
         self.VL_force_selection.setContentsMargins(0, 0, 0, 0)
         self.VL_force_selection.addWidget(self.F_start)
         self.VL_force_selection.addWidget(self.F_stop)
@@ -117,7 +117,7 @@ class StiffnessParamsWidget(PYAFWidget):
 
         # Indentation range selection
         self.indentation_selection = QtWidgets.QWidget(None)
-        self.VL_indentation_selection = QtWidgets.QVBoxLayout()
+        self.VL_indentation_selection = QtWidgets.QHBoxLayout()
         self.VL_indentation_selection.setContentsMargins(0, 0, 0, 0)
         self.VL_indentation_selection.addWidget(self.IN_start)
         self.VL_indentation_selection.addWidget(self.IN_stop)
@@ -138,45 +138,34 @@ class StiffnessParamsWidget(PYAFWidget):
             self.STK_data_selection.setParent(None)
             self.IN_stop.setToolTip("0: up to the end of the indentation")
             self.IN_step.setToolTip("0: a single segment")
-            box_segments = QtWidgets.QGroupBox("Segments")
-            VL_segments = QtWidgets.QVBoxLayout()
-            VL_segments.addWidget(self.IN_start)
-            VL_segments.addWidget(self.IN_stop)
-            VL_segments.addWidget(self.IN_step)
-            VL_segments.addStretch(1)
-            box_segments.setLayout(VL_segments)
+            # Segments: start and stop on one line, then their size (in the
+            # computation method box of the compute tab)
+            HL_segments = QtWidgets.QHBoxLayout()
+            HL_segments.addWidget(self.IN_start)
+            HL_segments.addWidget(self.IN_stop)
+            HL_segments.addStretch(1)
             self.VL_params_stiff.setContentsMargins(0, 0, 0, 0)
-            self.VL_params_stiff.addWidget(box_segments)
+            self.VL_params_stiff.addLayout(HL_segments)
+            self.VL_params_stiff.addWidget(self.IN_step)
+            self.VL_params_stiff.addStretch(1)
 
         elif self.name == "widget_fitting":
 
             self.HL_list_range_mode = QtWidgets.QHBoxLayout()
-            self.label_range_mode = QtWidgets.QLabel("Range mode")
+            self.label_range_mode = QtWidgets.QLabel("Fit range")
             self.HL_list_range_mode.addWidget(self.label_range_mode)
             self.HL_list_range_mode.addWidget(self.list_range_mode)
             self.HL_list_range_mode.addStretch(1)
 
-            # Range of the data fitted, and limits of the fit, side by side
-            # under the computation method
-            box_range = QtWidgets.QGroupBox("Fit range")
-            VL_range = QtWidgets.QVBoxLayout()
-            VL_range.addLayout(self.HL_list_range_mode)
-            VL_range.addWidget(self.STK_data_selection)
-            box_range.setLayout(VL_range)
-
-            box_adjustment = QtWidgets.QGroupBox("Fit adjustment")
-            VL_adjustment = QtWidgets.QVBoxLayout()
-            VL_adjustment.addWidget(self.IN_min_indentation)
-            VL_adjustment.addWidget(self.IN_poc_window)
-            VL_adjustment.addStretch(1)
-            box_adjustment.setLayout(VL_adjustment)
-
-            HL_boxes = QtWidgets.QHBoxLayout()
-            HL_boxes.setContentsMargins(0, 0, 0, 0)
-            HL_boxes.addWidget(box_range)
-            HL_boxes.addWidget(box_adjustment)
+            # Range of the data fitted (start and stop on one line), then
+            # the limits of the fit (in the computation method box of the
+            # compute tab)
             self.VL_params_stiff.setContentsMargins(0, 0, 0, 0)
-            self.VL_params_stiff.addLayout(HL_boxes)
+            self.VL_params_stiff.addLayout(self.HL_list_range_mode)
+            self.VL_params_stiff.addWidget(self.STK_data_selection)
+            self.VL_params_stiff.addWidget(self.IN_min_indentation)
+            self.VL_params_stiff.addWidget(self.IN_poc_window)
+            self.VL_params_stiff.addStretch(1)
 
         self.setLayout(self.VL_params_stiff)
 

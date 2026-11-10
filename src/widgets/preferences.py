@@ -110,12 +110,12 @@ class PreferencesWidget(PYAFWidget):
             PYAFInput(self, "main_label", "Window title label", width=200)
 
         text = "Plots font size (all plots)"
-        tip = "Is set to 12 by default"
+        tip = "11 points by default"
         self.IN_labels_font_size = PYAFInput(self, "labels", text, width=40)
         self.IN_labels_font_size.setToolTip(tip)
 
         text = "Tick labels font size (all plots)"
-        tip = "Set this value to 12 points for printing. Default is 8"
+        tip = "11 points by default (12 for printing)"
         self.IN_tick_labels_font_size = \
             PYAFInput(self, "tick_labels", text, width=40)
         self.IN_tick_labels_font_size.setToolTip(tip)
