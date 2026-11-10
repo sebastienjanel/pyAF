@@ -277,6 +277,24 @@ def breakthrough(data):
                          "of the compressed bilayer)"}
 
 
+def plant(data):
+    """Parameters of the plant cells, None if not computed."""
+    if not data.plant_calculated:
+        return None
+    from ..tools import plant_tools
+    method = data.used_plant_method
+    values = {"apparent_stiffness": plant_tools.STIFFNESS_METHODS[method],
+              "wall_thickness_nm": data.used_plant_wall_thickness,
+              "poisson_ratio": data.used_poisson_ratio,
+              "cell_geometry": "ROIs of the maps (quadratic surface)"}
+    if method == 0:
+        values["smoothing_pct_of_indentation"] = data.used_plant_smoothing
+    else:
+        values["force_range_pct_of_max"] = [data.used_plant_force_start,
+                                            data.used_plant_force_stop]
+    return values
+
+
 # Settings of the computations, by part (names of the attributes of the
 # datasets, whose used_* values are the ones used for the computations):
 # reloaded by tools.params_import (Load parameters, Compute tab)
@@ -316,6 +334,8 @@ SETTINGS = {
     "breakthrough": (
         "breakthrough_n_sigma", "breakthrough_min_thickness",
         "breakthrough_min_force", "breakthrough_max_events"),
+    "plant": ("plant_method", "plant_smoothing", "plant_force_start",
+              "plant_force_stop", "plant_wall_thickness"),
     "curves": (
         "sg_smoothing_enabled", "sg_smoothing_order", "sg_smoothing_width",
         "sg_smoothing_uniform", "tilt_applied", "tilt_limit_1",
@@ -336,7 +356,8 @@ COMPUTED = {"elasticity": "stiffness_calculated",
             "work_and_rupture_force": "work_and_rupture_force1_calculated",
             "events": "events_calculated",
             "loading_rates": "loading_rates_calculated",
-            "breakthrough": "breakthrough_calculated"}
+            "breakthrough": "breakthrough_calculated",
+            "plant": "plant_calculated"}
 
 
 def settings(data):
@@ -372,6 +393,7 @@ def file_params(data):
             "work_and_rupture_force": work_and_rupture_force(data),
             "events": events(data),
             "breakthrough": breakthrough(data),
+            "plant": plant(data),
             "settings": settings(data)}
 
 

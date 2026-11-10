@@ -49,6 +49,7 @@ if multiprocessing.current_process().name == "MainProcess":
     import os
     from ...tools import misc_tools
     from ...tools import math_tools
+    from ...tools import planefit
     from ...widgets.progressbar import Progressbar
     from ... import widgets_list
     from ... import shared
@@ -343,6 +344,26 @@ class Stiffness:
                 data.meshgrid_type = "stiffness"
             if data.display_curve_type in ("microrheology",
                                            "microrheology_map"):
+                data.display_curve_type = "defl_ext"
+
+        # Planes of the substrate ROIs (B.E.C. and planefit), drawn before
+        # the elasticity on the piezo height: fitted on the topography
+        planefit.update_substrates(data)
+
+        # The bottom effect correction corrects the elasticity: out of date
+        # (computed again after the elasticity with the option of the B.E.C.
+        # tab)
+        if data.stiffness_corrected:
+            data.bec_outdated = True
+
+        # The plant cells use the point of contact and E Hertz of the
+        # elasticity: to be computed again
+        if data.plant_calculated:
+            data.plant_calculated = False
+            data.plant_results = None
+            if data.meshgrid_type.startswith("plant_"):
+                data.meshgrid_type = "stiffness"
+            if data.display_curve_type == "plant":
                 data.display_curve_type = "defl_ext"
 
         # Close the progressbar and return

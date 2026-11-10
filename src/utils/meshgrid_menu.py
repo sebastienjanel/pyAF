@@ -42,6 +42,7 @@ from ..tools import params_export
 from ..utils import discarding
 from ..widgets.plot_options import PlotOptionsWidget
 from ..widgets.progressbar import Progressbar
+from ..widgets.roi_manager import open_roi_manager
 from ..widgets_small.indentation import WidgetIndentation
 from ..widgets_small.slice_depth import ChangeSliceDepthWidget
 
@@ -112,20 +113,10 @@ def create_meshgrid_menu(parent, widget, pos):
 
         menu.addSeparator()
 
-        if data.roi_selected_row is not None:
-            # Add ROI
-            text = "Draw to ROI " + str(data.roi_selected_row + 1)
-            action = QtWidgets.QAction(text, parent)
-            action.triggered.connect(
-                lambda: parent.change_cursor_mode("roi_add"))
-            menu.addAction(action)
-
-            # Erase from ROI
-            text = "Erase from ROI " + str(data.roi_selected_row + 1)
-            action = QtWidgets.QAction(text, parent)
-            action.triggered.connect(
-                lambda: parent.change_cursor_mode("roi_erase"))
-            menu.addAction(action)
+        # The ROIs are drawn in the ROI manager
+        action = QtWidgets.QAction("ROI Manager", parent)
+        action.triggered.connect(open_roi_manager)
+        menu.addAction(action)
 
         # Add a profile
         action_plot_profile = QtWidgets.QAction("Plot profile", parent)
@@ -221,7 +212,7 @@ def open_indentation_widget(parent):
 def change_slice_heigth(parent):
     """Opens a small widget to change the height of the slice."""
     widget = ChangeSliceDepthWidget(parent)
-    widget.setWindowTitle("Change height (nm)")
+    widget.setWindowTitle("Change height [nm]")
     widget.resize(200, 100)
     widget.activateWindow()
     widget.show()

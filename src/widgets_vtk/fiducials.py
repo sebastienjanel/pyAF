@@ -94,7 +94,7 @@ class FiducialsWidget(PYAFWidget):
         self.BT_colors = PYAFButton(self, "color", "Color")
         self.BT_change_heights = PYAFButton(self, "heights", "Change heights")
         self.BT_center = PYAFButton(self, "center", "Center")
-        self.IN_radius = PYAFInput(self, "radius", "Radius (nm)")
+        self.IN_radius = PYAFInput(self, "radius", "Radius [nm]")
 
         VL_options.addWidget(self.BT_load_fiducials)
         VL_options.addWidget(self.BT_add_fiducial)

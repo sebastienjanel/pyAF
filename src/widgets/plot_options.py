@@ -346,7 +346,8 @@ class PlotOptionsWidget(PYAFWidget):
                 data.colortable_max_value = high
                 data.colortable_middle_value = high / 2.0
             elif mt.startswith("breakthrough_") or \
-                    mt.startswith("brush_") or mt == "microrheo_crossover":
+                    mt.startswith("brush_") or mt.startswith("plant_") or \
+                    mt == "microrheo_crossover":
                 # From the 2nd to the 98th percentile
                 values = numpy.asarray(getattr(data, mt), dtype=float)
                 values = values[numpy.isfinite(values)]
@@ -503,6 +504,18 @@ class PlotOptionsWidget(PYAFWidget):
             values = values[numpy.isfinite(values)]
             val = float(values.max()) if values.size else 0.0
             val_all = None
+        elif mt.startswith("plant_"):
+            name, unit, factor = {
+                "plant_k_as": ("Max. k_as", "N/m", 1),
+                "plant_modulus": ("Max. wall modulus", "MPa", 1e-6),
+                "plant_pressure": ("Max. turgor pressure", "MPa", 1e-6),
+                "plant_tau": ("Max. \u03c4", "", 1),
+                "plant_pressure_hertz": ("Max. turgor pressure", "MPa",
+                                         1e-6)}[mt]
+            values = numpy.asarray(getattr(data, mt), dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(values.max()) if values.size else 0.0
+            val_all = None
         elif mt == "fit_r2":
             name, unit, factor = "Median R\u00b2", "", 1
             values = numpy.asarray(data.fit_r2, dtype=float)
@@ -600,6 +613,9 @@ def color_value_conversion(data, field):
                 "microrheo_storage", "microrheo_loss"):
         # kPa to Pa
         return 1e3, 0.0
+    elif mt in ("plant_modulus", "plant_pressure", "plant_pressure_hertz"):
+        # MPa to Pa
+        return 1e6, 0.0
     elif mt == "work":
         # fJ to J
         return 1e-15, 0.0

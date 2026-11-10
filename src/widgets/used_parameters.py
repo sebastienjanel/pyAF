@@ -252,10 +252,10 @@ class UsedParametersWidget(PYAFWidget):
 
         # - Other
         self.LB_defl_sens.setText(
-            "Deflection sensitivity (nm/V) : " +
+            "Deflection sensitivity [nm/V] : " +
             misc_tools.format_number(dt.used_deflection_sensitivity))
         self.LB_spring_constant.setText(
-            "Spring constant (N/m) : " +
+            "Spring constant [N/m] : " +
             misc_tools.format_number(dt.used_spring_constant * 1e9))
 
         # Viscoelasticity
@@ -269,7 +269,7 @@ class UsedParametersWidget(PYAFWidget):
                 "\nB.E.C. : " + ("yes" if dt.used_visco_bec else "no") +
                 "\nViscous drag corrected : " +
                 ("yes" if dt.used_visco_drag_correction else "no") +
-                "\nBaseline before contact (nm) : " +
+                "\nBaseline before contact [nm] : " +
                 str(dt.used_visco_contact_offset) +
                 "\nPoints : " + str(dt.used_visco_nbr_points) +
                 "\nInitial fluidity : " + beta)
@@ -277,7 +277,8 @@ class UsedParametersWidget(PYAFWidget):
             self.LB_visco.setText("Not computed")
 
         # Stiffness when computed by Tomography
-        self.box_elasticity.setTitle(misc_tools.elasticity_name([dt]))
+        # In uppercase, as the titles of the other boxes
+        self.box_elasticity.setTitle(misc_tools.elasticity_name([dt]).upper())
 
         # Elasticity
         if dt.stiffness_calculated:
@@ -314,24 +315,24 @@ class UsedParametersWidget(PYAFWidget):
                     str(dt.used_force_stop) + " % (force)"
             self.LB_fit_range.setText("Fit range : " + fit_range)
             self.LB_fit_range.setVisible(fitting)
-            value = "Skip (start) (nm) : " + \
+            value = "Skip (start) [nm] : " + \
                 str(dt.used_fitparam_poc_skip_start)
             self.LB_poc_skip_start.setText(value)
-            value = "Length (nm) : " + str(dt.used_fitparam_poc_fit_length)
+            value = "Length [nm] : " + str(dt.used_fitparam_poc_fit_length)
             self.LB_poc_fit_length.setText(value)
             value = "Fit noise : " + \
                 str(dt.used_fitparam_poc_noise_multiplicator)
             self.LB_poc_noise_multiplicator.setText(value)
-            value = "Refit (nm) : " + str(dt.used_fitparam_poc_refit_option)
+            value = "Refit [nm] : " + str(dt.used_fitparam_poc_refit_option)
             self.LB_poc_refit_option.setText(value)
             value = "Refit (times) : " + str(dt.used_fitparam_poc_refit_times)
             self.LB_poc_refit_times.setText(value)
             # Segments of the Tomography
-            value = "Segments start (nm) : " + str(dt.used_indentation_start)
+            value = "Segments start [nm] : " + str(dt.used_indentation_start)
             self.LB_indentation_start.setText(value)
-            value = "Segments step (nm) : " + str(dt.used_indentation_step)
+            value = "Segments step [nm] : " + str(dt.used_indentation_step)
             self.LB_indentation_step.setText(value)
-            value = "Segments stop (nm) : " + str(dt.used_indentation_stop)
+            value = "Segments stop [nm] : " + str(dt.used_indentation_stop)
             self.LB_indentation_stop.setText(value)
             for label in (self.LB_indentation_start, self.LB_indentation_step,
                           self.LB_indentation_stop):
@@ -355,16 +356,16 @@ class UsedParametersWidget(PYAFWidget):
                 self.LB_msf_window_size.setText(value)
             value = "Event fit size : " + str(dt.used_events_fit_size)
             self.LB_event_fit_size.setText(value)
-            value = "Fit start (nm) : " + \
+            value = "Fit start [nm] : " + \
                 str(dt.used_fitparam_events_joc_skip_start)
             self.LB_events_joc_skip_start.setText(value)
-            value = "Fit length (nm) : " + \
+            value = "Fit length [nm] : " + \
                 str(dt.used_fitparam_events_joc_fit_length)
             self.LB_events_joc_fit_length.setText(value)
             value = "Refit (times) : " + \
                 str(dt.used_fitparam_events_joc_refit_times)
             self.LB_events_joc_refit_times.setText(value)
-            value = "Refit (nm) : " + \
+            value = "Refit [nm] : " + \
                 str(dt.used_fitparam_events_joc_refit_option)
             self.LB_events_joc_refit_option.setText(value)
             value = "Noise : " + \
@@ -386,11 +387,11 @@ class UsedParametersWidget(PYAFWidget):
 
         # Work
         if dt.work_and_rupture_force1_calculated:
-            value = "Fit start (nm) : " + str(dt.used_fitparam_joc_skip_start)
+            value = "Fit start [nm] : " + str(dt.used_fitparam_joc_skip_start)
             self.LB_joc_skip_start.setText(value)
-            value = "Fit length (nm) : " + str(dt.used_fitparam_joc_fit_length)
+            value = "Fit length [nm] : " + str(dt.used_fitparam_joc_fit_length)
             self.LB_joc_fit_length.setText(value)
-            value = "Refit (nm) : " + str(dt.used_fitparam_joc_refit_option)
+            value = "Refit [nm] : " + str(dt.used_fitparam_joc_refit_option)
             self.LB_joc_refit_option.setText(value)
             value = "Refit (times) : " + str(dt.used_fitparam_joc_refit_times)
             self.LB_joc_refit_times.setText(value)

@@ -34,6 +34,7 @@
 
 from .. import shared
 from .. import widgets_list
+from ..tools import map_values
 from qtpy import QtCore, QtWidgets
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
@@ -106,6 +107,7 @@ from .curves.results.residuals import ResultsResiduals
 from .curves.results.visco import ResultsVisco
 from .curves.results.microrheology import ResultsMicrorheology
 from .curves.results.brush import ResultsBrush
+from .curves.results.plant import ResultsPlant
 
 # Events
 from .curves.results.force_events import ResultsForceEvents
@@ -220,6 +222,11 @@ class PYAFPlot(FigureCanvasQTAgg):
         # For multimeshgrid, use the multimeshgrid's type
         if self.plot_type == "multimeshgrid":
             self.mesh_type = shared.exp.multi_meshgrid_type
+        elif self.plot_type == "meshgrid_roi":
+            # Map chosen in the ROI manager, if computed for the file
+            self.mesh_type = shared.exp.roi_meshgrid_type
+            if self.mesh_type not in map_values.available_maps(dt):
+                self.mesh_type = "piezo"
         elif self.plot_type == "meshgrid_data":
             # The map on the data tab is always the piezo height, whatever
             # the type of map selected on the results tab
@@ -238,8 +245,8 @@ class PYAFPlot(FigureCanvasQTAgg):
         if p_type == "meshgrid_tilt_check":
             self.canvas = PlotTiltCheckMeshGrid(self)
 
-        if (p_type in ("meshgrid", "multimeshgrid", "meshgrid_data") and
-                dt.is_single is False):
+        if (p_type in ("meshgrid", "multimeshgrid", "meshgrid_data",
+                       "meshgrid_roi") and dt.is_single is False):
             if mesh == "piezo" or p_type == "meshgrid_data":
                 self.canvas = PlotPiezoMeshGrid(self)
             elif mesh == "topo" and dt.stiffness_calculated:
@@ -267,7 +274,8 @@ class PYAFPlot(FigureCanvasQTAgg):
             elif mesh.startswith("breakthrough_") and \
                     dt.breakthrough_calculated:
                 self.canvas = PlotBreakthroughMeshGrid(self)
-            elif mesh.startswith("brush_") and dt.brush_calculated:
+            elif (mesh.startswith("brush_") and dt.brush_calculated) or \
+                    (mesh.startswith("plant_") and dt.plant_calculated):
                 # Same map (one value per curve, nan when not fitted)
                 self.canvas = PlotBreakthroughMeshGrid(self)
             elif mesh.startswith("fit_") and dt.has_fit_quality():
@@ -320,6 +328,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ResultsVisco(self)
                 elif c_type == "brush":
                     self.canvas = ResultsBrush(self)
+                elif c_type == "plant":
+                    self.canvas = ResultsPlant(self)
                 elif c_type in ("microrheology", "microrheology_map"):
                     self.canvas = ResultsMicrorheology(self)
             elif p_type == "fit_preview":
@@ -344,6 +354,8 @@ class PYAFPlot(FigureCanvasQTAgg):
                     self.canvas = ResultsVisco(self)
                 elif ct == "microrheology":
                     self.canvas = ResultsMicrorheology(self)
+                elif ct == "plant":
+                    self.canvas = ResultsPlant(self)
                 elif ct == "breakthrough":
                     self.canvas = ComputeBreakthrough(self)
         elif p_type == "results_single":
@@ -371,7 +383,8 @@ class PYAFPlot(FigureCanvasQTAgg):
         cond = widgets_list.widget_main.first_load is False
 
         if (p_type in ("meshgrid", "small_meshgrid_compute",
-                       "meshgrid_data", "meshgrid_tilt_check")
+                       "meshgrid_data", "meshgrid_tilt_check",
+                       "meshgrid_roi")
                 and cond and mode is None):
             self.refresh_blitting()
 
@@ -450,10 +463,12 @@ class PYAFPlot(FigureCanvasQTAgg):
         # changed from one tab to another, and the first thing which is called
         # (before the tabs_changed() call) is the resizeEvent here. So we have
         # to mak sure we don't update the plot here.
-        cond = self.tab_id == widgets_list.widget_main.current_tab
+        cond = self.tab_id == widgets_list.widget_main.current_tab or \
+            p_type == "meshgrid_roi"
 
         if (p_type in ("meshgrid", "small_meshgrid_compute",
-                       "meshgrid_data", "meshgrid_tilt_check")
+                       "meshgrid_data", "meshgrid_tilt_check",
+                       "meshgrid_roi")
                 and self.timer_is_running is False and
                 self.is_not_first and cond):
             # Not while the data file is closed (computations): the timer
@@ -519,6 +534,8 @@ def curve_type_available(data, curve_type):
         return data.visco_calculated
     if curve_type == "brush":
         return data.brush_calculated
+    if curve_type == "plant":
+        return data.plant_calculated
     if curve_type in ("microrheology", "microrheology_map"):
         return data.microrheo_calculated
     return True

@@ -300,8 +300,10 @@ class ViolinOptionsWidget(PYAFWidget):
         # The loading rates are plotted as forces vs loading rates (no
         # violins): their own options
         violins = shared.exp.results_type != "loading_rates"
-        self.box.setTitle("Violin plot" if violins
-                          else "Force vs loading rate plot")
+        # In uppercase, as the titles of the other boxes (see
+        # theme_handler.GroupBoxTitles, only when the box is first shown)
+        self.box.setTitle("VIOLIN PLOT" if violins
+                          else "FORCE VS LOADING RATE PLOT")
         self.arrange(violins)
         self.IN_x_min.setEnabled(manual_x)
         self.IN_x_max.setEnabled(manual_x)

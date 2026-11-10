@@ -103,6 +103,29 @@ MICRORHEO_TYPES = {
                             "column": "microrheo_tan_delta"},
 }
 
+# Plant cells (see compute_tools.plant)
+PLANT_TYPES = {
+    "plant_k_as": {"name": "Apparent stiffness k_as", "label": "k_as [N/m]",
+                   "factor": 1.0, "export": "Apparent stiffness (N/m)",
+                   "column": "plant_k_as"},
+    "plant_modulus": {"name": "Wall modulus E (Yamasaki)",
+                      "label": "E [MPa]", "factor": 1e-6,
+                      "export": "Wall modulus (Pa)",
+                      "column": "plant_wall_modulus"},
+    "plant_pressure": {"name": "Turgor pressure P (Yamasaki)",
+                       "label": "P [MPa]", "factor": 1e-6,
+                       "export": "Turgor pressure (Pa)",
+                       "column": "plant_pressure"},
+    "plant_tau": {"name": "Dimensionless pressure \u03c4",
+                  "label": "\u03c4", "factor": 1.0,
+                  "export": "Dimensionless pressure tau",
+                  "column": "plant_tau"},
+    "plant_pressure_hertz": {"name": "Turgor pressure P (E Hertz)",
+                             "label": "P [MPa]", "factor": 1e-6,
+                             "export": "Turgor pressure from E Hertz (Pa)",
+                             "column": "plant_pressure_hertz"},
+}
+
 # Results with one value per pixel (map), with the computation they need
 PIXEL_TYPES = {**{name: dict(values, calculated="visco_calculated")
                   for name, values in VISCO_TYPES.items()},
@@ -111,7 +134,9 @@ PIXEL_TYPES = {**{name: dict(values, calculated="visco_calculated")
                **{name: dict(values, calculated="breakthrough_calculated")
                   for name, values in BREAKTHROUGH_TYPES.items()},
                **{name: dict(values, calculated="brush_calculated")
-                  for name, values in BRUSH_TYPES.items()}}
+                  for name, values in BRUSH_TYPES.items()},
+               **{name: dict(values, calculated="plant_calculated")
+                  for name, values in PLANT_TYPES.items()}}
 
 
 class GetResults:

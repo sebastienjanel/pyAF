@@ -143,6 +143,7 @@ class StiffnessCorrection:
 
         # Flush the file and update the values in the experiment class
         data.stiffness_corrected = True
+        data.bec_outdated = False
         data.update()
 
         # Close the progressbar and return

@@ -50,19 +50,19 @@ class ResultsSelectorWidget(PYAFWidget):
 
     def __init__(self, parent, name):
         super().__init__(parent, name)
-        self.IN_curve_x = PYAFInput(
-            self, "input_chose_curve_x", ",", 40)
+        self.IN_curve_x = PYAFInput(self, "input_chose_curve_x", "", 40)
         self.IN_curve_y = PYAFInput(self, "input_chose_curve_y", "", 40)
         self.IN_curve_x.input.setValidator(validator("x"))
         self.IN_curve_y.input.setValidator(validator("y"))
         self.IN_curve_x.changeValue(shared.exp.meshgrid_click_xpos + 1)
         self.IN_curve_y.changeValue(shared.exp.meshgrid_click_ypos + 1)
 
+        # As wide as their texts (compact rows)
         self.button_rand = PYAFButton(
-            self, "button_rand", "Random curve", size=115)
+            self, "button_rand", "Random curve", size=0)
 
-        self.BT_back = PYAFButton(self, "back", "<", size=40)
-        self.BT_forward = PYAFButton(self, "forward", ">", size=40)
+        self.BT_back = PYAFButton(self, "back", "<", size=0)
+        self.BT_forward = PYAFButton(self, "forward", ">", size=0)
 
         self.label_info = QtWidgets.QLabel()
 

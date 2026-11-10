@@ -96,6 +96,8 @@ class BoxData(QtWidgets.QWidget):
                 data_id=self.data_id)
         else:
             self.meshgrid = None
+            # On the color of the item, selected or not
+            self.canvas.setStyleSheet("background-color: transparent;")
             # Number of the file in the list, as on the maps where the
             # single curves are recorded (see plot_meshgrid)
             self.number = QtWidgets.QLabel(str(i + 1), self.canvas)
@@ -103,7 +105,9 @@ class BoxData(QtWidgets.QWidget):
             self.number.setAlignment(QtCore.Qt.AlignCenter)
             # (stylesheet: the font of the application style sheet would be
             # used otherwise)
-            self.number.setStyleSheet("font-size: 26px; font-weight: bold;")
+            # (transparent: the color of the item, selected or not)
+            self.number.setStyleSheet("font-size: 26px; font-weight: bold; "
+                                      "background-color: transparent;")
             self.number.setToolTip(
                 "Number of the file, shown on the map at the position of "
                 "the curve")

@@ -326,3 +326,216 @@ def cell_geometry(data, pixels, points=None):
             "angle": float(math.degrees(math.atan2(major[1], major[0]))),
             "L_major": half_length(major), "L_minor": half_length(minor),
             "rms": rms, "heights": name, "points": results}
+
+
+# Apparent stiffness of the cell (slope of the force vs the indentation at
+# large indentation): Yamasaki et al. 2025 (Eq. 16), the derivative of the
+# force is fitted with k = k_as (1 - exp(-alpha (delta - beta))); Beauzamy
+# et al. 2015, linear fit of the force between 75 and 100 % of the maximum.
+STIFFNESS_METHODS = ("Derivative (Yamasaki)", "Force range (Beauzamy)")
+
+
+def force_indentation(data, i, j):
+    """Indentation [m] and force [N] of the loading (approach) and of the
+    unloading (retraction) of a curve, from its point of contact
+    (elasticity computed): ((delta, force) of the loading, (delta, force)
+    of the unloading), each in the order of the indentation, or None."""
+    from ..compute_tools.viscoelasticity.main import prepare_curve
+    if not data.stiffness_calculated:
+        return None
+    curve = prepare_curve(data, i, j, {"drag_correction": False},
+                          whole=True)
+    if curve is None:
+        return None
+    delta, force, k_tm = curve
+    parts = []
+    for part in (slice(0, k_tm + 1), slice(k_tm, None)):
+        d, f = numpy.asarray(delta[part]), numpy.asarray(force[part])
+        inside = numpy.isfinite(d) & numpy.isfinite(f) & (d > 0)
+        d, f = d[inside], f[inside]
+        order = numpy.argsort(d, kind="stable")
+        parts.append((d[order], f[order]))
+    if min(len(part[0]) for part in parts) < 10:
+        return None
+    return parts
+
+
+def derivative(delta, force, nbr_points=200, window=0.05):
+    """Derivative dF/ddelta [N/m] on a regular grid of the indentation
+    (mean of the force in nbr_points bins, then a Savitzky-Golay filter of
+    the given width, fraction of the indentation range): (delta, k)."""
+    from scipy.signal import savgol_filter
+    edges = numpy.linspace(delta[0], delta[-1], nbr_points + 1)
+    index = numpy.clip(numpy.searchsorted(edges, delta, side="right") - 1,
+                       0, nbr_points - 1)
+    counts = numpy.bincount(index, minlength=nbr_points)
+    sums = numpy.bincount(index, weights=force, minlength=nbr_points)
+    filled = counts > 0
+    centres = (edges[:-1] + edges[1:]) / 2.0
+    grid, values = centres[filled], sums[filled] / counts[filled]
+    if len(grid) < 7:
+        return None
+    length = max(5, int(round(window * len(grid))) | 1)
+    length = min(length, len(grid) - (1 - len(grid) % 2))
+    step = (grid[-1] - grid[0]) / (len(grid) - 1)
+    slope = savgol_filter(numpy.interp(
+        numpy.linspace(grid[0], grid[-1], len(grid)), grid, values),
+        length, 2, deriv=1, delta=step)
+    return numpy.linspace(grid[0], grid[-1], len(grid)), slope
+
+
+# End of the indentation not fitted (fraction of the range): the derivative
+# is not reliable where the piezo turns back (edge of the filter)
+END_EXCLUDED = 0.03
+
+
+def stiffness_derivative(delta, force, window=0.05):
+    """Apparent stiffness from the derivative of the force (Yamasaki Eq.
+    16, with k = 0 before beta: the point of contact can be found before
+    the force rises): {"k_as" [N/m], "alpha" [1/m], "beta" [m], "r2",
+    "delta", "k" (derivative), "fit" (fitted derivative)}, or None."""
+    from scipy.optimize import curve_fit
+    curve = derivative(delta, force, window=window)
+    if curve is None:
+        return None
+    grid, slope = curve
+    kept = grid <= grid[0] + (grid[-1] - grid[0]) * (1.0 - END_EXCLUDED)
+    grid, slope = grid[kept], slope[kept]
+    if len(grid) < 7:
+        return None
+
+    def model(d, k_as, alpha, beta):
+        return k_as * (1.0 - numpy.exp(-alpha * numpy.maximum(d - beta,
+                                                               0.0)))
+
+    top = slope[int(len(slope) * 0.75):]
+    k0 = float(numpy.median(top)) if len(top) else float(slope.max())
+    if not k0 > 0:
+        return None
+    rising = numpy.nonzero(slope > 0.1 * k0)[0]
+    beta0 = float(grid[rising[0]]) if len(rising) else 0.0
+    guess = [k0, 3.0 / (grid[-1] - beta0), beta0]
+    try:
+        params, _ = curve_fit(
+            model, grid, slope, p0=guess,
+            bounds=([0.0, 0.0, 0.0], [numpy.inf, numpy.inf, grid[-1]]),
+            maxfev=5000)
+    except (RuntimeError, ValueError):
+        return None
+    fit = model(grid, *params)
+    residual = numpy.sum((slope - fit) ** 2)
+    total = numpy.sum((slope - slope.mean()) ** 2)
+    return {"k_as": float(params[0]), "alpha": float(params[1]),
+            "beta": float(params[2]),
+            "r2": float(1.0 - residual / total) if total > 0 else
+            float("nan"), "delta": grid, "k": slope, "fit": fit}
+
+
+def stiffness_force_range(delta, force, start=75.0, stop=100.0):
+    """Apparent stiffness: slope of a linear fit of the force between start
+    and stop % of its maximum (Beauzamy et al. 2015): {"k_as" [N/m], "r2",
+    "delta", "force" (fitted part), "fit"}, or None."""
+    maximum = force.max()
+    used = (force >= maximum * start / 100.0) & \
+        (force <= maximum * stop / 100.0)
+    if used.sum() < 5:
+        return None
+    d, f = delta[used], force[used]
+    slope, intercept = numpy.polyfit(d, f, 1)
+    fit = slope * d + intercept
+    total = numpy.sum((f - f.mean()) ** 2)
+    return {"k_as": float(slope),
+            "r2": float(1.0 - numpy.sum((f - fit) ** 2) / total)
+            if total > 0 else float("nan"),
+            "delta": d, "force": f, "fit": fit}
+
+
+def apparent_stiffness(data, i, j, method=0, window=0.05, start=75.0,
+                       stop=100.0):
+    """Apparent stiffness of the curve (i, j), loading and unloading (see
+    STIFFNESS_METHODS): {"approach": result or None, "retraction": result
+    or None, "k_as": mean of the two (or the one found), "curves":
+    (loading, unloading) from force_indentation}, or None without point of
+    contact."""
+    curves = force_indentation(data, i, j)
+    if curves is None:
+        return None
+    results = {}
+    for name, (delta, force) in zip(("approach", "retraction"), curves):
+        if method == 0:
+            results[name] = stiffness_derivative(delta, force, window)
+        else:
+            results[name] = stiffness_force_range(delta, force, start, stop)
+    found = [results[name]["k_as"] for name in ("approach", "retraction")
+             if results[name] is not None]
+    results["k_as"] = float(numpy.mean(found)) if found else float("nan")
+    results["curves"] = curves
+    return results
+
+
+# Turgor pressure and modulus of the cell wall, shell of thickness t and
+# mean curvature kM indented at a point (Vella et al. 2012; Beauzamy et al.
+# 2015; Yamasaki et al. 2025, Eq. 1):
+#
+#     k_as = pi P f / (kM log(P f c / (E t^2 kM^2))),  c = sqrt(3 (1 - nu^2))
+#
+# valid for a large dimensionless pressure tau = P f c / (2 E t^2 kM^2)
+# (Eq. 2, tau >> 1).
+# Yamasaki: the strain of the wall, from its curvature (Eq. 9), gives the
+# second equation (Eq. 6, P = E t kM (e_major + e_minor) / f), and E and P
+# are explicit (Eq. 10-11).
+# Beauzamy: E is the elasticity of the Hertz fit (shallow indentation, below
+# the thickness of the wall), and P is the root of Eq. 1.
+
+
+def wall_strain(half_length, curvature):
+    """Strain of the cell wall along an axis (Yamasaki Eq. 9), from its
+    half-length L [m] and its curvature [1/m]: 2 (asin(L k) / (L k) - 1),
+    nan if L k is not in ]0, 1]."""
+    product = half_length * curvature
+    if not 0 < product <= 1:
+        return float("nan")
+    return 2.0 * (math.asin(product) / product - 1.0)
+
+
+def pressure_yamasaki(k_as, geometry, thickness, poisson_ratio):
+    """Modulus E [Pa], pressure P [Pa] and dimensionless pressure tau of the
+    wall (Yamasaki Eq. 10, 11 and 2) from the apparent stiffness [N/m], the
+    geometry of the cell at the curve (lengths [m], curvatures [1/m]:
+    L_major, L_minor, k_major, k_minor, kM, f) and the thickness of the
+    wall [m]. nan without solution (saddle, flat or too curved wall)."""
+    nan = (float("nan"),) * 3
+    kappa_m, f = geometry["kM"], geometry["f"]
+    strain = wall_strain(geometry["L_major"], geometry["k_major"]) + \
+        wall_strain(geometry["L_minor"], geometry["k_minor"])
+    if not (kappa_m > 0 and f > 0 and numpy.isfinite(strain) and
+            strain > 0 and k_as > 0):
+        return nan
+    c = math.sqrt(3.0 * (1.0 - poisson_ratio ** 2))
+    argument = strain * c / (thickness * kappa_m)
+    if argument <= 1:
+        return nan
+    log = math.log(argument)
+    modulus = k_as * log / (math.pi * thickness * strain)
+    pressure = k_as * kappa_m * log / (math.pi * f)
+    return modulus, pressure, argument / 2.0
+
+
+def pressure_beauzamy(k_as, modulus, geometry, thickness, poisson_ratio):
+    """Pressure P [Pa] and dimensionless pressure tau, root of Eq. 1 with
+    the modulus E [Pa] of the wall (Hertz fit). With u = P f c / (E t^2
+    kM^2) = 2 tau, Eq. 1 is u / log(u) = k_as c / (pi E t^2 kM), solved on
+    the branch u > e (large pressures). nan without solution."""
+    from scipy.special import lambertw
+    nan = (float("nan"),) * 2
+    kappa_m, f = geometry["kM"], geometry["f"]
+    if not (kappa_m > 0 and f > 0 and k_as > 0 and modulus > 0):
+        return nan
+    c = math.sqrt(3.0 * (1.0 - poisson_ratio ** 2))
+    ratio = k_as * c / (math.pi * modulus * thickness ** 2 * kappa_m)
+    if ratio <= math.e:
+        # u / log(u) >= e: k_as too small for this modulus
+        return nan
+    u = float(numpy.real(-ratio * lambertw(-1.0 / ratio, -1)))
+    pressure = u * modulus * thickness ** 2 * kappa_m ** 2 / (f * c)
+    return pressure, u / 2.0

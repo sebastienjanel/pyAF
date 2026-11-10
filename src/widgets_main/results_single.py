@@ -483,6 +483,8 @@ class ResultsSingleWidget(PYAFWidget):
             line_edit.setFrame(False)
             line_edit.setToolTip(
                 "Name in the plots (edit it, empty: automatic name)")
+            # The beginning of a long name, not its end
+            line_edit.setCursorPosition(0)
             line_edit.editingFinished.connect(
                 lambda r=row_index, e=line_edit: self.short_name_edited(r, e))
             # In a layout: keeps the width of the cell (see FullCellWidget)

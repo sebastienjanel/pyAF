@@ -73,15 +73,15 @@ class StiffnessParamsWidget(PYAFWidget):
         self.IN_step = PYAFInput(self, "input_step_in", "Segment size [nm]")
         self.IN_step.input.setValidator(misc_tools.validator("UI"))
         # Force start
-        self.F_start = PYAFInput(self, "input_start_f", "Start (%)")
+        self.F_start = PYAFInput(self, "input_start_f", "Start [%]")
         self.F_start.input.setValidator(misc_tools.validator("UI"))
         # Force end
-        self.F_stop = PYAFInput(self, "input_stop_f", "Stop (%)")
+        self.F_stop = PYAFInput(self, "input_stop_f", "Stop [%]")
         self.F_stop.input.setValidator(misc_tools.validator("UI"))
 
         # Limits of the fit (percentages)
         self.IN_min_indentation = PYAFInput(
-            self, "input_min_indentation", "Min. indentation (%)")
+            self, "input_min_indentation", "Min. indentation [%]")
         self.IN_min_indentation.input.setValidator(
             misc_tools.validator("UF"))
         self.IN_min_indentation.setToolTip(
@@ -90,7 +90,7 @@ class StiffnessParamsWidget(PYAFWidget):
             "cantilever (e.g. glass): the point of contact is not\nfitted, "
             "the elasticity is fitted with the detected point of contact.")
         self.IN_poc_window = PYAFInput(
-            self, "input_poc_window", "Max. POC shift (%)")
+            self, "input_poc_window", "Max. POC shift [%]")
         self.IN_poc_window.input.setValidator(misc_tools.validator("UF"))
         self.IN_poc_window.setToolTip(
             "Percentage of the indentation: the fit can move the point of "

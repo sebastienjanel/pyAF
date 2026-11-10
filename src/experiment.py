@@ -224,6 +224,8 @@ class Experiment:
 
         # Multi meshgrid
         self.multi_meshgrid_type = "piezo"
+        # Map of the ROI manager (piezo height when not computed)
+        self.roi_meshgrid_type = "piezo"
         self.missing_z_positions = []
 
         # Info selected
@@ -436,7 +438,8 @@ class ConditionGroup:
             self.name = "None"
 
         else:
-            self.name = "Condition " + str(condition_id)
+            # Short: the names are in the tables and the comparisons
+            self.name = "Cond. " + str(condition_id)
         self.color = None  # Color for the histograms
 
 

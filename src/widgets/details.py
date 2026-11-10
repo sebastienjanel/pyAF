@@ -91,10 +91,10 @@ class DetailsWidget(PYAFWidget):
 
         if data.used_stiffness_model_selected == 3:
             # Slope
-            self.box_stiffness.setTitle("Apparent stiffness")
+            self.box_stiffness.setTitle("APPARENT STIFFNESS")
         else:
             # Stiffness
-            self.box_stiffness.setTitle("Elasticity")
+            self.box_stiffness.setTitle("ELASTICITY")
 
         # --- Stiffness ------------------------------------------------
         # Clear the layout with the labels

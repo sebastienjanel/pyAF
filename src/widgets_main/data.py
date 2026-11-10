@@ -91,6 +91,8 @@ class DataWidget(PYAFWidget):
         self.VL_list = QtWidgets.QVBoxLayout()
 
         self.list_widget = QtWidgets.QScrollArea()
+        # One list: border and background of the style sheets (fileList)
+        self.list_widget.setObjectName("fileList")
         self.list_widget.setWidgetResizable(True)
         self.list_widget.setSizePolicy(QtWidgets.QSizePolicy.Minimum,
                                        QtWidgets.QSizePolicy.Expanding)
@@ -117,7 +119,12 @@ class DataWidget(PYAFWidget):
 
         # General information -------------------------------------------------
         self.box_info1 = QtWidgets.QGroupBox("File parameters")
-        self.box_info1.setFixedSize(550, 250)
+        # At least 550 px wide, and as wide as possible: the calibration box
+        # is on the right edge of the window
+        self.box_info1.setFixedHeight(250)
+        self.box_info1.setMinimumWidth(550)
+        self.box_info1.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                     QtWidgets.QSizePolicy.Fixed)
         self.HL_box_info = QtWidgets.QHBoxLayout()
         self.VL_box_info1 = QtWidgets.QVBoxLayout()
         self.VL_box_info2 = QtWidgets.QVBoxLayout()
@@ -272,7 +279,6 @@ class DataWidget(PYAFWidget):
         self.HL_box_infos = QtWidgets.QHBoxLayout()
         self.HL_box_infos.addWidget(self.box_info1)
         self.HL_box_infos.addWidget(self.box_cantilever)
-        self.HL_box_infos.addStretch(1)
 
         name = "widget_plot_selector_data"
         self.plot_selector = PlotSelectorWidget(self, name)
@@ -319,6 +325,8 @@ class DataWidget(PYAFWidget):
     def create_new_list(self):
         """Create a new list with the files on the right of the data tab."""
         self.container = QtWidgets.QFrame()
+        # Transparent: the background of the list (see fileList)
+        self.container.setObjectName("fileListContent")
 
         # Reset list of boxes
         self.list_boxes = []
@@ -568,10 +576,8 @@ class DataWidget(PYAFWidget):
                 color = " { background-color: #3b8eea; }"
                 style = "QWidget#data_" + str(i) + color
                 self.list_sel_styles.append(style)
-                if shared.exp.current_theme == "Dark":
-                    color = " { background-color: #31363b; }"
-                elif shared.exp.current_theme == "Light":
-                    color = " { background-color: #D0D3D7; }"
+                # Unselected: on the background of the list
+                color = " { background-color: transparent; }"
                 style = "QWidget#data_" + str(i) + color
                 self.list_unsel_styles.append(style)
 
