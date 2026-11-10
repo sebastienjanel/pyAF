@@ -44,7 +44,7 @@ from ... import widgets_list
 from qtpy import QtWidgets
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools.gui_tools import PYAFInput
-from ...tools.gui_tools import PYAFCheckBox
+from ...tools.gui_tools import PYAFToggle
 from ...tools import misc_tools
 
 
@@ -69,6 +69,9 @@ class FitParamsWidget(PYAFWidget):
             title = "Jump of contact"
         elif self.name == "fit_param_jocs_events":
             title = "Jump of contact"
+            # No margins: evenly spaced with the other boxes of the events
+            # tab
+            VL.setContentsMargins(0, 0, 0, 0)
 
         BOX = QtWidgets.QGroupBox(title)
         self.GL = QtWidgets.QGridLayout()
@@ -90,16 +93,17 @@ class FitParamsWidget(PYAFWidget):
         self.IN_refit_times.input.setValidator(misc_tools.validator("UI"))
 
         # Is added to GL in update_widget
-        self.CB_display_fit_events_joc2_preview = PYAFCheckBox(
+        self.CB_display_fit_events_joc2_preview = PYAFToggle(
             self, "display_fit_events_joc2_preview", "Display fit")
 
         self.GL.addWidget(self.IN_skip_start, 0, 0)
         self.GL.addWidget(self.IN_fit_length, 1, 0)
         self.GL.addWidget(self.IN_noise_multi, 2, 0)
-        if self.name in ("fit_param_pocs", "fit_param_jocs"):
-            # Point of contact (elasticity) and jump of contact (work): the
-            # parameters are stacked in one column. Not for the events, whose
-            # tab would be taller (and the main window with it).
+        if self.name == "fit_param_pocs":
+            # Point of contact (elasticity): the parameters are stacked in
+            # one column. Not for the jumps of contact (work and events),
+            # two columns as in the events tab, which would be taller (and
+            # the main window with it).
             self.GL.addWidget(self.IN_refit, 3, 0)
             self.GL.addWidget(self.IN_refit_times, 4, 0)
         else:

@@ -161,11 +161,8 @@ class SingleFile:
         self.stiffness_calculated = False
         self.stiffness_corrected = False
         # The B.E.C. maps no longer correspond to the elasticity or to the
-        # substrate (computed again with them, see the B.E.C. tab)
+        # substrate (computed again with them, see the B.E.C. box)
         self.bec_outdated = False
-        # B.E.C. computed after the elasticity (with a substrate ROI or a
-        # sample height)
-        self.bec_with_elasticity = False
         self.work_and_rupture_force1_calculated = False
         self.loading_rates_calculated = False
         self.events_calculated = False

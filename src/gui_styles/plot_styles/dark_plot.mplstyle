@@ -5,8 +5,8 @@ patch.edgecolor: white
 
 text.color: white
 
-axes.facecolor: 363D46
-axes.edgecolor: white
+axes.facecolor: 383C42
+axes.edgecolor: 8A8F96
 axes.labelcolor: white
 axes.prop_cycle: cycler('color', ['8dd3c7', 'feffb3', 'bfbbd9', 'fa8174', '81b1d2', 'fdb462', 'b3de69', 'bc82bd', 'ccebc4', 'ffed6f'])
 
@@ -15,10 +15,10 @@ ytick.color: white
 
 grid.color: white
 
-figure.facecolor: 363D46
+figure.facecolor: 383C42
 figure.edgecolor: black
 
-savefig.facecolor: 363D46
+savefig.facecolor: 383C42
 savefig.edgecolor: black
 
 ### Boxplots

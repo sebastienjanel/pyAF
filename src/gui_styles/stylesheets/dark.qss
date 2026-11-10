@@ -1466,8 +1466,9 @@ QPushButton::menu-indicator
 
 QTableView
 {
-    gridline-color: #232629;
-    background-color: #232629;
+    /* A little darker than the window (not a hole in it) */
+    gridline-color: #2b2f34;
+    background-color: #2b2f34;
     border: none;
 }
 
@@ -1511,7 +1512,7 @@ QTreeView::item:selected:hover
 
 QHeaderView
 {
-    background-color: #232629;
+    background-color: #2b2f34;
     border: none;
     margin: 0px;
     padding: 0px;
@@ -1519,12 +1520,12 @@ QHeaderView
 
 QHeaderView::section
 {
-    background-color: #444450;
+    /* Neutral grey, as the buttons */
+    background-color: #43484f;
     color: #eff0f1;
     padding: 0.5ex;
     border: none;
-    /* border-right: 2px solid #333340; */
-    border-bottom: 2px solid #555560;
+    border-bottom: 2px solid #575b62;
     text-align: center;
 }
 

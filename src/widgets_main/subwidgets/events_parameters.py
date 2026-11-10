@@ -37,7 +37,7 @@ from ... import widgets_list
 from qtpy import QtCore, QtWidgets
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools.gui_tools import PYAFInput
-from ...tools.gui_tools import PYAFCheckBox
+from ...tools.gui_tools import PYAFToggle
 from ...tools import misc_tools
 from ...tools import events_tools
 
@@ -62,13 +62,13 @@ class EventsParamsWidget(PYAFWidget):
             misc_tools.validator("MI", bottom=5))
 
         # Fit - Display events
-        self.CB_fit_event = PYAFCheckBox(
+        self.CB_fit_event = PYAFToggle(
             self,
             "fit_event",
             "Display events")
 
         # Fit - Display fit event
-        self.CB_fit_event_seg = PYAFCheckBox(
+        self.CB_fit_event_seg = PYAFToggle(
             self,
             "fit_event_seg",
             "Display fit")
@@ -81,7 +81,7 @@ class EventsParamsWidget(PYAFWidget):
             misc_tools.validator("R", reg=reg))
 
         # Kernel - Adaptive threshold Option
-        self.CB_adaptive_threshold_option = PYAFCheckBox(
+        self.CB_adaptive_threshold_option = PYAFToggle(
             self,
             "adaptive_threshold_option",
             "Adaptive threshold")
@@ -185,7 +185,11 @@ class EventsParamsWidget(PYAFWidget):
         VL_threshold_params.addStretch(1)
         VL_fit_params.addStretch(1)
 
+        # No margins, gaps of the boxes of the events tab (evenly spaced
+        # with the jump of contact and the loading rates)
         HL = QtWidgets.QHBoxLayout()
+        HL.setContentsMargins(0, 0, 0, 0)
+        HL.setSpacing(10)
         HL.addWidget(GB_conv_params)
         HL.addWidget(GB_threshold_params)
         HL.addWidget(GB_fit_params)

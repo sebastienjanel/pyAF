@@ -348,8 +348,9 @@ class PYAFPlot(FigureCanvasQTAgg):
                             self.canvas = ComputeEventsDetectionKernel(self)
                         elif dt.events_algorithm == "msf":
                             self.canvas = ComputeEventsDetectionMSF(self)
-                elif ct == "loading_rates":
-                    self.canvas = ComputeLoadingRates(self)
+                    elif dt.events_curve_type == "loading_rates":
+                        # Loading rates of the events (same tab)
+                        self.canvas = ComputeLoadingRates(self)
                 elif ct == "viscoelasticity":
                     self.canvas = ResultsVisco(self)
                 elif ct == "microrheology":
