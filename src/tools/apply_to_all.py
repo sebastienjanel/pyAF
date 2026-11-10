@@ -101,6 +101,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.meshgrid_type = mt
             elif mt.startswith("microrheo_") and dt.microrheo_calculated:
                 dt.meshgrid_type = mt
+            elif mt.startswith("plant_") and dt.plant_calculated:
+                dt.meshgrid_type = mt
             elif mt.startswith("fit_") and dt.has_fit_quality():
                 dt.meshgrid_type = mt
             elif mt == "piezo":
@@ -272,6 +274,7 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt = exp.list[i]
                 cur = exp.list[oldid]
                 dt.user_h = cur.user_h
+                dt.bec_with_elasticity = cur.bec_with_elasticity
 
         if exp.compute_type == "viscoelasticity" or mode == "all":
             cur = exp.list[oldid]
@@ -294,6 +297,13 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.microrheo_piezo_amplitude = cur.microrheo_piezo_amplitude
                 dt.microrheo_piezo = None if cur.microrheo_piezo is None \
                     else dict(cur.microrheo_piezo)
+
+        if exp.compute_type == "plant" or mode == "all":
+            cur = exp.list[oldid]
+            for dt in exp.list:
+                for name in ("method", "smoothing", "force_start",
+                             "force_stop", "wall_thickness"):
+                    setattr(dt, "plant_" + name, getattr(cur, "plant_" + name))
 
         if exp.compute_type == "breakthrough" or mode == "all":
             cur = exp.list[oldid]

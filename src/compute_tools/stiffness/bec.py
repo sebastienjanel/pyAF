@@ -57,6 +57,13 @@ def has_height(data):
         data.roi_list[data.roi_glass_id - 1].glass_coeffs is not None
 
 
+def mark_outdated(data):
+    """The substrate or the sample height of a file changed: its corrected
+    maps no longer correspond (see the B.E.C. tab)."""
+    if data.stiffness_corrected:
+        data.bec_outdated = True
+
+
 def check_file(data):
     """Returns None if the B.E.C. can be computed for the file, else the
     reason."""

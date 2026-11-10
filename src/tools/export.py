@@ -54,6 +54,7 @@ from ..tools import dfs_tools
 from ..tools import map_values
 from ..compute_tools import microrheology
 from ..tools import params_export
+from ..tools import plant_tools
 from ..tools import results_sorting
 from ..tools import superplot_tools
 from ..tools.breakthrough_tools import EVENT_VALUES
@@ -227,6 +228,20 @@ def get_r_tables(row, data):
             df = table(get(force_type), values["column"])
             stats.append(describe(df, values["column"]))
             curve_tables.append(df)
+
+    if data.plant_calculated:
+        # Cell of the curves: ROI (from 1), and the map and its pixel for a
+        # single curve
+        roi = data.get_plant_result("roi")
+        curves = get("plant_k_as")
+        df = table([[index, i, j, roi[i][j]] for index, i, j, _ in curves],
+                   "plant_cell_roi")
+        on_map = plant_tools.map_of_curve(data) if data.is_single else None
+        if on_map is not None:
+            df["plant_map"] = on_map[1].filename
+            df["plant_map_x_pos"] = on_map[2]["i"] + 1
+            df["plant_map_y_pos"] = on_map[2]["j"] + 1
+        curve_tables.append(df)
 
     if data.microrheo_calculated:
         # G' and G'' of the curves at each frequency (Pa)
@@ -522,7 +537,12 @@ RESULT_TYPES = (("stiffness", "stiffness_calculated"),
                 ("breakthrough_thickness", "breakthrough_calculated"),
                 ("brush_modulus", "brush_calculated"),
                 ("brush_length", "brush_calculated"),
-                ("brush_density", "brush_calculated"))
+                ("brush_density", "brush_calculated"),
+                ("plant_k_as", "plant_calculated"),
+                ("plant_modulus", "plant_calculated"),
+                ("plant_pressure", "plant_calculated"),
+                ("plant_tau", "plant_calculated"),
+                ("plant_pressure_hertz", "plant_calculated"))
 
 
 def computed_result_types():

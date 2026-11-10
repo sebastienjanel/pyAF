@@ -174,8 +174,8 @@ class Load:
         if lines != "" and consts.UNIT_TESTING is False:
             text = "Some curves are shorter than the baseline window of " \
                 "the point of contact, or have no data, and may not be " \
-                "fitted: <ul>" + lines + "</ul>The other curves are not " \
-                "affected. The Clean up widget lists these curves."
+                "fitted. The Clean up widget lists these curves: <ul>" + \
+                lines + "</ul>"
 
             # Warning (orange sign, as the other messages)
             gui_tools.show_success(None, "Short curves", details=text,

@@ -258,6 +258,11 @@ def save_used_params(data, mode):
         data.used_events_kernel_adaptive_threshold = \
             data.events_kernel_adaptive_threshold
 
+    if mode == "plant" or mode == "all":
+        # Not the wall thickness, applied when the values are used
+        for name in ("method", "smoothing", "force_start", "force_stop"):
+            setattr(data, "used_plant_" + name, getattr(data, "plant_" + name))
+
     if mode == "breakthrough" or mode == "all":
         for name in ("n_sigma", "min_thickness", "min_force", "max_events"):
             setattr(data, "used_breakthrough_" + name,
@@ -381,7 +386,9 @@ MESHGRID_TYPES = ("piezo", "topo", "stiffness", "stiffness_slice",
                   "breakthrough_thickness", "breakthrough_count",
                   "brush_modulus", "brush_length", "brush_density",
                   "microrheo_storage", "microrheo_loss",
-                  "microrheo_tan_delta", "microrheo_crossover")
+                  "microrheo_tan_delta", "microrheo_crossover",
+                  "plant_k_as", "plant_modulus", "plant_pressure",
+                  "plant_tau", "plant_pressure_hertz")
 
 
 def get_meshgrid_type_as_string(mesh_id):

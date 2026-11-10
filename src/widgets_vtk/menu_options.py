@@ -631,10 +631,10 @@ class WidgetGlass(QtWidgets.QWidget):
         self.box = QtWidgets.QGroupBox()
         self.vl_box = QtWidgets.QVBoxLayout()
 
-        label = "X size (um) : "
+        label = "X size [\u00b5m] : "
         self.IN_x_size = PYAFInput(self, "size_x", label, width=100)
         self.IN_x_size.input.setValidator(misc_tools.validator("UF"))
-        label = "Y size (um) : "
+        label = "Y size [\u00b5m] : "
         self.IN_y_size = PYAFInput(self, "size_y", label, width=100)
         self.IN_y_size.input.setValidator(misc_tools.validator("UF"))
         self.TG_bind = PYAFToggle(self, "bind", "Maintain aspect ratio")

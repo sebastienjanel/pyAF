@@ -60,6 +60,9 @@ from . import widgets_list
 from .tools import results_sorting
 from .tools.breakthrough_tools import EVENT_VALUES
 
+# Maps of the plant cells (see compute_tools.plant)
+PLANT_MAPS = ("plant_k_as", "plant_modulus", "plant_pressure", "plant_tau",
+              "plant_pressure_hertz")
 
 
 # Upper limit of the automatic color scales: percentile of the values (the
@@ -157,6 +160,12 @@ class SingleFile:
         # Define values to know what has been calculated
         self.stiffness_calculated = False
         self.stiffness_corrected = False
+        # The B.E.C. maps no longer correspond to the elasticity or to the
+        # substrate (computed again with them, see the B.E.C. tab)
+        self.bec_outdated = False
+        # B.E.C. computed after the elasticity (with a substrate ROI or a
+        # sample height)
+        self.bec_with_elasticity = False
         self.work_and_rupture_force1_calculated = False
         self.loading_rates_calculated = False
         self.events_calculated = False
@@ -167,6 +176,8 @@ class SingleFile:
         self.breakthrough_calculated = False
         # Brush model of the cells (with the elasticity)
         self.brush_calculated = False
+        # Plant cells: apparent stiffness, wall modulus and turgor pressure
+        self.plant_calculated = False
 
         # --- Header informations ---------------------------------------------
         self.file_type = None
@@ -269,6 +280,13 @@ class SingleFile:
         self.color_opts_brush_modulus = [2, 0, 0, 0, 0]
         self.color_opts_brush_length = [12, 0, 0, 0, 0]
         self.color_opts_brush_density = [12, 0, 0, 0, 0]
+        # Plant cells: stiffness and modulus (Viridis), pressures (Magma),
+        # dimensionless pressure (Gray)
+        self.color_opts_plant_k_as = [2, 0, 0, 0, 0]
+        self.color_opts_plant_modulus = [2, 0, 0, 0, 0]
+        self.color_opts_plant_pressure = [4, 0, 0, 0, 0]
+        self.color_opts_plant_tau = [12, 0, 0, 0, 0]
+        self.color_opts_plant_pressure_hertz = [4, 0, 0, 0, 0]
         # Microrheology: storage and loss moduli and loss tangent at the
         # frequency of the maps (as the viscoelasticity)
         self.color_opts_microrheo_storage = [2, 0, 0, 0, 0]
@@ -523,6 +541,23 @@ class SingleFile:
         self.brush_results = None
         self.used_brush_model = None
         self.used_brush_threshold_pct = None
+
+        # Plant cells (see compute_tools.plant): apparent stiffness by the
+        # derivative of the force (0, Yamasaki) or by a linear fit between
+        # two percentages of the maximum force (1, Beauzamy), smoothing of
+        # the derivative [% of the indentation], thickness of the wall [nm]
+        # (applied when the values are used, see used_plant_wall_thickness)
+        self.plant_method = 0
+        self.plant_smoothing = 5.0
+        self.plant_force_start = 75.0
+        self.plant_force_stop = 100.0
+        self.plant_wall_thickness = 500.0
+        self.used_plant_method = None
+        self.used_plant_smoothing = None
+        self.used_plant_force_start = None
+        self.used_plant_force_stop = None
+        # Results [i, j, k], k: plant.CURVE_VALUES (nan when not found)
+        self.plant_results = None
         # Microrheology (see compute_tools.microrheology): method of the
         # transfer function ("fft" or "sine"), viscous drag coefficient of
         # the cantilever b(0) [uN s/m], modulation segment of the maps (its
@@ -1303,6 +1338,19 @@ class SingleFile:
                     opts[1], opts[2] = float(low), float(high)
                     opts[3] = float(low + high) / 2.0
 
+        # Plant cells: from the 2nd to the 98th percentile
+        if self.plant_calculated and color:
+            for name in PLANT_MAPS:
+                values = getattr(self, name)
+                values = values[numpy.isfinite(values)]
+                if values.size:
+                    low, high = numpy.percentile(values, [2, 98])
+                    if high <= low:
+                        high = low + 1e-12
+                    opts = getattr(self, "color_opts_" + name)
+                    opts[1], opts[2] = float(low), float(high)
+                    opts[3] = float(low + high) / 2.0
+
         # Events
         if self.events_calculated:
             # Note that here, unlike the conditions above, the
@@ -1509,6 +1557,51 @@ class SingleFile:
         """Grafting density of the brush [1/um^2]."""
         return self.get_brush_result("density")
 
+    def get_plant_result(self, name):
+        """Map of a value of the plant cells (see compute_tools.plant.VALUES),
+        nan when not found."""
+        from .compute_tools import plant
+        if not self.plant_calculated or self.plant_results is None:
+            return numpy.full((self.nbr_pixels_x, self.nbr_pixels_y),
+                              numpy.nan)
+        if name in plant.CELL_VALUES:
+            # From the current cells (ROIs) and wall thickness
+            return numpy.array(plant.cell_values(self)[name], dtype=float)
+        return numpy.array(self.plant_results[
+            :, :, plant.CURVE_VALUES.index(name)], dtype=float)
+
+    @property
+    def used_plant_wall_thickness(self):
+        """Thickness of the wall of the plant cells used for the values
+        [nm]: the current one (applied when the values are used)."""
+        return self.plant_wall_thickness
+
+    @property
+    def plant_k_as(self):
+        """Apparent stiffness of the cells [N/m]."""
+        return self.get_plant_result("k_as")
+
+    @property
+    def plant_modulus(self):
+        """Modulus of the cell wall (Yamasaki) [Pa]."""
+        return self.get_plant_result("modulus")
+
+    @property
+    def plant_pressure(self):
+        """Turgor pressure (Yamasaki) [Pa]."""
+        return self.get_plant_result("pressure")
+
+    @property
+    def plant_tau(self):
+        """Dimensionless pressure (Yamasaki)."""
+        return self.get_plant_result("tau")
+
+    @property
+    def plant_pressure_hertz(self):
+        """Turgor pressure from the elasticity of the Hertz fit
+        (Beauzamy) [Pa]."""
+        return self.get_plant_result("pressure_hertz")
+
     def get_microrheo_result(self, name, label=None):
         """Map of a result of the microrheology for a modulation segment
         (its label, see microrheology.labels: "10 Hz", "10 Hz (2)"; the
@@ -1667,6 +1760,11 @@ class SingleFile:
                  "brush_modulus": "color_opts_brush_modulus",
                  "brush_length": "color_opts_brush_length",
                  "brush_density": "color_opts_brush_density",
+                 "plant_k_as": "color_opts_plant_k_as",
+                 "plant_modulus": "color_opts_plant_modulus",
+                 "plant_pressure": "color_opts_plant_pressure",
+                 "plant_tau": "color_opts_plant_tau",
+                 "plant_pressure_hertz": "color_opts_plant_pressure_hertz",
                  "microrheo_storage": "color_opts_microrheo_storage",
                  "microrheo_loss": "color_opts_microrheo_loss",
                  "microrheo_tan_delta": "color_opts_microrheo_tan_delta",

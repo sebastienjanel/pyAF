@@ -33,13 +33,11 @@
 """Tab with the meshgrids and the results of the fits."""
 
 import os
-import math
 from .. import widgets_list
 from .. import shared
 import logging
 from .. import consts
 from qtpy import QtGui, QtCore, QtWidgets
-from ..tools import math_tools
 from ..tools import apply_to_all
 from ..tools import misc_tools
 from ..utils import meshgrid_menu
@@ -53,7 +51,7 @@ from ..widgets.multi_meshgrids import MultiMeshgridsWidget
 from ..widgets.slices import SlicesWidget
 from ..widgets.profiles import ProfileWidget
 from ..widgets.details import DetailsWidget
-from ..widgets.roi_manager import RoiManagerWidget
+from ..widgets.roi_manager import open_roi_manager
 from ..widgets.events_filters import ChangeFilterWidget
 from ..widgets.used_parameters import UsedParametersWidget
 from ..plots.plot_main import MainPlot
@@ -231,6 +229,21 @@ class ResultsWidget(PYAFWidget):
             "microrheo_crossover": "Microrheology: frequency where G\u2033 "
             "becomes larger than G\u2032 (log interpolation between the "
             "analysed frequencies; none: no crossing).",
+            "plant_k_as": "Plant cells: apparent stiffness k_as, slope of "
+            "the force at large indentation (mean of the approach and the "
+            "retraction).",
+            "plant_modulus": "Plant cells: modulus E of the cell wall, from "
+            "k_as, the geometry of the cell (ROI) and the thickness of the "
+            "wall (Yamasaki et al. 2025).",
+            "plant_pressure": "Plant cells: turgor pressure P, from k_as, "
+            "the geometry of the cell (ROI) and the thickness of the wall "
+            "(Yamasaki et al. 2025).",
+            "plant_tau": "Plant cells: dimensionless pressure \u03c4 of the "
+            "Yamasaki solution: the shell model holds for \u03c4 >> 1.",
+            "plant_pressure_hertz": "Plant cells: turgor pressure P from "
+            "k_as and the elasticity of the Hertz fit (Beauzamy et al. "
+            "2015): fit the shallow indentation, below the thickness of "
+            "the wall.",
             "fit_r2": "R\u00b2 of the elasticity fit, on the fitted points "
             "after the point of contact.",
             "fit_poc_fixed": "Pixels where the point of contact could not be "
@@ -260,6 +273,13 @@ class ResultsWidget(PYAFWidget):
                                ("microrheo_tan_delta", "Loss tangent"),
                                ("microrheo_crossover",
                                 "Crossover frequency G\u2032 = G\u2033"))),
+            ("Plant cells", (("plant_k_as", "Apparent stiffness k_as"),
+                             ("plant_modulus", "Wall modulus E (Yamasaki)"),
+                             ("plant_pressure",
+                              "Turgor pressure P (Yamasaki)"),
+                             ("plant_tau", "Dimensionless pressure \u03c4"),
+                             ("plant_pressure_hertz",
+                              "Turgor pressure P (E Hertz)"))),
             ("Adhesion", (("work", "Detachment work"),
                           ("rupture_force", "Detachment force"),
                           ("events_per_curve", "Events per curve"),
@@ -340,6 +360,9 @@ class ResultsWidget(PYAFWidget):
             ("microrheology_map", "Microrheology G\u2032, G\u2033 (average)",
              "Microrheology, average of the file: median of the analysed "
              "curves with the interquartile range (band) at each frequency"),
+            ("plant", "Plant cell fit", "Plant cells: derivative of the "
+             "force (or force) vs the indentation, approach and retraction, "
+             "with the fits of the apparent stiffness"),
             ("results_force_events", "Force curve (events)", None))
         self.list_curves = PYAFComboBox(self, "list_curves")
         for name, label, tip in self.curve_types:
@@ -469,7 +492,9 @@ class ResultsWidget(PYAFWidget):
         VL_choser.addStretch(1)
         VL_choser.addLayout(self.HL_navigation)
 
+        # Centred below the map and the curve
         self.HL_buttons = QtWidgets.QHBoxLayout()
+        self.HL_buttons.addStretch(1)
         self.HL_buttons.addWidget(self.BT_multi_meshgrids)
         self.HL_buttons.addWidget(self.BT_roi_manager)
         self.HL_buttons.addWidget(self.BT_profiles)
@@ -579,6 +604,8 @@ class ResultsWidget(PYAFWidget):
             data.display_curve_type = "brush"
         elif mt.startswith("microrheo_") and data.microrheo_calculated:
             data.display_curve_type = "microrheology"
+        elif mt.startswith("plant_") and data.plant_calculated:
+            data.display_curve_type = "plant"
         elif mt.startswith("breakthrough_") and data.breakthrough_calculated:
             # Approach in force vs distance, with the breakthroughs
             data.display_curve_type = "force"
@@ -634,6 +661,8 @@ class ResultsWidget(PYAFWidget):
                     enabled = data.brush_calculated
                 elif name.startswith("microrheo_"):
                     enabled = data.microrheo_calculated
+                elif name.startswith("plant_"):
+                    enabled = data.plant_calculated
                 else:
                     enabled = available[name]
                 model.item(index).setEnabled(bool(enabled))
@@ -737,7 +766,7 @@ class ResultsWidget(PYAFWidget):
 
             elif data.display_curve_type in ("visco", "brush",
                                              "microrheology",
-                                             "microrheology_map"):
+                                             "microrheology_map", "plant"):
                 # Approach and retraction in time, approach of the brush
                 self.radiobutton_trace.setEnabled(False)
                 self.radiobutton_retrace.setEnabled(False)
@@ -993,13 +1022,7 @@ class ResultsWidget(PYAFWidget):
                 widgets_list.widget_details.raise_()
 
         elif button == "button_roi_manager":
-            if widgets_list.widget_roi_manager is None:
-                RoiManagerWidget(self)
-                widgets_list.widget_roi_manager.resize(350, 500)
-                widgets_list.widget_roi_manager.show()
-            else:
-                widgets_list.widget_roi_manager.activateWindow()
-                widgets_list.widget_roi_manager.raise_()
+            open_roi_manager()
 
         elif button == "button_group_type_of_curve":
             # Save the curve type
@@ -1251,9 +1274,6 @@ class ResultsWidget(PYAFWidget):
                 data.profile_count = len(data.profile_list) - 1
                 self.drawing_profile = True
 
-            elif mode == "roi_add" or mode == "roi_erase":
-                self.draw_roi(xpos, ypos)
-
             elif mode == "profile_erase":
                 # Delete the first profile passing by this pixel
                 for count, profile in enumerate(data.profile_list):
@@ -1329,18 +1349,6 @@ class ResultsWidget(PYAFWidget):
             if widgets_list.widget_profiles is not None and ls:
                 widgets_list.widget_profiles.update_widget()
 
-        # Releasing for the ROI can be done outside the canvas
-        if self.cursor_mode == "roi_add" or self.cursor_mode == "roi_erase":
-            # Finalize plotting
-            if widgets_list.widget_roi_manager is not None:
-                widgets_list.widget_roi_manager.update_widget()
-            self.MPL_canvas1.canvas.update_blit("all")
-
-            # Update the ROIs if displayed on multimeshgrids widget
-            if widgets_list.widget_multimeshgrids is not None:
-                if shared.exp.display_roi_in_multimeshgrid:
-                    widgets_list.widget_multimeshgrids.update_MPL()
-
         # Reset cursor mode
         self.cursor_mode = "select"
         QtWidgets.QApplication.restoreOverrideCursor()
@@ -1348,8 +1356,8 @@ class ResultsWidget(PYAFWidget):
     def canvas_motion(self, event):
         """The canvas_motion is called when the mouse moves over the plots.
 
-        Depending on the action, a profile or a ROI can be drawn with
-        this method.
+        Depending on the action, a profile can be drawn with this method
+        (the ROIs are drawn in the ROI manager).
         """
         data = shared.exp.list[shared.exp.id_selected]
 
@@ -1377,21 +1385,6 @@ class ResultsWidget(PYAFWidget):
                 cv = self.MPL_canvas1.canvas
                 cv.update_blit("profile_preview",
                                profile=data.profile_list[-1])
-
-            elif mode == "roi_add" or mode == "roi_erase":
-                # Draw a ROI
-                self.draw_roi(xpos, ypos)
-
-        elif (inaxes == self.MPL_canvas1.canvas.axes and
-              (self.cursor_mode == "roi_add" or
-               self.cursor_mode == "roi_erase")):
-            # Mouse motion over meshgrid, no click
-
-            # Get the current position
-            xpos, ypos = misc_tools.get_position_on_meshgrid(event)
-
-            # Predraw the ROI
-            self.pre_draw_roi(xpos, ypos)
 
         elif (inaxes == self.MPL_canvas1.canvas.axes
               and self.cursor_mode == "profile_erase"):
@@ -1421,77 +1414,6 @@ class ResultsWidget(PYAFWidget):
                     self.MPL_canvas1.canvas.update_blit("all")
                     self.current_profile_erase = None
 
-    def pre_draw_roi(self, xpos, ypos):
-        """Pre draw the ROI on the meshgrid.
-
-        Used when moving the mouse without clicking above the meshgrid.
-        """
-        data = shared.exp.list[shared.exp.id_selected]
-        local_roi, local_roi_mask = prepare_roi(xpos, ypos)
-        local_roi, local_roi_mask = \
-            check_roi_boundaries(data, local_roi, local_roi_mask)
-        cv = self.MPL_canvas1.canvas
-        if self.cursor_mode == "roi_add":
-            cv.update_blit("preview_add", local_roi, local_roi_mask)
-        elif self.cursor_mode == "roi_erase":
-            cv.update_blit("preview_erase", local_roi, local_roi_mask)
-
-    def draw_roi(self, xpos, ypos):
-        """Draw the ROI on the meshgrid."""
-        data = shared.exp.list[shared.exp.id_selected]
-        id_roi = data.roi_selected_row
-        local_roi, local_roi_mask = prepare_roi(xpos, ypos)
-        local_roi, local_roi_mask = \
-            self.check_roi_values(data, local_roi, local_roi_mask, id_roi)
-
-        cv = self.MPL_canvas1.canvas
-
-        if self.cursor_mode == "roi_add":
-            for i in range(len(local_roi)):
-                if local_roi_mask[i] and local_roi[i] is not None:
-                    data.roi_list[id_roi].values.extend([local_roi[i]])
-            cv.update_blit("local_add", local_roi, local_roi_mask)
-
-        elif self.cursor_mode == "roi_erase":
-            for i in range(len(local_roi) - 1, -1, -1):
-                vals = data.roi_list[id_roi].values
-                inlist = math_tools.in_list(vals, local_roi[i])
-                if local_roi_mask[i] and inlist:
-                    ind = local_roi[i]
-                    ls = data.roi_list[id_roi]
-                    del ls.values[data.roi_list[id_roi].values.index(ind)]
-            cv.update_blit("local_erase", local_roi, local_roi_mask)
-
-        if widgets_list.widget_roi_manager is not None:
-            widgets_list.widget_roi_manager.update_widget()
-
-    def check_roi_values(self, data, values, mask, id_roi):
-        """Return well formatted array."""
-        new_values = []
-        new_mask = []
-        for i in range(len(values)):
-            position = values[i]
-
-            cond1 = position[0] >= 0 and position[1] >= 0
-            cond2 = position[0] < data.nbr_pixels_x
-            cond3 = position[1] < data.nbr_pixels_y
-
-            if cond1 and cond2 and cond3:
-                if self.cursor_mode == "roi_add":
-                    vals = data.roi_list[id_roi].values
-                    inlist = math_tools.in_list(vals, position)
-                    if not inlist:
-                        new_values.append(position)
-                        new_mask.append(mask[i])
-                    else:
-                        new_values.append(None)
-                        new_mask.append(False)
-                elif self.cursor_mode == "roi_erase":
-                    new_values.append(position)
-                    new_mask.append(mask[i])
-
-        return new_values, new_mask
-
     def curves_canvas_press(self, event):
         """Called when there is a click on the curve."""
         if event.button == 3 and event.inaxes == self.MPL_canvas2.canvas.axes:
@@ -1507,25 +1429,9 @@ class ResultsWidget(PYAFWidget):
         with the PyQT setOverrideCursor method.
         """
         self.cursor_mode = mode
-        data = shared.exp.current_data
         if mode == "profile_add":
             curs = QtGui.QCursor(QtCore.Qt.CrossCursor)
             QtWidgets.QApplication.setOverrideCursor(curs)
-
-        elif mode == "roi_add":
-            curs = QtGui.QCursor(QtCore.Qt.CrossCursor)
-            QtWidgets.QApplication.setOverrideCursor(curs)
-            self.MPL_canvas1.canvas.first_blit = True
-
-        elif mode == "roi_erase":
-            curs = QtGui.QCursor(QtCore.Qt.CrossCursor)
-            QtWidgets.QApplication.setOverrideCursor(curs)
-            self.MPL_canvas1.canvas.first_blit = True
-            # Hide all the other roi's
-            for index in range(len(data.roi_list)):
-                if index != data.roi_selected_row:
-                    data.roi_list[index].display = False
-            self.MPL_canvas1.canvas.update_blit("all")
 
         elif mode == "profile_erase":
             curs = QtGui.QCursor(QtCore.Qt.ForbiddenCursor)
@@ -1633,56 +1539,3 @@ class ResultsWidget(PYAFWidget):
         """Update the value of the filter for the events."""
         widget = ChangeFilterWidget(self, filter_value)
         widget.exec()
-
-
-def prepare_roi(xpos, ypos):
-    """Prepare the ROI.
-
-    Returns an array with ids on the meshgrid, depending on the chosen
-    pencil.
-    """
-    shape = shared.exp.roi_cursor_shape
-    dot_size = shared.exp.roi_cursor_size
-    local_roi = []
-    local_roi_mask = []
-    if shape == "square":
-        for i in range(-dot_size - 1, dot_size):
-            for j in range(-dot_size - 1, dot_size):
-                local_roi.append([xpos + i, ypos + j])
-                local_roi_mask.append(True)
-    elif shape == "dot":
-        local_roi.append([xpos - 1, ypos - 1])
-        local_roi_mask.append(True)
-    elif shape == "circle":
-        circle_limit = math.sqrt((dot_size - 0.5) ** 2 + (dot_size - 0.5) ** 2)
-        for i in range(-dot_size, dot_size + 1):
-            for j in range(-dot_size, dot_size + 1):
-                dist_to_center = math.sqrt(i ** 2 + j ** 2)
-                local_roi.append([xpos + i - 1, ypos + j - 1])
-                if dist_to_center < circle_limit:
-                    local_roi_mask.append(True)
-                else:
-                    local_roi_mask.append(False)
-
-    return local_roi, local_roi_mask
-
-
-def check_roi_boundaries(data, values, mask):
-    """Check if a ROI value is inside the meshgrid."""
-    new_values = []
-    new_mask = []
-    for i in range(len(values)):
-        position = values[i]
-        if position is not None:
-            cond1 = position[0] >= 0 and position[1] >= 0
-            cond2 = position[0] < data.nbr_pixels_x
-            cond3 = position[1] < data.nbr_pixels_y
-
-            if cond1 and cond2 and cond3:
-                new_values.append(position)
-                new_mask.append(mask[i])
-            else:
-                new_values.append(None)
-                new_mask.append(False)
-
-    return new_values, new_mask

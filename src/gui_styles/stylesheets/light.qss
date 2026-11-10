@@ -78,7 +78,7 @@ QCheckBox
 
 QCheckBox:disabled
 {
-    color: #BAB9B8;
+    color: #9a9ea4;
 }
 
 QGroupBox::indicator
@@ -178,7 +178,7 @@ QRadioButton
 
 QRadioButton:disabled
 {
-    color: #BAB9B8;
+    color: #9a9ea4;
 }
 
 QRadioButton::indicator
@@ -341,7 +341,8 @@ QMenu::right-arrow
 
 QWidget:disabled
 {
-    color: #454545;
+    /* Dimmed but readable (texts of the disabled controls) */
+    color: #9a9ea4;
     background-color: #D0D3D7;
 }
 
@@ -381,16 +382,47 @@ QLineEdit:focus {
 }
 
 QLineEdit:disabled {
-    color: #a3a6ab;
+    color: #9a9ea4;
     border: 1px solid #d5d7da;
 }
 
 QGroupBox
 {
-    border: 1px solid #B4B8BD;
+    /* Soft: the tint of the boxes separates them */
+    border: 1px solid #c2c5ca;
     border-radius: 6px;
     padding-top: 1ex;
     margin-top: 1ex;
+    /* A tint lighter than the window: the groups of controls stand out */
+    background-color: #dcdfe2;
+}
+
+/* Texts and buttons without background inside the boxes: on the color of
+   the box (the fields, lists and buttons keep theirs) */
+QGroupBox QLabel,
+QGroupBox QLabel:disabled,
+QGroupBox QRadioButton,
+QGroupBox QRadioButton:disabled,
+QGroupBox QCheckBox,
+QGroupBox QCheckBox:disabled,
+QGroupBox QStackedWidget,
+QGroupBox QStackedWidget > QWidget
+{
+    background-color: transparent;
+}
+
+/* List of the files (data tab): one border, on the color of the box */
+QScrollArea#fileList
+{
+    border: 1px solid #B4B8BD;
+    border-radius: 6px;
+    background-color: transparent;
+}
+
+QScrollArea#fileList > QWidget,
+QFrame#fileListContent
+{
+    background-color: transparent;
 }
 
 QGroupBox::title
@@ -673,8 +705,8 @@ QPushButton {
 QPushButton:disabled
 {
     background-color: #f0f1f2;
-    border: 1px solid #dcdee1;
-    color: #b0b3b8;
+    border: 1px solid #d0d3d7;
+    color: #9a9ea4;
 }
 
 QPushButton:focus
@@ -685,6 +717,8 @@ QPushButton:focus
 QComboBox
 {
     selection-background-color: #3b8eea;
+    /* White, as the input fields (also on the tint of the boxes) */
+    background-color: #ffffff;
     border-style: solid;
     border: 1px solid #c4c7cc;
     border-radius: 5px;
@@ -1677,8 +1711,8 @@ QPushButton#primaryButton:pressed
 QPushButton#primaryButton:disabled
 {
     background-color: #f0f1f2;
-    border: 1px solid #dcdee1;
-    color: #b0b3b8;
+    border: 1px solid #d0d3d7;
+    color: #9a9ea4;
 }
 
 

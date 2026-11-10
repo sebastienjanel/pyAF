@@ -74,9 +74,11 @@ class PlotMeshGrid(MainPlot):
 
         # Colormap
         self.colortables = ColorTables()
-        if self.plot_type == "multimeshgrid":
+        if self.plot_type in ("multimeshgrid", "meshgrid_roi"):
+            # Scale of the map type of these maps (not the one of the
+            # results tab)
             colors = misc_tools.get_color_opts_by_meshgrid_type(
-                self.data, shared.exp.multi_meshgrid_type)
+                self.data, self.mesh_type)
             self.colormap = self.colortables.colortables_mpl_list[colors[0]]
             self.colortable_min_value = colors[1]
             self.colortable_middle_value = colors[3]
@@ -267,7 +269,8 @@ class PlotMeshGrid(MainPlot):
 
         # Single curves recorded on the map (numbers of the files)
         if mesh is not None and self.plot_type in ("meshgrid",
-                                                   "meshgrid_data"):
+                                                   "meshgrid_data",
+                                                   "meshgrid_roi"):
             self.draw_curves_on_map()
 
         # Set the ranges
@@ -714,7 +717,7 @@ class PlotMeshGrid(MainPlot):
                 bbox = self.fig.canvas.copy_from_bbox(self.axes.bbox)
                 self.parent.restore_region(bbox)
 
-        if (self.plot_type in ("meshgrid", "meshgrid_data",
+        if (self.plot_type in ("meshgrid", "meshgrid_data", "meshgrid_roi",
                                "meshgrid_tilt_check")):
             if self.plot_type != "meshgrid_tilt_check":
                 # Discarded curves under the ROIs and the profiles (else they

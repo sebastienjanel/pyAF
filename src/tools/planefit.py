@@ -41,6 +41,45 @@ import numpy
 from . import math_tools
 
 
+def fit_substrate(data, roi):
+    """Plane fitted on the heights of a substrate ROI (coefficients of
+    math_tools.polyfit2d, see ROI.glass_coeffs): on the zero-force
+    topography, or on the piezo height before the elasticity is computed
+    (fitted again on the topography by the elasticity). None without
+    height in the ROI."""
+    if data.stiffness_calculated and data.topography is not None:
+        heights = numpy.asarray(data.topography, dtype=float)
+    else:
+        heights = numpy.asarray(data.piezo_image, dtype=float)
+    pixels = numpy.asarray(roi.values, dtype=int).reshape(-1, 2)
+    if not len(pixels):
+        return None
+    x_size = data.scan_size_x / data.nbr_pixels_x
+    y_size = data.scan_size_y / data.nbr_pixels_y
+    x = pixels[:, 0] * x_size
+    y = pixels[:, 1] * y_size
+    z = heights[pixels[:, 0], pixels[:, 1]]
+    # Ignore the pixels without height (no point of contact)
+    finite = numpy.isfinite(z)
+    if finite.sum() < 3:
+        return None
+    return math_tools.polyfit2d(x[finite], y[finite], z[finite], order=1,
+                                linear=True)
+
+
+def update_substrates(data):
+    """Planes of the substrate ROIs of a file fitted again (new heights or
+    new pixels). Returns True if a substrate changed."""
+    changed = False
+    for roi in data.roi_list:
+        if roi.glass_coeffs is not None:
+            coeffs = fit_substrate(data, roi)
+            if coeffs is not None:
+                roi.glass_coeffs = coeffs
+                changed = True
+    return changed
+
+
 def get_planefit_roi(data):
     """Substrate ROI used for the planefit of a file (None if the planefit
     is not applied, or if the ROI is no longer a substrate)."""

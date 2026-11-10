@@ -41,6 +41,7 @@ from .params_export import EXPORT_NAMES, SETTINGS
 PARTS = (("elasticity", "Elasticity"),
          ("viscoelasticity", "Viscoelasticity"),
          ("microrheology", "Microrheology"),
+         ("plant", "Plant cells"),
          ("work_and_rupture_force", "Detachment work and force"),
          ("events", "Events"),
          ("loading_rates", "Loading rates"),
@@ -51,7 +52,7 @@ PARTS = (("elasticity", "Elasticity"),
 
 
 # Parts of the computations (the curves and calibration are always given)
-COMPUTATIONS = ("elasticity", "viscoelasticity", "microrheology",
+COMPUTATIONS = ("elasticity", "viscoelasticity", "microrheology", "plant",
                 "work_and_rupture_force",
                 "events", "loading_rates", "breakthrough")
 

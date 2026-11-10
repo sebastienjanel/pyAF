@@ -286,6 +286,11 @@ class ResultsGroupsWidget(PYAFWidget):
         experiment.setFrame(False)
         experiment.setValidator(QtGui.QIntValidator(1, 999))
         experiment.setPlaceholderText(str(order))
+        # The default number looks as a typed one (it is the value used)
+        palette = experiment.palette()
+        palette.setColor(QtGui.QPalette.PlaceholderText,
+                         palette.color(QtGui.QPalette.Text))
+        experiment.setPalette(palette)
         number = getattr(group, "experiment", None)
         experiment.setText(str(number) if number else "")
         experiment.editingFinished.connect(

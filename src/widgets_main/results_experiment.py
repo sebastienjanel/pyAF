@@ -46,7 +46,7 @@ from ..experiment import ConditionGroup
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools import gui_tools
 from ..tools import superplot_tools
-from ..tools.gui_tools import PYAFButton, PYAFCheckBox, PYAFComboBox
+from ..tools.gui_tools import PYAFButton, PYAFComboBox, PYAFToggle
 from ..tools.gui_tools import PYAFTableWidget
 from ..tools.PYAFWidget import PYAFWidget
 from ..widgets_main.results_single import PLOT_MIN_HEIGHT
@@ -55,7 +55,7 @@ from ..widgets_small.rename_conditions import RenameConditionsWidget
 
 CONDITION_COLUMNS = ("", "Condition", "Replicates", "Files", "Curves",
                      "Mean", "S.D.", "95% CI")
-TEST_COLUMNS = ("Comparison", "Test", "N", "p-value", "",
+TEST_COLUMNS = ("Comparison", "Test", "N", "p-value", "Sig.",
                 "Fold change [95% CI]")
 
 
@@ -108,6 +108,9 @@ class ResultsExperimentWidget(PYAFWidget):
         self.SA_plot.setVerticalScrollBarPolicy(
             QtCore.Qt.ScrollBarAlwaysOff)
         self.SA_plot.setFrameShape(QtWidgets.QFrame.NoFrame)
+        # No border (the border of the scroll areas of the style sheets), as
+        # the plot of the Plots tab
+        self.SA_plot.setStyleSheet("QScrollArea { border: none; }")
         self.SA_plot.setMinimumHeight(PLOT_MIN_HEIGHT)
         self.SA_plot.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                    QtWidgets.QSizePolicy.Expanding)
@@ -119,6 +122,8 @@ class ResultsExperimentWidget(PYAFWidget):
         # Options
         box = QtWidgets.QGroupBox("SuperPlot")
         form = QtWidgets.QFormLayout()
+        # Labels on the left, as in the options of the Plots tab
+        form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.list_control = PYAFComboBox(self, "control")
         self.list_control.setToolTip(
             "The other conditions are compared to this one.\nNone: all the "
@@ -155,18 +160,22 @@ class ResultsExperimentWidget(PYAFWidget):
         self.list_paired.fit_to_contents()
         self.list_test.fit_to_contents()
         self.list_error.fit_to_contents()
-        self.CB_log = PYAFCheckBox(self, "log", "Log scale (plot and tests)")
-        self.CB_curves = PYAFCheckBox(self, "curves", "All the curves")
+        # Toggles, as the options of the Plots tab, aligned (their texts
+        # in the labels of the form)
+        self.CB_log = PYAFToggle(self, "log", "")
+        self.CB_log.setToolTip("Logarithmic scale of the plot and of the "
+                               "tests")
+        self.CB_curves = PYAFToggle(self, "curves", "")
         self.CB_curves.setToolTip(
             "Violin of all the curves of the condition in the background")
-        self.CB_white = PYAFCheckBox(self, "white", "White background")
+        self.CB_white = PYAFToggle(self, "white", "")
         form.addRow("Control", self.list_control)
         form.addRow("Replicates", self.list_paired)
         form.addRow("Test", self.list_test)
         form.addRow("Error bars", self.list_error)
-        form.addRow(self.CB_log)
-        form.addRow(self.CB_curves)
-        form.addRow(self.CB_white)
+        form.addRow("Log scale", self.CB_log)
+        form.addRow("All the curves", self.CB_curves)
+        form.addRow("White background", self.CB_white)
         box.setLayout(form)
         self.widget_options = box
 
@@ -206,6 +215,9 @@ class ResultsExperimentWidget(PYAFWidget):
         for column, width in enumerate(widths, start=1):
             self.TW_tests.setColumnWidth(column, width)
         self.TW_tests.setMinimumWidth(sum(widths) + 120 + 20)
+        self.TW_tests.horizontalHeaderItem(4).setToolTip(
+            "Significance: * p < 0.05, ** p < 0.01, *** p < 0.001, "
+            "**** p < 0.0001, ns: not significant")
         self.TW_tests.horizontalHeaderItem(5).setToolTip(
             "Ratio of the means of the replicates vs the control (geometric "
             "means with the log scale; means of the mixed model with this "

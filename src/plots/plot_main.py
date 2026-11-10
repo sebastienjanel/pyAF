@@ -205,7 +205,7 @@ class MainPlot:
             if p_type == "meshgrid_tilt_check":
                 self.draw_check_tilt_squares()
 
-            if p_type in ("meshgrid", "meshgrid_data"):
+            if p_type in ("meshgrid", "meshgrid_data", "meshgrid_roi"):
                 # Save the current and empty bboxes for blitting
                 cv = self.parent
                 self.empty_bbox = cv.copy_from_bbox(self.axes.bbox)
@@ -260,6 +260,12 @@ class MainPlot:
                 self.fig.subplots_adjust(left=0.125, right=0.7,
                                          bottom=0.2, top=0.9)
 
+            elif p_type == "meshgrid_roi":
+                # Map of the ROI manager: as large as possible in its
+                # canvas, room for the colour bar on the right
+                self.fig.subplots_adjust(left=0.09, right=0.86, bottom=0.08,
+                                         top=0.98)
+
             elif p_type in ("meshgrid_data", "small_meshgrid_compute"):
                 # Small map: leave room on the right for the colour bar
                 # (ticks and label)
@@ -276,9 +282,8 @@ class MainPlot:
 
             else:
                 # Use tight layout for all the other figures
-                if p_type != "meshgrid" and \
-                        p_type != "small_meshgrid_compute" and \
-                        p_type != "meshgrid_data":
+                if p_type not in ("meshgrid", "small_meshgrid_compute",
+                                  "meshgrid_data", "meshgrid_roi"):
                     self.fig.tight_layout()
                     # A curve next to a map has the same height as the map
                     self.align_with_map(get_map_next_to_curve(p_type))

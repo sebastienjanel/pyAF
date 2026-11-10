@@ -41,7 +41,7 @@ from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools import misc_tools
 from ...tools.results_sorting import BREAKTHROUGH_TYPES, BRUSH_TYPES, \
-    MICRORHEO_TYPES, VISCO_TYPES
+    MICRORHEO_TYPES, PLANT_TYPES, VISCO_TYPES
 
 
 def groups():
@@ -55,6 +55,8 @@ def groups():
         ("Microrheology", tuple(
             (name, values["name"])
             for name, values in MICRORHEO_TYPES.items())),
+        ("Plant cells", tuple(
+            (name, values["name"]) for name, values in PLANT_TYPES.items())),
         ("Adhesion", (("work", "Detachment work"),
                       ("rupture_force", "Detachment force"),
                       ("events_forces", "Events force"),
@@ -86,6 +88,8 @@ def available(result_type):
         return any(item.microrheo_calculated for item in datas)
     if result_type in BRUSH_TYPES:
         return any(item.brush_calculated for item in datas)
+    if result_type in PLANT_TYPES:
+        return any(item.plant_calculated for item in datas)
     return False
 
 

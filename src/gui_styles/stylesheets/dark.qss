@@ -83,7 +83,7 @@ QCheckBox
 
 QCheckBox:disabled
 {
-    color: #76797c;
+    color: #7d8289;
 }
 
 QGroupBox::indicator
@@ -176,7 +176,7 @@ QRadioButton
 
 QRadioButton:disabled
 {
-    color: #76797c;
+    color: #7d8289;
 }
 
 QRadioButton::indicator
@@ -332,7 +332,8 @@ QMenu::right-arrow
 
 QWidget:disabled
 {
-    color: #454545;
+    /* Dimmed but readable (texts of the disabled controls) */
+    color: #7d8289;
     background-color: #31363b;
 }
 
@@ -372,16 +373,47 @@ QLineEdit:focus {
 }
 
 QLineEdit:disabled {
-    color: #76797c;
+    color: #7d8289;
     border: 1px solid #3c3f44;
 }
 
 QGroupBox
 {
-    border: 1px solid #484c52;
+    /* Soft: the tint of the boxes separates them */
+    border: 1px solid #42464c;
     border-radius: 6px;
     padding-top: 1ex;
     margin-top: 1ex;
+    /* A tint lighter than the window: the groups of controls stand out */
+    background-color: #383d43;
+}
+
+/* Texts and buttons without background inside the boxes: on the color of
+   the box (the fields, lists and buttons keep theirs) */
+QGroupBox QLabel,
+QGroupBox QLabel:disabled,
+QGroupBox QRadioButton,
+QGroupBox QRadioButton:disabled,
+QGroupBox QCheckBox,
+QGroupBox QCheckBox:disabled,
+QGroupBox QStackedWidget,
+QGroupBox QStackedWidget > QWidget
+{
+    background-color: transparent;
+}
+
+/* List of the files (data tab): one border, on the color of the box */
+QScrollArea#fileList
+{
+    border: 1px solid #484c52;
+    border-radius: 6px;
+    background-color: transparent;
+}
+
+QScrollArea#fileList > QWidget,
+QFrame#fileListContent
+{
+    background-color: transparent;
 }
 
 QGroupBox::title
@@ -655,19 +687,20 @@ QToolBar::separator:vertical
 
 QPushButton {
     color: #eff0f1;
-    border: 1px solid #50545a;
+    border: 1px solid #575b62;
     border-radius: 6px;
     margin: 5px;
     padding: 0.5ex 1.2ex;
     outline: none;
-    background-color: #3c4046;
+    /* Lighter than the boxes (#383d43): raised controls */
+    background-color: #43484f;
 }
 
 QPushButton:disabled
 {
-    background-color: #33363b;
-    border: 1px solid #3c3f44;
-    color: #6b6e74;
+    background-color: #3a3f45;
+    border: 1px solid #464a50;
+    color: #7d8289;
 }
 
 QPushButton:focus
@@ -703,16 +736,18 @@ QPushButton#primaryButton:pressed
 
 QPushButton#primaryButton:disabled
 {
-    background-color: #33363b;
-    border: 1px solid #3c3f44;
-    color: #6b6e74;
+    background-color: #3a3f45;
+    border: 1px solid #464a50;
+    color: #7d8289;
 }
 
 QComboBox
 {
     selection-background-color: #3b8eea;
+    /* As the buttons: lighter than the boxes */
+    background-color: #43484f;
     border-style: solid;
-    border: 1px solid #4b4f55;
+    border: 1px solid #575b62;
     border-radius: 5px;
     padding: 0.4ex 0.7ex;
     min-width: 7.5ex;
@@ -732,8 +767,8 @@ QPushButton:checked
 } */
 
 QPushButton:hover {
-    background-color: #464a51;
-    border: 1px solid #5c6067;
+    background-color: #4b5058;
+    border: 1px solid #62666d;
 }
 
 QPushButton:checked:hover
@@ -773,6 +808,12 @@ QAbstractView:hover:pressed,
 QTreeView:hover:pressed
 {
     background-color: #31363b;
+}
+
+QComboBox:disabled
+{
+    background-color: #3a3f45;
+    border: 1px solid #464a50;
 }
 
 QComboBox:on

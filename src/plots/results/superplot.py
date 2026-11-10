@@ -196,7 +196,9 @@ class PlotSuperPlot(PlotResults):
                             level + 0.06 * (top - bottom))
         for i, c in enumerate(conditions):
             test = tests.get(c["name"] + " vs " + str(control))
-            if test is not None:
+            # No mark without test (no p-value: e.g. one replicate)
+            if test is not None and test["p"] is not None and \
+                    numpy.isfinite(test["p"]):
                 ax.text(i, top, superplot_tools.stars(test["p"]),
                         ha="center", va="bottom", color=ink,
                         fontproperties=self.font)

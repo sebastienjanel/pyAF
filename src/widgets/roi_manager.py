@@ -30,15 +30,24 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-"""Widget used to manage the regions of interest (ROIs)."""
+"""Widget used to manage the regions of interest (ROIs), drawn on its own
+map."""
+
+import math
 
 import numpy
 from .. import shared
 from .. import widgets_list
 import logging
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
+from ..compute_tools import plant
+from ..compute_tools.stiffness import bec
+from ..plots.PYAFPlot import PYAFPlot
+from ..plots.plot_main import MainPlot
 from ..tools import gui_tools
+from ..tools import map_values
 from ..tools import math_tools
+from ..tools import misc_tools
 from ..tools import planefit
 from ..tools import plant_tools
 from ..tools.gui_tools import PYAFButton
@@ -52,20 +61,96 @@ from .. import experiment
 class RoiManagerWidget(PYAFWidget):
     """Widget used to manage the regions of interest (ROIs).
 
-    The Rois can be used to define the substrate's surface, or to sort data
-    in the results by excluding data from a ROI.
+    The ROIs are drawn on the map of the window (piezo height as soon as the
+    file is loaded, or any computed map), before or after the computations.
+    They define the substrate (B.E.C., planefit), the cells (plant cells),
+    or sort the data in the results.
     """
 
     def __init__(self, parent):
         super().__init__(parent, "widget_roi_manager")
+        self.setWindowTitle("ROI Manager")
 
         self.BG_selected = None
+        # Drawing: "select" (click: curve), "roi_add" or "roi_erase"
+        self.cursor_mode = "select"
+        self.drawing = False
+        # File of the map displayed
+        self.shown_file = None
 
         self.logger = logging.getLogger()
         self.logger.debug("Opening ROI manager")
 
         self.VL = QtWidgets.QVBoxLayout()
         self.HL = QtWidgets.QHBoxLayout()
+
+        # --- Map -------------------------------------------------------------
+
+        self.list_files = PYAFComboBox(self, "files")
+        self.list_files.setToolTip("File of the map (the single curves have "
+                                   "no map)")
+        self.list_maps = PYAFComboBox(self, "maps")
+        self.list_maps.setToolTip(
+            "Map to draw on: the piezo height as soon as the file is loaded, "
+            "the other maps once computed")
+        # File, and the map below it
+        GL_lists = QtWidgets.QGridLayout()
+        GL_lists.addWidget(QtWidgets.QLabel("File"), 0, 0)
+        GL_lists.addWidget(self.list_files, 0, 1)
+        GL_lists.addWidget(QtWidgets.QLabel("Map"), 1, 0)
+        GL_lists.addWidget(self.list_maps, 1, 1, QtCore.Qt.AlignLeft)
+        GL_lists.setColumnStretch(1, 1)
+
+        resolution = widgets_list.widget_main.canvas_resolution
+        canvas_size = [520, 460]
+        # The map fills the free space of the window (initial size: the
+        # size of the window)
+        self.W_canvas = QtWidgets.QWidget()
+        self.W_canvas.setMinimumSize(canvas_size[0], canvas_size[1])
+        self.W_canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                    QtWidgets.QSizePolicy.Expanding)
+        sizes = [canvas_size[0] / resolution, canvas_size[1] / resolution,
+                 resolution]
+        self.MPL_canvas = PYAFPlot(self, "meshgrid_roi", self.W_canvas,
+                                   sizes)
+        layout_canvas = QtWidgets.QVBoxLayout(self.W_canvas)
+        layout_canvas.setContentsMargins(0, 0, 0, 0)
+        layout_canvas.addWidget(self.MPL_canvas)
+        self.MPL_canvas.mpl_connect("button_press_event", self.canvas_press)
+        self.MPL_canvas.mpl_connect("button_release_event",
+                                    self.canvas_release)
+        self.MPL_canvas.mpl_connect("motion_notify_event", self.canvas_motion)
+
+        # Drawing tools
+        self.BG_tool = PYAFButtonGroup(self, "tool")
+        self.RB_select = QtWidgets.QRadioButton("Select curve")
+        self.RB_select.setToolTip("Click: curve displayed in the main tabs")
+        self.RB_draw = QtWidgets.QRadioButton("Draw")
+        self.RB_draw.setToolTip("Add the pixels under the pencil to the ROI "
+                                "checked in the Draw column")
+        self.RB_erase = QtWidgets.QRadioButton("Erase")
+        self.RB_erase.setToolTip("Remove the pixels under the pencil from "
+                                 "the ROI checked in the Draw column")
+        for index, button in enumerate((self.RB_select, self.RB_draw,
+                                        self.RB_erase)):
+            self.BG_tool.addButton(button, index)
+        self.RB_select.setChecked(True)
+        self.label_no_map = QtWidgets.QLabel(
+            "Single curve: no map. Its cell is drawn on the map where it was "
+            "recorded.")
+        self.label_no_map.setWordWrap(True)
+        HL_tools = QtWidgets.QHBoxLayout()
+        HL_tools.addWidget(self.RB_select)
+        HL_tools.addWidget(self.RB_draw)
+        HL_tools.addWidget(self.RB_erase)
+        HL_tools.addStretch(1)
+
+        self.VL_map = QtWidgets.QVBoxLayout()
+        self.VL_map.addLayout(GL_lists)
+        self.VL_map.addWidget(self.W_canvas, 1)
+        self.VL_map.addWidget(self.label_no_map)
+        self.VL_map.addLayout(HL_tools)
+        self.HL.addLayout(self.VL_map)
 
         self.TW = QtWidgets.QTableWidget(0, 8)
         self.TW.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -74,8 +159,8 @@ class RoiManagerWidget(PYAFWidget):
         labels = ["#", "Draw", "Show", "Pixels", "Area [µm²]", "Color",
                   "Substrate", "Data"]
         self.TW.setHorizontalHeaderLabels(labels)
-        tooltips = ["", "ROI drawn or erased with the right click menu of "
-                    "the map", "Display the ROI on the map", "", "", "",
+        tooltips = ["", "ROI drawn or erased with the Draw and Erase tools",
+                    "Display the ROI on the maps", "", "", "",
                     "ROI defined as substrate", "Curves of the ROI "
                     "discarded with Discard data"]
         for col, tooltip in enumerate(tooltips):
@@ -89,7 +174,7 @@ class RoiManagerWidget(PYAFWidget):
 
         self.VL_options = QtWidgets.QVBoxLayout()
 
-        self.input_size = PYAFInput(self, "size", "Size")
+        self.input_size = PYAFInput(self, "size", "Pencil size")
         self.BG = PYAFButtonGroup(self, "bg")
         self.radiobutton_square = QtWidgets.QRadioButton("Square")
         self.radiobutton_circle = QtWidgets.QRadioButton("Circle")
@@ -126,21 +211,25 @@ class RoiManagerWidget(PYAFWidget):
             "selected ROI (quadratic surface fitted on its heights), at its\n"
             "centre and at the single curves recorded inside it.")
 
-        self.VL_options.addWidget(self.input_size)
-        self.VL_options.addWidget(self.radiobutton_square)
-        self.VL_options.addWidget(self.radiobutton_circle)
-        self.VL_options.addWidget(self.radiobutton_dot)
-        self.VL_options.addWidget(self.button_add)
-        self.VL_options.addWidget(self.button_remove)
-        self.VL_options.addWidget(self.BT_discard)
-        self.VL_options.addWidget(self.button_invert)
-        self.VL_options.addWidget(self.BT_glass)
-        self.VL_options.addWidget(self.BT_planefit)
-        self.VL_options.addWidget(self.BT_volume)
-        self.VL_options.addWidget(self.BT_cell)
-        self.VL_options.addStretch(1)
+        # Pencil, below the map with the tools
+        self.HL_pencil = QtWidgets.QHBoxLayout()
+        self.HL_pencil.addWidget(self.radiobutton_square)
+        self.HL_pencil.addWidget(self.radiobutton_circle)
+        self.HL_pencil.addWidget(self.radiobutton_dot)
+        self.HL_pencil.addWidget(self.input_size)
+        self.HL_pencil.addStretch(1)
+        self.VL_map.insertLayout(4, self.HL_pencil)
 
-        self.HL.addWidget(self.TW)
+        # Table and actions on the ROIs, right of the map
+        GL_buttons = QtWidgets.QGridLayout()
+        for index, button in enumerate((
+                self.button_add, self.button_remove, self.BT_discard,
+                self.button_invert, self.BT_glass, self.BT_planefit,
+                self.BT_volume, self.BT_cell)):
+            GL_buttons.addWidget(button, index // 2, index % 2)
+        self.VL_options.addWidget(self.TW, 1)
+        self.VL_options.addLayout(GL_buttons)
+
         self.HL.addLayout(self.VL_options)
         self.VL.addLayout(self.HL)
         self.setLayout(self.VL)
@@ -176,7 +265,7 @@ class RoiManagerWidget(PYAFWidget):
 
             self.TW.selectRow(data.roi_selected_row)
 
-            widgets_list.widget_results_single.reset_table()
+            reset_results_table()
 
         elif button == "remove":
             indexes = []
@@ -226,13 +315,10 @@ class RoiManagerWidget(PYAFWidget):
                     self.TW.selectRow(0)
 
                 self.update_widget()
-                self.parent.MPL_canvas1.canvas.update_blit("all")
-                self.update_results()
+                self.rois_changed(data)
                 widgets_list.widget_compute.update_GUI("roi_list_height_corr")
 
-            widgets_list.widget_results_single.reset_table()
-
-            update_roi_on_multimeshgrids_widget()
+            reset_results_table()
 
         elif button == "bg":
             value = self.BG.checkedId()
@@ -245,6 +331,10 @@ class RoiManagerWidget(PYAFWidget):
             shared.exp.roi_cursor_shape = shape
 
             self.logger.debug("Changing roi shape to %s", shape)
+
+        elif button == "tool":
+            self.change_cursor_mode(
+                ("select", "roi_add", "roi_erase")[self.BG_tool.checkedId()])
 
         elif button == "invert":
             for item in self.TW.selectionModel().selectedRows():
@@ -271,51 +361,22 @@ class RoiManagerWidget(PYAFWidget):
                 data.roi_list[newid].values = inverted_roi
 
             self.update_widget()
-            self.parent.MPL_canvas1.canvas.update_blit("all")
-            self.update_results()
-            widgets_list.widget_results_single.reset_table()
-
-            update_roi_on_multimeshgrids_widget()
+            self.rois_changed(data)
+            reset_results_table()
 
         elif button == "button_group_selected":
             data.roi_selected_row = self.BG_selected.checkedId()
             self.logger.debug("Selecting ROI %s", data.roi_selected_row)
 
         elif button == "glass":
-            x_size = data.scan_size_x / data.nbr_pixels_x
-            y_size = data.scan_size_y / data.nbr_pixels_y
-
             for item in self.TW.selectionModel().selectedRows():
                 index = item.row()
                 roi = data.roi_list[index]
                 if roi.glass_coeffs is None:
                     self.logger.debug("Set as glass. ROI %s", index)
-
-                    x = []
-                    y = []
-                    z = []
-
-                    for i, j in roi.values:
-                        x.append(i * x_size)
-                        y.append(j * y_size)
-                        z.append(data.topography[i][j])
-                    x = numpy.array(x)
-                    y = numpy.array(y)
-                    z = numpy.array(z)
-
-                    # Ignore the pixels without topography (no POC found)
-                    finite = numpy.isfinite(z)
-                    x, y, z = x[finite], y[finite], z[finite]
-
-                    # Get the coefficients of the 2D fit
-                    co = math_tools.polyfit2d(
-                        x,
-                        y,
-                        z,
-                        order=1,
-                        linear=True)
-                    roi.glass_coeffs = co
-
+                    # Plane of the substrate (fitted again on the
+                    # topography by the elasticity)
+                    roi.glass_coeffs = planefit.fit_substrate(data, roi)
                 else:
                     self.logger.debug("Remove glass. ROI %s", index)
 
@@ -324,9 +385,13 @@ class RoiManagerWidget(PYAFWidget):
                     # The planefit used this substrate
                     if data.planefit_applied and data.planefit_roi == index:
                         self.set_planefit(data, None)
+                bec.mark_outdated(data)
 
             self.update_widget()
             widgets_list.widget_compute.update_GUI("roi_list_height_corr")
+            widgets_list.widget_compute.update_GUI("BT_height_correction")
+            # The substrate is not a cell
+            plant.refresh_results()
 
         elif button == "volume":
             self.show_volume(data)
@@ -368,6 +433,7 @@ class RoiManagerWidget(PYAFWidget):
             # Refresh the meshgrids and the results
             widgets_list.widget_data.meshgrid.update_plot()
             widgets_list.widget_results.update_MPL("MPL_canvas1")
+            self.update_map()
             self.update_results()
 
     def show_cell_geometry(self, data):
@@ -448,6 +514,8 @@ class RoiManagerWidget(PYAFWidget):
         planefit.reset_color_scales(data)
         if data.meshgrid_type in ("piezo", "topo"):
             widgets_list.widget_results.update_MPL("MPL_canvas1")
+        if shared.exp.roi_meshgrid_type in ("piezo", "topo"):
+            self.update_map()
         if widgets_list.widget_multimeshgrids is not None:
             widgets_list.widget_multimeshgrids.update_widget()
         self.update_3D(data)
@@ -525,12 +593,37 @@ class RoiManagerWidget(PYAFWidget):
 
     def update_results(self):
         """Update the results in the results tables."""
-        if self.parent.parent.tabs.currentIndex() in (3, 4):
+        main = widgets_list.widget_main
+        if main.tabs.currentIndex() in (3, 4):
             # A plots tab is displayed: recompute the values now (the values
             # are recomputed when going to the plots tabs from the others)
             widgets_list.widget_results_single.schedule_refresh()
         else:
-            self.parent.parent.update_results = True
+            main.update_results = True
+
+    def rois_changed(self, data, pixels=True):
+        """The ROIs of a file changed (pixels, or display and colors with
+        pixels=False): maps redrawn, and with new pixels the substrate
+        planes fitted again and the values which depend on the ROIs (B.E.C.
+        out of date, plant cells, results tables)."""
+        refresh_rois()
+        if not pixels:
+            return
+        substrate = data.roi_list[data.roi_glass_id - 1] \
+            if 0 < data.roi_glass_id <= len(data.roi_list) else None
+        before = None if substrate is None or \
+            substrate.glass_coeffs is None else \
+            numpy.array(substrate.glass_coeffs, dtype=float)
+        planefit.update_substrates(data)
+        if before is not None and not numpy.allclose(
+                before, numpy.array(substrate.glass_coeffs, dtype=float)):
+            # New plane of the substrate of the B.E.C.
+            bec.mark_outdated(data)
+            widgets_list.widget_compute.update_GUI("BT_height_correction")
+        if planefit.get_planefit_roi(data) is not None:
+            planefit.reset_color_scales(data)
+        plant.refresh_results()
+        self.update_results()
 
     def checkbox_clicked(self, checkbox, cb_id):
         """Called when a checkbox is clicked."""
@@ -540,12 +633,157 @@ class RoiManagerWidget(PYAFWidget):
             value = self.TW.cellWidget(cb_id, 2).checkbox.isChecked()
             self.logger.debug("Display/hide ROI %s, %s", cb_id, value)
             data.roi_list[cb_id].display = value
-            self.parent.MPL_canvas1.canvas.update_blit("all")
+            self.rois_changed(data, pixels=False)
 
-            update_roi_on_multimeshgrids_widget()
+    def update_lists(self):
+        """Lists of the files and of the maps computed for the current
+        file; the map is drawn again for another file."""
+        data = shared.exp.current_data
+        self.list_files.blockSignals(True)
+        self.list_files.clear()
+        for index, dt in enumerate(shared.exp.list):
+            if not dt.is_single:
+                self.list_files.addItem(str(index + 1) + " : " +
+                                        dt.filename, index)
+        position = self.list_files.findData(shared.exp.id_selected)
+        if position >= 0:
+            self.list_files.setCurrentIndex(position)
+        self.list_files.blockSignals(False)
+
+        self.list_maps.blockSignals(True)
+        self.list_maps.clear()
+        maps = map_values.available_maps(data) if not data.is_single else []
+        for map_type in maps:
+            self.list_maps.addItem(map_values.MAPS[map_type][0], map_type)
+        shown = shared.exp.roi_meshgrid_type
+        self.list_maps.setCurrentIndex(max(self.list_maps.findData(
+            shown if shown in maps else "piezo"), 0))
+        self.list_maps.fit_to_contents()
+        self.list_maps.blockSignals(False)
+
+        # Single curve: no map, no ROI
+        for widget in (self.W_canvas, self.RB_select, self.RB_draw,
+                       self.RB_erase, self.list_maps):
+            widget.setEnabled(not data.is_single)
+        self.label_no_map.setVisible(data.is_single)
+        if data.is_single and self.cursor_mode != "select":
+            self.RB_select.setChecked(True)
+            self.change_cursor_mode("select")
+
+        if self.shown_file is not data:
+            self.shown_file = data
+            self.update_map()
+
+    def update_map(self):
+        """Draw the map of the window again (empty for a single curve)."""
+        self.MPL_canvas.update_plot()
+        if shared.exp.current_data.is_single:
+            # No map: no plot to draw the ROIs on
+            self.MPL_canvas.canvas = None
+            self.MPL_canvas.draw_idle()
+
+    def change_cursor_mode(self, mode):
+        """Tool used on the map: select a curve, draw or erase a ROI."""
+        self.cursor_mode = mode
+        if mode == "select":
+            self.MPL_canvas.unsetCursor()
+        else:
+            self.MPL_canvas.setCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
+            if isinstance(self.MPL_canvas.canvas, MainPlot):
+                self.MPL_canvas.canvas.first_blit = True
+
+    def map_plot(self, event):
+        """Plot of the map if the event is on it, else None."""
+        plot = self.MPL_canvas.canvas
+        if isinstance(plot, MainPlot) and event.inaxes == plot.axes:
+            return plot
+        return None
+
+    def canvas_press(self, event):
+        """Click on the map: select a curve, or start drawing."""
+        data = shared.exp.current_data
+        if event.button != 1 or data.is_single or \
+                self.map_plot(event) is None:
+            return
+        xpos, ypos = misc_tools.get_position_on_meshgrid(event)
+        if self.cursor_mode == "select":
+            widgets_list.widget_main.change_curve(xpos, ypos)
+            refresh_rois()
+        elif data.roi_selected_row is None:
+            QtWidgets.QMessageBox.information(
+                self, "ROI Manager", "Add a ROI first (Add ROI).")
+        else:
+            self.drawing = True
+            self.draw_roi(xpos, ypos)
+
+    def canvas_motion(self, event):
+        """Mouse over the map: draw (button pressed) or preview the
+        pencil."""
+        data = shared.exp.current_data
+        if self.cursor_mode == "select" or data.is_single or \
+                data.roi_selected_row is None or \
+                self.map_plot(event) is None:
+            return
+        xpos, ypos = misc_tools.get_position_on_meshgrid(event)
+        if self.drawing and event.button == 1:
+            self.draw_roi(xpos, ypos)
+        else:
+            self.pre_draw_roi(xpos, ypos)
+
+    def canvas_release(self, event):
+        """End of the drawing (also outside of the map)."""
+        _ = event
+        if not self.drawing:
+            return
+        self.drawing = False
+        data = shared.exp.current_data
+        self.update_widget()
+        self.rois_changed(data)
+        reset_results_table()
+
+    def pre_draw_roi(self, xpos, ypos):
+        """Pencil drawn on the map, without changing the ROI."""
+        data = shared.exp.current_data
+        local_roi, local_roi_mask = prepare_roi(xpos, ypos)
+        local_roi, local_roi_mask = \
+            check_roi_boundaries(data, local_roi, local_roi_mask)
+        mode = "preview_add" if self.cursor_mode == "roi_add" \
+            else "preview_erase"
+        self.MPL_canvas.canvas.update_blit(mode, local_roi, local_roi_mask)
+
+    def draw_roi(self, xpos, ypos):
+        """Pixels under the pencil added to (or removed from) the ROI
+        checked in the Draw column."""
+        data = shared.exp.current_data
+        roi = data.roi_list[data.roi_selected_row]
+        local_roi, local_roi_mask = prepare_roi(xpos, ypos)
+        local_roi, local_roi_mask = \
+            check_roi_boundaries(data, local_roi, local_roi_mask)
+        inside = {tuple(value) for value in roi.values}
+        if self.cursor_mode == "roi_add":
+            # Only the new pixels are drawn (transparent color)
+            added = []
+            for index, pixel in enumerate(local_roi):
+                new = local_roi_mask[index] and pixel is not None and \
+                    tuple(pixel) not in inside
+                if new:
+                    roi.values.append(pixel)
+                    inside.add(tuple(pixel))
+                added.append(new)
+            local_roi_mask = added
+            mode = "local_add"
+        else:
+            erased = {tuple(pixel) for index, pixel in enumerate(local_roi)
+                      if local_roi_mask[index] and pixel is not None}
+            roi.values[:] = [value for value in roi.values
+                             if tuple(value) not in erased]
+            mode = "local_erase"
+        self.MPL_canvas.canvas.update_blit(mode, local_roi, local_roi_mask)
 
     def update_widget(self):
         """Update the content of the ROI manager."""
+        self.update_lists()
+
         # Get previously selected rows
         selected_rows = []
         for item in self.TW.selectionModel().selectedRows():
@@ -564,7 +802,7 @@ class RoiManagerWidget(PYAFWidget):
 
             # Index
             label = QtWidgets.QLabel()
-            label.setFont(self.parent.parent.smallfont)
+            label.setFont(widgets_list.widget_main.smallfont)
             label.setText(str(i + 1))
             self.TW.setCellWidget(i, 0, gui_tools.CenteredCellwidget(label))
 
@@ -584,7 +822,7 @@ class RoiManagerWidget(PYAFWidget):
 
             # Pixels
             label = QtWidgets.QLabel()
-            label.setFont(self.parent.parent.smallfont)
+            label.setFont(widgets_list.widget_main.smallfont)
             label.setText(str(len(data.roi_list[i].values)))
             self.TW.setCellWidget(i, 3, gui_tools.CenteredCellwidget(label))
 
@@ -593,14 +831,14 @@ class RoiManagerWidget(PYAFWidget):
             ysize = data.scan_size_y / data.nbr_pixels_y
             one_area = xsize * ysize
             label = QtWidgets.QLabel()
-            label.setFont(self.parent.parent.smallfont)
+            label.setFont(widgets_list.widget_main.smallfont)
             area = len(data.roi_list[i].values) * one_area * 1e-6
             label.setText("%.4g" % area)
             self.TW.setCellWidget(i, 4, gui_tools.CenteredCellwidget(label))
 
             # Color
             colorlist = PYAFComboBox(self, "colorlist")
-            colorlist.setFont(self.parent.parent.smallfont)
+            colorlist.setFont(widgets_list.widget_main.smallfont)
             for j in range(len(data.roi_color_names)):
                 colorlist.addItem(data.roi_color_names[j])
             colorlist.setCurrentIndex(data.roi_list[i].color)
@@ -609,7 +847,7 @@ class RoiManagerWidget(PYAFWidget):
 
             # Glass
             label = QtWidgets.QLabel()
-            label.setFont(self.parent.parent.smallfont)
+            label.setFont(widgets_list.widget_main.smallfont)
             if data.roi_list[i].glass_coeffs is not None:
                 label.setText("Yes")
             else:
@@ -618,7 +856,7 @@ class RoiManagerWidget(PYAFWidget):
 
             # Discarded data
             label = QtWidgets.QLabel()
-            label.setFont(self.parent.parent.smallfont)
+            label.setFont(widgets_list.widget_main.smallfont)
             if getattr(data.roi_list[i], "discarded", []):
                 label.setText("Discarded")
             self.TW.setCellWidget(i, 7, gui_tools.CenteredCellwidget(label))
@@ -655,13 +893,10 @@ class RoiManagerWidget(PYAFWidget):
                 roi = data.roi_list[index]
                 found_item = True
 
-                if not data.stiffness_calculated:
-                    self.BT_glass.setEnabled(False)
-                else:
-                    if roi.values == []:
-                        self.BT_glass.setEnabled(False)
-                    else:
-                        self.BT_glass.setEnabled(True)
+                # Before the elasticity: on the piezo height (fitted again
+                # on the topography by the elasticity)
+                self.BT_glass.setEnabled(bool(roi.values) and
+                                         not data.is_single)
 
                 if roi.glass_coeffs is None:
                     self.BT_glass.setText("Define as substrate")
@@ -706,9 +941,20 @@ class RoiManagerWidget(PYAFWidget):
             for i in range(len(data.roi_list)):
                 cell = self.TW.cellWidget(i, 5)
                 data.roi_list[i].color = cell.widget.currentIndex()
-            self.parent.MPL_canvas1.canvas.update_blit("all")
+            self.rois_changed(data, pixels=False)
 
-            update_roi_on_multimeshgrids_widget()
+        elif name == "files":
+            index = self.list_files.currentData()
+            if index is not None and index != shared.exp.id_selected:
+                # Same file in the main tabs
+                widgets_list.widget_results.list_exp.setCurrentIndex(index)
+                widgets_list.widget_main.file_changed("list1")
+
+        elif name == "maps":
+            map_type = self.list_maps.currentData()
+            if map_type is not None:
+                shared.exp.roi_meshgrid_type = map_type
+                self.update_map()
 
 
 def new_roi(data, roi_id):
@@ -720,6 +966,77 @@ def new_roi(data, roi_id):
     free = [i for i in range(nbr_colors) if i not in used]
     roi.color = free[0] if free else len(data.roi_list) % nbr_colors
     return roi
+
+
+def open_roi_manager():
+    """Open the ROI manager (or bring it to the front)."""
+    if widgets_list.widget_roi_manager is None:
+        RoiManagerWidget(widgets_list.widget_results)
+        widgets_list.widget_roi_manager.show()
+    else:
+        widgets_list.widget_roi_manager.update_widget()
+        widgets_list.widget_roi_manager.activateWindow()
+        widgets_list.widget_roi_manager.raise_()
+
+
+def refresh_rois():
+    """ROIs drawn again on all the maps showing them (ROI manager, data and
+    results tabs, multiple meshgrids)."""
+    for plot in (getattr(widgets_list.widget_roi_manager, "MPL_canvas", None),
+                 getattr(widgets_list.widget_results, "MPL_canvas1", None),
+                 getattr(widgets_list.widget_data, "meshgrid", None)):
+        if plot is not None and isinstance(getattr(plot, "canvas", None),
+                                           MainPlot):
+            plot.canvas.update_blit("all")
+    update_roi_on_multimeshgrids_widget()
+
+
+def reset_results_table():
+    """Rows of the ROIs in the results table."""
+    if widgets_list.widget_results_single is not None:
+        widgets_list.widget_results_single.reset_table()
+
+
+def prepare_roi(xpos, ypos):
+    """Pixels under the pencil at a position of the map (from 1): list of
+    [i, j], and mask of the ones in the pencil."""
+    shape = shared.exp.roi_cursor_shape
+    dot_size = shared.exp.roi_cursor_size
+    local_roi = []
+    local_roi_mask = []
+    if shape == "square":
+        for i in range(-dot_size - 1, dot_size):
+            for j in range(-dot_size - 1, dot_size):
+                local_roi.append([xpos + i, ypos + j])
+                local_roi_mask.append(True)
+    elif shape == "dot":
+        local_roi.append([xpos - 1, ypos - 1])
+        local_roi_mask.append(True)
+    elif shape == "circle":
+        circle_limit = math.sqrt((dot_size - 0.5) ** 2 + (dot_size - 0.5) ** 2)
+        for i in range(-dot_size, dot_size + 1):
+            for j in range(-dot_size, dot_size + 1):
+                dist_to_center = math.sqrt(i ** 2 + j ** 2)
+                local_roi.append([xpos + i - 1, ypos + j - 1])
+                local_roi_mask.append(dist_to_center < circle_limit)
+    return local_roi, local_roi_mask
+
+
+def check_roi_boundaries(data, values, mask):
+    """Pixels of the pencil outside of the map replaced by None."""
+    new_values = []
+    new_mask = []
+    for i in range(len(values)):
+        position = values[i]
+        if position is not None and position[0] >= 0 and \
+                position[1] >= 0 and position[0] < data.nbr_pixels_x and \
+                position[1] < data.nbr_pixels_y:
+            new_values.append(position)
+            new_mask.append(mask[i])
+        else:
+            new_values.append(None)
+            new_mask.append(False)
+    return new_values, new_mask
 
 
 def update_roi_on_multimeshgrids_widget():
