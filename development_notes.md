@@ -25,5 +25,7 @@ Version 5: Sébastien Janel
 → New Ting viscoelasticity fit (Garcia)
 → New microrheology (Alcaraz)
 → New breakthrough analysis
+→ New plant cells analysis: wall modulus and turgor pressure (Yamasaki, Beauzamy), cell geometry from the ROIs
+→ JPK Smart Mapping files, single curves placed on the maps, levelling of the z motor steps
 → Complete new statistics: violin plots + superplots
 → Revamped result export with JSON

@@ -200,7 +200,50 @@ The original formulas give the most probable force (Bell-Evans) or the mean forc
 
 See Gumí-Audenis & Giannotti [30]. A breakthrough is a jump of the separation $z - d$ above its local trend, larger than a minimum thickness and $n_\sigma$ times the noise, with a drop of the force. $F_b$ is the force just before the jump, and the thickness is the size of the jump.
 
-## 13. Statistics
+## 13. Plant cells: wall modulus and turgor pressure
+
+The cell is a thin pressurized shell of wall thickness $t$ (Yamasaki et al. [33], Beauzamy et al. [34]), with $c = \sqrt{3(1-\nu^2)}$.
+
+**Apparent stiffness** $k_{as}$, the slope of the force at large indentation, mean of the approach and of the retraction:
+
+- **Derivative** (Yamasaki [33], eq. 16): $dF/d\delta$ (Savitzky-Golay filter) fitted with $k = k_{as}\left(1 - e^{-\alpha(\delta - \beta)}\right)$, $k = 0$ before $\beta$.
+- **Force range** (Beauzamy [34]): slope of a linear fit of the force between 75 and 100 % of its maximum.
+
+**Cell geometry**, from the ROI of the cell on the zero-force topography (piezo height before the elasticity):
+
+- Axes: principal axes of the pixels of the ROI. Half-lengths $L$: from the centre to the edge of the ROI along each axis (mean of the two directions).
+- Curvatures: the height of the ROI is fitted with a quadratic surface, and $\kappa_{\text{major}}$, $\kappa_{\text{minor}}$ are its normal curvatures along the axes at each curve (positive for a dome), with
+$$\kappa_M = \frac{\kappa_{\text{major}} + \kappa_{\text{minor}}}{2}, \qquad \kappa_G = \kappa_{\text{major}}\kappa_{\text{minor}}$$
+- Structural factor (Yamasaki [33], eq. 15), $f = 1$ for a sphere, $3/4$ for a cylinder, with $r = \kappa_G/\kappa_M^2$:
+$$f = \frac{2 + \left(\sqrt{1-r} - 1\right)/r}{\sqrt{1-r} + 1}$$
+
+**Yamasaki** [33] (eqs. 9 to 11 and 2): wall strain along each axis, and modulus, pressure and dimensionless pressure $\tau$:
+
+$$\varepsilon = 2\left(\frac{\arcsin(L\kappa)}{L\kappa} - 1\right), \qquad \Sigma\varepsilon = \varepsilon_{\text{major}} + \varepsilon_{\text{minor}}$$
+
+$$E = \frac{k_{as}}{\pi t \Sigma\varepsilon}\ln\frac{\Sigma\varepsilon c}{t\kappa_M}, \qquad P = \frac{k_{as}\kappa_M}{\pi f}\ln\frac{\Sigma\varepsilon c}{t\kappa_M}, \qquad \tau = \frac{\Sigma\varepsilon c}{2t\kappa_M}$$
+
+**Beauzamy** [34] (eq. 1): pressure from the modulus $E$ of the elasticity of the curve (section 3, paraboloid for Hertz as in [34]). With $u = \frac{Pfc}{Et^2\kappa_M^2} = 2\tau$,
+
+$$\frac{u}{\ln u} = \frac{k_{as}c}{\pi E t^2\kappa_M}$$
+
+solved with the Lambert function on the branch $u > e$ (large pressures).
+
+No value is given (NaN) on a saddle or a flat wall ($\kappa_M \le 0$), if $L\kappa$ is not in $]0, 1]$, or without solution ($\ln$ argument $\le 1$, or right-hand side $\le e$). The values are computed for the curves inside a cell ROI (not the substrate ROI) and follow the ROIs, the thickness and $\nu$ without computing again.
+
+## 14. Height maps
+
+**Flatten**, along the scan lines (x), on the pixels of the region of the map: order 0 removes the median of each line, orders 1 and 2 remove the polynomial fitted on each line (offset and slope, and curvature).
+
+**Z motor steps** (JPK Smart Mapping, maps higher than the range of the piezo). The height is the piezo plus the z motor, and each move of the motor leaves an offset in the height (also in the middle of a line). The map is cut into parts at each move of the motor, in the order of the curves (the offset after a move depends on the previous positions of the motor, not only on its position). The offsets $o$ of the parts are fitted by least squares on the pairs of neighbouring pixels $p$, $q$ of two parts:
+
+$$(h_q - o_q) - (h_p - o_p) = s_{pq}$$
+
+$s_{pq}$ is the slope of the surface (mean of the height differences on each side of the pair, in each part). The pairs with a residual above $3 \times 1.4826$ MAD are removed and the fit done again; the largest part is the reference. The levelling is done before the flatten.
+
+**Planefit**: the plane fitted on a substrate ROI is subtracted from the height maps.
+
+## 15. Statistics
 
 - **SuperPlots**: one value per file, the median of its curves (the mean for the events per curve), and statistics on the replicates.
 - **Tests on the means of the replicates**: t-test, paired or not, Tukey HSD for all the pairs, Holm correction, Fieller interval for the fold change.
@@ -241,3 +284,5 @@ See Gumí-Audenis & Giannotti [30]. A breakthrough is a jump of the separation $
 30. Gumí-Audenis B, Giannotti MI. Structural and mechanical characterization of supported model membranes by AFM. In *Biomimetic Lipid Membranes: Fundamentals, Applications, and Commercialization*, pp. 1–27. Springer (2019). [doi:10.1007/978-3-030-11596-8_1](https://doi.org/10.1007/978-3-030-11596-8_1)
 31. Garcia PD, Guerrero CR, Garcia R. Nanorheology of living cells measured by AFM-based force-distance curves. *Nanoscale* 12:9133–9143 (2020). [doi:10.1039/C9NR10316C](https://doi.org/10.1039/C9NR10316C)
 32. Ding EA, Kumar S. Frequency-dependent cellular microrheology with pyramidal atomic force microscopy probes. *Biophys. J.* 125:3087–3094 (2026). [doi:10.1016/j.bpj.2025.10.037](https://doi.org/10.1016/j.bpj.2025.10.037)
+33. Yamasaki Y, Okano K, Mimura T, Tsugawa S, Hosokawa Y. Simultaneous quantification of cell wall elasticity and turgor pressure in live plant cells by elastic shell theory analysis and AFM. *Planta* 261:131 (2025). [doi:10.1007/s00425-025-04683-4](https://doi.org/10.1007/s00425-025-04683-4)
+34. Beauzamy L, Derr J, Boudaoud A. Quantifying hydrostatic pressure in plant cells by using indentation with an atomic force microscope. *Biophys. J.* 108:2448–2456 (2015). [doi:10.1016/j.bpj.2015.03.035](https://doi.org/10.1016/j.bpj.2015.03.035)

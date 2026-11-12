@@ -1,6 +1,6 @@
 # pyAF : An AFM Force Curve Analysis Software Dedicated to Biologists
 
-pyAF is a Python software to analyze force curves & force maps acquired by atomic force microscopes (up to now Bruker and JPK).
+pyAF is a Python software to analyze force curves & force maps acquired by atomic force microscopes (up to now Bruker and JPK, including JPK QI and Smart Mapping files).
 Developed at CMPI lab (https://cmpi.cnrs.fr).
 
 It computes:
@@ -10,8 +10,9 @@ It computes:
 - Microrheology (Alcaraz)
 - Work of detachment and rupture force
 - Unbinding events and loading rates (SMFS)
-- Zero-force topography, flattening, plane fitting
-- Regions of interest for substrate definition and stats
+- Plant cells: cell wall modulus and turgor pressure (Yamasaki, Beauzamy)
+- Zero-force topography, flattening (with the z motor steps of Smart Mapping), plane fitting
+- Regions of interest (ROI manager) for substrate definition, cell geometry and stats
 - Curve tilt correction and smoothing
 - 3D map rendering
 - Text and JSON export
