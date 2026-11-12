@@ -158,10 +158,13 @@ def compute_columns(task):
                 result = main_compute_work(col, row, curve_app, curve_ret,
                                            dt, fit_params)
 
-            # Errors of the curve (the computation continues)
+            # Errors of the curve (the computation continues); not for the
+            # discarded curves (and the pixels outside of the region of the
+            # map), which are not fitted
             position = "[" + str(col + 1) + ", " + str(row + 1) + "]"
             status = "continue"
-            if result is not None and mode == "stiffness":
+            if result is not None and mode == "stiffness" and \
+                    not dt["is_discarded"]:
                 if params["perform_fit"] and len(result[5]) == 0:
                     # The fit failed, no stiffness value for this curve
                     status = "fit_error"

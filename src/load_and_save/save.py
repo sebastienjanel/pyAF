@@ -194,9 +194,10 @@ class Save:
                 "Nbr_of_files=" + str(len(prefs_single)) + "\n"))
 
             # Save global prefs
-            pickle.dump(global_prefs_to_save,
-                        open(tmp_dir_path + "/global_prefs.txt", "wb"),
-                        pickle.HIGHEST_PROTOCOL)
+            # (closed before reading its size)
+            with open(tmp_dir_path + "/global_prefs.txt", "wb") as prefs:
+                pickle.dump(global_prefs_to_save, prefs,
+                            pickle.HIGHEST_PROTOCOL)
 
             # Write offset for global prefs
             size = os.path.getsize(tmp_dir_path + "/global_prefs.txt")
@@ -206,10 +207,9 @@ class Save:
             # Save single prefs
             for i in range(len(prefs_single)):
                 pref_path = tmp_dir_path + "/single_prefs_" + str(i) + ".txt"
-                pickle.dump(
-                    prefs_single[i],
-                    open(pref_path, "wb"),
-                    pickle.HIGHEST_PROTOCOL)
+                with open(pref_path, "wb") as prefs:
+                    pickle.dump(prefs_single[i], prefs,
+                                pickle.HIGHEST_PROTOCOL)
 
                 # Write offset for single prefs
                 size = os.path.getsize(pref_path)
@@ -275,14 +275,14 @@ class Save:
             prog.set_range(0, int(size / blocksize) + 1)
 
             # Copy the header and the global prefs
-            destination.write(open(tmp_dir_path + "/header.txt", "rb").read())
-            prefs_path = tmp_dir_path + "/global_prefs.txt"
-            destination.write(open(prefs_path, "rb").read())
-
-            # Copy the single prefs
-            for i in range(len(prefs_single)):
-                prefs_path = tmp_dir_path + "/single_prefs_" + str(i) + ".txt"
-                destination.write(open(prefs_path, "rb").read())
+            paths = [tmp_dir_path + "/header.txt",
+                     tmp_dir_path + "/global_prefs.txt"]
+            # And the single prefs
+            paths += [tmp_dir_path + "/single_prefs_" + str(i) + ".txt"
+                      for i in range(len(prefs_single))]
+            for path in paths:
+                with open(path, "rb") as part:
+                    destination.write(part.read())
 
             # Copy the hdf5 file piecewise
             for i in range(int(size / blocksize) + 1):
