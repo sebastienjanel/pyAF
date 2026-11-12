@@ -122,8 +122,10 @@ class ResultsExperimentWidget(PYAFWidget):
         # Options
         box = QtWidgets.QGroupBox("SuperPlot")
         form = QtWidgets.QFormLayout()
-        # Labels on the left, as in the options of the Plots tab
+        # Labels on the left, gaps and compact toggles as in the options of
+        # the Plots tab
         form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        form.setVerticalSpacing(gui_tools.FORM_ROW_SPACING)
         self.list_control = PYAFComboBox(self, "control")
         self.list_control.setToolTip(
             "The other conditions are compared to this one.\nNone: all the "
@@ -173,6 +175,8 @@ class ResultsExperimentWidget(PYAFWidget):
         form.addRow("Replicates", self.list_paired)
         form.addRow("Test", self.list_test)
         form.addRow("Error bars", self.list_error)
+        for toggle in (self.CB_log, self.CB_curves, self.CB_white):
+            toggle.setFixedHeight(gui_tools.COMPACT_TOGGLE_HEIGHT)
         form.addRow("Log scale", self.CB_log)
         form.addRow("All the curves", self.CB_curves)
         form.addRow("White background", self.CB_white)

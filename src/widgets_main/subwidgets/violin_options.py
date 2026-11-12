@@ -35,7 +35,7 @@ from ... import consts
 from ... import shared
 from ... import widgets_list
 from ... import experiment
-from ...tools import misc_tools, palettes, stat_tools
+from ...tools import gui_tools, misc_tools, palettes, stat_tools
 from ...tools.gui_tools import PYAFButton, PYAFComboBox, PYAFInput, \
     PYAFToggle
 from ...tools.PYAFWidget import PYAFWidget
@@ -75,6 +75,8 @@ class ViolinOptionsWidget(PYAFWidget):
         self.box = box
         form = QtWidgets.QFormLayout()
         form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        # Same gaps on all the systems (larger by default on macOS)
+        form.setVerticalSpacing(gui_tools.FORM_ROW_SPACING)
 
         self.list_inner = PYAFComboBox(self, "inner")
         for item in INNER:
@@ -195,9 +197,13 @@ class ViolinOptionsWidget(PYAFWidget):
                                 self.TG_zeros, self.TG_white)
         self.toggles_lr = (self.TG_events, self.TG_medians, self.TG_errors,
                            self.TG_zeros, self.TG_white, self.TG_legend)
+        # Compact rows of toggles (their switch is smaller than the lists)
+        for toggle in set(self.toggles_violins + self.toggles_lr):
+            toggle.setFixedHeight(gui_tools.COMPACT_TOGGLE_HEIGHT)
         self.grid = QtWidgets.QGridLayout()
         self.grid.setContentsMargins(0, 0, 0, 0)
         self.grid.setHorizontalSpacing(16)
+        self.grid.setVerticalSpacing(form.verticalSpacing())
         self.grid.setColumnStretch(2, 1)
         form.addRow(self.grid)
         self.form = form

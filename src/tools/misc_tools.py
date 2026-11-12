@@ -684,8 +684,11 @@ def format_number(value):
     """Text of a value with 6 significant digits.
 
     Removes the floating point noise of the conversions (e.g. 21.5 degC
-    stored as 294.65 K, displayed as 21.499999999999996).
+    stored as 294.65 K, displayed as 21.499999999999996). "None" without
+    value (e.g. the used values before a computation).
     """
+    if value is None:
+        return "None"
     return "{:.6g}".format(value)
 
 

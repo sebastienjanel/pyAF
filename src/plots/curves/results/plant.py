@@ -132,7 +132,8 @@ class ResultsPlant(PlotCurve):
                 return "-"
             return format(value * factor, "." + str(digits) + "g")
 
-        text = ["k_as = " + number(values["k_as"]) + " N/m (approach " +
+        text = ["$k_\\mathrm{as}$ = " + number(values["k_as"]) +
+                " N/m (approach " +
                 number(values["k_approach"]) + ", retract " +
                 number(values["k_retraction"]) + ")",
                 "R² = " + number(values["r2_approach"], digits=3) +
@@ -140,7 +141,8 @@ class ResultsPlant(PlotCurve):
                 "E Hertz = " + number(values["modulus_hertz"], 1e-6) +
                 " MPa"]
         if cell is None:
-            text.append("Not in a cell (ROI of a map): k_as only")
+            text.append("Not in a cell (ROI of a map): $k_\\mathrm{as}$ "
+                        "only")
         else:
             text += ["Cell: ROI " + str(int(values["roi"])) + " of " +
                      str(cell[1].filename) + ", f = " +
