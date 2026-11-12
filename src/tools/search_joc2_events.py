@@ -157,10 +157,11 @@ def get_JOC_events(curve, first, params):
     else:
         real_joc2x, real_joc2y = None, None
 
-    # Intersection found too far away or not found
-    if (real_joc2x is None and real_joc2y is None) or \
-            real_joc2x > curve_x[joc2_indice + 1] or \
-            real_joc2x < curve_x[joc2_indice]:
+    # Intersection found too far away or not found: outside of the segment
+    # between the two points, in either order (the Z of the height sensor
+    # can go back a little between two points)
+    low, high = sorted((curve_x[joc2_indice], curve_x[joc2_indice + 1]))
+    if real_joc2x is None or real_joc2x > high or real_joc2x < low:
         real_joc2x = curve_x[joc2_indice - 1]
         real_joc2y = curve_y[joc2_indice - 1]
         joc2_indice = len(curve_y) - 1

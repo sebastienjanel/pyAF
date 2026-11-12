@@ -506,7 +506,7 @@ class PlotOptionsWidget(PYAFWidget):
             val_all = None
         elif mt.startswith("plant_"):
             name, unit, factor = {
-                "plant_k_as": ("Max. k_as", "N/m", 1),
+                "plant_k_as": ("Max. k\u2090\u209b", "N/m", 1),
                 "plant_modulus": ("Max. wall modulus", "MPa", 1e-6),
                 "plant_pressure": ("Max. turgor pressure", "MPa", 1e-6),
                 "plant_tau": ("Max. \u03c4", "", 1),

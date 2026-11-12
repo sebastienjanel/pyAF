@@ -257,7 +257,7 @@ class ResultsGroupsWidget(PYAFWidget):
     def add_row_in_tablewidget(self, row):
         """Adds a row in the table (row 0 is the group 1)."""
         # Default row height is 30, but it is too big
-        self.tableWidget.setRowHeight(row, 40)
+        self.tableWidget.setRowHeight(row, gui_tools.TABLE_ROW_HEIGHT)
         group = shared.exp.groups_list[row + 1]
 
         # Checkbox (hide or display the group)
@@ -285,16 +285,14 @@ class ResultsGroupsWidget(PYAFWidget):
         experiment.setAlignment(QtCore.Qt.AlignCenter)
         experiment.setFrame(False)
         experiment.setValidator(QtGui.QIntValidator(1, 999))
-        experiment.setPlaceholderText(str(order))
-        # The default number looks as a typed one (it is the value used)
-        palette = experiment.palette()
-        palette.setColor(QtGui.QPalette.PlaceholderText,
-                         palette.color(QtGui.QPalette.Text))
-        experiment.setPalette(palette)
+        # The number used is displayed as a typed one (the default: the
+        # order of the replicate in its condition, kept until another
+        # number is typed)
         number = getattr(group, "experiment", None)
-        experiment.setText(str(number) if number else "")
+        experiment.setText(str(number) if number else str(order))
         experiment.editingFinished.connect(
-            lambda r=row, e=experiment: self.experiment_edited(r, e))
+            lambda r=row, e=experiment, o=order:
+            self.experiment_edited(r, e, o))
         self.tableWidget.setCellWidget(
             row, col("Experiment"), gui_tools.FullCellWidget(experiment))
 
@@ -322,11 +320,15 @@ class ResultsGroupsWidget(PYAFWidget):
             "Number of files in the replicate (column Replicate of the "
             "Plots tab)")
 
-    def experiment_edited(self, row, line_edit):
-        """The experiment number of a replicate was edited."""
+    def experiment_edited(self, row, line_edit, order):
+        """The experiment number of a replicate was edited (empty or the
+        default number, its order in its condition: automatic)."""
         group = shared.exp.groups_list[row + 1]
         text = line_edit.text().strip()
-        group.experiment = int(text) if text else None
+        group.experiment = int(text) if text and int(text) != order \
+            else None
+        if not text:
+            line_edit.setText(str(order))
         widgets_list.widget_results_experiment.update_widget()
 
     def name_edited(self, row, line_edit):

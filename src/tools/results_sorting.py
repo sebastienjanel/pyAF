@@ -105,7 +105,8 @@ MICRORHEO_TYPES = {
 
 # Plant cells (see compute_tools.plant)
 PLANT_TYPES = {
-    "plant_k_as": {"name": "Apparent stiffness k_as", "label": "k_as [N/m]",
+    "plant_k_as": {"name": "Apparent stiffness k\u2090\u209b",
+                   "label": "$k_\\mathrm{as}$ [N/m]",
                    "factor": 1.0, "export": "Apparent stiffness (N/m)",
                    "column": "plant_k_as"},
     "plant_modulus": {"name": "Wall modulus E (Yamasaki)",

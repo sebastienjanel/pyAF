@@ -495,11 +495,13 @@ def add_result(unique_id, name):
 def auto_short_name(name):
     """Name of a file without the end added by the AFM software: the
     extension of the Bruker files (.spm, with the number of the file, e.g.
-    .0_00012.spm), and of the JPK files (.jpk-force-map, .jpk-qi-data or
-    .h5-jpk, with the milliseconds of the time, e.g. .311.jpk-force-map)."""
+    .0_00012.spm), and of the JPK files (.jpk-force-map, .jpk-qi-data,
+    .h5-jpk or .jpk-force for a single curve, with the milliseconds of the
+    time, e.g. .311.jpk-force-map)."""
     short = re.sub(r"(\.\d+_\d+)?\.spm$", "", name)
-    short = re.sub(r"(\.\d+)?\.(jpk-force-map|jpk-qi-data|h5-jpk)$", "",
-                   short)
+    short = re.sub(
+        r"(\.\d+)?\.(jpk-force-map|jpk-qi-data|h5-jpk|jpk-force)$", "",
+        short)
     return short or name
 
 

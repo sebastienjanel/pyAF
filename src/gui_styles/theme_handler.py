@@ -38,8 +38,8 @@ from qtpy.QtWidgets import QApplication
 import os
 import sys
 from qtpy.QtCore import QDir, QEvent, QFile, QObject, QSettings, \
-    QTextStream
-from qtpy.QtWidgets import QGroupBox
+    QTextStream, QTimer, Qt
+from qtpy.QtWidgets import QGroupBox, QWidget
 from ..tools.misc_tools import get_resource_path
 import matplotlib.pyplot as plt
 from . import breeze_resources  # Do not delete, important for making the style themes work.
@@ -104,11 +104,54 @@ class GroupBoxTitles(QObject):
         return False
 
 
+class CenteredWindows(QObject):
+    """Centres the windows (dialogs, messages, tools such as the ROI
+    manager or the 3D view, figures) on the main window when they are first
+    shown, inside its screen. Not the menus, tooltips and lists, nor the
+    main window itself."""
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Show and isinstance(obj, QWidget) and \
+                obj.isWindow() and \
+                obj.windowType() in (Qt.Window, Qt.Dialog, Qt.Tool, Qt.Sheet) \
+                and not obj.property("pyaf_centered"):
+            # Not imported at the top (the widgets import this module)
+            from .. import widgets_list
+            main = widgets_list.widget_main
+            if main is not None and obj is not main and main.isVisible():
+                obj.setProperty("pyaf_centered", True)
+                center_on(obj, main)
+                # Again once its layout has its final size (the windows can
+                # grow just after they are shown)
+                QTimer.singleShot(0, lambda: center_on(obj, main))
+        return False
+
+
+def center_on(window, main):
+    """Moves a window to the centre of the main window, inside the screen of
+    the main window."""
+    try:
+        geometry = window.frameGeometry()
+        geometry.moveCenter(main.frameGeometry().center())
+        screen = main.screen().availableGeometry()
+        geometry.moveLeft(max(screen.left(), min(
+            geometry.left(), screen.right() - geometry.width())))
+        geometry.moveTop(max(screen.top(), min(
+            geometry.top(), screen.bottom() - geometry.height())))
+        window.move(geometry.topLeft())
+    except RuntimeError:
+        # The window was closed and deleted in between
+        pass
+
+
 def install_group_box_titles(app):
-    """Install the GroupBoxTitles filter on the application (once)."""
+    """Install the GroupBoxTitles and CenteredWindows filters on the
+    application (once)."""
     if getattr(app, "_pyaf_group_box_titles", None) is None:
         app._pyaf_group_box_titles = GroupBoxTitles(app)
         app.installEventFilter(app._pyaf_group_box_titles)
+        app._pyaf_centered_windows = CenteredWindows(app)
+        app.installEventFilter(app._pyaf_centered_windows)
 
 
 def get_icons_path():

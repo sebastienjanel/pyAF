@@ -84,8 +84,16 @@ def file_label(data):
     return experiment.auto_short_name(os.path.basename(str(data.filename)))
 
 
-# Spacing between the boxes of the events tab
-EVENTS_BOX_SPACING = 10
+# Vertical gap between the rows of the boxes of the tabs [px] (as the jump
+# of contact)
+BOX_ROW_SPACING = 6
+
+# Width of the name of the piezo correction file (microrheology) [px]
+MICRORHEO_PIEZO_WIDTH = 220
+
+# Spacing between the boxes of the events tab (as the boxes of the
+# elasticity tab)
+EVENTS_BOX_SPACING = 24
 
 
 def info_button(parent, title, text):
@@ -572,6 +580,8 @@ class ComputeWidget(PYAFWidget):
         # Centred vertically in the tab
         VL_events_options.addStretch(1)
         VL_events_options.addLayout(HL_events_compute_type)
+        # Room between the row of the method and the boxes (their titles)
+        VL_events_options.addSpacing(EVENTS_BOX_SPACING // 2)
         VL_events_options.addLayout(self.GL_events)
         VL_events_options.addStretch(1)
 
@@ -588,7 +598,12 @@ class ComputeWidget(PYAFWidget):
 
         # --- Loading rates (in the events tab) -------------------------------
 
-        self.BT_get_lr = PYAFButton(self, "get_lr", "Loading rates", size=100)
+        # On two lines, as wide as the compute button above it
+        self.BT_get_lr = PYAFButton(self, "get_lr", "Loading\nrates",
+                                    size=100)
+        self.BT_get_lr.setFixedHeight(
+            2 * self.BT_get_lr.fontMetrics().height() + 12 +
+            2 * gui_tools.BUTTON_MARGIN)
         self.BT_get_lr.setToolTip(
             "Loading rates of the events (computed first)")
 
@@ -704,7 +719,8 @@ class ComputeWidget(PYAFWidget):
 
         self.Box_visco = QtWidgets.QGroupBox("Ting fit")
         GL_visco = QtWidgets.QGridLayout()
-        GL_visco.setVerticalSpacing(4)
+        # Same gaps as the other boxes of the tabs
+        GL_visco.setVerticalSpacing(BOX_ROW_SPACING)
 
         self.label_visco_solver = QtWidgets.QLabel("Solver :")
         self.list_visco_solver = PYAFComboBox(self, "visco_solver")
@@ -821,7 +837,7 @@ class ComputeWidget(PYAFWidget):
 
         self.Box_microrheo = QtWidgets.QGroupBox("Microrheology")
         GL_microrheo = QtWidgets.QGridLayout()
-        GL_microrheo.setVerticalSpacing(4)
+        GL_microrheo.setVerticalSpacing(BOX_ROW_SPACING)
 
         self.label_microrheo_method = QtWidgets.QLabel("Method :")
         self.list_microrheo_method = PYAFComboBox(self, "microrheo_method")
@@ -852,8 +868,8 @@ class ComputeWidget(PYAFWidget):
             "extrapolating to contact (0: no correction).")
         self.IN_microrheo_drag.input.setValidator(
             misc_tools.validator("UF"))
-        self.BT_microrheo_drag = PYAFButton(
-            self, "microrheo_drag_file", "From file\u2026")
+        self.BT_microrheo_drag = gui_tools.box_button(PYAFButton(
+            self, "microrheo_drag_file", "From file\u2026"))
         self.BT_microrheo_drag.setToolTip(
             "b(0) from a viscous drag measurement loaded in pyAF: "
             "modulations of the cantilever at several heights above the "
@@ -912,8 +928,12 @@ class ComputeWidget(PYAFWidget):
         # Piezo correction: lag and gain of the piezo measured on a curve of
         # a rigid sample (substrate)
         self.label_microrheo_piezo = QtWidgets.QLabel()
-        self.BT_microrheo_piezo = PYAFButton(
-            self, "microrheo_piezo", "From this curve")
+        # The file of the correction, cut in the middle when long (its
+        # whole name in the tooltip): the tab, and the window, keep their
+        # width
+        self.label_microrheo_piezo.setFixedWidth(MICRORHEO_PIEZO_WIDTH)
+        self.BT_microrheo_piezo = gui_tools.box_button(PYAFButton(
+            self, "microrheo_piezo", "From this curve"))
         self.BT_microrheo_piezo.setToolTip(
             "Lag and gain of the piezo measured on the displayed curve, which "
             "must be on a rigid sample (substrate: the deflection follows the "
@@ -931,8 +951,8 @@ class ComputeWidget(PYAFWidget):
             "Open the file in pyAF, display a curve on the substrate, then "
             "click here; the correction is used for all the files with "
             "Apply to all.")
-        self.BT_microrheo_piezo_clear = PYAFButton(
-            self, "microrheo_piezo_clear", "Clear")
+        self.BT_microrheo_piezo_clear = gui_tools.box_button(PYAFButton(
+            self, "microrheo_piezo_clear", "Clear"))
         HL_microrheo_piezo = QtWidgets.QHBoxLayout()
         HL_microrheo_piezo.addWidget(QtWidgets.QLabel("Piezo correction : "))
         HL_microrheo_piezo.addWidget(self.label_microrheo_piezo)
@@ -983,12 +1003,13 @@ class ComputeWidget(PYAFWidget):
         # Explanation of the computation: "?" button below the compute
         # button
         text_plant = (
-            "Apparent stiffness k_as: slope of the force at large "
+            "Apparent stiffness k\u2090\u209b: slope of the force at large "
             "indentation, approach and retraction (mean), from the point "
             "of contact of the elasticity.\n"
             "In a cell (ROI drawn on a map, or single curve recorded on "
-            "it): modulus E of the wall and turgor pressure P from k_as and "
-            "the geometry of the cell\n(Yamasaki et al. 2025), and P from "
+            "it): modulus E of the wall and turgor pressure P from "
+            "k\u2090\u209b and the geometry of the cell\n(Yamasaki et al. "
+            "2025), and P from "
             "E Hertz of the elasticity fit (Beauzamy et al. 2015: fit the "
             "shallow indentation, below the wall thickness).\n"
             "Draw the cells in the ROI manager (before or after the "
@@ -997,19 +1018,20 @@ class ComputeWidget(PYAFWidget):
 
         self.Box_plant = QtWidgets.QGroupBox("Plant cells")
         GL_plant = QtWidgets.QGridLayout()
-        GL_plant.setVerticalSpacing(4)
+        GL_plant.setVerticalSpacing(BOX_ROW_SPACING)
 
         self.list_plant_method = PYAFComboBox(self, "plant_method")
         for name in plant_tools.STIFFNESS_METHODS:
             self.list_plant_method.addItem(name)
         self.list_plant_method.setToolTip(
-            "Derivative: dF/d\u03b4 fitted with k_as (1 - exp(-\u03b1 "
-            "(\u03b4 - \u03b2))) (Yamasaki et al. 2025, Eq. 16).\n"
+            "Derivative: dF/d\u03b4 fitted with k\u2090\u209b (1 - "
+            "exp(-\u03b1 (\u03b4 - \u03b2))) (Yamasaki et al. 2025, Eq. "
+            "16).\n"
             "Force range: linear fit of the force between two percentages "
             "of its maximum (Beauzamy et al. 2015: 75-100 %).")
         self.list_plant_method.fit_to_contents()
         HL_plant_method = QtWidgets.QHBoxLayout()
-        HL_plant_method.addWidget(QtWidgets.QLabel("k_as :"))
+        HL_plant_method.addWidget(QtWidgets.QLabel("k\u2090\u209b :"))
         HL_plant_method.addWidget(self.list_plant_method)
         HL_plant_method.addStretch(1)
 
@@ -1037,9 +1059,10 @@ class ComputeWidget(PYAFWidget):
         self.IN_plant_wall.input.setValidator(misc_tools.validator("PF"))
 
         GL_plant.addLayout(HL_plant_method, 0, 0, 1, 2)
+        # Smoothing then wall thickness (left), force range (right)
         GL_plant.addWidget(self.IN_plant_smoothing, 1, 0)
-        GL_plant.addWidget(self.IN_plant_wall, 1, 1)
-        GL_plant.addWidget(self.IN_plant_force_start, 2, 0)
+        GL_plant.addWidget(self.IN_plant_wall, 2, 0)
+        GL_plant.addWidget(self.IN_plant_force_start, 1, 1)
         GL_plant.addWidget(self.IN_plant_force_stop, 2, 1)
         GL_plant.setColumnStretch(2, 1)
         self.Box_plant.setLayout(GL_plant)
@@ -1195,6 +1218,11 @@ class ComputeWidget(PYAFWidget):
         self.VL.addLayout(self.GL_compute)
 
         self.setLayout(self.VL)
+
+        # Same gaps between the rows of all the boxes of the tabs
+        # (also the parameters of the event algorithm not displayed)
+        for root in (self.tabs, self.widget_kernel, self.widget_msf):
+            gui_tools.even_box_rows(root, BOX_ROW_SPACING)
 
         self.update_widget()
         widgets_list.widget_progressbar.update()
@@ -1395,9 +1423,13 @@ class ComputeWidget(PYAFWidget):
             self.IN_microrheo_max_freq.changeValue(
                 misc_tools.format_number(data.microrheo_max_freq or 0))
             piezo = data.microrheo_piezo
+            text = "None" if not piezo else piezo["file"] + " [" + ", ".join(
+                str(k) for k in piezo["curve"]) + "]"
             self.label_microrheo_piezo.setText(
-                "None" if not piezo else piezo["file"] + " [" + ", ".join(
-                    str(k) for k in piezo["curve"]) + "]")
+                self.label_microrheo_piezo.fontMetrics().elidedText(
+                    text, QtCore.Qt.ElideMiddle, MICRORHEO_PIEZO_WIDTH))
+            self.label_microrheo_piezo.setToolTip(
+                "" if not piezo else text)
             self.BT_microrheo_piezo.setEnabled(
                 microrheology.available(data))
             self.BT_microrheo_piezo_clear.setEnabled(bool(piezo))
@@ -2444,7 +2476,7 @@ class ComputeWidget(PYAFWidget):
                 experiment.add_result(calc_id, data.filename)
                 if shared.exp.results_type is None:
                     shared.exp.results_type = "plant_k_as"
-                line = file_label(data) + " : k_as for " + \
+                line = file_label(data) + " : k\u2090\u209b for " + \
                     str(counts["k_as"]) + " of " + str(counts["curves"]) + \
                     " curves"
                 if counts["cell"]:

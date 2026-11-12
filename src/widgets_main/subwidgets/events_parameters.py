@@ -189,7 +189,7 @@ class EventsParamsWidget(PYAFWidget):
         # with the jump of contact and the loading rates)
         HL = QtWidgets.QHBoxLayout()
         HL.setContentsMargins(0, 0, 0, 0)
-        HL.setSpacing(10)
+        HL.setSpacing(24)
         HL.addWidget(GB_conv_params)
         HL.addWidget(GB_threshold_params)
         HL.addWidget(GB_fit_params)

@@ -42,6 +42,56 @@ from qtpy import QtCore, QtGui, QtWidgets
 from ..plots.PYAFPlot import PYAFPlot
 
 
+# Height of the buttons, lists and input fields as drawn [px] (the buttons
+# have margins of 5 px in the style sheets around it)
+CONTROL_HEIGHT = 26
+BUTTON_MARGIN = 5
+
+
+# Height of the toggles in the option boxes of the plots tabs (lists of
+# toggles: compact, the switch is smaller than the lists)
+COMPACT_TOGGLE_HEIGHT = 21
+# Vertical gap between the rows of the option boxes (forms) [px]
+FORM_ROW_SPACING = 6
+
+# Height of the rows of the tables with widgets (lists, short names): room
+# for the margins and padding of the cells of the style sheets
+TABLE_ROW_HEIGHT = CONTROL_HEIGHT + 8
+
+
+def control_height(widget):
+    """Height of a button, list or input field: CONTROL_HEIGHT, or more if
+    its font needs it (larger fonts on some systems: no clipped text)."""
+    return max(CONTROL_HEIGHT, widget.fontMetrics().height() + 10)
+
+
+def box_button(button):
+    """A button in the rows of a box: no margin (they would make its row
+    taller than the others), as high as the lists and fields."""
+    button.setStyleSheet("QPushButton { margin: 0px; }")
+    button.setFixedHeight(control_height(button))
+    return button
+
+
+def even_box_rows(root, spacing=None):
+    """Same vertical gap between the rows of all the boxes in root (grids,
+    forms and vertical layouts, also nested): the system default differs
+    (larger on macOS)."""
+    spacing = FORM_ROW_SPACING if spacing is None else spacing
+    for box in root.findChildren(QtWidgets.QGroupBox):
+        widgets = [box] + box.findChildren(QtWidgets.QWidget)
+        for widget in widgets:
+            layout = QtWidgets.QWidget.layout(widget)
+            if layout is None:
+                continue
+            for item in [layout] + layout.findChildren(QtWidgets.QLayout):
+                if isinstance(item, (QtWidgets.QGridLayout,
+                                     QtWidgets.QFormLayout)):
+                    item.setVerticalSpacing(spacing)
+                elif isinstance(item, QtWidgets.QVBoxLayout):
+                    item.setSpacing(spacing)
+
+
 class BoxData(QtWidgets.QWidget):
     """A box with the piezo meshgrid and minimal information for the data tab."""
 
@@ -199,7 +249,7 @@ class PYAFButtonGroup(QtWidgets.QButtonGroup):
 class PYAFInput(QtWidgets.QWidget):
     """An input field with a label on the left."""
 
-    def __init__(self, parent, name, label_text, width=50, height=30):
+    def __init__(self, parent, name, label_text, width=50, height=None):
         super().__init__()
 
         self.layout = QtWidgets.QHBoxLayout()
@@ -211,6 +261,9 @@ class PYAFInput(QtWidgets.QWidget):
         self.logger = logging.getLogger()
 
         self.input = QtWidgets.QLineEdit()
+        # Same height as the buttons and the lists
+        if height is None:
+            height = control_height(self.input)
         self.input.setFixedSize(width, height)
 
         # Last accepted value, restored when the user leaves the input with
@@ -402,8 +455,11 @@ class FullCellWidget(QtWidgets.QWidget):
         super().__init__()
 
         self.widget = widget
+        # As high as the buttons and the lists, centred in the row (short
+        # names, lists and inputs of the tables have the same height)
+        self.widget.setFixedHeight(control_height(self.widget))
         layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(self.widget)
+        layout.addWidget(self.widget, 0, QtCore.Qt.AlignVCenter)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.setLayout(layout)
@@ -444,7 +500,9 @@ class PYAFButton(QtWidgets.QPushButton):
         # Width chosen for the layout, enlarged if the text does not fit
         # (the fonts are wider on some systems, e.g. on Linux)
         self.base_width = size
-        self.setFixedHeight(40)
+        # Height of the lists and fields, with the margins of the style
+        # sheets
+        self.setFixedHeight(control_height(self) + 2 * BUTTON_MARGIN)
         self.setText(text)
         self.clicked.connect(self.button_clicked)
 
@@ -541,6 +599,8 @@ class PYAFComboBox(QtWidgets.QComboBox):
             self.activated.connect(self.list_updated)
 
         self.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
+        # Same height as the buttons and the input fields
+        self.setFixedHeight(control_height(self))
 
     def list_updated(self):
         """Catch the list updated signal, and trigger the parent call.
@@ -657,6 +717,9 @@ class PYAFToggle(QtWidgets.QWidget):
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.toggle)
         self.setLayout(self.layout)
+        # As high as the buttons, lists and fields: the rows of the boxes
+        # are evenly spaced
+        self.setFixedHeight(control_height(self.label))
         # Width of the label and the switch (like a checkbox)
         self.setSizePolicy(QtWidgets.QSizePolicy.Maximum,
                            QtWidgets.QSizePolicy.Fixed)

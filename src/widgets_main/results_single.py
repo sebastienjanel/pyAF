@@ -402,7 +402,8 @@ class ResultsSingleWidget(PYAFWidget):
     def add_row_in_tablewidget(self, row_index):
         """Adds a row in the result's tablewidget."""
         # Default row height is 30, but it is too big
-        self.tableWidget.setRowHeight(row_index, 40)
+        self.tableWidget.setRowHeight(
+            row_index, gui_tools.TABLE_ROW_HEIGHT)
 
         if self.columns.get_column("CB").visibility:
             self.add_cell_at_pos("CB", row_index)

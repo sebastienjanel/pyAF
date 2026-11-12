@@ -229,20 +229,20 @@ class ResultsWidget(PYAFWidget):
             "microrheo_crossover": "Microrheology: frequency where G\u2033 "
             "becomes larger than G\u2032 (log interpolation between the "
             "analysed frequencies; none: no crossing).",
-            "plant_k_as": "Plant cells: apparent stiffness k_as, slope of "
-            "the force at large indentation (mean of the approach and the "
-            "retraction).",
+            "plant_k_as": "Plant cells: apparent stiffness k\u2090\u209b, "
+            "slope of the force at large indentation (mean of the approach "
+            "and the retraction).",
             "plant_modulus": "Plant cells: modulus E of the cell wall, from "
-            "k_as, the geometry of the cell (ROI) and the thickness of the "
-            "wall (Yamasaki et al. 2025).",
-            "plant_pressure": "Plant cells: turgor pressure P, from k_as, "
-            "the geometry of the cell (ROI) and the thickness of the wall "
-            "(Yamasaki et al. 2025).",
+            "k\u2090\u209b, the geometry of the cell (ROI) and the thickness "
+            "of the wall (Yamasaki et al. 2025).",
+            "plant_pressure": "Plant cells: turgor pressure P, from "
+            "k\u2090\u209b, the geometry of the cell (ROI) and the thickness "
+            "of the wall (Yamasaki et al. 2025).",
             "plant_tau": "Plant cells: dimensionless pressure \u03c4 of the "
             "Yamasaki solution: the shell model holds for \u03c4 >> 1.",
             "plant_pressure_hertz": "Plant cells: turgor pressure P from "
-            "k_as and the elasticity of the Hertz fit (Beauzamy et al. "
-            "2015): fit the shallow indentation, below the thickness of "
+            "k\u2090\u209b and the elasticity of the Hertz fit (Beauzamy et "
+            "al. 2015): fit the shallow indentation, below the thickness of "
             "the wall.",
             "fit_r2": "R\u00b2 of the elasticity fit, on the fitted points "
             "after the point of contact.",
@@ -273,7 +273,8 @@ class ResultsWidget(PYAFWidget):
                                ("microrheo_tan_delta", "Loss tangent"),
                                ("microrheo_crossover",
                                 "Crossover frequency G\u2032 = G\u2033"))),
-            ("Plant cells", (("plant_k_as", "Apparent stiffness k_as"),
+            ("Plant cells", (("plant_k_as",
+                              "Apparent stiffness k\u2090\u209b"),
                              ("plant_modulus", "Wall modulus E (Yamasaki)"),
                              ("plant_pressure",
                               "Turgor pressure P (Yamasaki)"),

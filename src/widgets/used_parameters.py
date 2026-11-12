@@ -256,7 +256,9 @@ class UsedParametersWidget(PYAFWidget):
             misc_tools.format_number(dt.used_deflection_sensitivity))
         self.LB_spring_constant.setText(
             "Spring constant [N/m] : " +
-            misc_tools.format_number(dt.used_spring_constant * 1e9))
+            misc_tools.format_number(
+                None if dt.used_spring_constant is None
+                else dt.used_spring_constant * 1e9))
 
         # Viscoelasticity
         if dt.visco_calculated:
