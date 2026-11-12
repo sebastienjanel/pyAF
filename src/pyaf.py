@@ -615,17 +615,14 @@ class MainWindow(QtWidgets.QMainWindow):
             wl.widget_curve_mod.IN_curve_x.changeValue(xpos)
             wl.widget_curve_mod.IN_curve_y.changeValue(ypos)
 
-        # Update the position of the red square on the data meshgrid
-        if self.tabs.currentIndex() == 0:
-            wl.widget_data.meshgrid.canvas.update_blit("red_square")
-
-        # Update the position of the red square on the compute meshgrid
-        if self.tabs.currentIndex() == 1:
-            wl.widget_compute.MPL_meshgrid.canvas.update_blit("red_square")
-
-        # Update the position of the red square on the meshgrid
-        if self.tabs.currentIndex() == 2:
-            wl.widget_results.MPL_canvas1.canvas.update_blit("red_square")
+        # Update the position of the red square on the map of the tab (if a
+        # map is drawn: not yet when changing from a single curve to a map,
+        # it is drawn with the new file)
+        plot = {0: wl.widget_data.meshgrid,
+                1: wl.widget_compute.MPL_meshgrid,
+                2: wl.widget_results.MPL_canvas1}.get(self.tabs.currentIndex())
+        if plot is not None and hasattr(plot.canvas, "update_blit"):
+            plot.canvas.update_blit("red_square")
 
         # Tilt check meshgrid
         if wl.widget_tilt_check is not None:

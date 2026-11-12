@@ -31,7 +31,8 @@
 
 """Plots a piezo extension meshgrid, flattened or not."""
 
-from ...tools import math_tools
+import numpy
+
 from ... import shared
 from .plot_meshgrid import PlotMeshGrid
 
@@ -44,9 +45,9 @@ class PlotFlattenMeshGrid(PlotMeshGrid):
 
         if self.plot_type == "small_meshgrid_for_correction":
             self.title = "Flattened"
-            fo = shared.exp.selected_flatten_order
-            self.temp_array[:] = math_tools.flatten(
-                self.data.piezo_image, fo, self.data.inside_region())
+            self.temp_array[:] = self.data.flattened_piezo_image(
+                shared.exp.selected_flatten_order,
+                shared.exp.selected_flatten_motor)
         elif self.plot_type == "small_meshgrid_for_correction_original":
             self.title = "Original"
             self.temp_array[:] = self.data.piezo_image
@@ -64,7 +65,8 @@ class PlotFlattenMeshGrid(PlotMeshGrid):
         # Overwrite colormap to have always a copper colormap fot these
         # meshgrids
         self.colormap = self.colortables.colortables_mpl_list[0]
-        self.colortable_max_value = self.data.max_piezo
+        # Range of the displayed (flattened) heights
+        self.colortable_max_value = numpy.amax(self.temp_array)
         self.colortable_min_value = 0
 
         self.plot_fig()

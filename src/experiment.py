@@ -204,6 +204,8 @@ class Experiment:
 
         # Selected flatten order
         self.selected_flatten_order = 1
+        # Remove the offsets at the steps of the z motor with the flatten
+        self.selected_flatten_motor = False
 
         # Data types (meshgrid types follow the same naming convention)
         # piezo
@@ -241,7 +243,7 @@ class Experiment:
         self.all_stiffness_depth_view = 0
         self.meshgrid_click_xpos = 0
         self.meshgrid_click_ypos = 0
-        self.roi_cursor_shape = "square"
+        self.roi_cursor_shape = "circle"
         self.roi_cursor_size = 2
         self.meshgrid_display_red_square = True
         self.meshgrid_display_discarded = True

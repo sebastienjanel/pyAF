@@ -36,6 +36,8 @@ import math
 import numpy
 import itertools
 from ..tools.utils import module_exists
+from scipy import sparse
+from scipy.sparse import linalg as sparse_linalg
 if module_exists("scipy"):
     from scipy import stats
 
@@ -117,47 +119,128 @@ def compute_noises(curve_x, curve_y):
     return rms, std, determination, sem
 
 
-def flatten(data, order=1, inside=None):
-    """Flatten a meshgrid along its lines.
+def flatten(data, order=1, inside=None, parts=None):
+    """Flatten a meshgrid ([x][y]) along its scan lines (along x, for each
+    y).
 
-    Order 0 removes the median of each line. Orders 1 and 2 fit each line,
-    average the coefficients over the lines and remove that slope (and
-    curvature) from every line; the offsets of the lines are kept.
+    Order 0 removes the median of each line, orders 1 and 2 remove the fit
+    of each line (offset and slope, and curvature).
 
     inside: pixels used (boolean array, the region of the map), None for all
     the pixels. The other pixels are set to the minimum.
+    parts: parts of the map between the steps of the z motor (see
+    level_steps), None to keep the offsets at the steps of the motor.
     """
     data = numpy.asarray(data, dtype=float)
+    if parts is not None:
+        data = level_steps(data, parts, inside)
+    if inside is not None:
+        inside = numpy.asarray(inside, dtype=bool).T
+    return flatten_rows(data.T, order, inside).T
+
+
+def level_steps(data, parts, inside=None):
+    """Remove the offsets of the height at the steps of the z motor (JPK
+    maps higher than the range of the piezo, where the motor moves between
+    the curves, also in the middle of the lines).
+
+    parts: number of the part of each pixel (-1 without curve), a new part
+    starts at each move of the motor (in the order of the curves: the
+    offset after a move depends on the previous positions of the motor, not
+    only on its position). The offsets of the parts are fitted (least
+    squares, without the outliers) on the height differences between
+    neighbouring pixels of two parts, minus the slope of the surface on each
+    side; the largest part is the reference.
+    """
+    data = numpy.asarray(data, dtype=float)
+    labels = numpy.asarray(parts, dtype=int)
+    used = (labels >= 0) & numpy.isfinite(data)
+    if inside is not None:
+        used &= numpy.asarray(inside, dtype=bool)
+    labels = numpy.where(used, labels, -1)
+
+    # Height differences between the parts (along x, then along y), minus
+    # the slope of the surface on each side
+    pairs_p, pairs_q, differences = [], [], []
+    for axis in (0, 1):
+        h = numpy.moveaxis(data, axis, 0)
+        lab = numpy.moveaxis(labels, axis, 0)
+        use = numpy.moveaxis(used, axis, 0)
+        n = len(h)
+        for k in range(n - 1):
+            pair = use[k] & use[k + 1] & (lab[k] != lab[k + 1])
+            if not pair.any():
+                continue
+            slopes = numpy.zeros(pair.shape)
+            count = numpy.zeros(pair.shape)
+            if k > 0:
+                side = use[k - 1] & (lab[k - 1] == lab[k])
+                slopes[side] += (h[k] - h[k - 1])[side]
+                count[side] += 1
+            if k + 2 < n:
+                side = use[k + 2] & (lab[k + 2] == lab[k + 1])
+                slopes[side] += (h[k + 2] - h[k + 1])[side]
+                count[side] += 1
+            slope = numpy.divide(slopes, count, out=numpy.zeros(pair.shape),
+                                 where=count > 0)
+            pairs_p.append(lab[k][pair])
+            pairs_q.append(lab[k + 1][pair])
+            differences.append((h[k + 1] - h[k] - slope)[pair])
+    if not differences:
+        return data.copy()
+    pairs_p = numpy.concatenate(pairs_p)
+    pairs_q = numpy.concatenate(pairs_q)
+    differences = numpy.concatenate(differences)
+
+    # Offsets of the parts: offset(q) - offset(p) = difference
+    numbers, columns = numpy.unique(numpy.concatenate((pairs_p, pairs_q)),
+                                    return_inverse=True)
+    columns_p = columns[:len(pairs_p)]
+    columns_q = columns[len(pairs_p):]
+    keep = numpy.ones(len(differences), bool)
+    for _ in range(2):
+        rows = numpy.arange(numpy.count_nonzero(keep))
+        matrix = sparse.coo_matrix(
+            (numpy.concatenate((-numpy.ones(len(rows)),
+                                numpy.ones(len(rows)))),
+             (numpy.concatenate((rows, rows)),
+              numpy.concatenate((columns_p[keep], columns_q[keep])))),
+            shape=(len(rows), len(numbers))).tocsr()
+        offsets = sparse_linalg.lsqr(matrix, differences[keep])[0]
+        residuals = offsets[columns_q] - offsets[columns_p] - differences
+        mad = numpy.median(numpy.abs(residuals[keep]))
+        if mad == 0:
+            break
+        keep = numpy.abs(residuals) <= 3 * 1.4826 * mad
+
+    # The largest part is the reference
+    sizes = numpy.bincount(labels[used])
+    offsets -= offsets[numpy.argmax(sizes[numbers])]
+    correction = numpy.zeros(len(sizes))
+    correction[numbers] = offsets
+    new_data = data.copy()
+    new_data[used] -= correction[labels[used]]
+    return new_data
+
+
+def flatten_rows(data, order=1, inside=None):
+    """Flatten a meshgrid along its rows (see flatten): each row minus its
+    median (order 0) or minus its own polynomial fit (orders 1 and 2), on
+    the pixels inside. The rows with too few pixels for the fit only lose
+    their median."""
     vect_x = numpy.arange(data.shape[1])
     if inside is None:
-        if order == 0:
-            new_data = data - numpy.median(data, axis=1)[:, None]
-        else:
-            coefs = numpy.polyfit(vect_x, data.T, order).mean(axis=1)
-            coefs[-1] = 0
-            new_data = data - numpy.polyval(coefs, vect_x)
-
-        # Go to zero after flatten
-        return new_data - numpy.amin(new_data)
-
-    # Only the pixels inside, line by line (lines with too few pixels are
-    # not used for the fit)
+        inside = numpy.ones(data.shape, bool)
     inside = numpy.asarray(inside, dtype=bool)
     new_data = data.copy()
-    all_coefs = []
-    for line, used in zip(data, inside):
-        if order == 0:
+    for k, (line, used) in enumerate(zip(data, inside)):
+        if not used.any():
             continue
-        if numpy.count_nonzero(used) > order:
-            all_coefs.append(numpy.polyfit(vect_x[used], line[used], order))
-    if order == 0:
-        for k in range(len(data)):
-            if inside[k].any():
-                new_data[k] -= numpy.median(data[k][inside[k]])
-    elif all_coefs:
-        coefs = numpy.mean(all_coefs, axis=0)
-        coefs[-1] = 0
-        new_data = data - numpy.polyval(coefs, vect_x)
+        if order > 0 and numpy.count_nonzero(used) > order:
+            coefs = numpy.polyfit(vect_x[used], line[used], order)
+            new_data[k] -= numpy.polyval(coefs, vect_x)
+        else:
+            new_data[k] -= numpy.median(line[used])
 
     # Go to zero after flatten
     if not inside.any():

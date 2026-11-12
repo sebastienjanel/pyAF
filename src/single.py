@@ -57,6 +57,7 @@ current temporary hdf5 file. See the src/tools/temp_file.py for more details.
 
 import numpy
 from . import widgets_list
+from .tools import math_tools
 from .tools import results_sorting
 from .tools.breakthrough_tools import EVENT_VALUES
 
@@ -662,6 +663,8 @@ class SingleFile:
         # If the user has flattened the data in pyAF
         self.applied_flatten_order = None
         self.flatten_applied = False
+        # Offsets at the steps of the z motor removed with the flatten
+        self.applied_flatten_motor = False
 
         # Planefit of the height maps with a substrate ROI as zero plane (see
         # tools.planefit): index of the ROI in roi_list
@@ -716,6 +719,11 @@ class SingleFile:
         # drawn by hand), 1 outside, None if the whole map was recorded.
         # These pixels have no curve, and are always discarded.
         self.outside_region = None
+        # Parts of the map between the moves of the z motor (JPK Smart
+        # Mapping, maps higher than the range of the piezo: number of the
+        # part of each pixel, -1 without curve), None if the motor did not
+        # move. See math_tools.level_steps.
+        self.motor_parts = None
 
         # Plant cells (see tools/plant_tools): positions of the stage and of
         # the scanners (JPK files), position of a single curve on the sample
@@ -1203,6 +1211,18 @@ class SingleFile:
         """True if the pixel (i, j) is outside of the region of the map."""
         return self.outside_region is not None and \
             bool(self.outside_region[i][j])
+
+    def flattened_piezo_image(self, order=None, motor=None):
+        """Piezo image flattened with this order (the applied one by
+        default), without the offsets at the steps of the z motor when motor
+        is True (applied_flatten_motor by default)."""
+        if order is None:
+            order = self.applied_flatten_order
+        if motor is None:
+            motor = self.applied_flatten_motor
+        parts = self.motor_parts if motor else None
+        return math_tools.flatten(self.piezo_image, order,
+                                  self.inside_region(), parts)
 
     def inside_region(self):
         """Pixels of the region of the map (boolean array), None if the

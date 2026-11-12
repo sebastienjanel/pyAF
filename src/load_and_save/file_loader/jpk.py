@@ -1272,8 +1272,11 @@ def check_position(position, pixel, grid):
     """True if the position [x, y] (in m) of a curve is in its pixel (i, j)
     of the grid (dict with the xcenter, ycenter, ulength, vlength, ilength,
     jlength and theta of the grid in the header), False if not. None if it
-    can not be checked: position or grid not known, or rotated grid (the
-    direction of the rotation is not known)."""
+    can not be checked: position or grid not known, rotated grid (the
+    direction of the rotation is not known), or position outside of the grid
+    (not in the frame of the grid: e.g. Smart Mapping files of the software
+    before 8.1.6x, position of the scanner from the center of the grid, the
+    stage moving for the larger maps)."""
     keys = ("xcenter", "ycenter", "ulength", "vlength", "ilength", "jlength")
     if None in position or any(key not in grid for key in keys) or \
             abs(grid.get("theta", 0.0)) > 1e-9:
@@ -1284,6 +1287,9 @@ def check_position(position, pixel, grid):
         return None
     i = (position[0] - grid["xcenter"]) / size_x + (grid["ilength"] - 1) / 2
     j = (position[1] - grid["ycenter"]) / size_y + (grid["jlength"] - 1) / 2
+    if not (-0.5 <= i < grid["ilength"] - 0.5 and
+            -0.5 <= j < grid["jlength"] - 0.5):
+        return None
     return round(i) == pixel[0] and round(j) == pixel[1]
 
 

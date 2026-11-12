@@ -101,6 +101,13 @@ def get_surface(parent, data, mode):
     topo = get_topography_for_geometry(data)
     mt = map_type(data)
     volume = is_volume(data)
+    # Surface only (not the volume of the tomography): only the squares
+    # whose four corners have a height, the surface ends at the edge of the
+    # region of the map and around the pixels without point of contact (not
+    # down to the lowest level)
+    drawn = None
+    if not volume:
+        drawn = map_values.has_height(data)
     # Without smoothing, each pixel has its own color (no interpolation of
     # the colors between the pixels)
     pixel_colors = data.vtk_smoothing_type is None
@@ -175,6 +182,12 @@ def get_surface(parent, data, mode):
 
     for i in range(data.opengl_slice_bottom, data.opengl_slice_top, 1):
         for j in range(data.opengl_slice_left, data.opengl_slice_right, 1):
+            if drawn is not None and not (
+                    drawn[i][j] and drawn[i][j + 1] and drawn[i + 1][j] and
+                    drawn[i + 1][j + 1]):
+                widgets_list.widget_progressbar.update()
+                continue
+
             z1 = z_array[i][j]
             z2 = z_array[i][j + 1]
             z3 = z_array[i + 1][j]
@@ -268,8 +281,8 @@ def get_surface(parent, data, mode):
     # Translate to 0,0,0
     polydata = center_data(polydata, data.scan_size_x, data.scan_size_y)
 
-    # Get the z scale
-    tmp_z = numpy.array(tmp_z)
+    # Get the z scale (no square drawn: the heights of the map)
+    tmp_z = numpy.array(tmp_z) if tmp_z else z_array
     if mode == "bottom":
         z_scale = numpy.amin(tmp_z)
     elif mode == "top":
