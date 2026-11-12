@@ -41,7 +41,9 @@ the piezo), for maps higher than the range of the z piezo.
         multi-scan-series and shared-data prefixes), and for each curve
         (row): its position index (meta-data/valid-indices) and position
         (Position_Values, [x, y] in m)
-    /Measurement_000/Map/SegmentN: style of the segment (attribute), number
+    /Measurement_000/Map/SegmentN: style of the segment (attribute; or
+        segments named Extend, Retract... in the files of the software
+        before 8.1.6x), number
         of points of each curve (meta-data/num-points, the curves are
         padded to the longest one) and the channels (ChannelK/Name, one row
         per curve, the raw values are converted with the net-encoder
@@ -85,13 +87,34 @@ def read_attributes(node):
     return attributes
 
 
+# Segments named by their style (files of the software before 8.1.6x:
+# Extend, Retract... without style attribute), in the order of a curve
+NAMED_SEGMENTS = ("extend", "pause", "modulation", "retract")
+
+
 def segment_groups(afm_file):
-    """Segment groups of the map ({segment number: group})."""
+    """Segment groups of the map ({segment number: group}): SegmentN, or the
+    segments named by their style (numbered in the order of a curve)."""
     groups = {}
+    named = {}
     for name, group in afm_file.get_node(MAP)._v_children.items():
         if name.startswith("Segment") and name[7:].isdigit():
             groups[int(name[7:])] = group
+        elif name.lower() in NAMED_SEGMENTS:
+            named[name.lower()] = group
+    if not groups:
+        groups = {number: named[style] for number, style in
+                  enumerate(s for s in NAMED_SEGMENTS if s in named)}
     return groups
+
+
+def segment_style(group):
+    """Style of a segment (extend, retract, pause, modulation): its
+    attribute, or its name (see NAMED_SEGMENTS)."""
+    style = read_attributes(group).get("style")
+    if style is None and group._v_name.lower() in NAMED_SEGMENTS:
+        style = group._v_name.lower()
+    return style
 
 
 def channel_nodes(group):
@@ -127,7 +150,7 @@ def check_file(path):
         info = read_attributes(afm_file.root).get("file-format-info", "")
         if "Force Map" not in info or MAP not in afm_file:
             return "Not a JPK force map", 0
-        styles = {read_attributes(group).get("style")
+        styles = {segment_style(group)
                   for group in segment_groups(afm_file).values()}
         if "extend" not in styles or "retract" not in styles:
             return "No force curves in the file", 0
@@ -223,7 +246,7 @@ class LoaderJPKSmart(LoaderJPK):
         # Segments
         for segment_nbr in sorted(self.groups):
             group = self.groups[segment_nbr]
-            style = read_attributes(group).get("style")
+            style = segment_style(group)
             if style is None:
                 continue
             self.segments_types.append([segment_nbr, style])
