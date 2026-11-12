@@ -602,7 +602,11 @@ class PlotCurve(MainPlot, CommonCurveTools):
                     xycoords = "axes fraction",
                     fontproperties = self.font)
 
-            if pt == "fit_preview" and ct == "events":
+            # Fits of the jump of contact of the events (not for the loading
+            # rates display)
+            if pt == "fit_preview" and ct == "events" and \
+                    self.curve_retraction is not None and \
+                    self.fits_lines_conv is not None:
                 self.plot_fits_lines(
                     self.curve_retraction[0], self.fits_lines_conv)
 

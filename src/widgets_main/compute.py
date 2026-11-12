@@ -1568,6 +1568,17 @@ class ComputeWidget(PYAFWidget):
             self.list_stiffness_mode.blockSignals(False)
 
         if element == "events_curve_type" or element == "all":
+            # Loading rates of the events: once the events are computed
+            # (the curve without them otherwise)
+            position = self.list_events_curve_type.findData("loading_rates")
+            if data.events_calculated:
+                gui_tools.enable_combobox_item(
+                    self.list_events_curve_type, position)
+            else:
+                gui_tools.disable_combobox_item(
+                    self.list_events_curve_type, position)
+                if data.events_curve_type == "loading_rates":
+                    data.events_curve_type = "curve"
             self.list_events_curve_type.blockSignals(True)
             self.list_events_curve_type.setCurrentIndex(
                 self.list_events_curve_type.findData(data.events_curve_type))
@@ -2040,6 +2051,8 @@ class ComputeWidget(PYAFWidget):
             self.update_GUI("microrheo")
             self.update_GUI("plant")
             self.update_GUI("get_lr")
+            # Loading rates display: with the events
+            self.update_GUI("events_curve_type")
             # New maps to draw on in the ROI manager
             if widgets_list.widget_roi_manager is not None:
                 widgets_list.widget_roi_manager.update_widget()
