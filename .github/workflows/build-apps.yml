@@ -38,9 +38,9 @@ jobs:
     steps:
       # Checked out in a folder named pyAF (pyAF imports itself under this
       # name, see main.py)
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -124,7 +124,7 @@ jobs:
           install -m 755 packaging/linux/install.sh "dist/$APP/install.sh"
           XZ_OPT=-T0 tar -C dist -cJf "$PACKAGE-$PYAF_VERSION.tar.xz" "$APP"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pyAF-${{ matrix.system }}
           path: |
@@ -138,12 +138,12 @@ jobs:
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: apps
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: apps/*
           draft: true
