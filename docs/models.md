@@ -239,7 +239,7 @@ No value is given (NaN) on a saddle or a flat wall ($\kappa_M \le 0$), if $L\kap
 
 $$(h_q - o_q) - (h_p - o_p) = s_{pq}$$
 
-$s_{pq}$ is the slope of the surface (mean of the height differences on each side of the pair, in each part). The pairs with a residual above $3 \times 1.4826$ MAD are removed and the fit done again; the largest part is the reference. The levelling is done before the flatten.
+$s_{pq}$ is the slope of the surface (mean of the height differences on each side of the pair, in each part). A pair weighs the number of sides with a slope (1 or 2), and 0.05 without slope (across the lines, the neighbouring lines are often in other parts: the slope is taken as 0). The pairs with a residual above $3 \times 1.4826$ MAD are removed and the fit done again; the largest part is the reference. The levelling is done before the flatten.
 
 **Planefit**: the plane fitted on a substrate ROI is subtracted from the height maps.
 

@@ -46,8 +46,9 @@ QWidget
 {
     color: #31363B;
     background-color: #eceef1;
-    selection-background-color:#3b8eea;
-    selection-color: #31363B;
+    /* Selection: white on a deeper blue than the accent (contrast) */
+    selection-background-color:#2a74d4;
+    selection-color: #ffffff;
     background-clip: border;
     border-image: none;
     border: 0px transparent black;
@@ -56,13 +57,14 @@ QWidget
 
 QWidget:item:hover
 {
-    background-color: #3b8eea;
-    color: #31363B;
+    background-color: #2a74d4;
+    color: #ffffff;
 }
 
 QWidget:item:selected
 {
-    background-color: #3b8eea;
+    background-color: #2a74d4;
+    color: #ffffff;
 }
 
 
@@ -276,7 +278,7 @@ QMenu::item
 
 QMenu::item:selected
 {
-    color: #31363B;
+    color: #ffffff;
 }
 
 QMenu::separator
@@ -374,7 +376,7 @@ QLineEdit {
     border: 1px solid #c4c7cc;
     border-radius: 5px;
     color: #31363B;
-    selection-background-color: #3b8eea;
+    selection-background-color: #2a74d4;
 }
 
 QLineEdit:focus {
@@ -717,7 +719,7 @@ QPushButton:focus
 
 QComboBox
 {
-    selection-background-color: #3b8eea;
+    selection-background-color: #2a74d4;
     /* White, as the input fields (also on the tint of the boxes) */
     background-color: #ffffff;
     border-style: solid;
@@ -777,7 +779,7 @@ QComboBox QAbstractItemView
     background-color: #FCFCFC;
     border-radius: 0.2ex;
     border: 0.1ex solid #BAB9B8;
-    selection-background-color: #3b8eea;
+    selection-background-color: #2a74d4;
 }
 
 QComboBox::drop-down
@@ -1421,41 +1423,41 @@ QHeaderView
 
 QTableView::item:pressed
 {
-    background: #3b8eea;
-    color: #31363B;
+    background: #2a74d4;
+    color: #ffffff;
 }
 
 QTableView::item:selected:active
 {
-    background: #3b8eea;
-    color: #31363B;
+    background: #2a74d4;
+    color: #ffffff;
 }
 
 QTableView::item:selected:hover
 {
-    background-color: #47b8f3;
-    color: #31363B;
+    background-color: #2a74d4;
+    color: #ffffff;
 }
 
 QListView::item:pressed,
 QTreeView::item:pressed
 {
-    background: #3b8eea;
-    color: #31363B;
+    background: #2a74d4;
+    color: #ffffff;
 }
 
 QTreeView::item:selected:active,
 QListView::item:selected:active
 {
-    background: #3b8eea;
-    color: #31363B;
+    background: #2a74d4;
+    color: #ffffff;
 }
 
 QListView::item:selected:hover,
 QTreeView::item:selected:hover
 {
-    background-color: #3b8eea;
-    color: #31363B;
+    background-color: #2a74d4;
+    color: #ffffff;
 }
 
 

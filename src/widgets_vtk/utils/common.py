@@ -59,16 +59,12 @@ def center_data(data, size_x, size_y, off=None):
 
     trans = vtk.vtkTransform()
     trans.Translate(-size_x / 2.0 + off_x, -size_y / 2.0 + off_y, 0.0)
-    trans_filter = vtk.vtkTransformPolyDataFilter()
+    trans_filter = vtk.vtkTransformFilter()
     trans_filter.SetTransform(trans)
+    trans_filter.SetInputData(data)
+    trans_filter.Update()
 
-    if vtk.VTK_MAJOR_VERSION <= 5:
-        trans_filter.SetInput(data)
-    else:
-        trans_filter.SetInputData(data)
-        trans_filter.Update()
-
-    return trans_filter.GetOutput()
+    return trans_filter.GetPolyDataOutput()
 
 
 def fill_image_sizes(parent, size, cal):

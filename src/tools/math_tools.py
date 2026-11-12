@@ -139,6 +139,13 @@ def flatten(data, order=1, inside=None, parts=None):
     return flatten_rows(data.T, order, inside).T
 
 
+# Weight in the fit of the offsets of the pairs of pixels without slope of
+# the surface (no neighbour of the same part on either side: across the
+# lines, the neighbouring lines are often in other parts), the pairs with
+# the slope of one or both sides weigh 1 or 2
+NO_SLOPE_WEIGHT = 0.05
+
+
 def level_steps(data, parts, inside=None):
     """Remove the offsets of the height at the steps of the z motor (JPK
     maps higher than the range of the piezo, where the motor moves between
@@ -161,7 +168,7 @@ def level_steps(data, parts, inside=None):
 
     # Height differences between the parts (along x, then along y), minus
     # the slope of the surface on each side
-    pairs_p, pairs_q, differences = [], [], []
+    pairs_p, pairs_q, differences, weights = [], [], [], []
     for axis in (0, 1):
         h = numpy.moveaxis(data, axis, 0)
         lab = numpy.moveaxis(labels, axis, 0)
@@ -186,11 +193,13 @@ def level_steps(data, parts, inside=None):
             pairs_p.append(lab[k][pair])
             pairs_q.append(lab[k + 1][pair])
             differences.append((h[k + 1] - h[k] - slope)[pair])
+            weights.append(numpy.maximum(count, NO_SLOPE_WEIGHT)[pair])
     if not differences:
         return data.copy()
     pairs_p = numpy.concatenate(pairs_p)
     pairs_q = numpy.concatenate(pairs_q)
     differences = numpy.concatenate(differences)
+    weights = numpy.concatenate(weights)
 
     # Offsets of the parts: offset(q) - offset(p) = difference
     numbers, columns = numpy.unique(numpy.concatenate((pairs_p, pairs_q)),
@@ -200,13 +209,14 @@ def level_steps(data, parts, inside=None):
     keep = numpy.ones(len(differences), bool)
     for _ in range(2):
         rows = numpy.arange(numpy.count_nonzero(keep))
+        weight = weights[keep]
         matrix = sparse.coo_matrix(
-            (numpy.concatenate((-numpy.ones(len(rows)),
-                                numpy.ones(len(rows)))),
+            (numpy.concatenate((-weight, weight)),
              (numpy.concatenate((rows, rows)),
               numpy.concatenate((columns_p[keep], columns_q[keep])))),
             shape=(len(rows), len(numbers))).tocsr()
-        offsets = sparse_linalg.lsqr(matrix, differences[keep])[0]
+        offsets = sparse_linalg.lsqr(matrix, weight * differences[keep],
+                                     atol=1e-12, btol=1e-12)[0]
         residuals = offsets[columns_q] - offsets[columns_p] - differences
         mad = numpy.median(numpy.abs(residuals[keep]))
         if mad == 0:

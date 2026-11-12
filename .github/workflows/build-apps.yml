@@ -69,6 +69,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller==6.22.3
 
+      # Checks of the calculations (synthetic data, a few seconds): no
+      # application if they fail
+      - name: Tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover tests -v
+
       - name: Build
         run: pyinstaller --noconfirm pyAF.spec
 

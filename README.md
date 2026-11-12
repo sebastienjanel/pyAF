@@ -101,6 +101,12 @@ Next times: open a terminal, go to the `pyAF` folder, activate the environment (
     git pull
     pip install -r requirements.txt
 
+### Tests
+
+Checks of the calculations (flatten, contact models, bottom effect correction, plant cells) on synthetic data, from the `pyAF` folder:
+
+    python -m unittest discover tests
+
 ### With PyCharm (free for academics)
 
 - File / Project from Version Control: https://github.com/sebastienjanel/pyAF.git

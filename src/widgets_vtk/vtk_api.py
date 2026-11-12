@@ -48,7 +48,7 @@ from vtkmodules.vtkFiltersCore import (  # noqa: F401
     vtkCleanPolyData, vtkTubeFilter, vtkPolyDataNormals,
     vtkPolyDataConnectivityFilter, vtkMarchingCubes, vtkDecimatePro,
     vtkAppendPolyData)
-from vtkmodules.vtkFiltersGeneral import vtkTransformPolyDataFilter  # noqa: F401
+from vtkmodules.vtkFiltersGeneral import vtkTransformFilter  # noqa: F401
 from vtkmodules.vtkFiltersModeling import (  # noqa: F401
     vtkLoopSubdivisionFilter, vtkFillHolesFilter)
 from vtkmodules.vtkFiltersSources import vtkSphereSource, vtkPlaneSource  # noqa: F401
