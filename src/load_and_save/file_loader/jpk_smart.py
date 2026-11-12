@@ -72,6 +72,12 @@ HEIGHT_CHANNELS = ("combinedHeightMeasured", "combinedHeight",
                    "measuredHeight", "height")
 # Height channels from the z sensor
 SENSOR_CHANNELS = ("combinedHeightMeasured", "measuredHeight")
+# Height of the head without the z motor, for each combined height (the
+# position of the motor is the difference)
+MOTOR_CHANNELS = {"combinedHeightMeasured": "measuredHeight",
+                  "combinedHeight": "height"}
+# Smallest move of the z motor (nm)
+MOTOR_TOLERANCE = 10.0
 
 
 def read_attributes(node):
@@ -403,6 +409,50 @@ class LoaderJPKSmart(LoaderJPK):
         for pixel in self.pixels:
             outside[pixel] = 0
         self.data.outside_region = outside if outside.any() else None
+
+    def fetch_curves(self):
+        """Loads the curves (see LoaderJPK), and the parts of the map
+        between the moves of the z motor."""
+        super().fetch_curves()
+        self.data.motor_parts = self.motor_parts()
+
+    def motor_parts(self):
+        """Parts of the map between the moves of the z motor (number of the
+        part of each pixel, -1 without curve; see math_tools.level_steps),
+        None if the motor did not move or without combined height.
+
+        The position of the motor is the combined height minus the height
+        of the head (MOTOR_CHANNELS), at the end of the extend segment."""
+        partner = MOTOR_CHANNELS.get(self.height_channel_name)
+        channels = self.channels_of[self.segments["extend"]]
+        if partner not in channels:
+            return None
+        attributes = channels[partner][1]
+        multiplier = float(
+            attributes.get("net-encoder.scaling.multiplier", 1.0))
+        offset = float(attributes.get("net-encoder.scaling.offset", 0.0))
+
+        parts = -numpy.ones((self.data.nbr_pixels_x, self.data.nbr_pixels_y),
+                            int)
+        part = -1
+        last = None
+        for index_nbr in range(self.data.real_nbr_pixels):
+            if not self.corrupted_pixel[index_nbr]:
+                continue
+            last_point = self.nbr_points_array_approach[index_nbr] - 1
+            combined = channels[self.height_channel_name][0][
+                index_nbr, last_point]
+            head = channels[partner][0][index_nbr, last_point]
+            # nm
+            motor = self.convert_height(combined) - \
+                (head * multiplier + offset) * 1e9
+            if last is None or abs(motor - last) > MOTOR_TOLERANCE:
+                part += 1
+            last = motor
+            parts[self.pixels[index_nbr]] = part
+        if part < 1:
+            return None
+        return parts
 
     def read_segment(self, index_nbr, segment, nbr_points):
         """Raw values of the height and of the deflection of a segment of

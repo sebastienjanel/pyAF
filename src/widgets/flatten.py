@@ -34,7 +34,7 @@
 
 from qtpy import QtWidgets
 from ..tools.gui_tools import PYAFButton
-from ..tools.gui_tools import PYAFCheckBox
+from ..tools.gui_tools import PYAFToggle
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools.PYAFWidget import PYAFWidget
 from .. import widgets_list
@@ -52,28 +52,30 @@ class FlattenWidget(PYAFWidget):
         else:
             flatten_order = 1
         shared.exp.selected_flatten_order = flatten_order
+        if shared.exp.current_data.flatten_applied:
+            shared.exp.selected_flatten_motor = \
+                shared.exp.current_data.applied_flatten_motor
 
         self.box_flatten = QtWidgets.QGroupBox("Flatten")
         self.VL_box_flatten = QtWidgets.QVBoxLayout()
 
+        # The maps fill the free space of the window
         self.HL_flatten_canvas = QtWidgets.QHBoxLayout()
-        self.W_original = QtWidgets.QWidget()
-        self.W_original.setFixedSize(216, 216)
+        self.W_original = self.canvas_widget()
         mesh_type = "small_meshgrid_for_correction_original"
         self.MPL_canvas_original = \
             PYAFPlot(self, mesh_type, self.W_original, [3, 3, 72])
-        self.canvas_flatten_widget = QtWidgets.QWidget()
-        self.canvas_flatten_widget.setFixedSize(216, 216)
+        self.W_original.layout().addWidget(self.MPL_canvas_original)
+        self.canvas_flatten_widget = self.canvas_widget()
         mesh_type = "small_meshgrid_for_correction"
         self.MPL_canvas_flatten = \
             PYAFPlot(self, mesh_type, self.canvas_flatten_widget, [3, 3, 72])
+        self.canvas_flatten_widget.layout().addWidget(self.MPL_canvas_flatten)
         if shared.exp.current_data.is_single is False:
             self.update_MPL("MPL_canvas_flatten")
 
-        self.HL_flatten_canvas.addStretch(1)
         self.HL_flatten_canvas.addWidget(self.W_original)
         self.HL_flatten_canvas.addWidget(self.canvas_flatten_widget)
-        self.HL_flatten_canvas.addStretch(1)
 
         self.flatten_buttons_HL = QtWidgets.QHBoxLayout()
         self.BT_apply_flatten = PYAFButton(self, "apply_flatten", "Apply")
@@ -81,13 +83,21 @@ class FlattenWidget(PYAFWidget):
             PYAFButton(self, "remove_flatten", "Go back to original")
         self.update_GUI("buttons_flatten")
 
-        self.CB_apply_flatten_on_all = \
-            PYAFCheckBox(self, "apply_flatten_on_all", "Apply on all")
+        self.TG_apply_flatten_on_all = \
+            PYAFToggle(self, "apply_flatten_on_all", "Apply on all")
 
         if len(shared.exp.list) < 2:
-            self.CB_apply_flatten_on_all.setEnabled(False)
+            self.TG_apply_flatten_on_all.setEnabled(False)
         if shared.exp.flatten_correction_all:
-            self.CB_apply_flatten_on_all.setChecked(True)
+            self.TG_apply_flatten_on_all.setChecked(True)
+
+        # Offsets at the steps of the z motor (JPK Smart Mapping)
+        self.TG_flatten_motor = \
+            PYAFToggle(self, "flatten_motor", "Level the z motor steps")
+        self.TG_flatten_motor.setToolTip(
+            "Removes the height offsets at each move of the z motor "
+            "(maps higher than the range of the piezo), before the flatten")
+        self.update_GUI("checkbox_flatten_motor")
 
         self.label_radiobuttons_order = QtWidgets.QLabel()
         self.label_radiobuttons_order.setText("Order : ")
@@ -98,8 +108,8 @@ class FlattenWidget(PYAFWidget):
         self.RV_flatten_order1.setText("1")
         self.RV_flatten_order2.setText("2")
         self.RV_flatten_order0.setToolTip("Offset of each line")
-        self.RV_flatten_order1.setToolTip("Slope")
-        self.RV_flatten_order2.setToolTip("Slope and curvature")
+        self.RV_flatten_order1.setToolTip("Offset and slope of each line")
+        self.RV_flatten_order2.setToolTip("Offset, slope and curvature of each line")
         self.update_GUI("radiobuttons_flatten_order")
         self.RV_flatten_order0.clicked.connect(
             lambda: self.button_clicked("radiobutton_flatten_order0"))
@@ -116,15 +126,26 @@ class FlattenWidget(PYAFWidget):
         self.flatten_buttons_HL.addWidget(self.RV_flatten_order2)
         self.flatten_buttons_HL.addStretch(1)
 
-        self.VL_box_flatten.addLayout(self.HL_flatten_canvas)
+        self.VL_box_flatten.addLayout(self.HL_flatten_canvas, 1)
         self.VL_box_flatten.addLayout(self.flatten_buttons_HL)
-        self.VL_box_flatten.addWidget(self.CB_apply_flatten_on_all)
-        self.VL_box_flatten.addStretch(1)
+        self.VL_box_flatten.addWidget(self.TG_flatten_motor)
+        self.VL_box_flatten.addWidget(self.TG_apply_flatten_on_all)
         self.box_flatten.setLayout(self.VL_box_flatten)
 
         self.gridLayout = QtWidgets.QGridLayout()
         self.gridLayout.addWidget(self.box_flatten, 0, 0)
         self.setLayout(self.gridLayout)
+
+    @staticmethod
+    def canvas_widget():
+        """Widget holding a map, which grows with the window."""
+        widget = QtWidgets.QWidget()
+        widget.setMinimumSize(216, 216)
+        widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                             QtWidgets.QSizePolicy.Expanding)
+        layout = QtWidgets.QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        return widget
 
     def button_clicked(self, name):
         """Called when a button is clicked."""
@@ -136,10 +157,16 @@ class FlattenWidget(PYAFWidget):
                     data = shared.exp.list[i]
                     data.applied_flatten_order = \
                         shared.exp.selected_flatten_order
+                    data.applied_flatten_motor = \
+                        shared.exp.selected_flatten_motor and \
+                        data.motor_parts is not None
                     data.flatten_applied = True
 
             else:
                 data.applied_flatten_order = shared.exp.selected_flatten_order
+                data.applied_flatten_motor = \
+                    shared.exp.selected_flatten_motor and \
+                    data.motor_parts is not None
                 data.flatten_applied = True
             widgets_list.widget_compute.update_MPL("MPL_meshgrid")
             self.BT_remove_flatten.setEnabled(True)
@@ -149,9 +176,11 @@ class FlattenWidget(PYAFWidget):
             if shared.exp.flatten_correction_all:
                 for i in range(len(shared.exp.list)):
                     shared.exp.list[i].applied_flatten_order = None
+                    shared.exp.list[i].applied_flatten_motor = False
                     shared.exp.list[i].flatten_applied = False
             else:
                 data.applied_flatten_order = None
+                data.applied_flatten_motor = False
                 data.flatten_applied = False
 
             widgets_list.widget_compute.update_MPL("MPL_meshgrid")
@@ -173,11 +202,16 @@ class FlattenWidget(PYAFWidget):
     def checkbox_clicked(self, name):
         """Called when a checkbox is clicked."""
         if name == "apply_flatten_on_all":
-            state = self.CB_apply_flatten_on_all.isChecked()
+            state = self.TG_apply_flatten_on_all.isChecked()
             if state:
                 shared.exp.flatten_correction_all = True
             else:
                 shared.exp.flatten_correction_all = False
+
+        elif name == "flatten_motor":
+            shared.exp.selected_flatten_motor = \
+                self.TG_flatten_motor.isChecked()
+            self.update_MPL("MPL_canvas_flatten")
 
     def update_MPL(self, name):
         """Updates the plot."""
@@ -192,6 +226,7 @@ class FlattenWidget(PYAFWidget):
         """Update the widget (GUI and plots)."""
         self.update_MPL("MPL_canvas_flatten")
         self.update_GUI("radiobuttons_flatten_order")
+        self.update_GUI("checkbox_flatten_motor")
         self.update_GUI("buttons_flatten")
 
     def update_GUI(self, what):
@@ -207,6 +242,15 @@ class FlattenWidget(PYAFWidget):
                 self.RV_flatten_order2.setChecked(True)
             else:
                 self.RV_flatten_order1.setChecked(True)
+
+        elif what == "checkbox_flatten_motor":
+            data = shared.exp.current_data
+            motor = shared.exp.selected_flatten_motor
+            if data.flatten_applied:
+                motor = data.applied_flatten_motor
+            self.TG_flatten_motor.setEnabled(data.motor_parts is not None)
+            self.TG_flatten_motor.setChecked(
+                motor and data.motor_parts is not None)
 
         elif what == "buttons_flatten":
             if shared.exp.current_data.flatten_applied is False:

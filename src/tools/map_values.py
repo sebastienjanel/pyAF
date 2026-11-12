@@ -160,9 +160,25 @@ def height(data):
     topography (opengl_height), with the planefit. Pixels without height
     (no point of contact) at the lowest level, as VTK needs finite
     coordinates."""
-    use_topo = getattr(data, "opengl_height", "topo") == "topo" and \
-        data.stiffness_calculated
-    array = values(data, "topo" if use_topo else "piezo")
-    finite = numpy.isfinite(array)
+    array = height_values(data)
+    finite = has_height(data)
     array[~finite] = array[finite].min() if finite.any() else 0.0
     return array
+
+
+def height_values(data):
+    """Piezo height or zero-force topography (opengl_height) [nm], with the
+    planefit, nan without point of contact."""
+    use_topo = getattr(data, "opengl_height", "topo") == "topo" and \
+        data.stiffness_calculated
+    return values(data, "topo" if use_topo else "piezo")
+
+
+def has_height(data):
+    """Pixels with a height in the 3D view (boolean array [x][y]): inside
+    the region of the map, with a point of contact for the topography."""
+    finite = numpy.isfinite(height_values(data))
+    inside = data.inside_region()
+    if inside is not None:
+        finite &= inside
+    return finite

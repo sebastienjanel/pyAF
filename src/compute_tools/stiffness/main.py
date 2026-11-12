@@ -48,7 +48,6 @@ if multiprocessing.current_process().name == "MainProcess":
     # Do not reimport this in the child processes.
     import os
     from ...tools import misc_tools
-    from ...tools import math_tools
     from ...tools import planefit
     from ...widgets.progressbar import Progressbar
     from ... import widgets_list
@@ -166,9 +165,7 @@ class Stiffness:
         piezo_image = \
             numpy.zeros([data.nbr_pixels_x, data.nbr_pixels_y], float)
         if data.flatten_applied:
-            piezo_image = math_tools.flatten(data.piezo_image,
-                                             data.applied_flatten_order,
-                                             data.inside_region())
+            piezo_image = data.flattened_piezo_image()
         else:
             piezo_image[:, :] = data.piezo_image
 

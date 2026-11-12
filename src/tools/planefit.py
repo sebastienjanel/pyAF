@@ -153,9 +153,7 @@ def piezo_map(data, flatten=True):
     """Displayed piezo height (with the flatten of the compute tab when
     flatten is True, and the planefit)."""
     if flatten and data.flatten_applied:
-        array = math_tools.flatten(data.piezo_image,
-                                   data.applied_flatten_order,
-                                   data.inside_region())
+        array = data.flattened_piezo_image()
     else:
         array = data.piezo_image
     return apply_planefit(data, numpy.array(array, dtype=float))

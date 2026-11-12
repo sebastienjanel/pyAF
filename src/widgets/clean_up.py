@@ -165,6 +165,9 @@ class CleanUpWidget(PYAFWidget):
             # Piezo_image needs also to be replaced
             self.data.piezo_image[orig_x, orig_y] = \
                 self.data.piezo_image[new_x][new_y]
+            if self.data.motor_parts is not None:
+                self.data.motor_parts[orig_x, orig_y] = \
+                    self.data.motor_parts[new_x][new_y]
             # Update positions
             self.data.approach_positions[orig_x, orig_y] = \
                 self.data.approach_positions[new_x][new_y]
@@ -185,6 +188,9 @@ class CleanUpWidget(PYAFWidget):
                 # Piezo image needs also to be replaced
                 self.data.piezo_image[orig_x, j] = \
                     self.data.piezo_image[new_x][j]
+                if self.data.motor_parts is not None:
+                    self.data.motor_parts[orig_x, j] = \
+                        self.data.motor_parts[new_x][j]
                 # Update positions
                 self.data.approach_positions[orig_x, j] = \
                     self.data.approach_positions[new_x][j]
@@ -204,6 +210,9 @@ class CleanUpWidget(PYAFWidget):
                 # Piezo image needs also to be replaced
                 self.data.piezo_image[i, orig_y] = \
                     self.data.piezo_image[i][new_y]
+                if self.data.motor_parts is not None:
+                    self.data.motor_parts[i, orig_y] = \
+                        self.data.motor_parts[i][new_y]
                 # Update positions
                 self.data.approach_positions[i, orig_y] = \
                     self.data.approach_positions[i][new_y]

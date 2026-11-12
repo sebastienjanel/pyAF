@@ -72,8 +72,11 @@ class RoiManagerWidget(PYAFWidget):
         self.setWindowTitle("ROI Manager")
 
         self.BG_selected = None
-        # Drawing: "select" (click: curve), "roi_add" or "roi_erase"
-        self.cursor_mode = "select"
+        # Drawing: "select" (click: curve), "roi_add" (default) or
+        # "roi_erase"
+        self.cursor_mode = "roi_add"
+        # Tool of the maps while a single curve is shown (Select curve)
+        self.map_tool = None
         self.drawing = False
         # File of the map displayed
         self.shown_file = None
@@ -134,7 +137,8 @@ class RoiManagerWidget(PYAFWidget):
         for index, button in enumerate((self.RB_select, self.RB_draw,
                                         self.RB_erase)):
             self.BG_tool.addButton(button, index)
-        self.RB_select.setChecked(True)
+        self.RB_draw.setChecked(True)
+        self.change_cursor_mode(self.cursor_mode)
         self.label_no_map = QtWidgets.QLabel(
             "Single curve: no map. Its cell is drawn on the map where it was "
             "recorded.")
@@ -251,14 +255,13 @@ class RoiManagerWidget(PYAFWidget):
         data = shared.exp.current_data
 
         if button == "add":
-            if data.roi_selected_row is None:
-                data.roi_selected_row = 0
-
             newid = len(data.roi_list)
 
             self.logger.debug("Adding ROI %s", newid)
 
             data.roi_list.append(new_roi(data, newid))
+            # The new ROI is the one drawn (Draw column)
+            data.roi_selected_row = newid
 
             self.update_widget()
             self.update_results()
@@ -667,8 +670,15 @@ class RoiManagerWidget(PYAFWidget):
             widget.setEnabled(not data.is_single)
         self.label_no_map.setVisible(data.is_single)
         if data.is_single and self.cursor_mode != "select":
+            # Tool of the maps, back with the next map
+            self.map_tool = self.cursor_mode
             self.RB_select.setChecked(True)
             self.change_cursor_mode("select")
+        elif not data.is_single and self.map_tool is not None:
+            self.BG_tool.button(("select", "roi_add", "roi_erase").index(
+                self.map_tool)).setChecked(True)
+            self.change_cursor_mode(self.map_tool)
+            self.map_tool = None
 
         if self.shown_file is not data:
             self.shown_file = data

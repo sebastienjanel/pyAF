@@ -32,7 +32,8 @@
 
 """Plots a small meshgrid on the compute tab, displaying the piezo height."""
 
-from ...tools import math_tools
+import numpy
+
 from .plot_meshgrid import PlotMeshGrid
 
 
@@ -46,10 +47,7 @@ class PlotSmallMeshGridCompute(PlotMeshGrid):
         super().__init__(parent)
 
         if self.data.flatten_applied:
-            self.temp_array[:] = math_tools.flatten(
-                self.data.piezo_image,
-                self.data.applied_flatten_order,
-                self.data.inside_region())
+            self.temp_array[:] = self.data.flattened_piezo_image()
         else:
             self.temp_array[:] = self.data.piezo_image
 
@@ -61,7 +59,8 @@ class PlotSmallMeshGridCompute(PlotMeshGrid):
         # Overwrite colormap to have always a copper colormap for
         #  these meshgrids
         self.colormap = self.colortables.colortables_mpl_list[0]
-        self.colortable_max_value = self.data.max_piezo
+        # Range of the displayed (flattened) heights
+        self.colortable_max_value = numpy.amax(self.temp_array)
         self.colortable_min_value = 0
 
         self.plot_fig()
