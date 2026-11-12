@@ -50,7 +50,8 @@ def fit_substrate(data, roi):
     if data.stiffness_calculated and data.topography is not None:
         heights = numpy.asarray(data.topography, dtype=float)
     else:
-        heights = numpy.asarray(data.piezo_image, dtype=float)
+        # With the flatten, as displayed
+        heights = data.piezo_for(data.flatten_state())
     pixels = numpy.asarray(roi.values, dtype=int).reshape(-1, 2)
     if not len(pixels):
         return None
@@ -165,9 +166,9 @@ def topo_map(data):
 
 
 def reset_color_scales(data):
-    """Color scales of the height maps after a change of the planefit: the
-    range of the planefitted values, or the default scales without
-    planefit."""
+    """Color scales of the height maps after a change of the planefit or of
+    the flatten: the range of the planefitted values, or the default scales
+    without planefit."""
     if get_planefit_roi(data) is not None:
         for array, opts in ((piezo_map(data), data.color_opts_piezo),
                             (topo_map(data) if data.stiffness_calculated
@@ -182,7 +183,8 @@ def reset_color_scales(data):
             low, high = numpy.nanmin(values), numpy.nanmax(values)
             opts[1], opts[2], opts[3] = low, high, (low + high) / 2.0
     else:
-        piezo = numpy.asarray(data.piezo_image, dtype=float)
+        # Piezo height as displayed (flatten)
+        piezo = numpy.asarray(piezo_map(data), dtype=float)
         if data.inside_region() is not None:
             piezo = piezo[data.inside_region()]
         high = numpy.median(piezo) + 3 * numpy.std(piezo)

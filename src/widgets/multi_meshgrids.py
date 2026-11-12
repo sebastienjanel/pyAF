@@ -284,9 +284,10 @@ class MultiMeshgridsWidget(PYAFWidget):
 
         Allows to change to another file and to another curve.
         """
-        if event.button == 1:
+        if event.button == 1 and event.inaxes is not None:
             for plot in self.canvas_list:
-                if event.inaxes == plot.canvas.axes:
+                # Not the single curves (no map, no axes)
+                if event.inaxes is getattr(plot.canvas, "axes", None):
                     data_id = plot.data_id
 
                     # Change the id

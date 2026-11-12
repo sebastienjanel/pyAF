@@ -199,11 +199,18 @@ def map_of_curve(curve_data):
 def map_heights(data):
     """Heights of a map [nm] for the cell geometry: the zero-force
     topography when the elasticity is computed, else the piezo height (at
-    the setpoint), without flatten. (array [x][y], name)."""
+    the setpoint), without flatten (the flatten of each line removes the
+    curvature of the cell along the lines), with the z motor steps levelled
+    if they are. (array [x][y], name)."""
+    state = data.flatten_state()
+    level = (None, True) if state is not None and state[1] else None
     if data.stiffness_calculated and data.topography is not None:
-        return numpy.array(data.topography, dtype=float), \
-            "zero-force topography"
-    return numpy.array(data.piezo_image, dtype=float), "piezo height"
+        topo = numpy.array(data.topography, dtype=float)
+        used = data.topography_state()
+        if used != level:
+            topo += data.piezo_for(level) - data.piezo_for(used)
+        return topo, "zero-force topography"
+    return data.piezo_for(level), "piezo height"
 
 
 def structural_factor(kappa_m, kappa_g):

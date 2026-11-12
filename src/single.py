@@ -61,6 +61,9 @@ from .tools import math_tools
 from .tools import results_sorting
 from .tools.breakthrough_tools import EVENT_VALUES
 
+# Flatten of the zero-force topography not known: the current one
+UNKNOWN_FLATTEN = "unknown"
+
 # Maps of the plant cells (see compute_tools.plant)
 PLANT_MAPS = ("plant_k_as", "plant_modulus", "plant_pressure", "plant_tau",
               "plant_pressure_hertz")
@@ -665,6 +668,11 @@ class SingleFile:
         self.flatten_applied = False
         # Offsets at the steps of the z motor removed with the flatten
         self.applied_flatten_motor = False
+        # Flatten of the piezo height in the zero-force topography (see
+        # flatten_state; UNKNOWN_FLATTEN: the current one), the topography
+        # follows the flatten applied after the elasticity (see
+        # sync_topography)
+        self.topography_flatten = UNKNOWN_FLATTEN
 
         # Planefit of the height maps with a substrate ROI as zero plane (see
         # tools.planefit): index of the ROI in roi_list
@@ -1220,9 +1228,56 @@ class SingleFile:
             order = self.applied_flatten_order
         if motor is None:
             motor = self.applied_flatten_motor
+        return self.piezo_for((order, bool(motor)))
+
+    def flatten_state(self):
+        """Flatten applied to the piezo height: None, or (order, motor
+        steps levelled)."""
+        if not self.flatten_applied:
+            return None
+        return (self.applied_flatten_order,
+                bool(self.applied_flatten_motor and
+                     self.motor_parts is not None))
+
+    def piezo_for(self, state):
+        """Piezo height with a flatten state (see flatten_state); order None:
+        only the z motor steps levelled, without flatten."""
+        piezo = numpy.array(self.piezo_image, dtype=float)
+        if state is None:
+            return piezo
+        order, motor = state
         parts = self.motor_parts if motor else None
-        return math_tools.flatten(self.piezo_image, order,
-                                  self.inside_region(), parts)
+        if order is None:
+            if parts is None:
+                return piezo
+            return math_tools.level_steps(piezo, parts, self.inside_region())
+        return math_tools.flatten(piezo, order, self.inside_region(), parts)
+
+    def topography_state(self):
+        """Flatten of the piezo height in the zero-force topography (see
+        flatten_state)."""
+        if self.topography_flatten == UNKNOWN_FLATTEN:
+            return self.flatten_state()
+        return self.topography_flatten
+
+    def sync_topography(self):
+        """Zero-force topography with the flatten applied now: the
+        topography is the piezo height at the point of contact, so the
+        difference of the flattened piezo heights is added (no new
+        computation). Returns True if it changed."""
+        state = self.flatten_state()
+        old = self.topography_state()
+        self.topography_flatten = state
+        if not self.stiffness_calculated or self.topography is None or \
+                old == state:
+            return False
+        topo = numpy.array(self.topography, dtype=float)
+        topo += self.piezo_for(state) - self.piezo_for(old)
+        if numpy.isfinite(topo).any():
+            topo -= numpy.nanmin(topo)
+            self.max_topo = numpy.nanmax(topo)
+        self.topography[:, :] = topo
+        return True
 
     def inside_region(self):
         """Pixels of the region of the map (boolean array), None if the

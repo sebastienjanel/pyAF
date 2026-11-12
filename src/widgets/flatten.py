@@ -37,7 +37,7 @@ from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFToggle
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools.PYAFWidget import PYAFWidget
-from .. import widgets_list
+from . import roi_manager
 from .. import shared
 
 
@@ -168,7 +168,7 @@ class FlattenWidget(PYAFWidget):
                     shared.exp.selected_flatten_motor and \
                     data.motor_parts is not None
                 data.flatten_applied = True
-            widgets_list.widget_compute.update_MPL("MPL_meshgrid")
+            self.heights_changed()
             self.BT_remove_flatten.setEnabled(True)
             self.BT_apply_flatten.setEnabled(False)
 
@@ -183,7 +183,7 @@ class FlattenWidget(PYAFWidget):
                 data.applied_flatten_motor = False
                 data.flatten_applied = False
 
-            widgets_list.widget_compute.update_MPL("MPL_meshgrid")
+            self.heights_changed()
             self.BT_remove_flatten.setEnabled(False)
             self.BT_apply_flatten.setEnabled(True)
 
@@ -198,6 +198,16 @@ class FlattenWidget(PYAFWidget):
         elif name == "radiobutton_flatten_order2":
             shared.exp.selected_flatten_order = 2
             self.update_MPL("MPL_canvas_flatten")
+
+    @staticmethod
+    def heights_changed():
+        """Topography, maps and values after a change of the flatten (of
+        all the files with Apply on all)."""
+        if shared.exp.flatten_correction_all:
+            datas = list(shared.exp.list)
+        else:
+            datas = [shared.exp.current_data]
+        roi_manager.heights_changed(datas)
 
     def checkbox_clicked(self, name):
         """Called when a checkbox is clicked."""

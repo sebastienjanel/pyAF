@@ -207,7 +207,8 @@ def rois_key(data):
     return (tuple(tuple(tuple(int(k) for k in pixel) for pixel in roi.values)
                   for roi in data.roi_list),
             data.roi_glass_id, data.stiffness_calculated,
-            id(data.stiffness_array))
+            id(data.stiffness_array),
+            data.flatten_applied and data.applied_flatten_motor)
 
 
 def cell_values(data):

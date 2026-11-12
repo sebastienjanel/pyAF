@@ -514,14 +514,7 @@ class RoiManagerWidget(PYAFWidget):
         self.logger.debug("Planefit with ROI %s", roi_index)
         data.planefit_applied = roi_index is not None
         data.planefit_roi = roi_index
-        planefit.reset_color_scales(data)
-        if data.meshgrid_type in ("piezo", "topo"):
-            widgets_list.widget_results.update_MPL("MPL_canvas1")
-        if shared.exp.roi_meshgrid_type in ("piezo", "topo"):
-            self.update_map()
-        if widgets_list.widget_multimeshgrids is not None:
-            widgets_list.widget_multimeshgrids.update_widget()
-        self.update_3D(data)
+        heights_changed([data])
 
     def show_volume(self, data):
         """Computes the volume above the selected substrate ROI and displays
@@ -976,6 +969,42 @@ def new_roi(data, roi_id):
     free = [i for i in range(nbr_colors) if i not in used]
     roi.color = free[0] if free else len(data.roi_list) % nbr_colors
     return roi
+
+
+def heights_changed(datas):
+    """The heights of files changed (flatten or planefit): zero-force
+    topography with the flatten, substrate planes fitted again (B.E.C. out of
+    date), color scales, and the maps, profiles, 3D view and values which
+    show the heights."""
+    for data in datas:
+        if data.sync_topography() and planefit.update_substrates(data) and \
+                data.roi_glass_id:
+            bec.mark_outdated(data)
+        planefit.reset_color_scales(data)
+    compute = widgets_list.widget_compute
+    if compute is not None:
+        compute.update_MPL("MPL_meshgrid")
+        compute.update_GUI("BT_height_correction")
+    results = widgets_list.widget_results
+    if results is not None:
+        results.update_MPL("MPL_canvas1")
+    if widgets_list.widget_profiles is not None:
+        widgets_list.widget_profiles.update_widget()
+    manager = widgets_list.widget_roi_manager
+    if manager is not None:
+        manager.update_map()
+    if widgets_list.widget_multimeshgrids is not None:
+        widgets_list.widget_multimeshgrids.update_widget()
+    for data in datas:
+        RoiManagerWidget.update_3D(data)
+    # Values of the heights and of the plant cells in the results
+    plant.refresh_results()
+    main = widgets_list.widget_main
+    if main is not None:
+        if main.tabs.currentIndex() in (3, 4):
+            widgets_list.widget_results_single.schedule_refresh()
+        else:
+            main.update_results = True
 
 
 def open_roi_manager():

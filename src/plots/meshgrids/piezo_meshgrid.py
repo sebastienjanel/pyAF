@@ -50,11 +50,9 @@ class PlotPiezoMeshGrid(PlotMeshGrid):
             # Data tab: the piezo height as loaded
             self.temp_array[:] = self.data.piezo_image
         else:
-            # Results tab: with the flatten of the compute tab and the
-            # planefit of the ROI manager
-            self.temp_array[:] = planefit.piezo_map(
-                self.data,
-                flatten=self.plot_type in ("meshgrid", "meshgrid_roi"))
+            # Other maps (results, multi-maps, ROI manager): with the
+            # flatten of the compute tab and the planefit of the ROI manager
+            self.temp_array[:] = planefit.piezo_map(self.data)
 
         if self.plot_type == "meshgrid_data":
             # Overwrite colormap to have always a copper colormap

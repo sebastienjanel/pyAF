@@ -306,6 +306,8 @@ class Stiffness:
         # Flush the file and update the values in the experiment class
         self.temp_file.flush_file()
         data.stiffness_calculated = True
+        # Flatten of the piezo height in the topography
+        data.topography_flatten = data.flatten_state()
 
         # No fit quality with the Tomography
         if data.meshgrid_type.startswith("fit_") and \
