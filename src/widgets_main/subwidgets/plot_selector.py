@@ -78,8 +78,9 @@ class PlotSelectorWidget(PYAFWidget):
             "Force vs distance: zoom on the contact of the approach curve, to "
             "see if it is vertical\non a hard substrate (deflection "
             "sensitivity).")
-        zoom = QtCore.QSettings().value("ForceDistanceZoom", False)
-        self.TG_zoom.setChecked(zoom not in ("false", False, None))
+        zoom = QtCore.QSettings().value("ForceDistanceZoom", False,
+                                        type=bool)
+        self.TG_zoom.setChecked(zoom)
 
         self.HL_select_curve = QtWidgets.QHBoxLayout()
         self.HL_select_curve.addStretch(1)

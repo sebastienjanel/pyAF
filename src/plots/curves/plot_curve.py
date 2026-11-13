@@ -158,11 +158,12 @@ class PlotCurve(MainPlot, CommonCurveTools):
 
         # Raw data
         self.display_raw_data = \
-            self.settings.value("DisplayRawData", False)
+            self.settings.value("DisplayRawData", False, type=bool)
 
         self.zero_defl = False
         if self.curve_type == "defl_ext" or self.curve_type == "force_ext":
-            self.zero_defl = self.settings.value("ZeroDefl", True)
+            self.zero_defl = self.settings.value("ZeroDefl", True,
+                                                 type=bool)
 
         # Get the curve with corrections
         self.approach, self.retraction, self.pause, self.modulation, self.zero, _ = \
@@ -670,8 +671,8 @@ class PlotCurve(MainPlot, CommonCurveTools):
     def curve_style(self):
         """Style of the data of the curves: dots (default) or lines
         (preferences). The fits are drawn with lines."""
-        dots = self.settings.value("CurvesAsDots", True)
-        if dots in ("false", False):
+        dots = self.settings.value("CurvesAsDots", True, type=bool)
+        if not dots:
             return {"linestyle": "-"}
         return {"linestyle": "none", "marker": ".", "markersize": 3}
 

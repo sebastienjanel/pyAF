@@ -316,7 +316,7 @@ class PlotMeshGrid(MainPlot):
         # results tabs
         pt = self.plot_type
         tp = (pt == "meshgrid" or pt == "meshgrid_data")
-        st = self.settings.value("ClassicMeshgridStyle", True)
+        st = self.settings.value("ClassicMeshgridStyle", True, type=bool)
 
         if st or not tp:
             self.plot_labels()

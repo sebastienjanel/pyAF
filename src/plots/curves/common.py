@@ -153,7 +153,7 @@ class CommonCurveTools:
         Different coefficients are calculated as there is no clear
         concencuss on what type of noise should be calculated.
         """
-        display = self.settings.value("DisplayFitNoise", False)
+        display = self.settings.value("DisplayFitNoise", False, type=bool)
 
         if display:
             if curve_type == "approach":

@@ -298,7 +298,8 @@ class MainWindow(QtWidgets.QMainWindow):
         supporting this kind of messages. Can be disabled in the
         preferences.
         """
-        enabled = self.settings.value("RememberMeToSave", True)
+        enabled = self.settings.value("RememberMeToSave", True,
+                                      type=bool)
         isavailable = QtWidgets.QSystemTrayIcon.isSystemTrayAvailable()
 
         if isavailable and self.tray_enabled and enabled:
@@ -502,7 +503,8 @@ class MainWindow(QtWidgets.QMainWindow):
         data = shared.exp.current_data
 
         # Allow or disable random control
-        random_control = self.settings.value("RandomControl", False)
+        random_control = self.settings.value("RandomControl", False,
+                                             type=bool)
 
         # If rand is given, chose a new xpos and ypos
         if rand == "rand":

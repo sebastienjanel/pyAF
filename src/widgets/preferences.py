@@ -149,27 +149,29 @@ class PreferencesWidget(PYAFWidget):
 
     def update_widget(self):
         """Updates the content of the widget."""
-        random_control = self.settings.value("RandomControl", False)
+        # type=bool: the settings files of Linux and Windows store the
+        # booleans as text ("true", "false")
+        random_control = self.settings.value("RandomControl", False,
+                                             type=bool)
         self.CB_rand_ctrl.setChecked(random_control)
 
-        zero_defl = self.settings.value("ZeroDefl", True)
+        zero_defl = self.settings.value("ZeroDefl", True, type=bool)
         self.CB_zero_defl.setChecked(zero_defl)
 
-        display_raw_data = self.settings.value(
-            "DisplayRawData",
-            False)
+        display_raw_data = self.settings.value("DisplayRawData", False,
+                                               type=bool)
         self.CB_raw_data.setChecked(display_raw_data)
 
-        dots = self.settings.value("CurvesAsDots", True)
-        self.CB_curves_dots.setChecked(dots not in ("false", False))
+        dots = self.settings.value("CurvesAsDots", True, type=bool)
+        self.CB_curves_dots.setChecked(dots)
 
-        remember = self.settings.value("RememberMeToSave", True)
+        remember = self.settings.value("RememberMeToSave", True, type=bool)
         self.CB_remember_to_save.setChecked(remember)
 
-        st = self.settings.value("DisplayFitNoise", False)
+        st = self.settings.value("DisplayFitNoise", False, type=bool)
         self.CB_fit_noise.setChecked(st)
 
-        st = self.settings.value("ClassicMeshgridStyle", True)
+        st = self.settings.value("ClassicMeshgridStyle", True, type=bool)
         self.CB_mesh_style.setChecked(st)
 
         self.IN_main_label.changeValue(shared.exp.main_title_label)

@@ -67,8 +67,8 @@ class PlotDataCurveForce(PlotCurve):
         contact in the data tab): a slope of the contact due to a wrong
         deflection sensitivity is visible at this scale (a few nm), not on
         the whole curve (microns)."""
-        zoom = self.settings.value("ForceDistanceZoom", False)
-        if zoom in ("false", False, None) or self.curve_approach is None:
+        zoom = self.settings.value("ForceDistanceZoom", False, type=bool)
+        if not zoom or self.curve_approach is None:
             super().set_lims()
             return
         seg = self.valid_seg_app
