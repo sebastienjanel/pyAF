@@ -107,7 +107,7 @@
         }
     ],
     "dateCreated": "2014-12-01",
-    "dateModified": "2026-11-12",
+    "dateModified": "2026-11-13",
     "datePublished": "2025-01-20",
     "description": "pyAF is a Python software to analyze force curves & force maps acquired by atomic force microscopes (Bruker and JPK)",
     "funder": {
@@ -130,7 +130,7 @@
         "Python 3"
     ],
     "softwareRequirements": "https://github.com/sebastienjanel/pyAF/blob/main/requirements.txt",
-    "version": "5.2",
+    "version": "5.3",
     "developmentStatus": "active",
     "funding": "ANR-10-EQPX-04-01, FEDER 12001407",
     "issueTracker": "https://github.com/sebastienjanel/pyAF/issues",
