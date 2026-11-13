@@ -61,6 +61,13 @@ from .tools import math_tools
 from .tools import results_sorting
 from .tools.breakthrough_tools import EVENT_VALUES
 
+def finite_max(values):
+    """Maximum of the finite values (0 without finite value)."""
+    values = numpy.asarray(values, dtype=float)
+    values = values[numpy.isfinite(values)]
+    return float(values.max()) if values.size else 0.0
+
+
 # Flatten of the zero-force topography not known: the current one
 UNKNOWN_FLATTEN = "unknown"
 
@@ -1340,9 +1347,10 @@ class SingleFile:
 
         # Jump of contact and work
         if self.work_and_rupture_force1_calculated:
-            # Update max_work and rupture_force1
-            self.max_work = numpy.amax(self.work)
-            self.max_rupture_force1 = numpy.amax(self.rupture_force1)
+            # Update max_work and rupture_force1 (nan: no jump of contact
+            # found)
+            self.max_work = finite_max(self.work)
+            self.max_rupture_force1 = finite_max(self.rupture_force1)
             if color:
                 self.color_opts_work[2] = self.max_work
                 self.color_opts_work[3] = self.max_work / 2.0

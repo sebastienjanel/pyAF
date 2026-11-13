@@ -36,6 +36,7 @@ import numpy
 from ..plot_curve import PlotCurve
 from .... import shared
 from ....compute_tools import plant
+from ....tools import plant_tools
 from ....gui_styles.theme_handler import curve_color
 
 
@@ -156,6 +157,12 @@ class ResultsPlant(PlotCurve):
                      number(values["tau_hertz"], digits=2)]
             if not cell[0]["dome"]:
                 text.append("Saddle: the surface is not a dome here")
+            taus = [values[name] for name in ("tau", "tau_hertz")
+                    if numpy.isfinite(values[name])]
+            if taus and min(taus) < plant_tools.TAU_MIN:
+                text.append("τ < " + format(plant_tools.TAU_MIN, "g") +
+                            ": outside the shell model (τ ≫ 1), "
+                            "less reliable")
         if shared.exp.display_curve_legend:
             for line in text:
                 self.axes.plot([], [], " ", label=line)

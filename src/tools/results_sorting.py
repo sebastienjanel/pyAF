@@ -459,10 +459,14 @@ class GetResults:
                         inlist = math_tools.in_list(roi_vals, [i, j])
 
                     if self.roi_id == 0 or inlist:
-                        array.append(dt.work[i][j])
+                        value = float(dt.work[i][j])
+                        # No jump of contact found: exported as nan, not in
+                        # the plots
+                        if numpy.isfinite(value):
+                            array.append(value)
 
                         if self.export == "single" or self.export == "r_format":
-                            export_array.append([index, i, j, dt.work[i][j]])
+                            export_array.append([index, i, j, value])
 
                 index += 1
 
@@ -533,10 +537,13 @@ class GetResults:
                         inlist = math_tools.in_list(roi_vals, [i, j])
 
                     if self.roi_id == 0 or inlist:
-                        array.append(dt.rupture_force1[i][j])
+                        val = float(dt.rupture_force1[i][j])
+                        # No jump of contact found: exported as nan, not in
+                        # the plots
+                        if numpy.isfinite(val):
+                            array.append(val)
 
                         if self.export == "single" or self.export == "r_format":
-                            val = dt.rupture_force1[i][j]
                             export_array.append([index, i, j, val])
 
                 index += 1

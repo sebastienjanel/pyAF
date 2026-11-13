@@ -251,14 +251,14 @@ def compute(calc_id):
     """Plant cells for the curves of a file. Returns the numbers of curves
     {"curves": computed, "k_as": with k_as, "cell": in a cell (with k_as),
     "pressure": with the pressure (Yamasaki), "saddle": in a cell but not on
-    a dome}."""
+    a dome, "low_tau": with the pressure but tau < plant_tools.TAU_MIN}."""
     data = shared.exp.list[calc_id]
     misc_tools.save_used_params(data, "plant")
     nx, ny = data.nbr_pixels_x, data.nbr_pixels_y
     results = numpy.full((nx, ny, len(CURVE_VALUES)), numpy.nan,
                          dtype=numpy.float32)
     counts = dict.fromkeys(("curves", "k_as", "cell", "pressure",
-                            "saddle"), 0)
+                            "saddle", "low_tau"), 0)
 
     Progressbar(os.path.basename(data.filename))
     widgets_list.widget_progressbar.set_label("Plant cells")
@@ -295,13 +295,16 @@ def compute(calc_id):
     data.plant_results = results
     data.plant_calculated = True
     found = cells(data)
-    pressure = cell_values(data)["pressure"]
+    values = cell_values(data)
+    pressure, tau = values["pressure"], values["tau"]
     for (i, j), cell in found.items():
         if data.discarded_curves[i][j] == 0 and \
                 numpy.isfinite(results[i, j, 0]):
             counts["cell"] += 1
             counts["pressure"] += bool(numpy.isfinite(pressure[i, j]))
             counts["saddle"] += not cell[0]["dome"]
+            counts["low_tau"] += bool(numpy.isfinite(tau[i, j]) and
+                                      tau[i, j] < plant_tools.TAU_MIN)
     data.update()
     widgets_list.widget_progressbar.close()
     return counts

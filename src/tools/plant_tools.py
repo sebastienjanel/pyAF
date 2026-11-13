@@ -507,6 +507,11 @@ def apparent_stiffness(data, i, j, method=0, window=0.05, start=75.0,
     return results
 
 
+# The shell formulas are valid for a large dimensionless pressure (tau >> 1,
+# Yamasaki Eq. 2): below this value the curves are reported (warning)
+TAU_MIN = 5.0
+
+
 # Turgor pressure and modulus of the cell wall, shell of thickness t and
 # mean curvature kM indented at a point (Vella et al. 2012; Beauzamy et al.
 # 2015; Yamasaki et al. 2025, Eq. 1):

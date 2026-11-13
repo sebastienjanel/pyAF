@@ -917,6 +917,10 @@ class DataWidget(PYAFWidget):
                 data.deflection_sensitivity = float(value)
                 self.update_GUI("info_selected")
                 self.update_curves()
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Info",
+                    "You should recompute the results.")
         elif field == "input_temp":
             value = self.IN_temp.get_str_value(True)
             # Compare with the displayed value (in degC)

@@ -142,8 +142,14 @@ def get_items(mode):
 
 
 def median_point(forces, lrs):
-    """Median loading rate and force of the events, with their quartiles:
-    (r, F, [r25, r75], [F25, F75])."""
+    """Median loading rate and force of the events with a loading rate > 0
+    (as in the fits, see get_points), with their quartiles:
+    (r, F, [r25, r75], [F25, F75]), None without such event."""
+    positive = numpy.asarray(lrs) > 0
+    if not positive.any():
+        return None
+    forces = numpy.asarray(forces)[positive]
+    lrs = numpy.asarray(lrs)[positive]
     return (numpy.median(lrs), numpy.median(forces),
             numpy.percentile(lrs, [25, 75]),
             numpy.percentile(forces, [25, 75]))
@@ -164,15 +170,18 @@ def get_points(mode, method, nbr_bins=10, statistic="median"):
 
     if method == "medians":
         for _, forces, lrs, _, _ in items:
-            r = numpy.median(lrs)
-            if r > 0:
-                points_r.append(r)
-                points_f.append(average(forces))
-                quartiles_r.append(numpy.percentile(lrs, [25, 75]))
-                quartiles_f.append(numpy.percentile(forces, [25, 75]))
-                used += forces.size
-            else:
-                negative += forces.size
+            # Events with a loading rate <= 0 (not found) are not used, as
+            # with the bins
+            positive = lrs > 0
+            negative += int(numpy.count_nonzero(~positive))
+            forces, lrs = forces[positive], lrs[positive]
+            if lrs.size == 0:
+                continue
+            points_r.append(numpy.median(lrs))
+            points_f.append(average(forces))
+            quartiles_r.append(numpy.percentile(lrs, [25, 75]))
+            quartiles_f.append(numpy.percentile(forces, [25, 75]))
+            used += forces.size
 
     elif method == "binned":
         forces = numpy.concatenate([item[1] for item in items]) \

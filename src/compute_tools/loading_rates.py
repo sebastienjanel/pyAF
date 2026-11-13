@@ -89,7 +89,8 @@ class GetLoadingRate:
                 _, ret, _, _, _, _ = get_curve(
                     data, [i, j], mode="compute_no_shared")
 
-                # X and Y axis in meters
+                # X and Y axis scaled by 1e9 (nm * 1e9), the spring constant
+                # in N/m: the scale cancels in the slope of the force (N/m)
                 ret[0] = ret[0] * 1e9
                 ret[1] = ret[1] * 1e9
 

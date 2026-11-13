@@ -1859,7 +1859,33 @@ class ComputeWidget(PYAFWidget):
     def radius_notes(calc_list):
         """Message for the files indented deeper than the radius of the tip
         with the paraboloid (Hertz is valid for an indentation much smaller
-        than the radius), None if there is none."""
+        than the radius), or deeper than the sphere model (contact radius
+        equal to the radius), None if there is none."""
+        sphere = ""
+        for calc_id in calc_list:
+            data = shared.exp.list[calc_id]
+            if not data.stiffness_calculated or \
+                    data.used_stiffness_model_selected != \
+                    contact_models.SPHERE:
+                continue
+            depth = numpy.asarray(data.indentation[:], dtype=float)
+            depth = depth[numpy.isfinite(depth)]
+            limit = contact_models.sphere_max_indentation(
+                data.used_tip_radius)
+            nbr = int(numpy.sum(depth > limit))
+            if nbr:
+                sphere += "<li>" + file_label(data) + " : " + str(nbr) + \
+                    " pixels out of " + str(depth.size) + " (limit " + \
+                    str(int(round(limit))) + " nm for a radius of " + \
+                    str(data.used_tip_radius) + " nm)</li>"
+        sphere_text = None
+        if sphere:
+            sphere_text = "The indentation is beyond the sphere model " \
+                "(the contact radius reaches the radius of the sphere, at " \
+                "about 14 times the radius): the force of the model is " \
+                "held at its last value there, the elasticity of these " \
+                "pixels is not reliable. Check the radius, or fit a " \
+                "smaller indentation range.<ul>" + sphere + "</ul>"
         lines = ""
         for calc_id in calc_list:
             data = shared.exp.list[calc_id]
@@ -1877,11 +1903,12 @@ class ComputeWidget(PYAFWidget):
                     str(int(round(float(numpy.median(depth))))) + " nm, tip " \
                     "radius " + str(data.used_tip_radius) + " nm)</li>"
         if not lines:
-            return None
-        return "The indentation is larger than the tip radius: the " \
+            return sphere_text
+        text = "The indentation is larger than the tip radius: the " \
             "paraboloid (Hertz) is valid for an indentation much smaller " \
             "than the radius. Use the Sneddon (Sphere) model for a bead, or " \
             "a blunted cone or pyramid for a sharp tip.<ul>" + lines + "</ul>"
+        return text + ("<br>" + sphere_text if sphere_text else "")
 
     def finish_computation(self, warnings=None, notes=None, info=None):
         """At the end of the computation, display the errors and refresh the GUI.
@@ -2502,6 +2529,14 @@ class ComputeWidget(PYAFWidget):
                     skipped.append(file_label(data) + " : " +
                                    str(counts["saddle"]) + " curves on a "
                                    "saddle of the surface (not a dome)")
+                if counts["low_tau"]:
+                    skipped.append(
+                        file_label(data) + " : " + str(counts["low_tau"]) +
+                        " curves with \u03c4 < " +
+                        format(plant_tools.TAU_MIN, "g") + ": the shell "
+                        "model needs \u03c4 \u226b 1, their pressure and "
+                        "modulus are less reliable (thicker wall or flatter "
+                        "cell than the model)")
 
             notes = None
             info = None

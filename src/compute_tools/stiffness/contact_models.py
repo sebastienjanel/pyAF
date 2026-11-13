@@ -258,6 +258,14 @@ def _table(model, tip_radius, tip_angle):
     return _TABLES[key]
 
 
+def sphere_max_indentation(radius):
+    """Largest indentation of the sphere model (contact radius equal to the
+    radius, about 14 R): beyond it the force of the model is held at its
+    last value. Same unit as radius."""
+    log_delta, _ = _table(SPHERE, radius, 0.0)
+    return float(numpy.exp(log_delta[-1]))
+
+
 def needle_force(delta, radius, angle):
     """Force per unit reduced modulus of the needle (flat punch of radius
     capped with a cone of half-angle)."""

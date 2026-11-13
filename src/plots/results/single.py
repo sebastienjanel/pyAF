@@ -237,8 +237,9 @@ class PlotSingleResults(PlotResults):
                     ax.scatter(lrs[positive], forces[positive], s=6,
                                color=color, alpha=0.35, linewidths=0,
                                zorder=2)
-                r, f, r_q, f_q = dfs_tools.median_point(forces, lrs)
-                if opts["lr_medians"] and r > 0:
+                point = dfs_tools.median_point(forces, lrs)
+                if opts["lr_medians"] and point is not None:
+                    r, f, r_q, f_q = point
                     # Median point, with the quartiles if asked
                     bars = opts["lr_error_bars"]
                     ax.errorbar(

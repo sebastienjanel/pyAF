@@ -32,7 +32,8 @@
 """Checks of the calculations of pyAF on synthetic data with known results
 (no file, no window): flatten and levelling of the z motor steps,
 zero-force topography after a flatten, contact models and bottom effect
-correction (docs/models.md, sections 3 and 5), plant cells (section 13).
+correction (docs/models.md, sections 3 and 5), adhesion (section 9),
+dynamic force spectroscopy (section 11), plant cells (section 13).
 
 Usage (from the pyAF folder):
     .venv/bin/python -m unittest discover tests
@@ -42,15 +43,21 @@ import math
 import os
 import sys
 import unittest
+from unittest import mock
 
 import numpy
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from src.compute_tools.stiffness import bec  # noqa: E402
 from src.compute_tools.stiffness import contact_models  # noqa: E402
+from src.compute_tools.work_and_rupture_force import \
+    work_and_rupture_force_compute as work  # noqa: E402
 from src.single import SingleFile, UNKNOWN_FLATTEN  # noqa: E402
+from src.tools import dfs_tools  # noqa: E402
 from src.tools import math_tools  # noqa: E402
+from src.tools import search_joc  # noqa: E402
 from src.tools import plant_tools  # noqa: E402
 
 NX, NY = 40, 30
@@ -312,6 +319,11 @@ class ContactModels(unittest.TestCase):
                                            self.R, 0, height)
         self.assertAlmostEqual(float(factor[0]), expected, places=9)
 
+    def test_sphere_limit(self):
+        # Contact radius equal to the radius: about 14 R
+        self.assertAlmostEqual(
+            contact_models.sphere_max_indentation(1.0), 14.16, delta=0.01)
+
     def test_bottom_effect_without_height(self):
         for height in (None, 0.0, float("nan")):
             factor = contact_models.bec_factor(
@@ -328,6 +340,94 @@ class ContactModels(unittest.TestCase):
             float(contact_models.bec_factor(
                 delta, contact_models.PARABOLOID, self.R, 0, height)[0]),
             places=12)
+
+
+class Adhesion(unittest.TestCase):
+    """Jumps of contact, work and rupture force of a retraction curve
+    (deflection [nm] vs distance [nm])."""
+
+    PARAMS = {"joc_skip_start": 20, "joc_fit_length": 200,
+              "joc_refit_option": 0, "joc_noise_multiplicator": 5,
+              "joc_refit_times": 0}
+    K = 0.05e-9   # N/nm
+
+    def curve(self, dip):
+        """Baseline, adhesion of 20 nm from 600 to 800 nm (dip), contact
+        after 800 nm."""
+        rng = numpy.random.default_rng(0)
+        x = numpy.linspace(0, 1000, 1001)
+        y = rng.normal(0, 0.05, x.size)
+        if dip:
+            part = (x > 600) & (x <= 800)
+            y[part] -= 20 * (x[part] - 600) / 200
+        contact = x > 800
+        y[contact] += x[contact] - 800
+        return [x, y]
+
+    def compute(self, curve):
+        joc = search_joc.get_JOC(curve, [0, len(curve[0])], self.PARAMS)
+        if not search_joc.joc_found(joc[1], curve):
+            return None
+        return work.get_surface_and_force(curve[0], curve[1], joc[0],
+                                          joc[1], joc[2], joc[3], self.K)
+
+    def test_rupture_force(self):
+        found = self.compute(self.curve(True))
+        self.assertIsNotNone(found)
+        work_value, force = found
+        self.assertGreater(work_value, 0)
+        # 20 nm of deflection x 0.05 N/m = 1 nN
+        self.assertAlmostEqual(force / 1e-9, 1.0, delta=0.05)
+
+    def test_no_jump_found_is_not_a_work_of_0(self):
+        self.assertIsNone(self.compute(self.curve(False)))
+
+
+class ForceSpectroscopy(unittest.TestCase):
+    """dfs_tools.get_points: the events with a loading rate <= 0 (not
+    fitted) are not used, with both methods."""
+
+    def items(self):
+        forces = numpy.array([100.0, 110.0, 120.0, 130.0, 10.0, 10.0, 10.0])
+        rates = numpy.array([1e4, 2e4, 3e4, 4e4, 0.0, 0.0, 0.0])
+        return [("file", forces, rates, "k", [300.0])]
+
+    def test_medians_per_file(self):
+        with mock.patch.object(dfs_tools, "get_items",
+                               return_value=self.items()):
+            points_r, points_f, used, negative, *_ = dfs_tools.get_points(
+                "single", "medians")
+        self.assertEqual(float(points_r[0]), 2.5e4)
+        self.assertEqual(float(points_f[0]), 115.0)
+        self.assertEqual((used, negative), (4, 3))
+
+    def test_median_point_of_the_plot(self):
+        _, forces, rates, _, _ = self.items()[0]
+        r, f, _, _ = dfs_tools.median_point(forces, rates)
+        self.assertEqual((float(r), float(f)), (2.5e4, 115.0))
+        self.assertIsNone(dfs_tools.median_point(forces[4:], rates[4:]))
+
+
+class CantileverOfTheBEC(unittest.TestCase):
+    """bec.cantilever_changed: the B.E.C. corrects the elasticity with its
+    spring constant and deflection sensitivity."""
+
+    def file(self, k, used_k, sensitivity=10.0, used_sensitivity=10.0):
+        return mock.Mock(spring_constant=k, used_spring_constant=used_k,
+                         deflection_sensitivity=sensitivity,
+                         used_deflection_sensitivity=used_sensitivity)
+
+    def test_same_values(self):
+        self.assertFalse(bec.cantilever_changed(self.file(5e-11, 5e-11)))
+
+    def test_changed_values(self):
+        self.assertTrue(bec.cantilever_changed(self.file(6e-11, 5e-11)))
+        self.assertTrue(bec.cantilever_changed(
+            self.file(5e-11, 5e-11, 12.0, 10.0)))
+
+    def test_not_computed(self):
+        self.assertFalse(bec.cantilever_changed(
+            self.file(5e-11, None, 10.0, None)))
 
 
 class PlantCells(unittest.TestCase):

@@ -193,16 +193,20 @@ def get_r_tables(row, data):
 
     if data.stiffness_calculated:
         array = get("stiffness")
+        # Elasticity [Pa] of the contact models, stiffness [N/m] of the
+        # slope model
+        column = "stiffness" if data.used_stiffness_model_selected == 3 \
+            else "elasticity"
         df = pd.DataFrame([line[:5] for line in array],
-                          columns=CURVE_KEYS + ["elasticity", "slice"])
-        stats.append(describe(df, "elasticity"))
+                          columns=CURVE_KEYS + [column, "slice"])
+        stats.append(describe(df, column))
         for key in CURVE_KEYS:
             df[key] = df[key].astype(int) + 1
         if len(df) and df["slice"].max() > 0:
             # Tomography: one column per slice
             df = df.pivot_table(index=CURVE_KEYS, columns="slice",
-                                values="elasticity", aggfunc="first")
-            df.columns = ["elasticity_slice_" + str(int(k) + 1)
+                                values=column, aggfunc="first")
+            df.columns = [column + "_slice_" + str(int(k) + 1)
                           for k in df.columns]
             df = df.reset_index()
         else:

@@ -45,6 +45,8 @@ $$F = 2R\frac{E}{1-\nu^2} \delta$$
 
 $$\delta = \frac{a}{2}\ln\frac{R+a}{R-a}, \qquad F = \frac{E}{2(1-\nu^2)}\left[(a^2+R^2)\ln\frac{R+a}{R-a} - 2aR\right]$$
 
+Valid up to $a \to R$, an indentation of about $14R$: the pixels indented deeper are reported at the end of the computation.
+
 **Blunted pyramid** (Rico et al. [5], as written in [7]) and **blunted cone** (Briscoe et al. [8]; $c = 1$): paraboloid apex tangent to the faces at $b$.
 
 $$c = \frac{n}{\pi}\sin\frac{\pi}{n}, \qquad b = \frac{cR}{\tan\theta}$$
@@ -171,6 +173,8 @@ Both are measured from the line through the two jumps of contact of the retract 
 - **Work of detachment**: area between this line and the curve (trapezes).
 - **Detachment force**: largest distance between this line and the curve.
 
+A curve whose jumps of contact are not found has no value (not 0, which is a curve without adhesion).
+
 ## 10. Unbinding events
 
 - **Kernel**: convolution of the curve with a step kernel, normalized on the noise, with an optional adaptive threshold (a Savitzky-Golay smoothing of the convolution is subtracted).
@@ -180,7 +184,7 @@ Both are measured from the line through the two jumps of contact of the retract 
 
 ## 11. Dynamic force spectroscopy
 
-See Mesbah et al. [26]. All models are fitted on median forces.
+See Mesbah et al. [26]. All models are fitted on median forces. The events whose loading rate could not be fitted ($r \le 0$) are not used, with both methods (medians per file, or bins).
 
 **Bell-Evans** (Evans & Ritchie [27]):
 
@@ -229,7 +233,7 @@ $$\frac{u}{\ln u} = \frac{k_{as}c}{\pi E t^2\kappa_M}$$
 
 solved with the Lambert function on the branch $u > e$ (large pressures).
 
-No value is given (NaN) on a saddle or a flat wall ($\kappa_M \le 0$), if $L\kappa$ is not in $]0, 1]$, or without solution ($\ln$ argument $\le 1$, or right-hand side $\le e$). The values are computed for the curves inside a cell ROI (not the substrate ROI) and follow the ROIs, the thickness and $\nu$ without computing again.
+The curves with $\tau < 5$ are reported (outside the condition $\tau \gg 1$ of the model, less reliable). No value is given (NaN) on a saddle or a flat wall ($\kappa_M \le 0$), if $L\kappa$ is not in $]0, 1]$, or without solution ($\ln$ argument $\le 1$, or right-hand side $\le e$). The values are computed for the curves inside a cell ROI (not the substrate ROI) and follow the ROIs, the thickness and $\nu$ without computing again.
 
 ## 14. Height maps
 

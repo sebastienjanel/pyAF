@@ -271,14 +271,17 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
                 app[1] = numpy.concatenate([numpy.array(app[1][seg0]), curve])
 
             if ret is not None:
+                # As the approach: not the corrupted part of the curve
                 seg = slice(ind_offset_ret[0], len(ret[0]))
                 seg0 = slice(0, ind_offset_ret[0])
 
-                ret[1] = math_tools.sg_filter(
-                    ret[0], ret[1], sg_smoothing_order, sg_smoothing_width,
-                    sg_smoothing_uniform)
+                curve = math_tools.sg_filter(ret[0][seg], ret[1][seg],
+                                             sg_smoothing_order,
+                                             sg_smoothing_width,
+                                             sg_smoothing_uniform)
+                ret[1] = numpy.concatenate([numpy.array(ret[1][seg0]), curve])
 
-        except:
+        except Exception:
             # Sometimes you will get trouble with corrupted curves
             # return an error
             smoothing_error = True
@@ -314,7 +317,11 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
             tilt_limit_2,
             tilt_applied,
             ind_offset_app,
-            ind_offset_ret)  # Apply for modulation and pause curves.
+            ind_offset_ret)
+        # Pause and modulation segments: with the deflection sensitivity,
+        # without the tilt correction (fitted on the approach or the
+        # retraction)
+        pause, modulation = pau, mod
     else:
         approach, retraction, pause, modulation = app, ret, pau, mod
 

@@ -69,6 +69,10 @@ def check_file(data):
     reason."""
     if not data.stiffness_calculated:
         return "the elasticity has not been computed"
+    if cantilever_changed(data):
+        return "the spring constant or the deflection sensitivity changed " \
+            "since the elasticity was computed: compute the elasticity " \
+            "again (the B.E.C. is applied with it)"
     if data.used_stiffness_model_selected not in contact_models.HAS_BEC:
         return "no bottom effect correction for the model " + \
             contact_models.MODEL_NAMES[data.used_stiffness_model_selected] + \
@@ -82,6 +86,19 @@ def check_file(data):
     if data.roi_list[data.roi_glass_id - 1].glass_coeffs is None:
         return "the selected ROI is no longer set as substrate"
     return None
+
+
+def cantilever_changed(data):
+    """True if the spring constant or the deflection sensitivity of the file
+    changed since the elasticity was computed (the B.E.C. corrects the
+    elasticity, with its values)."""
+    for used, current in ((data.used_spring_constant, data.spring_constant),
+                          (data.used_deflection_sensitivity,
+                           data.deflection_sensitivity)):
+        if used is not None and not numpy.isclose(used, current,
+                                                  rtol=1e-9, atol=0):
+            return True
+    return False
 
 
 def get_height_map(data):
@@ -149,8 +166,14 @@ def fit_range_mask(data, delta, force):
             else data.force_start
         stop = data.used_force_stop if data.used_force_stop is not None \
             else data.force_stop
-        setpoint = data.trig_threshold * data.deflection_sensitivity * \
-            data.spring_constant
+        # Values of the elasticity fit (see cantilever_changed)
+        sensitivity = data.used_deflection_sensitivity
+        if sensitivity is None:
+            sensitivity = data.deflection_sensitivity
+        k = data.used_spring_constant
+        if k is None:
+            k = data.spring_constant
+        setpoint = data.trig_threshold * sensitivity * k
         values, low, high = force, start / 100 * setpoint, \
             stop / 100 * setpoint
     else:

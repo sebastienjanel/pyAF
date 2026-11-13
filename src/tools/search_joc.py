@@ -36,8 +36,16 @@ import numpy
 from . import math_tools
 
 
+def joc_found(joc2_indice, curve):
+    """True if get_JOC found the jumps of contact: when they are not found,
+    the second jump is the last point of the curve (a jump found is at
+    least one point before)."""
+    return joc2_indice < len(curve[0]) - 1
+
+
 def get_JOC(curve, cor_pos, params):
-    """Function used to search for a jump of contact on a curve."""
+    """Function used to search for a jump of contact on a curve (see
+    joc_found)."""
     curve_x = curve[0]
     curve_y = curve[1]
     first = cor_pos[0]

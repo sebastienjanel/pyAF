@@ -46,13 +46,18 @@ def main_compute_work(i, j, app, ret, dt, fit_params):
     joc1_indice, joc2_indice, joc1_real, joc2_real, fit_joc, _ = \
         search_joc.get_JOC(ret, dt["retraction_position"], fit_params)
 
-    work, rupture_force1 = get_surface_and_force(ret[0],
-                                                 ret[1],
-                                                 joc1_indice,
-                                                 joc2_indice,
-                                                 joc1_real,
-                                                 joc2_real,
-                                                 dt["spring_constant"])
+    if search_joc.joc_found(joc2_indice, ret):
+        work, rupture_force1 = get_surface_and_force(ret[0],
+                                                     ret[1],
+                                                     joc1_indice,
+                                                     joc2_indice,
+                                                     joc1_real,
+                                                     joc2_real,
+                                                     dt["spring_constant"])
+    else:
+        # No jump of contact found: no value (not a work of 0, which is a
+        # curve without adhesion)
+        work, rupture_force1 = numpy.nan, numpy.nan
 
     return i, j, joc1_indice, joc2_indice, \
         joc1_real, joc2_real, fit_joc, work, rupture_force1
@@ -103,7 +108,8 @@ def get_surface_and_force(x, y, ind1, ind2, joc1_real, joc2_real, spring_ct):
     if a is not None and b is not None:
         y = numpy.polyval([a, b], new_curve_x)
     else:
-        return 0, 0
+        # The two jumps at the same distance: no line between them
+        return numpy.nan, numpy.nan
 
     # Work: surface between the line and the curve (trapezes); rupture
     # force: largest distance between the line and the curve, so that both

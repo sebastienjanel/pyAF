@@ -1212,10 +1212,14 @@ class LoaderJPK:
                 self.capSensHeight_nom_offset) * 1e9
 
     def convert_deflection(self, values):
-        """Deflection [V] from the raw values of the vDeflection channel."""
+        """Deflection [V] from the raw values of the vDeflection channel
+        (with the offset of the distance conversion, in V: the offset is in
+        nm and the multiplier in nm/V)."""
+        offset = self.vDeflection_distance_offset
+        if offset and self.vDeflection_distance_multiplier:
+            offset = offset / self.vDeflection_distance_multiplier
         return (values * self.encoder_vDeflection_multiplier +
-                self.encoder_vDeflection_offset +
-                self.vDeflection_distance_offset)
+                self.encoder_vDeflection_offset + offset)
 
     def get_time_segments(self):
         """Time of the points of the segments [s], from the durations of
