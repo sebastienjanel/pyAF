@@ -69,7 +69,9 @@ def run(app):
         from . import misc_tools
         from ..gui_styles.theme_handler import get_icons_path
         paths = [misc_tools.get_resource_path(name) for name in
-                 ("fix.png", "icon.png", "01.png", "triangle_down.png",
+                 ("logos_light.png", "logos_dark.png", "icon.png",
+                  os.path.join("showcase", "dark", "01_elasticity_map.png"),
+                  "triangle_down.png",
                   "dark.qss", "light.qss", "dark_plot.mplstyle")]
         paths += [misc_tools.get_font_path(),
                   os.path.join(get_icons_path(), "check.svg")]

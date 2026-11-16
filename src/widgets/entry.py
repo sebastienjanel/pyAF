@@ -46,6 +46,8 @@ import tempfile
 from PIL import Image
 import numpy
 from ..load_and_save.pre_check import CheckFiles, sort_infos
+from .splash import LINK_COLORS, SplashBanner
+from ..gui_styles import theme_handler
 
 # Width of the table of the files
 TABLE_WIDTH = 800
@@ -141,32 +143,12 @@ class EntryWidget(QtWidgets.QDialog):
             self.tempPath = temp_path
             self.settings.setValue("tempPath", temp_path)
 
-        # Get the path of the entry image
-        path = os.path.normpath(misc_tools.get_app_path() + "/images")
-        self.im_path = os.path.normpath(path)
-
-        # List of images
-        self.image_list = []
-        self.load_images()
-
         self.VL_entry = QtWidgets.QVBoxLayout()
 
-        self.HL_image = QtWidgets.QHBoxLayout()
-        self.HL_image.setSpacing(0)
-        self.labelfixed = QtWidgets.QLabel()
-        self.labelchanging = QtWidgets.QLabel()
-        self.HL_image.addWidget(self.labelfixed)
-        self.HL_image.addWidget(self.labelchanging)
-        self.labelchanging.setStyleSheet("background-color: white")
-
-        # Set fixed image
-        #path = os.path.normpath(self.im_path + "/fix.png")
-        im = numpy.array(Image.open(get_resource_path("fix.png")).convert("RGBA"))
-        self.labelfixed.setPixmap(misc_tools.get_pixmap(im))
-        # Width of the image (fixed and changing parts)
-        self.image_width = im.shape[1] + self.image_list[0].shape[1]
-
-        self.VL_entry.addLayout(self.HL_image)
+        # Banner: name, version, authors, logos and showcase of pyAF
+        self.banner = SplashBanner(TABLE_WIDTH)
+        self.image_width = TABLE_WIDTH
+        self.VL_entry.addWidget(self.banner)
 
         # Advanced mode
         self.label_triangle = QtWidgets.QLabel()
@@ -211,16 +193,6 @@ class EntryWidget(QtWidgets.QDialog):
             self.label_path.setText(new_tmp_path)
             self.logger.debug("Changed path to = %s", new_tmp_path)
 
-        # Create a QTimer
-        self.timer = QtCore.QTimer()
-        self.alpha = 255
-        self.pos = 0
-        self.sign = -1
-        # Connect it to fade
-        self.timer.timeout.connect(self.fade)
-        # Call every 0.1 seconds
-        self.timer.start(50)
-
         if consts.UNIT_TESTING:
             if self.mode == "first_load":
                 self.button_clicked("first_load")
@@ -240,7 +212,9 @@ class EntryWidget(QtWidgets.QDialog):
             "When using the program, cite the original article: "
             "<i>Stiffness tomography of eukaryotic intracellular "
             "compartments by atomic force microscopy</i> (Nanoscale, 2019, "
-            "11, 10320-10328).<br>DOI <a href=\"" + doi + "\">" + doi + "</a>")
+            "11, 10320-10328).<br>DOI <a style=\"color: " +
+            LINK_COLORS.get(theme_handler.current_theme, "#7fb6f5") +
+            ";\" href=\"" + doi + "\">" + doi + "</a>")
         label_cite.setWordWrap(True)
         label_cite.setOpenExternalLinks(True)
         label_cite.setFixedWidth(self.image_width)
@@ -466,63 +440,6 @@ class EntryWidget(QtWidgets.QDialog):
             else QtCore.Qt.AscendingOrder
         self.tableWidget.horizontalHeader().setSortIndicator(column, order)
 
-    def fade(self):
-        """Method which changes the alpha value of an image.
-
-        The image is stored in a numpy array, the slicing allows a fast change
-        of the alpha value. Depending on self.sign, the alpha value will
-        increase or decrease, resulting in a fade in or a fade out.
-        """
-        outpos = self.pos
-
-        if self.pos + 1 == len(self.image_list):
-            outpos = self.pos
-
-        fade_out = self.image_list[outpos].astype('float')
-
-        self.alpha += 3 * self.sign
-
-        fade_out[:, :, 3] = self.alpha
-        self.labelchanging.setPixmap(misc_tools.get_pixmap(fade_out))
-
-        QtWidgets.QApplication.processEvents()
-
-        if self.alpha == 0 or self.alpha == 255:
-            if self.pos + 1 == len(self.image_list):
-                self.pos = 0
-            else:
-                self.pos += 1
-            # Reset values
-            if self.sign == 1:
-                self.sign = -1
-            else:
-                self.sign = 1
-
-    def load_images(self):
-        """Load the images."""
-        # Display image in a label
-        im1 = Image.open(get_resource_path("01.png")).convert("RGBA")
-        im2 = Image.open(get_resource_path("02.png")).convert("RGBA")
-        im3 = Image.open(get_resource_path("03.png")).convert("RGBA")
-        im4 = Image.open(get_resource_path("04.png")).convert("RGBA")
-        im5 = Image.open(get_resource_path("05.png")).convert("RGBA")
-        im6 = Image.open(get_resource_path("06.png")).convert("RGBA")
-        im7 = Image.open(get_resource_path("07.png")).convert("RGBA")
-        self.image_list.append(numpy.array(im1))
-        self.image_list.append(numpy.array(im2))
-        self.image_list.append(numpy.array(im2))
-        self.image_list.append(numpy.array(im3))
-        self.image_list.append(numpy.array(im3))
-        self.image_list.append(numpy.array(im4))
-        self.image_list.append(numpy.array(im4))
-        self.image_list.append(numpy.array(im5))
-        self.image_list.append(numpy.array(im5))
-        self.image_list.append(numpy.array(im6))
-        self.image_list.append(numpy.array(im6))
-        self.image_list.append(numpy.array(im7))
-        self.image_list.append(numpy.array(im7))
-        self.image_list.append(numpy.array(im1))
-
     def center(self):
         """Called by main.py to center the Widget in the middle of the screen."""
         geometry = self.frameGeometry()
@@ -719,8 +636,8 @@ class EntryWidget(QtWidgets.QDialog):
         When closing the entry widget we don't want the app to be closed,
         we want to continue to go through the loading procedure.
         """
-        # Stop the timer
-        self.timer.stop()
+        # Stop the showcase of the banner
+        self.banner.stop()
 
         if self.exit_from_button:
             self.logger.debug("Closing and continue loading")
