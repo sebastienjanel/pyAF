@@ -45,7 +45,12 @@ from ..tools import gui_tools
 import tempfile
 from PIL import Image
 import numpy
-from ..load_and_save.pre_check import CheckFiles
+from ..load_and_save.pre_check import CheckFiles, sort_infos
+
+# Width of the table of the files
+TABLE_WIDTH = 800
+# Columns of the table which sort the files (header click)
+SORT_COLUMNS = {1: "name", 2: "date"}
 from ..tools.misc_tools import get_resource_path
 
 
@@ -111,6 +116,18 @@ class EntryWidget(QtWidgets.QDialog):
         if consts.UNIT_TESTING and self.mode == "first_load":
             # In case of unit tests, fill the list with the passed files
             self.files_info = CheckFiles(self.files).infos
+
+        # Order of the files (and of the loading): by name or by date, kept
+        # between the launches (the order of the file dialog depends on the
+        # system)
+        self.sort_by = self.settings.value("FileSortBy", "name")
+        if self.sort_by not in SORT_COLUMNS.values():
+            self.sort_by = "name"
+        self.sort_descending = self.settings.value("FileSortDescending",
+                                                   False, type=bool)
+        if self.files_info is not None:
+            self.files_info = sort_infos(self.files_info, self.sort_by,
+                                         self.sort_descending)
 
         # Is the advanced mode part displayed or not ?
         self.display_advanced = False
@@ -256,19 +273,32 @@ class EntryWidget(QtWidgets.QDialog):
         self.tableWidget.setHorizontalScrollBarPolicy(policy)
         self.tableWidget.verticalHeader().hide()
 
-        header_labels = ["Load", "Name", "Type", "Error"]
-        self.tableWidget.setColumnCount(4)
+        header_labels = ["Load", "Name", "Date", "Type", "Error"]
+        self.tableWidget.setColumnCount(5)
         self.tableWidget.setHorizontalHeaderLabels(header_labels)
+        self.tableWidget.horizontalHeaderItem(1).setToolTip(
+            "Sort by name (click again: reverse order)")
+        self.tableWidget.horizontalHeaderItem(2).setToolTip(
+            "Sort by date of the acquisition (click again: reverse order)")
 
-        for i in range(len(self.files)):
+        for i in range(len(self.files_info)):
             self.add_line_in_tablewidget(i)
 
-        # Set the width of the columns
+        # Sort by clicking on the name or the date (the cells are widgets:
+        # the rows are filled again in the new order)
+        header = self.tableWidget.horizontalHeader()
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        header.sectionClicked.connect(self.header_clicked)
+        self.show_sort_indicator()
+
+        # Set the width of the columns: the name fills the free width
         self.tableWidget.setColumnWidth(0, 40)
-        self.tableWidget.setColumnWidth(1, 220)
-        self.tableWidget.setColumnWidth(2, 150)
-        # The last column fills the width of the table
-        self.tableWidget.horizontalHeader().setStretchLastSection(True)
+        self.tableWidget.setColumnWidth(2, 135)
+        self.tableWidget.setColumnWidth(3, 170)
+        self.tableWidget.setColumnWidth(4, 120)
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
 
         # Define check all checkbox
         self.checkbox = QtWidgets.QCheckBox("Select all")
@@ -360,13 +390,21 @@ class EntryWidget(QtWidgets.QDialog):
         lb = gui_tools.CenteredCellwidget(label)
         self.tableWidget.setCellWidget(i, 1, lb)
 
+        # Date of the acquisition (without the seconds)
+        label = QtWidgets.QLabel()
+        label.setFont(self.smallfont)
+        label.setText(info.get("date", "")[:16])
+        label.setStyleSheet(color)
+        lb = gui_tools.CenteredCellwidget(label)
+        self.tableWidget.setCellWidget(i, 2, lb)
+
         # Type
         label = QtWidgets.QLabel()
         label.setFont(self.smallfont)
         label.setText(info["file_type"])
         label.setStyleSheet(color)
         lb = gui_tools.CenteredCellwidget(label)
-        self.tableWidget.setCellWidget(i, 2, lb)
+        self.tableWidget.setCellWidget(i, 3, lb)
 
         # Error message
         if info["error"] == "Nanoscope version error":
@@ -376,17 +414,21 @@ class EntryWidget(QtWidgets.QDialog):
             content.addItem("6.x")
             content.addItem("7.x")
             content.addItem("8.x")
+            # Version chosen before (the rows are filled again by a sort)
+            if info["version"] is not None:
+                content.setCurrentIndex(
+                    max(content.findText(str(info["version"])), 0))
             content.setFont(self.smallfont)
             content.setStyleSheet(color)
             lb = gui_tools.CenteredCellComboBox(content)
-            self.tableWidget.setCellWidget(i, 3, lb)
+            self.tableWidget.setCellWidget(i, 4, lb)
         else:
             content = QtWidgets.QLabel()
             content.setFont(self.smallfont)
             content.setText(info["error"])
             content.setStyleSheet(color)
             lb = gui_tools.CenteredCellwidget(content)
-            self.tableWidget.setCellWidget(i, 3, lb)
+            self.tableWidget.setCellWidget(i, 4, lb)
 
         # Define the size of the table to hide the white space at the bottom:
         # rows (up to 200 px, then the table scrolls) + header + frame, so
@@ -394,7 +436,35 @@ class EntryWidget(QtWidgets.QDialog):
         table_height = min(self.tableWidget.verticalHeader().length(), 200)
         header_height = self.tableWidget.horizontalHeader().sizeHint().height()
         frame = 2 * self.tableWidget.frameWidth()
-        self.tableWidget.setFixedSize(600, table_height + header_height + frame)
+        self.tableWidget.setFixedSize(TABLE_WIDTH,
+                                      table_height + header_height + frame)
+
+    def header_clicked(self, column):
+        """Sort the files by name or by date (the same column again: reverse
+        order), kept for the next loadings."""
+        if column not in SORT_COLUMNS:
+            self.show_sort_indicator()
+            return
+        by = SORT_COLUMNS[column]
+        self.sort_descending = not self.sort_descending \
+            if by == self.sort_by else False
+        self.sort_by = by
+        self.settings.setValue("FileSortBy", self.sort_by)
+        self.settings.setValue("FileSortDescending", self.sort_descending)
+        self.files_info = sort_infos(self.files_info, self.sort_by,
+                                     self.sort_descending)
+        self.tableWidget.setRowCount(0)
+        for i in range(len(self.files_info)):
+            self.add_line_in_tablewidget(i)
+        self.show_sort_indicator()
+
+    def show_sort_indicator(self):
+        """Arrow of the sort in the header of the table."""
+        column = {value: key for key, value in SORT_COLUMNS.items()}[
+            self.sort_by]
+        order = QtCore.Qt.DescendingOrder if self.sort_descending \
+            else QtCore.Qt.AscendingOrder
+        self.tableWidget.horizontalHeader().setSortIndicator(column, order)
 
     def fade(self):
         """Method which changes the alpha value of an image.
@@ -577,7 +647,7 @@ class EntryWidget(QtWidgets.QDialog):
 
     def list_updated(self, i):
         """Method called when a list is clicked."""
-        value = self.tableWidget.cellWidget(i, 3).list.currentText()
+        value = self.tableWidget.cellWidget(i, 4).list.currentText()
         self.logger.debug("List updated (%s)", value)
 
         # Count how many files there are with a version error
@@ -627,7 +697,7 @@ class EntryWidget(QtWidgets.QDialog):
                         self.files_info[j]["version"] = value
                         self.files_info[j]["enabled"] = True
                         self.files_info[j]["checked"] = True
-                        tw.cellWidget(j, 3).list.setCurrentIndex(index)
+                        tw.cellWidget(j, 4).list.setCurrentIndex(index)
                         tw.cellWidget(j, 0).checkbox.setChecked(True)
                         tw.cellWidget(j, 0).checkbox.setEnabled(True)
 
@@ -641,7 +711,7 @@ class EntryWidget(QtWidgets.QDialog):
 
             elif ret == QtWidgets.QMessageBox.Abort:
                 # Abort and reset combobox
-                self.tableWidget.cellWidget(i, 3).list.setCurrentIndex(0)
+                self.tableWidget.cellWidget(i, 4).list.setCurrentIndex(0)
 
     def closeEvent(self, event):
         """Reimplement the closeEvent.

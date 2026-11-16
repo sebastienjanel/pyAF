@@ -34,13 +34,19 @@
 import os
 import logging
 import pickle
+import re
+import warnings
 import zipfile
+
+import tables
+from dateutil.parser import parse
 
 from .. import consts
 from ..tools import pickle_tools
 from .. import widgets_list
 from .file_loader.nanoscope import extract_text, extract_num
-from .file_loader.jpk import extract_int, has_force_curves
+from .file_loader.jpk import extract_int, has_force_curves, \
+    extract_jpk_date
 from .file_loader.jpk_smart import check_smart_mapping
 from ..widgets.progressbar import Progressbar
 
@@ -101,7 +107,8 @@ def check_single_file(path):
               "error": "",
               "version": None,
               "path": path,
-              "nbrcurves": 0}
+              "nbrcurves": 0,
+              "date": ""}
 
     # Check if the file can be opened
     try:
@@ -229,7 +236,74 @@ def check_single_file(path):
             result["checked"] = True
 
         result["nbrcurves"] = nbrcurves
+        result["date"] = file_date(path, file_type)
         return result
+
+
+def file_date(path, file_type):
+    """Date of the acquisition of a file ("YYYY-MM-DD HH:MM:SS", as in the
+    file list after the loading), "" if it is not known (projects, files
+    that can not be read)."""
+    try:
+        if file_type in ("JPK (Force Map)", "JPK (QI)"):
+            prefix = "force-scan-map" if file_type == "JPK (Force Map)" \
+                else "quantitative-imaging-map"
+            with zipfile.ZipFile(path, "r") as jpkfile:
+                for line in jpkfile.read("header.properties").splitlines():
+                    line = line.decode()
+                    if line.find(prefix + ".start-time") != -1:
+                        return extract_jpk_date(line)
+        elif file_type == "JPK (Single File)":
+            # In the first segment for the single curves
+            with zipfile.ZipFile(path, "r") as jpkfile:
+                header = jpkfile.read("segments/0/segment-header.properties")
+                for line in header.splitlines():
+                    line = line.decode()
+                    if line.find("force-segment-header.time-stamp") != -1:
+                        return extract_jpk_date(line)
+        elif file_type == "JPK (Smart Mapping)":
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore",
+                                      tables.exceptions.DataTypeWarning)
+                with tables.open_file(path, "r") as h5file:
+                    attrs = h5file.get_node("/Measurement_000/Map")._v_attrs
+                    start = attrs["multi-scan-series.map.header.start-time"]
+                    if isinstance(start, bytes):
+                        start = start.decode()
+                    date = parse(str(start), ignoretz=True)
+                    return str(date).split(".")[0]
+        elif file_type.startswith("Nanoscope"):
+            with open(path, mode="r", encoding="latin_1") as nanofile:
+                for line in nanofile:
+                    if line.find("\\Date:") + 1:
+                        return str(parse(line[7:].strip()))
+                    if line.find("\\*File list end") + 1:
+                        break
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile,
+            tables.exceptions.HDF5ExtError, tables.NoSuchNodeError):
+        pass
+    return ""
+
+
+def natural_key(text):
+    """Key of the natural order of names (map2 before map10)."""
+    return [int(part) if part.isdigit() else part.lower()
+            for part in re.split(r"(\d+)", text)]
+
+
+def sort_infos(infos, by="name", descending=False):
+    """Files sorted by name (natural order) or by date (the files without
+    date at the end)."""
+    if by == "date":
+        dated = [info for info in infos if info["date"]]
+        undated = [info for info in infos if not info["date"]]
+        dated.sort(key=lambda info: (info["date"],
+                                     natural_key(info["filename"])),
+                   reverse=descending)
+        undated.sort(key=lambda info: natural_key(info["filename"]))
+        return dated + undated
+    return sorted(infos, key=lambda info: natural_key(info["filename"]),
+                  reverse=descending)
 
 
 def check_project(pyaffile):

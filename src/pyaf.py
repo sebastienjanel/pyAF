@@ -1062,7 +1062,7 @@ def open_entry_widget(mode, files, new_tmp_path=None):
     entry_window = EntryWidget(
         files=files, mode=mode, new_tmp_path=new_tmp_path)
     entry_window.center()
-    entry_window.resize(600, 300)
+    entry_window.resize(800, 300)
     entry_window.setWindowTitle(window_title)
     entry_window.activateWindow()
     entry_window.show()

@@ -33,7 +33,8 @@
 (no file, no window): flatten and levelling of the z motor steps,
 zero-force topography after a flatten, contact models and bottom effect
 correction (docs/models.md, sections 3 and 5), adhesion (section 9),
-dynamic force spectroscopy (section 11), plant cells (section 13).
+dynamic force spectroscopy (section 11), plant cells (section 13), and the
+order of the files of the loading window.
 
 Usage (from the pyAF folder):
     .venv/bin/python -m unittest discover tests
@@ -54,6 +55,7 @@ from src.compute_tools.stiffness import bec  # noqa: E402
 from src.compute_tools.stiffness import contact_models  # noqa: E402
 from src.compute_tools.work_and_rupture_force import \
     work_and_rupture_force_compute as work  # noqa: E402
+from src.load_and_save.pre_check import sort_infos  # noqa: E402
 from src.single import SingleFile, UNKNOWN_FLATTEN  # noqa: E402
 from src.tools import dfs_tools  # noqa: E402
 from src.tools import math_tools  # noqa: E402
@@ -532,6 +534,31 @@ class PlantCells(unittest.TestCase):
         self.assertAlmostEqual(centre["f"], 1.0, delta=0.01)
         for name in ("L_major", "L_minor"):
             self.assertAlmostEqual(geometry[name], roi_radius, delta=0.75)
+
+
+class FileOrder(unittest.TestCase):
+    """pre_check.sort_infos: order of the files of the loading window."""
+
+    INFOS = [{"filename": "map10.jpk-force-map", "date": "2026-01-03 10:00:00"},
+             {"filename": "project.pyaf", "date": ""},
+             {"filename": "Map2.jpk-force-map", "date": "2026-01-01 10:00:00"},
+             {"filename": "map1.jpk-force-map", "date": "2026-01-02 10:00:00"}]
+
+    def names(self, infos):
+        return [info["filename"].split(".")[0] for info in infos]
+
+    def test_natural_order_of_the_names(self):
+        self.assertEqual(self.names(sort_infos(self.INFOS, "name")),
+                         ["map1", "Map2", "map10", "project"])
+        self.assertEqual(self.names(sort_infos(self.INFOS, "name", True)),
+                         ["project", "map10", "Map2", "map1"])
+
+    def test_dates_and_files_without_date(self):
+        self.assertEqual(self.names(sort_infos(self.INFOS, "date")),
+                         ["Map2", "map1", "map10", "project"])
+        # Without date: at the end in both orders
+        self.assertEqual(self.names(sort_infos(self.INFOS, "date", True)),
+                         ["map10", "map1", "Map2", "project"])
 
 
 if __name__ == "__main__":
