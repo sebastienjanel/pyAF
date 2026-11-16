@@ -197,8 +197,17 @@ class MainPlot:
         p_type = self.plot_type
 
         if self.parent.single:
-            if p_type in ("results_single", "results_groups"):
-                # Violins: no legend, use all the space
+            if p_type == "results_experiment":
+                # SuperPlot: room on the right for the legend of the
+                # experiments
+                self.fig.tight_layout(rect=(0, 0, 0.86, 1))
+            elif p_type == "results_stats":
+                # Legend outside of the box: no tight layout (see below)
+                self.fig.subplots_adjust(left=0.125, right=0.7,
+                                         bottom=0.2, top=0.9)
+            else:
+                # Margins of the labels (the default ones cut the x label
+                # with the fonts of pyAF)
                 self.fig.tight_layout()
             pyplot.draw()
 
