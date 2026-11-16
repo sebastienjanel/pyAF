@@ -110,7 +110,8 @@ if multiprocessing.current_process().name == "MainProcess":
     from .load_and_save.pre_check import CheckFiles
     from .widgets.preferences import PreferencesWidget
     from .utils import discarding
-    from .gui_styles.theme_handler import theme_handler, saved_theme
+    from .gui_styles.theme_handler import theme_handler, saved_theme, \
+        follow_system
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -1169,7 +1170,8 @@ def main(app=None, files=None):
         elif not getattr(sys, "frozen", False):
             app.setWindowIcon(
                 QtGui.QIcon(misc_tools.get_resource_path("icon.icns")))
-        # Theme of the preferences (dark at the first launch)
+        # Theme of the preferences (the theme of the system at the first
+        # launch)
         theme_handler(saved_theme())
 
     # Check of the installation or of the application, without the windows
@@ -1236,6 +1238,14 @@ def main(app=None, files=None):
     # Create main window once the loading window is closed
     main_window = MainWindow(files_info)
     main_window.show()
+
+    # Automatic theme: follows the system when it changes
+    def theme_changed():
+        from .gui_styles import theme_handler as handler
+        shared.exp.current_theme = handler.current_theme
+        PreferencesWidget.update_plots()
+
+    follow_system(app, theme_changed)
     if sys.platform == "darwin":
         main_window.raise_()
 

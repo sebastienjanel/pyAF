@@ -42,7 +42,7 @@ from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFCheckBox
 from ..tools.gui_tools import PYAFInput
 from ..tools.gui_tools import PYAFComboBox
-from ..gui_styles.theme_handler import set_theme
+from ..gui_styles import theme_handler
 from .. import widgets_list
 
 
@@ -122,8 +122,11 @@ class PreferencesWidget(PYAFWidget):
 
         self.list_theme = PYAFComboBox(self, "list_theme")
         self.list_theme.setFixedSize(200, 26)
-        for theme in shared.exp.theme_list:
-            self.list_theme.addItem(theme)
+        for theme in theme_handler.THEME_CHOICES:
+            # Automatic: the theme of the system
+            self.list_theme.addItem("Automatic (system)"
+                                    if theme == theme_handler.AUTOMATIC
+                                    else theme)
 
         self.HL_theme = QtWidgets.QHBoxLayout()
         self.HL_theme.addWidget(self.list_theme)
@@ -182,7 +185,8 @@ class PreferencesWidget(PYAFWidget):
         font_size = shared.exp.mpl_tick_labels_font_size
         self.IN_tick_labels_font_size.changeValue(font_size)
 
-        self.list_theme.setCurrentIndex(shared.exp.theme_list.index(shared.exp.current_theme))
+        self.list_theme.setCurrentIndex(
+            theme_handler.THEME_CHOICES.index(theme_handler.saved_choice()))
 
     def checkbox_clicked(self, name):
         """Called whenever a checkbox is clicked."""
@@ -293,17 +297,16 @@ class PreferencesWidget(PYAFWidget):
 
     def list_updated(self, name):
         if name == "list_theme":
-            # Get current theme
-            selected_theme = shared.exp.theme_list[self.list_theme.currentIndex()]
-            # Set selected theme
-            shared.exp.current_theme = selected_theme
-            # Apply selected theme (kept for the next launches)
-            set_theme(selected_theme)
+            # Apply the selected theme (kept for the next launches)
+            choice = theme_handler.THEME_CHOICES[
+                self.list_theme.currentIndex()]
+            theme_handler.set_theme(choice)
+            shared.exp.current_theme = theme_handler.current_theme
             # Update plots to apply plot theme
             self.update_plots()
 
-
-    def update_plots(self):
+    @staticmethod
+    def update_plots():
         widgets_list.widget_data.meshgrid.update_plot()
         widgets_list.widget_data.curve.update_plot()
         widgets_list.widget_compute.update_MPL("MPL_meshgrid")

@@ -34,6 +34,7 @@
 """
 Python application for fitting Hertz model to different force curves
 """
+from qtpy.QtGui import QGuiApplication
 from qtpy.QtWidgets import QApplication
 import os
 import sys
@@ -47,6 +48,11 @@ from . import breeze_resources  # Do not delete, important for making the style 
 
 # Theme applied by theme_handler ("Dark" or "Light")
 current_theme = "Dark"
+
+# Choices of the preferences: the theme of the system (followed when it
+# changes), or a fixed theme
+AUTOMATIC = "Automatic"
+THEME_CHOICES = (AUTOMATIC, "Light", "Dark")
 
 # Colours of the curves: the light theme needs darker colours on the white
 # plot background
@@ -65,17 +71,60 @@ def curve_color(name):
     return CURVE_COLORS.get(current_theme, CURVE_COLORS["Dark"])[name]
 
 
-def saved_theme():
+def saved_choice():
     """Theme chosen in the preferences (kept between the launches of pyAF),
-    dark at the first launch."""
-    theme = QSettings().value("theme", "Dark")
-    return theme if theme in ("Light", "Dark") else "Dark"
+    the theme of the system at the first launch."""
+    choice = QSettings().value("theme", AUTOMATIC)
+    return choice if choice in THEME_CHOICES else AUTOMATIC
 
 
-def set_theme(theme):
-    """Apply a theme and keep it for the next launches."""
-    theme_handler(theme)
-    QSettings().setValue("theme", theme)
+def system_theme():
+    """Light or dark theme of the system (Qt 6.5+), dark if it is not known
+    (some Linux desktops do not give it)."""
+    try:
+        scheme = QGuiApplication.styleHints().colorScheme()
+    except AttributeError:
+        return "Dark"
+    return "Light" if scheme == Qt.ColorScheme.Light else "Dark"
+
+
+def resolve(choice):
+    """Theme to apply ("Light" or "Dark") for a choice of the preferences."""
+    return system_theme() if choice == AUTOMATIC else choice
+
+
+def saved_theme():
+    """Theme to apply at the launch: the choice of the preferences, or the
+    theme of the system (see saved_choice)."""
+    return resolve(saved_choice())
+
+
+def set_theme(choice):
+    """Apply a choice of the preferences and keep it for the next
+    launches."""
+    theme_handler(resolve(choice))
+    QSettings().setValue("theme", choice)
+
+
+def follow_system(app, on_change):
+    """With the Automatic choice, the theme follows the system when it
+    changes (e.g. macOS between day and night): theme applied, then
+    on_change() (to redraw the plots)."""
+    hints = app.styleHints()
+    if not hasattr(hints, "colorSchemeChanged"):
+        return
+
+    def changed(_scheme):
+        if saved_choice() != AUTOMATIC:
+            return
+        theme = system_theme()
+        if theme != current_theme:
+            theme_handler(theme)
+            on_change()
+
+    hints.colorSchemeChanged.connect(changed)
+    # Kept with the application (not garbage collected)
+    app._pyaf_follow_system = changed
 
 
 def theme_handler(theme):
