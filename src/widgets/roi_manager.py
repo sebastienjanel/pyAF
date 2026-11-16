@@ -173,6 +173,9 @@ class RoiManagerWidget(PYAFWidget):
         for col, width in enumerate(widths):
             self.TW.setColumnWidth(col, width)
         self.TW.setFixedWidth(sum(widths) + 4)
+        # The frame of the themes is not 2 pixels: the last column takes
+        # the rest of the width (no empty space on the right)
+        self.TW.horizontalHeader().setStretchLastSection(True)
         self.TW.verticalHeader().hide()
         self.TW.cellClicked.connect(self.tableWidget_clicked)
 
