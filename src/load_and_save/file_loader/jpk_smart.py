@@ -78,6 +78,13 @@ MOTOR_CHANNELS = {"combinedHeightMeasured": "measuredHeight",
                   "combinedHeight": "height"}
 # Smallest move of the z motor (nm)
 MOTOR_TOLERANCE = 10.0
+# Numbering of the curves in the header, and its numbering in pyAF (see
+# jpk.grid_pixel): with left-to-right (software from 2026), the position
+# index of a curve is its pixel line by line from left to right, the curves
+# being recorded back and forth
+NUMBERINGS = {"back-and-forth": "back-and-forth",
+              "line-by-line": "line-by-line",
+              "left-to-right": "line-by-line"}
 
 
 def read_attributes(node):
@@ -221,11 +228,11 @@ class LoaderJPKSmart(LoaderJPK):
         for key in ("xcenter", "ycenter", "ulength", "vlength"):
             self.grid[key] = number(GRID + key)
         self.grid["theta"] = self.data.scan_angle
-        self.numbering = value(SERIES + "map.header.position-pattern.numbering",
-                               "back-and-forth")
-        if self.numbering not in ("back-and-forth", "line-by-line"):
-            raise ValueError("Unknown numbering of the curves: " +
-                             self.numbering)
+        numbering = value(SERIES + "map.header.position-pattern.numbering",
+                          "back-and-forth")
+        if numbering not in NUMBERINGS:
+            raise ValueError("Unknown numbering of the curves: " + numbering)
+        self.numbering = NUMBERINGS[numbering]
 
         closed_loop = value(SERIES + "header.force-settings.closed-loop")
         if closed_loop == "true":
