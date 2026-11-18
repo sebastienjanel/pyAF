@@ -169,13 +169,19 @@ class RoiManagerWidget(PYAFWidget):
                     "discarded with Discard data"]
         for col, tooltip in enumerate(tooltips):
             self.TW.horizontalHeaderItem(col).setToolTip(tooltip)
+        # At least the width of the titles (larger fonts on Linux and
+        # Windows), and the list as wide as its columns
+        self.TW.ensurePolished()
+        header = self.TW.horizontalHeader()
+        header.setMinimumSectionSize(20)
         widths = [30, 45, 45, 60, 85, 100, 75, 80]
         for col, width in enumerate(widths):
-            self.TW.setColumnWidth(col, width)
-        self.TW.setFixedWidth(sum(widths) + 4)
-        # The frame of the themes is not 2 pixels: the last column takes
-        # the rest of the width (no empty space on the right)
-        self.TW.horizontalHeader().setStretchLastSection(True)
+            self.TW.setColumnWidth(
+                col, max(width, header.sectionSizeHint(col)))
+        self.TW.setFixedWidth(header.length() + 2 * self.TW.frameWidth())
+        # The last column takes the rest of the width (no empty space on
+        # the right)
+        header.setStretchLastSection(True)
         self.TW.verticalHeader().hide()
         self.TW.cellClicked.connect(self.tableWidget_clicked)
 
