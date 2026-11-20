@@ -271,9 +271,22 @@ class MainPlot:
 
             elif p_type == "meshgrid_roi":
                 # Map of the ROI manager: as large as possible in its
-                # canvas, room for the colour bar on the right
-                self.fig.subplots_adjust(left=0.09, right=0.86, bottom=0.08,
-                                         top=0.98)
+                # canvas, room for the colour bar on the right. The bottom
+                # margin is the height of the x axis (tick labels and
+                # label), measured: a fraction of the height cuts the x
+                # label when the canvas is low (e.g. with the options of
+                # ROI assistance below it, or with a tall map). The map is
+                # drawn again when resized
+                height = self.fig.bbox.height
+                top = 1 - 12 / height
+                self.fig.subplots_adjust(left=0.09, right=0.86, bottom=0.1,
+                                         top=top)
+                box = self.axes.xaxis.get_tightbbox(
+                    self.fig.canvas.get_renderer())
+                if box is not None:
+                    bottom = 0.1 + (4 - box.y0) / height
+                    self.fig.subplots_adjust(bottom=min(max(bottom, 0.02),
+                                                        0.4))
 
             elif p_type in ("meshgrid_data", "small_meshgrid_compute"):
                 # Small map: leave room on the right for the colour bar

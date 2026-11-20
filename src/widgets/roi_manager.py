@@ -44,6 +44,7 @@ from ..compute_tools import plant
 from ..compute_tools.stiffness import bec
 from ..plots.PYAFPlot import PYAFPlot
 from ..plots.plot_main import MainPlot
+from ..tools import auto_roi
 from ..tools import gui_tools
 from ..tools import map_values
 from ..tools import math_tools
@@ -55,6 +56,7 @@ from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFButtonGroup
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools.gui_tools import PYAFInput
+from ..tools.gui_tools import PYAFToggle
 from .. import experiment
 
 
@@ -80,6 +82,14 @@ class RoiManagerWidget(PYAFWidget):
         self.drawing = False
         # File of the map displayed
         self.shown_file = None
+        # ROI assistance: pixels marked in each ROI and pixels erased from it
+        # (sets of (i, j) by ROI, by file, for the session), features of the
+        # file of the map, and the proposal (see auto_update)
+        self.auto_marks = {}
+        self.auto_erased = {}
+        self.auto_features = None
+        self.auto_domes = None
+        self.auto_result = None
 
         self.logger = logging.getLogger()
         self.logger.debug("Opening ROI manager")
@@ -138,6 +148,19 @@ class RoiManagerWidget(PYAFWidget):
                                         self.RB_erase)):
             self.BG_tool.addButton(button, index)
         self.RB_draw.setChecked(True)
+        self.TG_auto = PYAFToggle(self, "roi_assistance", "ROI assistance")
+        if auto_roi.available():
+            self.TG_auto.setToolTip(
+                "Sort the other pixels into the ROIs from a few pixels of\n"
+                "them (the ROIs drawn, and the pixels marked with Draw\n"
+                "while ROI assistance is on): by regions with all the maps\n"
+                "computed for the file (topography, elasticity...), or by\n"
+                "dome with the domes of the height (see Sort by). Erase\n"
+                "takes pixels out of the ROI (by dome, with the region\n"
+                "around them up to the grooves). The ROIs change only with\n"
+                "Accept.")
+        else:
+            self.TG_auto.setToolTip("Needs scikit-learn (not installed)")
         self.change_cursor_mode(self.cursor_mode)
         self.label_no_map = QtWidgets.QLabel(
             "Single curve: no map. Its cell is drawn on the map where it was "
@@ -147,6 +170,8 @@ class RoiManagerWidget(PYAFWidget):
         HL_tools.addWidget(self.RB_select)
         HL_tools.addWidget(self.RB_draw)
         HL_tools.addWidget(self.RB_erase)
+        HL_tools.addSpacing(12)
+        HL_tools.addWidget(self.TG_auto)
         HL_tools.addStretch(1)
 
         self.VL_map = QtWidgets.QVBoxLayout()
@@ -232,6 +257,84 @@ class RoiManagerWidget(PYAFWidget):
         self.HL_pencil.addWidget(self.input_size)
         self.HL_pencil.addStretch(1)
         self.VL_map.insertLayout(4, self.HL_pencil)
+
+        # ROI assistance, below the pencil (shown with ROI assistance)
+        self.CB_auto_mode = PYAFComboBox(self, "auto_mode")
+        self.CB_auto_mode.addItem("Regions", "regions")
+        self.CB_auto_mode.addItem("Dome", "dome")
+        self.CB_auto_mode.fit_to_contents()
+        self.CB_auto_mode.setToolTip(
+            "Regions: the pixels sorted into the ROIs from all the maps,\n"
+            "at least two ROIs marked (cell and glass, domains of a\n"
+            "bilayer).\n"
+            "Dome: each ROI takes the whole domes of the height its marks\n"
+            "touch, separated by the grooves (cells of a tissue); one ROI\n"
+            "is enough.")
+        self.SL_auto = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.SL_auto.setRange(30, 99)
+        self.SL_auto.setValue(70)
+        self.SL_auto.setFixedWidth(100)
+        self.SL_auto.setToolTip(
+            "Pixels sorted with a lower confidence are left uncertain (in\n"
+            "no ROI): borders, debris")
+        self.label_threshold = QtWidgets.QLabel()
+        self.SB_auto_size = QtWidgets.QSpinBox()
+        self.SB_auto_size.setRange(1, 9999)
+        self.SB_auto_size.setValue(5)
+        self.SB_auto_size.setMaximumWidth(70)
+        self.SB_auto_size.setToolTip(
+            "Groups of fewer pixels of a ROI are left uncertain")
+        self.SL_auto.valueChanged.connect(self.auto_classify)
+        self.SB_auto_size.valueChanged.connect(self.auto_classify)
+        self.SB_dome = QtWidgets.QSpinBox()
+        self.SB_dome.setRange(1, 50)
+        self.SB_dome.setValue(5)
+        self.SB_dome.setSuffix(" %")
+        self.SB_dome.setToolTip(
+            "Height of a dome above the grooves around it, in % of the\n"
+            "range of the heights of the map: lower domes (noise, small\n"
+            "bumps) are merged with their neighbors. Lower it if two domes\n"
+            "are merged, raise it if a dome is cut")
+        self.SB_dome.valueChanged.connect(self.auto_classify)
+        self.BT_auto_accept = PYAFButton(self, "auto_accept", "Accept")
+        self.set_auto_status("")
+        self.BT_auto_clear = PYAFButton(self, "auto_clear", "Clear marks")
+        # Options of the regions, or of the domes
+        self.W_regions = QtWidgets.QWidget()
+        HL_regions = QtWidgets.QHBoxLayout(self.W_regions)
+        HL_regions.setContentsMargins(0, 0, 0, 0)
+        HL_regions.addWidget(QtWidgets.QLabel("Uncertain below"))
+        HL_regions.addWidget(self.SL_auto)
+        HL_regions.addWidget(self.label_threshold)
+        HL_regions.addSpacing(12)
+        HL_regions.addWidget(QtWidgets.QLabel("Min. size [px]"))
+        HL_regions.addWidget(self.SB_auto_size)
+        self.W_dome = QtWidgets.QWidget()
+        HL_dome = QtWidgets.QHBoxLayout(self.W_dome)
+        HL_dome.setContentsMargins(0, 0, 0, 0)
+        HL_dome.addWidget(QtWidgets.QLabel("Min. dome height"))
+        HL_dome.addWidget(self.SB_dome)
+        # Two rows, as wide as the map at most (the window does not grow):
+        # the mode and the buttons, then the options of the mode
+        HL_auto = QtWidgets.QHBoxLayout()
+        HL_auto.addWidget(QtWidgets.QLabel("Sort by"))
+        HL_auto.addWidget(self.CB_auto_mode)
+        HL_auto.addSpacing(12)
+        HL_auto.addWidget(self.BT_auto_accept)
+        HL_auto.addWidget(self.BT_auto_clear)
+        HL_auto.addStretch(1)
+        HL_auto_options = QtWidgets.QHBoxLayout()
+        HL_auto_options.addWidget(self.W_regions)
+        HL_auto_options.addWidget(self.W_dome)
+        HL_auto_options.addStretch(1)
+        self.W_auto = QtWidgets.QWidget()
+        VL_auto = QtWidgets.QVBoxLayout(self.W_auto)
+        VL_auto.setContentsMargins(0, 0, 0, 0)
+        VL_auto.addLayout(HL_auto)
+        VL_auto.addLayout(HL_auto_options)
+        self.W_auto.setVisible(False)
+        self.VL_map.insertWidget(5, self.W_auto)
+        self.update_auto_panel()
 
         # Table and actions on the ROIs, right of the map
         GL_buttons = QtWidgets.QGridLayout()
@@ -327,6 +430,9 @@ class RoiManagerWidget(PYAFWidget):
                     self.TW.selectRow(0)
 
                 self.update_widget()
+                if self.auto_active():
+                    # Without the marks of the ROIs removed
+                    self.auto_update()
                 self.rois_changed(data)
                 widgets_list.widget_compute.update_GUI("roi_list_height_corr")
 
@@ -420,6 +526,15 @@ class RoiManagerWidget(PYAFWidget):
 
         elif button == "cell":
             self.show_cell_geometry(data)
+
+        elif button == "auto_accept":
+            self.auto_accept(data)
+
+        elif button == "auto_clear":
+            self.auto_marks.pop(data.unique_id, None)
+            self.auto_erased.pop(data.unique_id, None)
+            self.auto_update()
+            refresh_rois()
 
         elif button == "discard":
             # Discard (or keep again) the curves of the selected ROI
@@ -670,6 +785,8 @@ class RoiManagerWidget(PYAFWidget):
         for widget in (self.W_canvas, self.RB_select, self.RB_draw,
                        self.RB_erase, self.list_maps):
             widget.setEnabled(not data.is_single)
+        self.TG_auto.setEnabled(not data.is_single and auto_roi.available())
+        self.update_auto_panel()
         self.label_no_map.setVisible(data.is_single)
         if data.is_single and self.cursor_mode != "select":
             # Tool of the maps, back with the next map
@@ -684,10 +801,17 @@ class RoiManagerWidget(PYAFWidget):
 
         if self.shown_file is not data:
             self.shown_file = data
+            # Proposal of this file (from its marks)
+            self.auto_features = None
+            self.auto_update()
             self.update_map()
 
     def update_map(self):
         """Draw the map of the window again (empty for a single curve)."""
+        # The maps may have changed (computations, planefit, flatten): the
+        # features of ROI assistance are computed again at the next proposal
+        self.auto_features = None
+        self.auto_domes = None
         self.MPL_canvas.update_plot()
         if shared.exp.current_data.is_single:
             # No map: no plot to draw the ROIs on
@@ -749,6 +873,11 @@ class RoiManagerWidget(PYAFWidget):
             return
         self.drawing = False
         data = shared.exp.current_data
+        if self.auto_active():
+            # Marks changed: new proposal (the ROIs do not change)
+            self.auto_update()
+            refresh_rois()
+            return
         self.update_widget()
         self.rois_changed(data)
         reset_results_table()
@@ -771,6 +900,27 @@ class RoiManagerWidget(PYAFWidget):
         local_roi, local_roi_mask = prepare_roi(xpos, ypos)
         local_roi, local_roi_mask = \
             check_roi_boundaries(data, local_roi, local_roi_mask)
+        if self.auto_active():
+            # Marks of the ROI (with ROI assistance), not its pixels: Draw
+            # marks pixels in the ROI, Erase takes pixels out of it (by
+            # dome, the region flooded from them, see auto_classify)
+            marks = self.auto_marks.setdefault(data.unique_id, {}) \
+                .setdefault(roi, set())
+            erased = self.auto_erased.setdefault(data.unique_id, {}) \
+                .setdefault(roi, set())
+            pencil = {tuple(pixel) for index, pixel in enumerate(local_roi)
+                      if local_roi_mask[index] and pixel is not None}
+            if self.cursor_mode == "roi_add":
+                marks |= pencil
+                erased -= pencil
+                mode = "local_add"
+            else:
+                marks -= pencil
+                erased |= pencil
+                mode = "local_erase"
+            self.MPL_canvas.canvas.update_blit(mode, local_roi,
+                                               local_roi_mask)
+            return
         inside = {tuple(value) for value in roi.values}
         if self.cursor_mode == "roi_add":
             # Only the new pixels are drawn (transparent color)
@@ -791,6 +941,243 @@ class RoiManagerWidget(PYAFWidget):
                              if tuple(value) not in erased]
             mode = "local_erase"
         self.MPL_canvas.canvas.update_blit(mode, local_roi, local_roi_mask)
+
+    # --- ROI assistance ------------------------------------------------------
+
+    def auto_active(self):
+        """True if the tools mark the pixels of the ROIs (ROI assistance)."""
+        return self.TG_auto.isChecked() and \
+            not shared.exp.current_data.is_single
+
+    def toggle_clicked(self, name):
+        """Called when a toggle is clicked."""
+        if name == "roi_assistance":
+            self.auto_toggled(self.TG_auto.isChecked())
+
+    def auto_toggled(self, checked):
+        """ROI assistance on: proposal from the marks of the file (the pixels
+        of the ROIs already drawn for the ROIs without marks); off: the ROIs
+        drawn again (the marks are kept for the session)."""
+        data = shared.exp.current_data
+        if checked and not data.is_single:
+            # The ROIs already drawn are the marks of the ROIs without marks
+            marks = self.auto_marks.setdefault(data.unique_id, {})
+            for roi in data.roi_list:
+                if roi.values and not marks.get(roi):
+                    marks[roi] = {(int(i), int(j)) for i, j in roi.values}
+        self.update_auto_panel()
+        self.auto_update()
+        refresh_rois()
+
+    def update_auto_panel(self):
+        """Options of ROI assistance, shown with it."""
+        self.W_auto.setVisible(self.auto_active())
+        by_dome = self.auto_by_dome()
+        # The options of the other mode hidden first: both in the row would
+        # enlarge the window (not shrunk back)
+        hidden, shown = (self.W_regions, self.W_dome) if by_dome else \
+            (self.W_dome, self.W_regions)
+        hidden.setVisible(False)
+        shown.setVisible(True)
+        self.label_threshold.setText("%d %%" % self.SL_auto.value())
+        result = self.auto_result
+        self.BT_auto_accept.setEnabled(
+            result is not None and result["classes"] is not None)
+        data = shared.exp.current_data
+        self.BT_auto_clear.setEnabled(any(
+            self.auto_marks.get(data.unique_id, {}).values()) or any(
+            self.auto_erased.get(data.unique_id, {}).values()))
+
+    def auto_by_dome(self):
+        """True if the pixels are sorted by dome (domes of the height),
+        False by regions (forest)."""
+        return self.CB_auto_mode.currentData() == "dome"
+
+    def auto_mode_changed(self):
+        """Sorted by regions or by dome: new proposal."""
+        self.auto_update()
+        refresh_rois()
+
+    def auto_dome_labels(self, data, seeds):
+        """Domes of the file, and the regions flooded from seeds (see
+        auto_roi.domes), computed again when they change."""
+        key = (data.unique_id, self.SB_dome.value(),
+               tuple(frozenset(pixels) for pixels in seeds))
+        if self.auto_domes is None or self.auto_domes[0] != key:
+            self.auto_domes = (key, auto_roi.domes(
+                auto_roi.height(data), self.SB_dome.value() / 100.0, seeds))
+        return self.auto_domes[1]
+
+    def set_auto_status(self, text):
+        """State of the proposal (pixels of each ROI, or what is missing),
+        in the tooltip of Accept."""
+        self.auto_status = text
+        tip = "The pixels of the proposal become the pixels of the ROIs\n" \
+            "marked, and ROI assistance is turned off (the ROIs can be\n" \
+            "edited with Draw and Erase)."
+        if text:
+            tip += "\n\n" + text
+        self.BT_auto_accept.setToolTip(tip)
+
+    def auto_rois(self, data):
+        """ROIs of the file with marks, in the order of the list, and their
+        marks."""
+        marks = self.auto_marks.get(data.unique_id, {})
+        erased = self.auto_erased.get(data.unique_id, {})
+        # Not the ROIs removed
+        for store in (marks, erased):
+            for roi in [roi for roi in store if roi not in data.roi_list]:
+                del store[roi]
+        rois = [roi for roi in data.roi_list if marks.get(roi)]
+        return rois, [marks[roi] for roi in rois]
+
+    def auto_update(self):
+        """Proposal from the marks of the file of the map: by regions, the
+        forest learns the ROIs on the marked pixels and gives the
+        probabilities of the ROIs for all the pixels; by dome, the domes
+        under the marks (see auto_classify and auto_roi)."""
+        self.auto_result = None
+        if not self.auto_active():
+            self.update_auto_panel()
+            return
+        data = shared.exp.current_data
+        rois, marks = self.auto_rois(data)
+        shape = (data.nbr_pixels_x, data.nbr_pixels_y)
+        labels = auto_roi.marks_labels(shape, marks)
+        self.auto_result = {"file": data.unique_id, "rois": rois,
+                            "marks": labels, "proba": None, "classes": None}
+        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        try:
+            if self.auto_by_dome():
+                if not rois:
+                    raise auto_roi.AutoRoiError(
+                        "Mark the domes (a stroke or a click in each) with "
+                        "the ROIs (Draw column).")
+            elif len(rois) < 2:
+                raise auto_roi.AutoRoiError(
+                    "Mark pixels in at least two ROIs (Draw column) to get "
+                    "a proposal.")
+            if self.auto_features is None or \
+                    self.auto_features[0] != data.unique_id:
+                self.auto_features = (data.unique_id,
+                                      auto_roi.features(data))
+            self.auto_result["proba"] = auto_roi.probabilities(
+                self.auto_features[1], labels, data.inside_region())
+        except auto_roi.AutoRoiError as error:
+            self.set_auto_status(str(error))
+        finally:
+            QtWidgets.QApplication.restoreOverrideCursor()
+        self.auto_classify()
+
+    def auto_classify(self):
+        """ROIs of the pixels: by regions from the probabilities, with the
+        confidence threshold and the minimum size (fast: not learned
+        again); by dome, the domes under the marks of each ROI."""
+        result = self.auto_result
+        data = shared.exp.current_data
+        if result is None or not result["rois"]:
+            self.update_auto_panel()
+            return
+        erased = self.auto_erased.get(data.unique_id, {})
+        if self.auto_by_dome():
+            # The pixels erased from a ROI are flooded as regions it does
+            # not take (e.g. a flat substrate next to a cell, which has no
+            # dome of its own)
+            seeds = [erased.get(roi, set()) for roi in result["rois"]]
+            try:
+                dome_labels, number = self.auto_dome_labels(data, seeds)
+            except auto_roi.AutoRoiError as error:
+                self.set_auto_status(str(error))
+                self.update_auto_panel()
+                return
+            result["classes"], several = auto_roi.dome_classes(
+                dome_labels, result["marks"], data.inside_region(),
+                {index: {number + 1 + index}
+                 for index in range(len(seeds))})
+            end = "%d dome%s in the map" % (number, "s" if number > 1
+                                            else "")
+            if several:
+                end += " (%d marked in several ROIs: left out; with no " \
+                    "dome, sort by Regions)" % several
+        elif result["proba"] is not None:
+            result["classes"] = auto_roi.classify(
+                result["proba"], result["marks"],
+                self.SL_auto.value() / 100.0, self.SB_auto_size.value())
+            end = None
+        else:
+            self.update_auto_panel()
+            return
+        # Pixels erased from the ROIs
+        for index, roi in enumerate(result["rois"]):
+            for i, j in erased.get(roi, ()):
+                if result["classes"][i, j] == index:
+                    result["classes"][i, j] = -1
+        if end is None:
+            end = "uncertain: %d px" % numpy.count_nonzero(
+                result["classes"] == -1)
+        counts = ["ROI %d: %d px" % (data.roi_list.index(roi) + 1,
+                                     numpy.count_nonzero(
+                                         result["classes"] == index))
+                  for index, roi in enumerate(result["rois"])]
+        self.set_auto_status(", ".join(counts + [end]))
+        if self.sender() in (self.SL_auto, self.SB_auto_size, self.SB_dome):
+            refresh_rois()
+        self.update_auto_panel()
+
+    def auto_overlay(self, data):
+        """What the map of the window shows with ROI assistance, None without:
+        the marks of the ROIs ([pixels, color]), and the proposal (ROI of
+        each pixel, see auto_roi.classify, and the colors of the ROIs) or
+        None."""
+        if not self.auto_active() or data is not shared.exp.current_data:
+            return None
+        rois, marks = self.auto_rois(data)
+        colors = [data.roi_color_names[roi.color] for roi in rois]
+        result = self.auto_result
+        classes = None
+        if result is not None and result["file"] == data.unique_id and \
+                result["classes"] is not None:
+            classes = result["classes"]
+            colors = [data.roi_color_names[roi.color]
+                      for roi in result["rois"]]
+        return {"marks": [([list(pixel) for pixel in pixels],
+                           data.roi_color_names[roi.color])
+                          for roi, pixels in zip(rois, marks)],
+                "classes": classes, "colors": colors}
+
+    def auto_accept(self, data):
+        """The pixels of the proposal become the pixels of the ROIs marked
+        (after a confirmation if pixels of the ROIs are not in it)."""
+        result = self.auto_result
+        if result is None or result["classes"] is None or \
+                result["file"] != data.unique_id:
+            return
+        rois = [roi for roi in result["rois"] if roi in data.roi_list]
+        classes = result["classes"]
+        reduced = [str(data.roi_list.index(roi) + 1)
+                   for index, roi in enumerate(result["rois"])
+                   if roi in data.roi_list and
+                   any(classes[i, j] != index for i, j in roi.values)]
+        if reduced:
+            answer = QtWidgets.QMessageBox.question(
+                self, "ROI Manager",
+                "Pixels of the ROI%s %s are not in the proposal. Replace "
+                "the pixels with the proposal?" %
+                ("s" if len(reduced) > 1 else "", ", ".join(reduced)))
+            if answer != QtWidgets.QMessageBox.Yes:
+                return
+        for index, roi in enumerate(result["rois"]):
+            if roi in data.roi_list:
+                roi.values = [[int(i), int(j)] for i, j in
+                              numpy.argwhere(result["classes"] == index)]
+        self.logger.debug("ROI assistance accepted for ROIs %s", [
+            data.roi_list.index(roi) + 1 for roi in rois])
+        # The ROIs, editable with the tools
+        self.TG_auto.setChecked(False)
+        self.auto_toggled(False)
+        self.update_widget()
+        self.rois_changed(data)
+        reset_results_table()
 
     def update_widget(self):
         """Update the content of the ROI manager."""
@@ -961,6 +1348,9 @@ class RoiManagerWidget(PYAFWidget):
                 # Same file in the main tabs
                 widgets_list.widget_results.list_exp.setCurrentIndex(index)
                 widgets_list.widget_main.file_changed("list1")
+
+        elif name == "auto_mode":
+            self.auto_mode_changed()
 
         elif name == "maps":
             map_type = self.list_maps.currentData()

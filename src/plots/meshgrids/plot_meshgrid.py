@@ -41,6 +41,7 @@ from ... import shared
 from qtpy import QtCore
 import matplotlib.font_manager as fm
 from matplotlib.collections import PolyCollection, LineCollection
+from matplotlib.image import AxesImage
 from ...tools.colortables import ColorTables
 from ...tools import misc_tools
 from ...tools import plant_tools
@@ -533,6 +534,13 @@ class PlotMeshGrid(MainPlot):
     def draw_roi(self, mode, roi=None, roi_mask=None):
         """Draw the ROIS on a meshgrid."""
         if mode == "all":
+            manager = widgets_list.widget_roi_manager
+            overlay = None if self.plot_type != "meshgrid_roi" or \
+                manager is None else manager.auto_overlay(self.data)
+            if overlay is not None:
+                # ROI assistance: the proposal and the marks, not the ROIs
+                self.draw_auto_roi(overlay)
+                return
             if self.data.roi_list is not None:
                 for roi in self.data.roi_list:
                     if roi.display and roi.values:
@@ -555,6 +563,28 @@ class PlotMeshGrid(MainPlot):
                     colors.append(self.mesh.to_rgba(value)
                                   if self.mesh is not None else self.color_nan)
             self.draw_single_roi(roi, colors, roi_mask, alpha=1.0)
+
+    def draw_auto_roi(self, overlay):
+        """ROI assistance (see RoiManagerWidget.auto_overlay): the pixels of
+        the proposal lightly in the colors of their ROIs (the uncertain ones
+        not colored), and the marks as the drawn ROIs."""
+        classes = overlay["classes"]
+        if classes is not None:
+            # One image over the map (fast with many pixels): [y][x]
+            image = numpy.zeros(classes.shape[::-1] + (4,))
+            for index, color in enumerate(overlay["colors"]):
+                rgba = matplotlib.colors.to_rgba(color, 0.35)
+                image[classes.T == index] = rgba
+            nbr_x, nbr_y = classes.shape
+            artist = AxesImage(self.axes, interpolation="nearest",
+                               origin="lower",
+                               extent=(0, nbr_x * self.x_size,
+                                       0, nbr_y * self.y_size))
+            artist.set_data(image)
+            self.add_blit_artist(artist)
+        for pixels, color in overlay["marks"]:
+            if pixels:
+                self.draw_single_roi(pixels, color, alpha=0.8)
 
     def draw_single_roi(self, roi, color, roi_mask=None, alpha=0.5):
         """Draws a ROI on the meshgrid."""
@@ -583,7 +613,10 @@ class PlotMeshGrid(MainPlot):
         removed by clear_blit_artists (else they pile up in the axes and the
         meshgrid gets slower at each mouse move)."""
         self.__dict__.setdefault("blit_artists", []).append(artist)
-        self.axes.add_collection(artist)
+        if isinstance(artist, AxesImage):
+            self.axes.add_image(artist)
+        else:
+            self.axes.add_collection(artist)
         if self.parent.canvas is not None:
             self.axes.draw_artist(artist)
 

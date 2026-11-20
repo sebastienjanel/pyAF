@@ -107,13 +107,16 @@ def run(app):
         import statsmodels.api  # noqa: F401
         import seaborn  # noqa: F401
         import tifffile  # noqa: F401
+        import sklearn
+        import sklearn.ensemble  # noqa: F401
         result = scipy.optimize.curve_fit(lambda x, a: a * x,
                                           numpy.arange(5.0),
                                           2 * numpy.arange(5.0))[0]
         if abs(result[0] - 2) > 1e-6:
             raise RuntimeError("wrong fit")
         return "numpy " + numpy.__version__ + ", lmfit " + \
-            lmfit.__version__ + ", pandas " + pandas.__version__
+            lmfit.__version__ + ", pandas " + pandas.__version__ + \
+            ", scikit-learn " + sklearn.__version__
 
     def hdf5():
         import numpy

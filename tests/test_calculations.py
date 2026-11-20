@@ -33,8 +33,9 @@
 (no file, no window): flatten and levelling of the z motor steps,
 zero-force topography after a flatten, contact models and bottom effect
 correction (docs/models.md, sections 3 and 5), adhesion (section 9),
-dynamic force spectroscopy (section 11), plant cells (section 13), and the
-order of the files of the loading window.
+dynamic force spectroscopy (section 11), plant cells (section 13), the
+order of the files of the loading window, and the pixels sorted into the
+ROIs by ROI assistance.
 
 Usage (from the pyAF folder):
     .venv/bin/python -m unittest discover tests
@@ -57,6 +58,7 @@ from src.compute_tools.work_and_rupture_force import \
     work_and_rupture_force_compute as work  # noqa: E402
 from src.load_and_save.pre_check import sort_infos  # noqa: E402
 from src.single import SingleFile, UNKNOWN_FLATTEN  # noqa: E402
+from src.tools import auto_roi  # noqa: E402
 from src.tools import dfs_tools  # noqa: E402
 from src.tools import math_tools  # noqa: E402
 from src.tools import search_joc  # noqa: E402
@@ -559,6 +561,159 @@ class FileOrder(unittest.TestCase):
         # Without date: at the end in both orders
         self.assertEqual(self.names(sort_infos(self.INFOS, "date", True)),
                          ["map10", "map1", "Map2", "project"])
+
+
+def domains_map(nx=64, ny=64, seed=0):
+    """Supported lipid bilayer: round domains 1 nm higher and stiffer than
+    the rest, noise on both maps; the topography, the elasticity [Pa] and
+    the domains (boolean [x][y])."""
+    rng = numpy.random.default_rng(seed)
+    x, y = grids(nx, ny)
+    domains = numpy.zeros((nx, ny), dtype=bool)
+    for cx, cy, radius in ((16, 16, 9), (45, 20, 7), (30, 47, 11)):
+        domains |= (x - cx) ** 2 + (y - cy) ** 2 < radius ** 2
+    topo = numpy.where(domains, 1.0, 0.0) + rng.normal(0, 0.4, (nx, ny))
+    stiffness = numpy.where(domains, 40e3, 20e3) * \
+        rng.lognormal(0, 0.3, (nx, ny))
+    return topo, stiffness, domains
+
+
+class AutoRoi(unittest.TestCase):
+    """Pixels sorted into the ROIs from a few marked pixels."""
+
+    def test_classify_threshold_and_size(self):
+        proba = numpy.zeros((6, 6, 2))
+        proba[..., 0] = 0.9
+        proba[..., 1] = 0.1
+        # One pixel of the second ROI (too small), one uncertain
+        proba[1, 1] = (0.2, 0.8)
+        proba[4, 4] = (0.55, 0.45)
+        proba[5, 5] = numpy.nan
+        marks = numpy.full((6, 6), -1)
+        marks[0, 0] = 1
+        result = auto_roi.classify(proba, marks, 0.7, 2)
+        self.assertEqual(result[1, 1], -1)
+        self.assertEqual(result[4, 4], -1)
+        self.assertEqual(result[5, 5], -2)
+        # The marks stay in their ROI
+        self.assertEqual(result[0, 0], 1)
+        self.assertEqual(result[3, 3], 0)
+        result = auto_roi.classify(proba, marks, 0.5, 1)
+        self.assertEqual(result[1, 1], 1)
+        self.assertEqual(result[4, 4], 0)
+
+    def test_smoothed_ignores_nan(self):
+        values = numpy.ones((20, 20))
+        values[5:8, 5:8] = numpy.nan
+        result = auto_roi.smoothed(values, 2.0)
+        self.assertTrue(numpy.allclose(result, 1.0))
+
+    def test_normalized(self):
+        self.assertIsNone(auto_roi.normalized(numpy.full((4, 4), 3.0)))
+        values = auto_roi.normalized([[1.0, 10.0], [100.0, numpy.nan]],
+                                     log=True)
+        self.assertAlmostEqual(values[0, 1], 0.0)
+        self.assertTrue(numpy.isnan(values[1, 1]))
+
+    @unittest.skipUnless(auto_roi.available(), "scikit-learn not installed")
+    def test_domains_from_few_marks(self):
+        topo, stiffness, domains = domains_map()
+        # Curves without values (nan) in both maps
+        topo[10:13, 40:43] = numpy.nan
+        stiffness[10:13, 40:43] = numpy.nan
+        feats = numpy.stack(
+            auto_roi.channel_features(auto_roi.normalized(topo)) +
+            auto_roi.channel_features(auto_roi.normalized(stiffness, True)),
+            axis=-1)
+        # A few strokes in a domain and outside
+        marks = [{(i, 16) for i in range(12, 21)},
+                 {(i, 60) for i in range(5, 60)} |
+                 {(60, j) for j in range(5, 40)}]
+        labels = auto_roi.marks_labels(domains.shape, marks)
+        proba = auto_roi.probabilities(feats, labels)
+        result = auto_roi.classify(proba, labels, 0.7, 5)
+        # Away from the borders of the domains, nearly all right
+        inner = ~(numpy.logical_xor(
+            domains, auto_roi.ndimage.binary_erosion(domains, iterations=2)) |
+            numpy.logical_xor(domains, auto_roi.ndimage.binary_dilation(
+                domains, iterations=2)))
+        sure = inner & (result >= 0)
+        right = (result[sure] == 0) == domains[sure]
+        self.assertGreater(right.mean(), 0.97)
+        self.assertGreater(sure.sum(), 0.8 * inner.sum())
+        # Region of the map: nan outside
+        inside = numpy.ones(domains.shape, dtype=bool)
+        inside[:, :4] = False
+        proba = auto_roi.probabilities(feats, labels, inside)
+        self.assertTrue(numpy.isnan(proba[:, :4]).all())
+        self.assertEqual(auto_roi.classify(proba, labels, 0.7, 5)[0, 0], -2)
+
+    def test_cells_of_a_tissue(self):
+        """Plant tissue: 3 x 3 domed cells of different heights, grooves
+        between them, noise; one stroke in a cell gives the whole cell."""
+        rng = numpy.random.default_rng(1)
+        x, y = grids(60, 60)
+        centers = [(10 + 20 * a, 10 + 20 * b) for a in range(3)
+                   for b in range(3)]
+        nearest = numpy.argmin([(x - cx) ** 2 + (y - cy) ** 2
+                                for cx, cy in centers], axis=0)
+        height = numpy.zeros((60, 60))
+        for index, (cx, cy) in enumerate(centers):
+            dome = (3000 + 300 * index) * numpy.clip(
+                1 - ((x - cx) ** 2 + (y - cy) ** 2) / 16.0 ** 2, 0, None)
+            height = numpy.where(nearest == index, dome, height)
+        height += rng.normal(0, 50, height.shape) + 2.0 * x
+        height[5, 5] = numpy.nan
+        dome_labels, number = auto_roi.domes(height, 0.05)
+        self.assertEqual(number, 9)
+        # A stroke in the central cell (index 4), and a click in a corner
+        labels = auto_roi.marks_labels(
+            height.shape, [{(i, 30) for i in range(27, 33)}, {(8, 50)}])
+        result, shared = auto_roi.dome_classes(dome_labels, labels)
+        self.assertEqual(shared, 0)
+        central = nearest == 4
+        self.assertGreater(numpy.mean(result[central] == 0), 0.9)
+        # At most a pixel more along its edge (80 px): between domes of
+        # different heights the groove is a step, within a pixel
+        self.assertLess(numpy.count_nonzero(result[~central] == 0), 80)
+        self.assertGreater(numpy.mean(result[nearest == 2] == 1), 0.9)
+        # A cell marked in two ROIs: uncertain, the marks kept
+        labels = auto_roi.marks_labels(height.shape, [{(30, 30)},
+                                                      {(31, 31)}])
+        result, shared = auto_roi.dome_classes(dome_labels, labels)
+        self.assertEqual(shared, 1)
+        self.assertEqual(result[30, 30], 0)
+        self.assertEqual(result[28, 33], -1)
+
+    def test_erased_substrate(self):
+        """Cell on a flat substrate, a shallow groove between them: the
+        substrate is no dome (too low above the groove), it is flooded from
+        the cell; erased from the ROI with one stroke, it is flooded from
+        the stroke up to the groove."""
+        x, y = grids(50, 40)
+        height = 300.0 + 2000.0 * numpy.clip(
+            1 - ((x - 15) ** 2 + (y - 20) ** 2) / 12.0 ** 2, 0, None)
+        height = numpy.where(numpy.abs(x - 30) < 1.5, 250.0, height)
+        cell = (x - 15) ** 2 + (y - 20) ** 2 < 11.0 ** 2
+        labels = auto_roi.marks_labels(height.shape,
+                                       [{(i, 20) for i in range(12, 18)}])
+        dome_labels, number = auto_roi.domes(height, 0.05)
+        result = auto_roi.dome_classes(dome_labels, labels)[0]
+        # The substrate is taken with the cell
+        self.assertTrue((result[x > 32] == 0).all())
+        stroke = {(45, j) for j in range(10, 30)}
+        dome_labels, number = auto_roi.domes(height, 0.05, [stroke])
+        result = auto_roi.dome_classes(dome_labels, labels,
+                                banned={0: {number + 1}})[0]
+        self.assertTrue((result[x > 32] == -1).all())
+        self.assertTrue((result[cell] == 0).all())
+
+    @unittest.skipUnless(auto_roi.available(), "scikit-learn not installed")
+    def test_one_roi_marked(self):
+        feats = numpy.zeros((8, 8, 3))
+        labels = auto_roi.marks_labels((8, 8), [{(1, 1), (2, 2)}])
+        with self.assertRaises(auto_roi.AutoRoiError):
+            auto_roi.probabilities(feats, labels)
 
 
 if __name__ == "__main__":
