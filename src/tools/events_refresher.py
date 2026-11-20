@@ -42,8 +42,12 @@ def update_events(mode=None, data_id=None):
     The mode can be used to force the update of all the maps,
     when set to "all".
     """
-    # Display a progressbar
-    Progressbar("Refresh events")
+    # Display a progressbar (the one of the loading of a .pyaf file, else a
+    # new one: a second one would replace it in widgets_list, and the
+    # loading one would stay open)
+    new_bar = widgets_list.widget_progressbar is None
+    if new_bar:
+        Progressbar("Refresh events")
 
     # Count the number of pixels to be refreshed
     total = 0
@@ -60,7 +64,8 @@ def update_events(mode=None, data_id=None):
         if data.events_calculated:
             total = data.nbr_pixels_x * data.nbr_pixels_y
 
-    widgets_list.widget_progressbar.set_range(0, total)
+    if new_bar:
+        widgets_list.widget_progressbar.set_range(0, total)
 
     # Update the arrays
     if (shared.exp.apply_to_all_data or mode == "all") and data_id is None:
@@ -81,4 +86,5 @@ def update_events(mode=None, data_id=None):
             data.update_events_per_curve()
             data.update_rupture_force2()
 
-    widgets_list.widget_progressbar.close()
+    if new_bar:
+        widgets_list.widget_progressbar.close()

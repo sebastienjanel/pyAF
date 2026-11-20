@@ -449,7 +449,8 @@ class MainWindow(QtWidgets.QMainWindow):
             Load(self, files_info, load_more=True)
 
             # Close progressbar
-            wl.widget_progressbar.close()
+            if wl.widget_progressbar is not None:
+                wl.widget_progressbar.close()
 
     def change_curve_by_key(self, key):
         """Changes the curve upon a call by the arrow keys."""
