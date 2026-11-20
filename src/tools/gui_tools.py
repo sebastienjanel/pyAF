@@ -144,6 +144,9 @@ class BoxData(QtWidgets.QWidget):
                 self, "small_meshgrid", self.canvas,
                 [72.0 / 72.0, 72.0 / 72.0, 72.0],
                 data_id=self.data_id)
+            # The clicks on the map select the file, as on the rest of the
+            # box (matplotlib would keep them)
+            self.canvas.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
         else:
             self.meshgrid = None
             # On the color of the item, selected or not
