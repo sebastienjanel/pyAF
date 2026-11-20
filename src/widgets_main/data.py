@@ -54,6 +54,7 @@ from ..utils import meshgrid_menu
 from ..tools.gui_tools import PYAFInput
 from ..widgets_main.subwidgets.curve_selector import ResultsSelectorWidget
 from ..widgets_main.subwidgets.plot_selector import PlotSelectorWidget
+from ..widgets_main.subwidgets.curve_sorting import CurveSortingWidget
 from ..tools.gui_tools import PYAFButton
 from ..plots.PYAFPlot import PYAFPlot
 from ..tools.PYAFWidget import PYAFWidget
@@ -283,10 +284,14 @@ class DataWidget(PYAFWidget):
         name = "widget_plot_selector_data"
         self.plot_selector = PlotSelectorWidget(self, name)
 
+        # Good and bad curves, below the plot selector
+        self.curve_sorting = CurveSortingWidget(self)
+
         self.GL_data.addLayout(self.HL_box_infos, 0, 0, 1, 0)
         self.GL_data.addWidget(self.plot_selector, 1, 1)
-        self.GL_data.addWidget(self.meshgrid, 2, 0)
-        self.GL_data.addWidget(self.canvas_stack, 2, 1)
+        self.GL_data.addWidget(self.curve_sorting, 2, 1)
+        self.GL_data.addWidget(self.meshgrid, 3, 0)
+        self.GL_data.addWidget(self.canvas_stack, 3, 1)
 
         self.box_files = QtWidgets.QGroupBox("File list")
         self.box_files.setLayout(self.VL_list)
@@ -471,6 +476,8 @@ class DataWidget(PYAFWidget):
         if self.has_time():
             self.curve_1.update_plot()
             self.curve_2.update_plot()
+        # Mark of the curve displayed
+        self.curve_sorting.update_widget()
 
     def has_time(self, data=None):
         """True for the files with the time plots (selected file by
@@ -509,7 +516,7 @@ class DataWidget(PYAFWidget):
             if data.is_single:
                 self.meshgrid.setParent(None)
             else:
-                self.GL_data.addWidget(self.meshgrid, 2, 0)
+                self.GL_data.addWidget(self.meshgrid, 3, 0)
 
         if what == "info_selected" or what == "all":
             info = shared.exp.info_selected

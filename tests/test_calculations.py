@@ -34,8 +34,8 @@
 zero-force topography after a flatten, contact models and bottom effect
 correction (docs/models.md, sections 3 and 5), adhesion (section 9),
 dynamic force spectroscopy (section 11), plant cells (section 13), the
-order of the files of the loading window, and the pixels sorted into the
-ROIs by ROI assistance.
+order of the files of the loading window, the pixels sorted into the ROIs
+by ROI assistance, and the curves sorted from a few marked curves.
 
 Usage (from the pyAF folder):
     .venv/bin/python -m unittest discover tests
@@ -59,6 +59,7 @@ from src.compute_tools.work_and_rupture_force import \
 from src.load_and_save.pre_check import sort_infos  # noqa: E402
 from src.single import SingleFile, UNKNOWN_FLATTEN  # noqa: E402
 from src.tools import auto_roi  # noqa: E402
+from src.tools import curve_sorting  # noqa: E402
 from src.tools import dfs_tools  # noqa: E402
 from src.tools import math_tools  # noqa: E402
 from src.tools import search_joc  # noqa: E402
@@ -714,6 +715,122 @@ class AutoRoi(unittest.TestCase):
         labels = auto_roi.marks_labels((8, 8), [{(1, 1), (2, 2)}])
         with self.assertRaises(auto_roi.AutoRoiError):
             auto_roi.probabilities(feats, labels)
+
+
+def synthetic_curves(kinds, seed=0, points=300):
+    """Curves [curve][z, deflection][point] (approach, retraction) of each
+    kind: "indentation" (contact, then indentation), "no contact" (flat),
+    "spikes" (indentation with jumps), "unbinding" (indentation, then an
+    adhesion peak on the retraction), "no unbinding" (no peak)."""
+    rng = numpy.random.default_rng(seed)
+    z = numpy.linspace(0, 1000, points)
+    approach, retraction = [], []
+    for kind in kinds:
+        contact = rng.uniform(550, 750)
+        push = numpy.clip(z - contact, 0, None)
+        app = 0.002 * push ** 1.5 * rng.uniform(0.8, 1.2)
+        if kind == "no contact":
+            app = numpy.zeros(points)
+        if kind == "spikes":
+            for _ in range(3):
+                start = rng.integers(20, points - 20)
+                app[start:start + 3] += rng.uniform(5, 10)
+        ret = app[::-1].copy()
+        if kind == "unbinding":
+            peak = rng.integers(points // 2, points - 30)
+            ret[peak - 15:peak] -= numpy.linspace(0, rng.uniform(4, 8), 15)
+        app = app + rng.normal(0, 0.2, points)
+        ret = ret + rng.normal(0, 0.2, points)
+        approach.append([z, app])
+        retraction.append([z[::-1], ret])
+    return numpy.array(approach), numpy.array(retraction)
+
+
+class CurveSorting(unittest.TestCase):
+    """Bad curves learned from a few marked curves, whatever they are."""
+
+    def sort(self, kinds, bad_kinds, marked):
+        """Probability to be bad of the curves of kinds, the curves of
+        marked (indexes) marked as bad if of bad_kinds."""
+        approach, retraction = synthetic_curves(kinds)
+        shape, numbers = curve_sorting.measures(approach, retraction)
+        # As a map of one row
+        all_features = curve_sorting.features(
+            [(shape[None], numbers[None])])
+        marks = [(0, 0, index, kinds[index] in bad_kinds)
+                 for index in marked]
+        return curve_sorting.bad_probability(all_features, marks)[0][0]
+
+    @unittest.skipUnless(curve_sorting.available(),
+                         "scikit-learn not installed")
+    def test_indentation(self):
+        kinds = ["indentation"] * 150 + ["no contact"] * 30 + \
+            ["spikes"] * 30
+        rng = numpy.random.default_rng(1)
+        kinds = list(rng.permutation(kinds))
+        # 10 marks of each kind
+        marked = [index for kind in ("indentation", "no contact", "spikes")
+                  for index in [i for i, k in enumerate(kinds)
+                                if k == kind][:10]]
+        proba = self.sort(kinds, ("no contact", "spikes"), marked)
+        bad = numpy.array([kind != "indentation" for kind in kinds])
+        self.assertGreater(numpy.mean((proba >= 0.5) == bad), 0.95)
+
+    @unittest.skipUnless(curve_sorting.available(),
+                         "scikit-learn not installed")
+    def test_unbinding(self):
+        """SMFS: here the good curves have an unbinding peak."""
+        kinds = list(numpy.random.default_rng(2).permutation(
+            ["unbinding"] * 80 + ["no unbinding"] * 120))
+        # 5 marks of each kind
+        marked = [index for index, kind in enumerate(kinds)
+                  if kind == "unbinding"][:5] + \
+            [index for index, kind in enumerate(kinds)
+             if kind == "no unbinding"][:5]
+        proba = self.sort(kinds, ("no unbinding",), marked)
+        bad = numpy.array([kind == "no unbinding" for kind in kinds])
+        self.assertGreater(numpy.mean((proba >= 0.5) == bad), 0.95)
+
+    def test_missing_curve(self):
+        approach, retraction = synthetic_curves(["indentation"] * 2)
+        approach[1] = 0.0
+        retraction[1] = 0.0
+        shape, numbers = curve_sorting.measures(approach, retraction)
+        self.assertTrue(numpy.isfinite(shape[0]).all())
+        self.assertTrue(numpy.isnan(shape[1]).all())
+        self.assertTrue(numpy.isnan(numbers[1]).all())
+
+    def test_curves_without_points(self):
+        """Files with curves of one point, or without retraction: missing
+        curves, no error."""
+        approach, retraction = synthetic_curves(["indentation"] * 3)
+        for app, ret in ((approach, retraction[:, :, :1]),
+                         (approach, retraction[:, :, :0]),
+                         (approach[:, :, :1], retraction)):
+            shape, numbers = curve_sorting.measures(app, ret)
+            self.assertEqual(shape.shape, (3, 2 * curve_sorting.POINTS))
+            self.assertEqual(numbers.shape, (3, 6))
+            self.assertTrue(numpy.isnan(shape).all())
+
+    def test_resampled(self):
+        values = numpy.arange(64.0).reshape(1, 64)
+        self.assertTrue(numpy.allclose(
+            curve_sorting.resampled(values, 32)[0],
+            numpy.arange(0.5, 64, 2)))
+        # Fewer points than asked: interpolated
+        self.assertEqual(curve_sorting.resampled(values[:, :10], 32).shape,
+                         (1, 32))
+
+    @unittest.skipUnless(curve_sorting.available(),
+                         "scikit-learn not installed")
+    def test_too_few_marks(self):
+        approach, retraction = synthetic_curves(["indentation"] * 20)
+        shape, numbers = curve_sorting.measures(approach, retraction)
+        all_features = curve_sorting.features([(shape[None],
+                                                numbers[None])])
+        with self.assertRaises(curve_sorting.CurveSortingError):
+            curve_sorting.bad_probability(all_features,
+                                          [(0, 0, 0, True), (0, 0, 1, False)])
 
 
 if __name__ == "__main__":

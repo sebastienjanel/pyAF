@@ -387,6 +387,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.change_curve_by_key("up")
             elif key == QtCore.Qt.Key_Down:
                 self.change_curve_by_key("down")
+            elif key in (QtCore.Qt.Key_G, QtCore.Qt.Key_B) and \
+                    self.tabs.currentIndex() == 0:
+                # Curve displayed marked good or bad (curve sorting)
+                wl.widget_data.curve_sorting.mark(key == QtCore.Qt.Key_B)
 
         event.accept()
 

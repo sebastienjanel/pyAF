@@ -56,8 +56,8 @@ class PlotSelectorWidget(PYAFWidget):
                            "Deflection vs Time", "Z position vs Time")
         self.time_plots = (2, 3)
 
-        self.BT_back = PYAFButton(self, "back", "<", size=60)
-        self.BT_forward = PYAFButton(self, "forward", ">", size=60)
+        self.BT_back = PYAFButton(self, "back", "<", size=0)
+        self.BT_forward = PYAFButton(self, "forward", ">", size=0)
 
         self.list_plot_types = PYAFComboBox(self, None)
 
@@ -73,7 +73,7 @@ class PlotSelectorWidget(PYAFWidget):
         self.list_plot_types.activated.connect(lambda: self.list_updated("plot_types"))
 
         # Zoom on the contact of the force vs distance plot
-        self.TG_zoom = PYAFToggle(self, "zoom", "Zoom on contact")
+        self.TG_zoom = PYAFToggle(self, "zoom", "Zoom")
         self.TG_zoom.setToolTip(
             "Force vs distance: zoom on the contact of the approach curve, to "
             "see if it is vertical\non a hard substrate (deflection "
@@ -82,22 +82,17 @@ class PlotSelectorWidget(PYAFWidget):
                                         type=bool)
         self.TG_zoom.setChecked(zoom)
 
+        # One row, as the curve selector of the map next to it
         self.HL_select_curve = QtWidgets.QHBoxLayout()
+        self.HL_select_curve.setContentsMargins(0, 0, 0, 0)
         self.HL_select_curve.addStretch(1)
         self.HL_select_curve.addWidget(self.BT_back)
         self.HL_select_curve.addWidget(self.list_plot_types)
         self.HL_select_curve.addWidget(self.BT_forward)
+        self.HL_select_curve.addSpacing(12)
+        self.HL_select_curve.addWidget(self.TG_zoom)
         self.HL_select_curve.addStretch(1)
-
-        HL_zoom = QtWidgets.QHBoxLayout()
-        HL_zoom.addStretch(1)
-        HL_zoom.addWidget(self.TG_zoom)
-        HL_zoom.addStretch(1)
-        VL = QtWidgets.QVBoxLayout()
-        VL.setContentsMargins(0, 0, 0, 0)
-        VL.addLayout(self.HL_select_curve)
-        VL.addLayout(HL_zoom)
-        self.setLayout(VL)
+        self.setLayout(self.HL_select_curve)
 
         self.update_widget()
 

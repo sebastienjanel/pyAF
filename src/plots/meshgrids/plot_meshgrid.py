@@ -283,6 +283,11 @@ class PlotMeshGrid(MainPlot):
             # http://matplotlib.sourceforge.net/users/tight_layout_guide.html
             # (part on the colorbar caveat)
             divider = make_axes_locatable(self.fig.gca())
+            if self.plot_type == "meshgrid_data":
+                # Map at the top of its canvas (the curve next to it is
+                # aligned on it): the free height below the plots, not
+                # between them and the buttons above
+                divider.set_anchor("N")
             cax = divider.append_axes("right", "5%", pad="3%")
             if norm is None:
                 self.color_bar = self.fig.colorbar(mesh,
@@ -697,6 +702,20 @@ class PlotMeshGrid(MainPlot):
         for artist in artists:
             self.add_blit_artist(artist)
 
+    def draw_curve_marks(self):
+        """Curves marked good (green) or bad (red) for the curve sorting
+        (data tab): outlines of their pixels."""
+        sorting = getattr(widgets_list.widget_data, "curve_sorting", None)
+        if sorting is None or self.data is None:
+            return
+        for bad, color in ((False, "#2ca02c"), (True, "#d62728")):
+            positions = [(i, j) for i, j, mark in sorting.marks_of(self.data)
+                         if mark is bad]
+            if positions:
+                self.add_blit_artist(PolyCollection(
+                    self.pixel_squares(positions), facecolors="none",
+                    edgecolors=color, linewidths=1.5))
+
     def draw_missing_z(self):
         """Draws a sign on the meshgrid when a z value in a piezo image is missing.
 
@@ -758,6 +777,8 @@ class PlotMeshGrid(MainPlot):
                 # a background which has them already
                 if mode == "all":
                     self.draw_corrupted()
+                    if self.plot_type == "meshgrid_data":
+                        self.draw_curve_marks()
 
                 # Draw ROI first
                 if roi is not None or mode == "all":

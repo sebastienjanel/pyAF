@@ -292,6 +292,11 @@ class MainPlot:
                 # Small map: leave room on the right for the colour bar
                 # (ticks and label)
                 self.fig.subplots_adjust(right=0.78)
+                if p_type == "meshgrid_data":
+                    # Close to the buttons above (room for the label of the
+                    # top tick only), the curve next to it aligned on it
+                    self.fig.subplots_adjust(
+                        top=1 - 14 / self.fig.bbox.height)
 
             elif p_type == "meshgrid":
                 # Results map: small vertical margins, to be as tall as
