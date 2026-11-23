@@ -10,7 +10,12 @@ $$\delta = (z - z_0) - (d - d_0), \qquad F = k (d - d_0)$$
 
 $(z_0, d_0)$ is the point of contact. The baseline is a straight line fitted on the non-contact part and subtracted.
 
-Optional corrections: tilt (line fitted between two limits and subtracted) and smoothing (Savitzky-Golay filter [1]).
+Optional corrections, before the computations:
+
+- **Smoothing**: Savitzky-Golay filter [1], a polynomial of the chosen order fitted on a sliding window of the chosen width (points). *Uniform SG*: one kernel for equally spaced points; otherwise a kernel for each window, with the real spacing of the heights.
+- **Tilt** (deflection varying linearly with $z$ out of contact, from the instrument): a line $a z + b$ subtracted from the approach and the retraction, fitted on the approach or on the retraction.
+  - *Limits*: $a$, $b$ fitted on each curve between two heights.
+  - *Auto* (default): the baseline of each curve is found without limits. For each first part of the curve (cumulative sums), a line is fitted and compared with the mean of its last points; the baseline ends where they depart from it by more than 4 times their noise (contact, adhesion, events). The noise is measured at the scale of these means, from the second differences of the means of successive windows (insensitive to the tilt, to slow noise and to the steps of the digitizer). A baseline shorter than 30 % of the curve is searched again after its end (noise of the turnaround of the piezo), and kept if it is longer and not shifted towards the contact. The slope $a$ is the same for the whole file (the tilt comes from the instrument): the median of the slopes of the baselines, weighted by their number of points times the square of their height range (their precision), so that short baselines barely count. The offset $b$ of each curve is the median of $d - a z$ on its baseline. The curves with a baseline shorter than 20 points, or a slope further than 5 × 1.4826 MAD from the slope of the file, are reported.
 
 ## 2. Point of contact
 
@@ -247,12 +252,23 @@ $s_{pq}$ is the slope of the surface (mean of the height differences on each sid
 
 **Planefit**: the plane fitted on a substrate ROI is subtracted from the height maps.
 
+**ROI assistance**: the pixels of a map sorted into the ROIs from a few pixels marked in each ROI (as ilastik). Each pixel is described by the computed maps (height, elasticity...), centered on their median and divided by their MAD (log of the moduli), smoothed at 1, 2 and 4 pixels, with their gradient and local spread. A random forest [36] (50 trees) gives each pixel a probability for each ROI; the pixels below the confidence threshold, or in groups smaller than the minimum size, are left in no ROI. *Dome* mode (cells that look alike, plant tissue): the height is cut into domes by a watershed from its maxima (grey reconstruction, one region per dome, boundaries in the grooves), and each ROI takes the whole domes its marks touch.
+
 ## 15. Statistics
 
 - **SuperPlots**: one value per file, the median of its curves (the mean for the events per curve), and statistics on the replicates.
 - **Tests on the means of the replicates**: t-test, paired or not, Tukey HSD for all the pairs, Holm correction, Fieller interval for the fold change.
 - **Mixed-effects model on the curves**: value = mean of the condition + offset of the replicate + offset of the file + residual, by REML (statsmodels).
 - **Mode**: maximum of a Gaussian kernel density estimate (Scott's rule).
+
+## 16. Curve sorting
+
+Good and bad curves learned from a few curves marked by the user (in any file), whatever the experiment: nothing is assumed about the bad curves. Each curve is described by its shape and a few numbers:
+
+- **Shape**: approach and retraction resampled to 32 points each (means of consecutive parts of the curve), relative to the baseline of the approach, divided by the median force range of all the files. The typical shapes of the experiment are the principal components (10) of all the curves; each curve gives its 10 coordinates and its distance to them (reconstruction error).
+- **Numbers**: force range, adhesion, noise of the baseline, largest jump of the approach and of the retraction (divided by the median force range), height range (divided by its median), and the $R^2$ of the elasticity fit when computed.
+
+Extremely randomized trees [35] (200 trees, all the features at each split, classes weighted by their number of marks) learn the marks and give each curve a probability to be bad; the curves at 0.5 or more are discarded, the marked curves keep their mark. At least 2 good and 2 bad marks are needed, 5 to 10 of each kind of curve recommended. The raw points of the curves are not used as features: with a few marks, the noise of some of them would separate the marks by chance.
 
 ## References
 
@@ -290,3 +306,5 @@ $s_{pq}$ is the slope of the surface (mean of the height differences on each sid
 32. Ding EA, Kumar S. Frequency-dependent cellular microrheology with pyramidal atomic force microscopy probes. *Biophys. J.* 125:3087–3094 (2026). [doi:10.1016/j.bpj.2025.10.037](https://doi.org/10.1016/j.bpj.2025.10.037)
 33. Yamasaki Y, Okano K, Mimura T, Tsugawa S, Hosokawa Y. Simultaneous quantification of cell wall elasticity and turgor pressure in live plant cells by elastic shell theory analysis and AFM. *Planta* 261:131 (2025). [doi:10.1007/s00425-025-04683-4](https://doi.org/10.1007/s00425-025-04683-4)
 34. Beauzamy L, Derr J, Boudaoud A. Quantifying hydrostatic pressure in plant cells by using indentation with an atomic force microscope. *Biophys. J.* 108:2448–2456 (2015). [doi:10.1016/j.bpj.2015.03.035](https://doi.org/10.1016/j.bpj.2015.03.035)
+35. Geurts P, Ernst D, Wehenkel L. Extremely randomized trees. *Machine Learning* 63:3–42 (2006). [doi:10.1007/s10994-006-6226-1](https://doi.org/10.1007/s10994-006-6226-1)
+36. Breiman L. Random forests. *Machine Learning* 45:5–32 (2001). [doi:10.1023/A:1010933404324](https://doi.org/10.1023/A:1010933404324)
