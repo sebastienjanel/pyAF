@@ -244,6 +244,10 @@ class ResultsWidget(PYAFWidget):
             "k\u2090\u209b and the elasticity of the Hertz fit (Beauzamy et "
             "al. 2015): fit the shallow indentation, below the thickness of "
             "the wall.",
+            "indentation_depth": "Maximum indentation reached by each "
+            "curve in the elasticity fit [nm]: compare it with the tip "
+            "radius\n(paraboloid: much smaller) and with the thickness of "
+            "the sample.",
             "fit_r2": "R\u00b2 of the elasticity fit, on the fitted points "
             "after the point of contact.",
             "fit_poc_fixed": "Pixels where the point of contact could not be "
@@ -258,6 +262,7 @@ class ResultsWidget(PYAFWidget):
                             ("stiffness_corr", "Elasticity (BEC)"),
                             ("stiffness_corr_slice",
                              "Elasticity (Slice) (BEC)"),
+                            ("indentation_depth", "Indentation"),
                             ("fit_r2", "Fit R\u00b2"),
                             ("fit_poc_fixed", "Fit: fixed point of contact"),
                             ("brush_modulus", "Elasticity (brush model)"),
@@ -575,7 +580,8 @@ class ResultsWidget(PYAFWidget):
         heights. Returns True if the curve changed."""
         mt = data.meshgrid_type
         if mt in ("stiffness", "stiffness_slice", "stiffness_corr",
-                  "stiffness_corr_slice", "fit_r2", "fit_poc_fixed") and \
+                  "stiffness_corr_slice", "indentation_depth", "fit_r2",
+                  "fit_poc_fixed") and \
                 data.stiffness_calculated:
             data.display_curve_type = "force"
             data.display_trace_retrace = 0
@@ -647,6 +653,7 @@ class ResultsWidget(PYAFWidget):
                 "stiffness_slice": stiff and slices,
                 "stiffness_corr": corr,
                 "stiffness_corr_slice": corr and slices,
+                "indentation_depth": stiff,
                 "fit_r2": data.has_fit_quality(),
                 "fit_poc_fixed": data.has_fit_quality(),
                 "work": adhesion, "rupture_force": adhesion,

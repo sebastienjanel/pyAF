@@ -228,6 +228,9 @@ def get_r_tables(row, data):
                           "microrheo_tan_delta"):
             # All the frequencies, below
             continue
+        if force_type == "indentation_depth":
+            # Column of the elasticity table, above
+            continue
         if getattr(data, values["calculated"]):
             df = table(get(force_type), values["column"])
             stats.append(describe(df, values["column"]))
@@ -525,6 +528,7 @@ def export_parameters(path):
 
 # Result types of the SuperPlots, with the computation they need
 RESULT_TYPES = (("stiffness", "stiffness_calculated"),
+                ("indentation_depth", "stiffness_calculated"),
                 ("work", "work_and_rupture_force1_calculated"),
                 ("rupture_force", "work_and_rupture_force1_calculated"),
                 ("events_forces", "events_calculated"),
@@ -532,6 +536,8 @@ RESULT_TYPES = (("stiffness", "stiffness_calculated"),
                 ("events_rupture_force", "events_calculated"),
                 ("events_distance", "events_calculated"),
                 ("visco_e0", "visco_calculated"),
+                ("visco_storage", "visco_calculated"),
+                ("visco_loss", "visco_calculated"),
                 ("visco_fluidity", "visco_calculated"),
                 ("visco_tan_delta", "visco_calculated"),
                 ("microrheo_storage", "microrheo_calculated"),

@@ -71,6 +71,7 @@ MAPS = {
     "plant_tau": ("Dimensionless pressure τ", "τ", 1.0),
     "plant_pressure_hertz": ("Turgor pressure P (E Hertz)", "P [MPa]",
                              1e-6),
+    "indentation_depth": ("Indentation", "Indentation [nm]", 1.0),
     "fit_r2": ("Fit R²", "R² of the fit", 1.0),
     "fit_poc_fixed": ("Fit: fixed point of contact",
                       "Point of contact fixed (1)", 1.0),
@@ -106,6 +107,7 @@ def available_maps(data):
         "microrheo_loss": data.microrheo_calculated,
         "microrheo_tan_delta": data.microrheo_calculated,
         "microrheo_crossover": data.microrheo_calculated,
+        "indentation_depth": data.stiffness_calculated,
         "fit_r2": data.has_fit_quality(),
         "fit_poc_fixed": data.has_fit_quality()}
     return [mt for mt in MAPS

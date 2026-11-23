@@ -204,7 +204,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                          "color_opts_visco_tan_delta",
                          "color_opts_microrheo_tan_delta",
                          "color_opts_microrheo_crossover", "color_opts_fit_r2",
-                         "color_opts_fit_poc_fixed"):
+                         "color_opts_fit_poc_fixed",
+                         "color_opts_indentation_depth"):
                 setattr(dt, name, copy.deepcopy(getattr(cur, name)))
             dt.stiffness_color_log = getattr(cur, "stiffness_color_log",
                                              False)

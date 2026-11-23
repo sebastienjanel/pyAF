@@ -279,6 +279,9 @@ class PYAFPlot(FigureCanvasQTAgg):
                     (mesh.startswith("plant_") and dt.plant_calculated):
                 # Same map (one value per curve, nan when not fitted)
                 self.canvas = PlotBreakthroughMeshGrid(self)
+            elif mesh == "indentation_depth" and dt.stiffness_calculated:
+                # One value per curve, nan without value
+                self.canvas = PlotBreakthroughMeshGrid(self)
             elif mesh.startswith("fit_") and dt.has_fit_quality():
                 self.canvas = PlotFitQualityMeshGrid(self)
             else:

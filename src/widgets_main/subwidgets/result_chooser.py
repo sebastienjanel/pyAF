@@ -41,7 +41,7 @@ from ...tools.gui_tools import PYAFComboBox
 from ...tools.PYAFWidget import PYAFWidget
 from ...tools import misc_tools
 from ...tools.results_sorting import BREAKTHROUGH_TYPES, BRUSH_TYPES, \
-    MICRORHEO_TYPES, PLANT_TYPES, VISCO_TYPES
+    INDENTATION_TYPES, MICRORHEO_TYPES, PLANT_TYPES, VISCO_TYPES
 
 
 def groups():
@@ -49,6 +49,8 @@ def groups():
     tab: (title, ((type, name), ...))."""
     return (
         ("Elasticity", (("stiffness", "Elasticity"),) + tuple(
+            (name, values["name"])
+            for name, values in INDENTATION_TYPES.items()) + tuple(
             (name, values["name"]) for name, values in BRUSH_TYPES.items())),
         ("Viscoelasticity", tuple(
             (name, values["name"]) for name, values in VISCO_TYPES.items())),
@@ -74,6 +76,8 @@ def available(result_type):
     datas = shared.exp.list
     if result_type == "stiffness":
         return any(item.stiffness_array is not None for item in datas)
+    if result_type in INDENTATION_TYPES:
+        return any(item.stiffness_calculated for item in datas)
     if result_type in ("work", "rupture_force"):
         return any(item.jocs1_indices is not None for item in datas)
     if result_type == "loading_rates":

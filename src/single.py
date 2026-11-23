@@ -309,6 +309,8 @@ class SingleFile:
         # bad fits in red, the good ones light), and the pixels with the
         # point of contact fixed (Reds: fixed in red)
         self.color_opts_fit_r2 = [14, 0.9, 1, 0.95, 0]
+        # Indentation reached by the curves (automatic scale)
+        self.color_opts_indentation_depth = [0, 0, 0, 0, 0]
         self.color_opts_fit_poc_fixed = [10, 0, 1, 0.5, 0]
         self.color_saturation = [1, 1, 1, 1]
         self.color_negative = [0, 0, 0, 1]
@@ -1348,6 +1350,19 @@ class SingleFile:
                 self.color_opts_rupture_force1[3] = \
                     self.max_rupture_force1 / 2.0
 
+        # Indentation reached by the curves: from the 2nd to the 98th
+        # percentile
+        if self.stiffness_calculated and color:
+            values = self.indentation_depth
+            values = values[numpy.isfinite(values)]
+            if values.size:
+                low, high = numpy.percentile(values, [2, 98])
+                if high <= low:
+                    high = low + 1e-12
+                opts = self.color_opts_indentation_depth
+                opts[1], opts[2] = float(low), float(high)
+                opts[3] = float(low + high) / 2.0
+
         # Viscoelasticity
         if self.visco_calculated and color:
             # Moduli: same automatic scale as the elasticity
@@ -1773,6 +1788,16 @@ class SingleFile:
         return bool(self.stiffness_calculated and self.used_perform_fit)
 
     @property
+    def indentation_depth(self):
+        """Maximum indentation reached by each curve in the elasticity fit
+        [nm] ([x][y], nan without value)."""
+        values = numpy.full((self.nbr_pixels_x, self.nbr_pixels_y), numpy.nan)
+        if self.stiffness_calculated:
+            values = numpy.asarray(self.indentation[:], dtype=float).copy()
+            values[values <= 0] = numpy.nan
+        return values
+
+    @property
     def fit_r2(self):
         """R^2 of the elasticity fit (fitted points after the contact)."""
         return self.get_fit_quality(0)
@@ -1840,6 +1865,7 @@ class SingleFile:
                  "microrheo_tan_delta": "color_opts_microrheo_tan_delta",
                  "microrheo_crossover": "color_opts_microrheo_crossover",
                  "fit_r2": "color_opts_fit_r2",
+                 "indentation_depth": "color_opts_indentation_depth",
                  "fit_poc_fixed": "color_opts_fit_poc_fixed"}
         return getattr(self, names[mt])
 

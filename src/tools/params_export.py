@@ -214,7 +214,10 @@ def viscoelasticity(data):
             "baseline_before_contact_nm": data.used_visco_contact_offset,
             "points": data.used_visco_nbr_points,
             "initial_fluidity": "auto" if data.used_visco_beta_auto
-            else data.used_visco_beta_init}
+            else data.used_visco_beta_init,
+            # E' and E'' are given at this frequency (from E0 and the
+            # fluidity)
+            "frequency_e_storage_loss_hz": data.visco_frequency}
 
 
 def microrheology(data):

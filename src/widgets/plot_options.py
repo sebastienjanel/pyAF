@@ -347,7 +347,7 @@ class PlotOptionsWidget(PYAFWidget):
                 data.colortable_middle_value = high / 2.0
             elif mt.startswith("breakthrough_") or \
                     mt.startswith("brush_") or mt.startswith("plant_") or \
-                    mt == "microrheo_crossover":
+                    mt in ("microrheo_crossover", "indentation_depth"):
                 # From the 2nd to the 98th percentile
                 values = numpy.asarray(getattr(data, mt), dtype=float)
                 values = values[numpy.isfinite(values)]
@@ -515,6 +515,12 @@ class PlotOptionsWidget(PYAFWidget):
             values = numpy.asarray(getattr(data, mt), dtype=float)
             values = values[numpy.isfinite(values)]
             val = float(values.max()) if values.size else 0.0
+            val_all = None
+        elif mt == "indentation_depth":
+            name, unit, factor = "Median indentation", "nm", 1
+            values = numpy.asarray(data.indentation_depth, dtype=float)
+            values = values[numpy.isfinite(values)]
+            val = float(numpy.median(values)) if values.size else 0.0
             val_all = None
         elif mt == "fit_r2":
             name, unit, factor = "Median R\u00b2", "", 1
