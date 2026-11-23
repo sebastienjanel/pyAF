@@ -161,8 +161,17 @@ class LoaderJPK:
                 self.nbr_segments = extract_int(line)
                 break
 
+        # Cantilever of the calibration (JPK software 7 and later)
+        probe, environment = None, None
         for line in self.afm_file.read("header.properties").splitlines():
             line = line.decode()
+            calibration = ".environment.cantilever-calibration-info."
+            if line.startswith(prefix) and line.find(calibration) != -1:
+                if line.find(calibration + "cantilever-name=") != -1:
+                    probe = extract_str(line)
+                elif line.find(calibration + "calibration-environment=") \
+                        != -1:
+                    environment = extract_str(line)
             if line.find(prefix + ".description.instrument") != -1:
                 self.data.microscope_name = extract_str(line)
             if line.find(prefix + ".description.source-software") != -1:
@@ -248,6 +257,8 @@ class LoaderJPK:
             # Setpoint (Force)
             if line.find(pr + "relative-setpoint") != -1:
                 self.data.trig_threshold = extract_float(line)
+
+        self.data.probe = probe_text(probe, environment)
 
         if self.data.ramp_size is None:
             # Sometimes there is no relative-z-start, for example if you
@@ -1393,3 +1404,13 @@ def extract_jpk_date(line):
     """
     date = parse(extract_str(line).replace("\\", ""), ignoretz=True)
     return str(date).split(".")[0]
+
+
+def probe_text(probe, environment):
+    """Name of the cantilever with the environment of its calibration
+    (lower case), e.g. "PFQNM-LC-A-CAL (water)"; None without name."""
+    if not probe:
+        return None
+    if environment:
+        return probe + " (" + environment.lower() + ")"
+    return probe

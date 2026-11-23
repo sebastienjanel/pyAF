@@ -59,7 +59,7 @@ import tables
 from dateutil.parser import parse
 
 from ...tools import plant_tools
-from .jpk import LoaderJPK
+from .jpk import LoaderJPK, probe_text
 
 MAP = "/Measurement_000/Map"
 SERIES = "multi-scan-series."
@@ -211,6 +211,11 @@ class LoaderJPKSmart(LoaderJPK):
 
         self.data.microscope_name = value(SERIES + "description.instrument")
         self.data.version = value(SERIES + "description.source-software")
+        calibration = SERIES + "map.header.environment." \
+            "cantilever-calibration-info."
+        self.data.probe = probe_text(
+            value(calibration + "cantilever-name"),
+            value(calibration + "calibration-environment"))
         self.data.retracted_delay = number(SETTINGS + "retracted-pause-time")
         self.data.extended_delay = number(SETTINGS + "extended-pause-time")
         self.data.pause_duration = self.data.extended_delay

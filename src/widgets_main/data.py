@@ -395,7 +395,11 @@ class DataWidget(PYAFWidget):
         # Update the labels
         text = "Microscope : " + str(data.microscope_name)
         self.LB_microscope_name.setText(text)
-        text = "Config. file : " + str(data.scanner_file)
+        # Nanoscope: configuration file of the scanner; JPK: cantilever
+        if data.file_type in JPK_FILE_TYPES:
+            text = "Probe : " + str(data.probe)
+        else:
+            text = "Config. file : " + str(data.scanner_file)
         self.LB_scanner_file.setText(text)
         text = "Software version : " + str(data.version)
         self.LB_version.setText(text)

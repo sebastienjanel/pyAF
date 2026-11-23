@@ -200,7 +200,10 @@ class SingleFile:
 
         self.microscope_name = None
         self.version = None
-        self.scanner_file = None
+        self.scanner_file = None  # Nanoscope
+        # JPK (software 7 and later): cantilever of the calibration, and its
+        # environment, e.g. "PFQNM-LC-A-CAL (water)"
+        self.probe = None
         self.real_nbr_pixels = None  # For incomplete JPK files
         self.sens_z_scan = None  # Nanoscope
         self.scan_angle = None
