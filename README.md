@@ -53,7 +53,7 @@ To check an installation (applications or sources), run pyAF with the environmen
 
 ## Installation from the sources
 
-pyAF runs on macOS, Windows and Linux with Python 3.11 or newer (3.13 recommended), on the same minimum systems as the applications.
+pyAF runs on macOS, Windows and Linux with Python 3.12 or newer (3.13 recommended), on the same minimum systems as the applications.
 
 ### 1. Install Python and Git
 
@@ -104,14 +104,14 @@ Next times: open a terminal, go to the `pyAF` folder, activate the environment (
 
 ### Tests
 
-Checks of the calculations (flatten, contact models, bottom effect correction, plant cells) on synthetic data, from the `pyAF` folder:
+Checks of the calculations on synthetic data (flatten, contact models, bottom effect correction, adhesion, force spectroscopy, plant cells, ROI assistance, curve sorting, automatic tilt correction), from the `pyAF` folder:
 
     python -m unittest discover tests
 
 ### With PyCharm (free for academics)
 
 - File / Project from Version Control: https://github.com/sebastienjanel/pyAF.git
-- Settings / Project / Python Interpreter: add a new virtual environment with Python 3.11 or newer
+- Settings / Project / Python Interpreter: add a new virtual environment with Python 3.12 or newer
 - in the terminal of PyCharm: `pip install -r requirements.txt`
 - Run / Edit Configurations: script `main.py` of the project, with the interpreter of the virtual environment, then Run
 

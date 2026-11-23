@@ -1,6 +1,6 @@
-#Development notes
+# Development notes
 
-##pyAF
+## pyAF
 *****************************
 Version 1: Michka Popoff, PhD work
 → Elasticity, stiffness tomography, adhesion, events, GUI, 3D, histogram stats
@@ -18,11 +18,11 @@ Version 4: Sébastien Janel and Nuno Duarte
 → New fitting and BEC models
 
 Version 5: Sébastien Janel
-→ Updated python and librairies
+→ Updated python and libraries
 → Revamped interface (toggles, selectors, theme, autoscale, LUT, plotting)
 → Semi-automatic curve sorting
 → Additional elasticity models and improved fitting
-→ Updated Bottom effect corrections factors (Garcia)
+→ Updated bottom effect correction factors (Garcia)
 → New Ting viscoelasticity fit (Garcia)
 → New microrheology (Alcaraz)
 → New breakthrough analysis
