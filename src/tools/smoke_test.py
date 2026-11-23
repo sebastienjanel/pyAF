@@ -130,7 +130,14 @@ def run(app):
         with tables.open_file(path) as file:
             if float(file.root.a[:].sum()) != 100:
                 raise RuntimeError("wrong values")
-        return "tables " + tables.__version__
+        # Copy of the compressed nodes (loading more .pyaf files)
+        import h5py
+        with h5py.File(path, "r+") as file:
+            file.copy(file["/a"], file["/"], name="b")
+        with tables.open_file(path) as file:
+            if float(file.root.b[:].sum()) != 100:
+                raise RuntimeError("wrong values of the copy")
+        return "tables " + tables.__version__ + ", h5py " + h5py.__version__
 
     def vtk():
         # The classes of the 3D view, and their implementations: without
