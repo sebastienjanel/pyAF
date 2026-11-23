@@ -32,16 +32,11 @@
 
 """Tools used to do some statistics and further results sorting."""
 
-import numpy
 from .. import widgets_list
 from .. import shared
 from ..tools import results_sorting
 from ..tools import misc_tools
-from ..tools.utils import module_exists
 from ..widgets.progressbar import Progressbar
-
-if module_exists("scipy"):
-    from scipy import stats
 
 
 def get_values():
@@ -75,54 +70,8 @@ def get_values():
         shared.single_data.append(array)
         shared.single_values.append(list(values))
 
-    update_single_modes()
-
     if new_bar:
         widgets_list.widget_progressbar.close()
-
-
-def update_single_modes():
-    """Computes the modes of the single results (index 3 of the values),
-    with the density estimate of the violins (same smoothing)."""
-    from ..experiment import get_violin_options
-    bw_adjust = get_violin_options(shared.exp)["bw_adjust"]
-
-    for i, data in enumerate(shared.single_data or []):
-        if shared.exp.results_type == "loading_rates":
-            # 0 = forces, 1 = loading rates
-            data = data[1] if len(data) > 1 else []
-        shared.single_values[i][3] = get_mode(data, bw_adjust)
-
-
-def update_groups_modes():
-    """Computes the modes of the groups (index 3 of the values), with the
-    density estimate of their violins (same smoothing)."""
-    from ..experiment import get_violin_options
-    bw_adjust = get_violin_options(shared.exp, "groups")["bw_adjust"]
-
-    for i, data in enumerate(shared.groups_data or []):
-        if shared.exp.results_type == "loading_rates":
-            # 0 = forces, 1 = loading rates
-            data = data[1] if len(data) > 1 else []
-        shared.groups_values[i][3] = get_mode(data, bw_adjust)
-
-
-def get_mode(data, bw_adjust=1.0):
-    """Mode of the values: maximum of their density estimate (gaussian
-    kernels, Scott's rule for the bandwidth multiplied by bw_adjust).
-
-    NaN if there are no values.
-    """
-    data = numpy.asarray(data, dtype=float).ravel()
-    data = data[numpy.isfinite(data)]
-    if data.size == 0:
-        return numpy.nan
-    if data.size == 1 or numpy.ptp(data) == 0:
-        return data[0]
-    kde = stats.gaussian_kde(data)
-    kde.set_bandwidth(kde.factor * bw_adjust)
-    grid = numpy.linspace(data.min(), data.max(), 1024)
-    return grid[numpy.argmax(kde(grid))]
 
 
 def fetch_group_data():
@@ -135,6 +84,5 @@ def fetch_group_data():
     shared.groups_data = groups
     shared.groups_values = values
 
-    update_groups_modes()
 
 

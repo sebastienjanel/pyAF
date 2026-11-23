@@ -35,7 +35,7 @@ from ... import consts
 from ... import shared
 from ... import widgets_list
 from ... import experiment
-from ...tools import gui_tools, misc_tools, palettes, stat_tools
+from ...tools import gui_tools, misc_tools, palettes
 from ...tools.gui_tools import PYAFButton, PYAFComboBox, PYAFInput, \
     PYAFToggle
 from ...tools.PYAFWidget import PYAFWidget
@@ -412,12 +412,6 @@ class ViolinOptionsWidget(PYAFWidget):
         options = self.get_options()
         if name == "bw_adjust":
             options["bw_adjust"] = self.IN_bw_adjust.get_float_value()
-            # The modes of the table use the same density estimate
-            if self.mode == "groups":
-                stat_tools.update_groups_modes()
-            else:
-                stat_tools.update_single_modes()
-            self.parent.update_GUI("table_labels")
         elif name == "y_min":
             options["y_min"] = self.IN_y_min.get_float_value()
         elif name == "y_max":

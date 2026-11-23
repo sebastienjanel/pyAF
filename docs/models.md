@@ -259,7 +259,6 @@ $s_{pq}$ is the slope of the surface (mean of the height differences on each sid
 - **SuperPlots**: one value per file, the median of its curves (the mean for the events per curve), and statistics on the replicates.
 - **Tests on the means of the replicates**: t-test, paired or not, Tukey HSD for all the pairs, Holm correction, Fieller interval for the fold change.
 - **Mixed-effects model on the curves**: value = mean of the condition + offset of the replicate + offset of the file + residual, by REML (statsmodels).
-- **Mode**: maximum of a Gaussian kernel density estimate (Scott's rule).
 
 ## 16. Curve sorting
 

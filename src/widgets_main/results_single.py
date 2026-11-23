@@ -76,7 +76,7 @@ class Columns:
         # Create the single columns
         self.list = []
         names = ["CB", "File", "Short name", "Group", "Mean", "Median",
-                 "Sd", "Mode"]
+                 "Sd"]
 
         if self.results_type == "stiffness":
             names += ["Slice", "ROI", "B.E.C."]
@@ -172,7 +172,6 @@ class ResultsSingleWidget(PYAFWidget):
         self.means_labels = None
         self.medians_labels = None
         self.sds_labels = None
-        self.mode_labels = None
 
         # A menu for the pop up submenu
         self.submenu_columns = None
@@ -362,7 +361,7 @@ class ResultsSingleWidget(PYAFWidget):
 
         # Widths of the columns (the file names take the remaining space)
         widths = {"CB": 35, "Short name": 170, "Group": 140, "Mean": 90,
-                  "Median": 90, "Sd": 90, "Mode": 90, "Slope filter": 110,
+                  "Median": 90, "Sd": 90, "Slope filter": 110,
                   "Distance filter": 160}
         for column in self.columns.list:
             if not column.visibility:
@@ -379,12 +378,10 @@ class ResultsSingleWidget(PYAFWidget):
         self.means_labels = []
         self.medians_labels = []
         self.sds_labels = []
-        self.mode_labels = []
         self.checkboxes = []
         self.means_labels = []
         self.medians_labels = []
         self.sds_labels = []
-        self.mode_labels = []
         self.checkboxes = []
 
         if shared.exp.results_list:
@@ -425,9 +422,6 @@ class ResultsSingleWidget(PYAFWidget):
 
         if self.columns.get_column("Sd").visibility:
             self.add_cell_at_pos("Sd", row_index)
-
-        if self.columns.get_column("Mode").visibility:
-            self.add_cell_at_pos("Mode", row_index)
 
         rtype = shared.exp.results_type
 
@@ -533,12 +527,6 @@ class ResultsSingleWidget(PYAFWidget):
             label = gui_tools.CenteredCellwidget(label_sd)
             self.tableWidget.setCellWidget(row_index, column_pos, label)
 
-        elif name == "Mode":
-            label_mode = QtWidgets.QLabel()
-            label_mode.setFont(self.parent.smallfont)
-            self.mode_labels.append(label_mode)
-            label = gui_tools.CenteredCellwidget(label_mode)
-            self.tableWidget.setCellWidget(row_index, column_pos, label)
 
         elif name == "ROI":
             roi_list = PYAFComboBox(self, None)
@@ -787,8 +775,8 @@ class ResultsSingleWidget(PYAFWidget):
                     # NaN (no values): "-"
                     texts = ["\u2013" if v is None or not numpy.isfinite(v)
                              else str(round(v, 6))
-                             for v in shared.single_values[i][:4]]
-                    mean, median, std, mode = texts
+                             for v in shared.single_values[i][:3]]
+                    mean, median, std = texts
 
                     if self.columns.get_column("Mean").visibility:
                         self.means_labels[i].setText(mean)
@@ -796,8 +784,6 @@ class ResultsSingleWidget(PYAFWidget):
                         self.medians_labels[i].setText(median)
                     if self.columns.get_column("Sd").visibility:
                         self.sds_labels[i].setText(std)
-                    if self.columns.get_column("Mode").visibility:
-                        self.mode_labels[i].setText(mode)
 
         if what == "BT_events_per_scan" or what == "all":
             found = False

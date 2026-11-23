@@ -45,6 +45,14 @@ from .. import widgets_list
 VISCO_TYPES = {
     "visco_e0": {"name": "E\u2080", "label": "E\u2080 [kPa]",
                  "factor": 1e-3, "export": "E0 (Pa)", "column": "visco_e0"},
+    # Storage and loss moduli of the power law, at the frequency of the maps
+    # of each file (1 Hz by default)
+    "visco_storage": {"name": "E\u2032", "label": "E\u2032 [kPa]",
+                      "factor": 1e-3, "export": "Storage modulus E' (Pa)",
+                      "column": "visco_storage"},
+    "visco_loss": {"name": "E\u2033", "label": "E\u2033 [kPa]",
+                   "factor": 1e-3, "export": "Loss modulus E'' (Pa)",
+                   "column": "visco_loss"},
     "visco_fluidity": {"name": "Fluidity", "label": "Fluidity",
                        "factor": 1.0, "export": "Fluidity",
                        "column": "fluidity"},
@@ -64,6 +72,13 @@ BREAKTHROUGH_TYPES = {
                                "label": "Jump [nm]", "factor": 1.0,
                                "export": "Breakthrough jump (nm)",
                                "column": "breakthrough_jump"},
+}
+
+# Indentation reached by the curves in the elasticity fit
+INDENTATION_TYPES = {
+    "indentation_depth": {"name": "Indentation", "label": "Indentation [nm]",
+                          "factor": 1.0, "export": "Indentation (nm)",
+                          "column": "indentation"},
 }
 
 # Brush model of the cells (with the elasticity)
@@ -136,9 +151,23 @@ PIXEL_TYPES = {**{name: dict(values, calculated="visco_calculated")
                   for name, values in BREAKTHROUGH_TYPES.items()},
                **{name: dict(values, calculated="brush_calculated")
                   for name, values in BRUSH_TYPES.items()},
+               **{name: dict(values, calculated="stiffness_calculated")
+                  for name, values in INDENTATION_TYPES.items()},
                **{name: dict(values, calculated="plant_calculated")
                   for name, values in PLANT_TYPES.items()}}
 
+
+
+def summary(values):
+    """Mean, median and standard deviation of the finite values (the
+    curves without value, nan, are not counted, as in the violins); nan
+    without finite value."""
+    values = numpy.asarray(values, dtype=float).ravel()
+    values = values[numpy.isfinite(values)]
+    if values.size == 0:
+        return [numpy.nan] * 3
+    return [float(numpy.mean(values)), float(numpy.median(values)),
+            float(numpy.std(values))]
 
 class GetResults:
     """Results fetching class."""
@@ -267,9 +296,7 @@ class GetResults:
                 return [[], [val, val, val, 0]]
 
             else:
-                values = [numpy.mean(result),
-                          numpy.median(result),
-                          numpy.std(result), 0]
+                values = summary(result) + [0]
 
                 return [numpy.array(result), values]
 
@@ -279,7 +306,7 @@ class GetResults:
                 return [[[], []], [val, val, val, 0]]
 
             else:
-                values = [numpy.mean(lr), numpy.median(lr), numpy.std(lr), 0]
+                values = summary(lr) + [0]
 
                 return [[forces, lr], values]
 
@@ -326,23 +353,19 @@ class GetResults:
                 if widgets_list.widget_progressbar is not None:
                     widgets_list.widget_progressbar.update()
 
-        # No values: NaN (the mode is computed with update_groups_modes)
+        # No values: NaN
         val = numpy.nan
         if self.type != "loading_rates":
             for i in range(len(groups)):
                 if groups[i]:
-                    values.append([numpy.mean(groups[i]),
-                                   numpy.median(groups[i]),
-                                   numpy.std(groups[i]), val])
+                    values.append(summary(groups[i]) + [val])
                 else:
                     values.append([val, val, val, val])
 
         elif self.type == "loading_rates":
             for i in range(len(groups)):
                 if groups_forces[i]:
-                    values.append([numpy.mean(groups_lr[i]),
-                                   numpy.median(groups_lr[i]),
-                                   numpy.std(groups_lr[i]), val])
+                    values.append(summary(groups_lr[i]) + [val])
 
                     groups[i] = numpy.array([groups_forces[i], groups_lr[i]])
                 else:

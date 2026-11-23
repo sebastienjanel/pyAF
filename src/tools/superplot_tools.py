@@ -81,23 +81,18 @@ EXPERIMENT_TIP = (
 CONDITION_TIP = (
     "Condition: treatment or sample compared in the SuperPlots (control, "
     "drug...), set of replicates.")
-MODE_TIP = (
-    "Mode: most frequent value, maximum of the density of the values "
-    "(kernel density estimate,\nsame smoothing as the violins).")
 FILE_TIP = (
     "File: force map, QI image or single curve. Its value is the median "
     "of its curves (mean for the number of events per curve).")
 COLUMN_TOOLTIPS = {
     "plots": {
-        "Replicate": "Replicate of the file. " + REPLICATE_TIP,
-        "Mode": MODE_TIP + "\nOf the curves of the file."},
+        "Replicate": "Replicate of the file. " + REPLICATE_TIP},
     "replicates": {
         "Replicate": REPLICATE_TIP,
         "Files": "Number of files in the replicate (column Replicate of "
                  "the Plots tab)",
         "Experiment": EXPERIMENT_TIP,
-        "Condition": CONDITION_TIP,
-        "Mode": MODE_TIP + "\nOf all the curves of the replicate."},
+        "Condition": CONDITION_TIP},
     "superplots": {
         "Condition": CONDITION_TIP,
         "Replicates": "Number of replicates of the condition: n of the "
@@ -134,7 +129,12 @@ def get_options():
 
 def map_value(values):
     """Value of a map: median of its curves (mean for the number of events
-    per curve, which is mostly 0 or 1)."""
+    per curve, which is mostly 0 or 1), without the curves without value
+    (nan); nan without value."""
+    values = numpy.asarray(values, dtype=float).ravel()
+    values = values[numpy.isfinite(values)]
+    if values.size == 0:
+        return numpy.nan
     if shared.exp.results_type == "events_per_curve":
         return float(numpy.mean(values))
     return float(numpy.median(values))

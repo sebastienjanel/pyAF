@@ -57,7 +57,7 @@ from .subwidgets.result_header import QCheckableHeader
 
 # Columns of the table (the values share the remaining space)
 COLUMNS = ("CB", "Group", "Files", "Experiment", "Condition", "Mean",
-           "Median", "S.D.", "Mode")
+           "Median", "S.D.")
 WIDTHS = {"CB": 35, "Group": 300, "Files": 70, "Experiment": 90,
           "Condition": 300}
 # Names of the columns displayed (the groups are the replicates of the
@@ -93,7 +93,6 @@ class ResultsGroupsWidget(PYAFWidget):
         self.means_labels = []
         self.medians_labels = []
         self.sds_labels = []
-        self.mode_labels = []
         self.files_labels = []
         self.submenu_conditions = None
 
@@ -243,7 +242,6 @@ class ResultsGroupsWidget(PYAFWidget):
         self.means_labels = []
         self.medians_labels = []
         self.sds_labels = []
-        self.mode_labels = []
         self.files_labels = []
 
         self.tableWidget.setRowCount(0)
@@ -309,8 +307,7 @@ class ResultsGroupsWidget(PYAFWidget):
         for name, labels in (("Files", self.files_labels),
                              ("Mean", self.means_labels),
                              ("Median", self.medians_labels),
-                             ("S.D.", self.sds_labels),
-                             ("Mode", self.mode_labels)):
+                             ("S.D.", self.sds_labels)):
             label = QtWidgets.QLabel()
             label.setFont(self.parent.smallfont)
             labels.append(label)
@@ -407,17 +404,16 @@ class ResultsGroupsWidget(PYAFWidget):
                           if result.group == group_id)
                 self.files_labels[row].setText(str(nbr))
 
-                values = [numpy.nan] * 4
+                values = [numpy.nan] * 3
                 if shared.groups_values is not None and \
                         group_id < len(shared.groups_values):
-                    values = shared.groups_values[group_id][:4]
+                    values = shared.groups_values[group_id][:3]
                 # NaN (no values): "-"
                 texts = ["–" if v is None or not numpy.isfinite(v)
                          else str(round(v, 6)) for v in values]
                 self.means_labels[row].setText(texts[0])
                 self.medians_labels[row].setText(texts[1])
                 self.sds_labels[row].setText(texts[2])
-                self.mode_labels[row].setText(texts[3])
 
         if what == "BT_dfs" or what == "all":
             found = any(data.loading_rates_calculated

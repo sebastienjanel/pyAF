@@ -65,6 +65,7 @@ from src.tools import dfs_tools  # noqa: E402
 from src.tools import math_tools  # noqa: E402
 from src.tools import search_joc  # noqa: E402
 from src.tools import tilt_tools  # noqa: E402
+from src.tools.results_sorting import summary  # noqa: E402
 from src.tools import plant_tools  # noqa: E402
 
 NX, NY = 40, 30
@@ -939,6 +940,19 @@ class AutoTilt(unittest.TestCase):
     def test_no_baseline(self):
         self.assertIsNone(tilt_tools.baseline([0, 1, 2], [0, 1, 2]))
         self.assertEqual(tilt_tools.file_slope([]), (None, [], []))
+
+
+class Statistics(unittest.TestCase):
+    """Mean, median and standard deviation of the tables of the plots."""
+
+    def test_curves_without_value(self):
+        # Curves without value (nan, e.g. a fit which failed) are not
+        # counted, as in the violins
+        values = numpy.r_[numpy.arange(1.0, 6.0), [numpy.nan] * 3]
+        mean, median, std = summary(values)
+        self.assertEqual((mean, median), (3.0, 3.0))
+        self.assertAlmostEqual(std, numpy.std(numpy.arange(1.0, 6.0)))
+        self.assertTrue(all(numpy.isnan(summary([numpy.nan]))))
 
 
 if __name__ == "__main__":
