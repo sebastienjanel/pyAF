@@ -278,9 +278,6 @@ class Experiment:
         # Units
         self.infowidget_threshold_units = "nN"
 
-        # Tilt or stretch is selected in curve modifcation widget
-        self.display_curve_modif_mode = "tilt"
-        self.display_stretch_mode = "approach"
 
         # Display or hide ROIs in multimeshgrids widget
         self.display_roi_in_multimeshgrid = False

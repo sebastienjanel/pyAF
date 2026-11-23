@@ -275,12 +275,7 @@ def save_used_params(data, mode):
     data.used_tilt_limit_1 = data.tilt_limit_1
     data.used_tilt_limit_2 = data.tilt_limit_2
     data.used_tilt_applied = data.tilt_applied
-    data.used_stretch_app_lim1 = data.stretch_app_lim1
-    data.used_stretch_app_lim2 = data.stretch_app_lim2
-    data.used_stretch_len_app = data.stretch_len_app
-    data.used_stretch_ret_lim1 = data.stretch_ret_lim1
-    data.used_stretch_ret_lim2 = data.stretch_ret_lim2
-    data.used_stretch_len_ret = data.stretch_len_ret
+    data.used_tilt_slope = data.tilt_slope
     data.used_sg_smoothing_enabled = data.sg_smoothing_enabled
     data.used_sg_smoothing_order = data.sg_smoothing_order
     data.used_sg_smoothing_width = data.sg_smoothing_width

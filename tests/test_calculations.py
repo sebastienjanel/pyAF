@@ -35,7 +35,8 @@ zero-force topography after a flatten, contact models and bottom effect
 correction (docs/models.md, sections 3 and 5), adhesion (section 9),
 dynamic force spectroscopy (section 11), plant cells (section 13), the
 order of the files of the loading window, the pixels sorted into the ROIs
-by ROI assistance, and the curves sorted from a few marked curves.
+by ROI assistance, the curves sorted from a few marked curves, and the
+automatic tilt correction.
 
 Usage (from the pyAF folder):
     .venv/bin/python -m unittest discover tests
@@ -63,6 +64,7 @@ from src.tools import curve_sorting  # noqa: E402
 from src.tools import dfs_tools  # noqa: E402
 from src.tools import math_tools  # noqa: E402
 from src.tools import search_joc  # noqa: E402
+from src.tools import tilt_tools  # noqa: E402
 from src.tools import plant_tools  # noqa: E402
 
 NX, NY = 40, 30
@@ -831,6 +833,112 @@ class CurveSorting(unittest.TestCase):
         with self.assertRaises(curve_sorting.CurveSortingError):
             curve_sorting.bad_probability(all_features,
                                           [(0, 0, 0, True), (0, 0, 1, False)])
+
+
+def tilted_curve(contact, rng, slope=0.004, offset=3.0, noise=0.08,
+                 points=1000, events=False):
+    """Approach (far from the surface first) of 2 um with a tilt, contact at
+    the height contact [nm] (Hertz-like indentation after it); with
+    events: two unbinding-like dips before the contact (retraction)."""
+    z = numpy.linspace(0, 2000.0, points)
+    d = slope * z + offset + rng.normal(0, noise, points)
+    d += 2e-4 * numpy.clip(z - contact, 0, None) ** 1.5
+    if events:
+        for position in (0.6 * contact, 0.85 * contact):
+            dip = (z > position - 60) & (z < position)
+            d[dip] -= numpy.linspace(0, 1.5, dip.sum())
+    return z, d
+
+
+class AutoTilt(unittest.TestCase):
+    """Baseline of each curve found without limits, slope of the file from
+    all the baselines (tools/tilt_tools)."""
+
+    def file_slope(self, contacts, **options):
+        rng = numpy.random.default_rng(2)
+        baselines, ends = [], []
+        for contact in contacts:
+            z, d = tilted_curve(contact, rng, **options)
+            slope, _, first, end, _ = tilt_tools.baseline(z, d)
+            baselines.append((slope, end - first, z[end - 1] - z[first]))
+            ends.append(z[end - 1] / contact)
+        return tilt_tools.file_slope(baselines), numpy.array(ends)
+
+    def test_varying_baselines(self):
+        # Contact from 3 % to 90 % of the curve (cells of different
+        # heights): the baseline ends at the contact, the slope is found
+        contacts = numpy.random.default_rng(3).uniform(60, 1800, 150)
+        (slope, _, _), ends = self.file_slope(contacts)
+        self.assertAlmostEqual(slope, 0.004, delta=0.0001)
+        self.assertGreater(numpy.median(ends), 0.9)
+        self.assertLess(numpy.median(ends), 1.1)
+
+    def test_events(self):
+        # Retraction with unbinding events: the baseline stops before them
+        contacts = numpy.random.default_rng(4).uniform(800, 1800, 50)
+        (slope, _, _), ends = self.file_slope(contacts, events=True)
+        self.assertAlmostEqual(slope, 0.004, delta=0.0001)
+        self.assertLess(ends.max(), 0.6)
+
+    def test_turnaround(self):
+        # Noise of the turnaround of the piezo at the start of the curves
+        # (old instruments), with a small tilt (0.2 nm over the curve, as in
+        # hela.003.spm): the baseline is not cut by it
+        rng = numpy.random.default_rng(6)
+        baselines = []
+        for contact in rng.uniform(1200, 1700, 30):
+            z, d = tilted_curve(contact, rng, slope=0.0001)
+            d[:60] += 0.6 * numpy.exp(-numpy.arange(60) / 15.0)
+            slope, _, first, end, _ = tilt_tools.baseline(z, d)
+            baselines.append((slope, end - first, z[end - 1] - z[first]))
+            self.assertGreater(z[end - 1], 0.8 * contact)
+        slope, short, _ = tilt_tools.file_slope(baselines)
+        self.assertAlmostEqual(slope, 0.0001, delta=0.00005)
+        self.assertEqual(short, [])
+
+    def test_turnaround_strong_tilt(self):
+        # With a strong tilt, a baseline found after the turnaround is not
+        # flat: the first one is kept (not a part of the contact)
+        rng = numpy.random.default_rng(7)
+        z, d = tilted_curve(300.0, rng)
+        _, _, first, end, _ = tilt_tools.baseline(z, d)
+        self.assertEqual(first, 0)
+        self.assertLess(z[end - 1], 1.2 * 300.0)
+
+    def test_correction(self):
+        # Slope of the file, offset of each curve: the baseline at 0
+        rng = numpy.random.default_rng(5)
+        z, d = tilted_curve(700.0, rng)
+        retraction = [z, d - 1.0]
+        approach, corrected_retraction, info = math_tools.correct_tilt(
+            [z, d], retraction, 0, 0, "trace", [0], [0], slope=0.004)
+        self.assertTrue(info["is_corrected"])
+        base = z < 650
+        self.assertLess(abs(numpy.median(approach[1][base])), 0.02)
+        self.assertLess(numpy.abs(approach[1][base]).max(), 0.5)
+        # Same line removed from the retraction
+        self.assertAlmostEqual(
+            numpy.median(corrected_retraction[1][base]), -1.0, delta=0.02)
+        # Fitted on the retraction
+        corrected_approach, retraction, _ = math_tools.correct_tilt(
+            [z, d + 1.0], [z, d], 0, 0, "retrace", [0], [0], slope=0.004)
+        self.assertLess(abs(numpy.median(retraction[1][base])), 0.02)
+        self.assertAlmostEqual(
+            numpy.median(corrected_approach[1][base]), 1.0, delta=0.02)
+
+    def test_outliers(self):
+        # A few curves with another slope are reported, not followed
+        baselines = [(0.004 + 0.0001 * (k % 3), 500, 1000.0)
+                     for k in range(40)]
+        baselines += [(0.05, 500, 1000.0), (0.004, 10, 20.0)]
+        slope, short, far = tilt_tools.file_slope(baselines)
+        self.assertAlmostEqual(slope, 0.004, delta=0.0003)
+        self.assertEqual(far, [40])
+        self.assertEqual(short, [41])
+
+    def test_no_baseline(self):
+        self.assertIsNone(tilt_tools.baseline([0, 1, 2], [0, 1, 2]))
+        self.assertEqual(tilt_tools.file_slope([]), (None, [], []))
 
 
 if __name__ == "__main__":

@@ -219,11 +219,6 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
             dt = exp.list[i]
             cur = exp.list[oldid]
 
-            dt.sg_smoothing_enabled = cur.sg_smoothing_enabled
-            dt.sg_smoothing_order = cur.sg_smoothing_order
-            dt.sg_smoothing_width = cur.sg_smoothing_width
-            dt.sg_smoothing_uniform = cur.sg_smoothing_uniform
-
             dt.check_tilt_option = cur.check_tilt_option
 
         if exp.compute_type == "stiffness" or mode == "all":
@@ -262,14 +257,6 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
                 dt.fitparam_poc_noise_multiplicator = \
                     cur.fitparam_poc_noise_multiplicator
                 dt.fitparam_poc_refit_times = cur.fitparam_poc_refit_times
-                dt.stretch_app_lim1 = cur.stretch_app_lim1
-                dt.stretch_app_lim2 = cur.stretch_app_lim2
-                dt.stretch_ret_lim1 = cur.stretch_ret_lim1
-                dt.stretch_ret_lim2 = cur.stretch_ret_lim2
-                dt.stretch_len_app = cur.stretch_len_app
-                dt.stretch_len_ret = cur.stretch_len_ret
-                dt.stretch_applied_app = cur.stretch_applied_app
-                dt.stretch_applied_ret = cur.stretch_applied_ret
 
         if exp.compute_type == "viscoelasticity" or mode == "all":
             cur = exp.list[oldid]
@@ -367,6 +354,12 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
             cur = exp.list[oldid]
             dt.tilt_limit_1 = cur.tilt_limit_1
             dt.tilt_limit_2 = cur.tilt_limit_2
+            dt.tilt_auto = cur.tilt_auto
+            # Smoothing (same window, same Apply to all)
+            dt.sg_smoothing_enabled = cur.sg_smoothing_enabled
+            dt.sg_smoothing_order = cur.sg_smoothing_order
+            dt.sg_smoothing_width = cur.sg_smoothing_width
+            dt.sg_smoothing_uniform = cur.sg_smoothing_uniform
 
     # Update some widgets
     if widgets_list.widget_indentation is not None:

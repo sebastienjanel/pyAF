@@ -32,8 +32,11 @@
 
 """Plots the curve for the tilt correction."""
 
+import numpy
+
 from .plot_curve import PlotCurve
 from ...tools import misc_tools
+from ...tools import tilt_tools
 from ... import shared
 
 
@@ -50,22 +53,34 @@ class PlotTiltPreview(PlotCurve):
         self.curve_approach = self.approach
         self.curve_retraction = self.retraction
 
-        # Limits for the tilt correction
-        # Offset is the approach/retraction position
-        if shared.exp.display_curve_modif_mode == "tilt":
+        # Limits for the tilt correction; in automatic mode, the baseline
+        # found on the curve displayed: on the curve the correction is
+        # fitted on, before: on the retraction for the adhesion and the
+        # events, otherwise on the approach
+        if not self.data.tilt_auto:
             self.curve_mod_limit_1 = self.data.tilt_limit_1
             self.curve_mod_limit_2 = self.data.tilt_limit_2
             self.color_curve_mod_limit = "r"
-        elif shared.exp.display_curve_modif_mode == "stretch":
-            if shared.exp.display_stretch_mode == "approach" and \
-                    self.curve_approach is not None:
-                self.curve_mod_limit_1 = self.data.stretch_app_lim1
-                self.curve_mod_limit_2 = self.data.stretch_app_lim2
+        else:
+            retraction = shared.exp.compute_type in (
+                "work_and_rupture_force", "events")
+            if self.data.tilt_applied:
+                retraction = self.data.tilt_applied == "retrace"
+            if retraction:
+                curve, start = self.curve_retraction, self.ret_pos[0]
+            else:
+                curve, start = self.curve_approach, self.app_pos[0]
+            found = None
+            if curve is not None:
+                # Corrected curve: its baseline is flat
+                slope = 0.0 if self.data.tilt_applied else None
+                found = tilt_tools.baseline(curve[0][start:],
+                                            curve[1][start:], slope)
+            if found is not None:
+                z = curve[0][start:]
+                z = z[numpy.isfinite(z)]
+                self.curve_mod_limit_1 = z[found[2]]
+                self.curve_mod_limit_2 = z[found[3] - 1]
                 self.color_curve_mod_limit = "g"
-            elif shared.exp.display_stretch_mode == "retraction" and \
-                    self.curve_retraction is not None:
-                self.curve_mod_limit_1 = self.data.stretch_ret_lim1
-                self.curve_mod_limit_2 = self.data.stretch_ret_lim2
-                self.color_curve_mod_limit = "k"
 
         self.plot_fig()

@@ -34,6 +34,7 @@
 import numpy
 from .plot_meshgrid import PlotMeshGrid
 from ...tools import math_tools
+from ...tools import tilt_tools
 from ...widgets.progressbar import Progressbar
 from ... import widgets_list
 
@@ -56,8 +57,31 @@ class PlotTiltCheckMeshGrid(PlotMeshGrid):
         widgets_list.widget_progressbar.set_range(0, total)
         widgets_list.widget_progressbar.set_label("Tilt correction check")
 
-        # Loop through the curves, apply the tilt correction, and check
-        # the returned info dictionnary.
+        if self.data.tilt_slope is not None:
+            # Automatic: points and slope of the baseline found on each
+            # curve (deflection in nm)
+            widgets_list.widget_progressbar.set_range(
+                0, self.data.nbr_pixels_x)
+            baselines = tilt_tools.data_baselines(
+                self.data, self.data.tilt_applied,
+                widgets_list.widget_progressbar.update)
+            sensitivity = self.data.deflection_sensitivity
+            for i, j, slope, number, _ in baselines:
+                if self.data.check_tilt_option == "nbr_points":
+                    self.temp_array[i][j] = number
+                else:
+                    self.temp_array[i][j] = slope * sensitivity
+                self.tilt_mask[i][j] = 1
+        else:
+            self.check_limits()
+
+        widgets_list.widget_progressbar.close()
+        # Curves not corrected: no value
+        self.temp_array[self.tilt_mask == 0] = 0
+        self.finish()
+
+    def check_limits(self):
+        """Points between the limits and slope fitted on each curve."""
         for i in range(self.data.nbr_pixels_x):
             for j in range(self.data.nbr_pixels_y):
                 _, _, res = math_tools.correct_tilt(
@@ -77,8 +101,8 @@ class PlotTiltCheckMeshGrid(PlotMeshGrid):
 
                 widgets_list.widget_progressbar.update()
 
-        widgets_list.widget_progressbar.close()
-
+    def finish(self):
+        """Map of the values."""
         self.factor = 1.0
         self.colorbarlabel = None
         self.x_label = None
@@ -91,7 +115,13 @@ class PlotTiltCheckMeshGrid(PlotMeshGrid):
 
         # Overwrite colormap to have always a green one
         self.colormap = self.colortables.colortables_mpl_list[6]
-        self.colortable_max_value = numpy.amax(self.temp_array)
-        self.colortable_min_value = 0
+        values = self.temp_array[self.tilt_mask != 0]
+        if self.data.check_tilt_option == "slopes" and len(values):
+            # Slopes: their range (can be negative)
+            self.colortable_max_value = numpy.amax(values)
+            self.colortable_min_value = numpy.amin(values)
+        else:
+            self.colortable_max_value = numpy.amax(self.temp_array)
+            self.colortable_min_value = 0
 
         self.plot_fig()

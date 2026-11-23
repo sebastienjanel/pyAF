@@ -113,7 +113,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
         self.events_preview = None
         self.fits_lines_conv = [None, None]
 
-        # Vertical lines displaying the tilt/stretch limits
+        # Vertical lines displaying the tilt limits
         self.curve_mod_limit_1 = None
         self.curve_mod_limit_2 = None
         self.color_curve_mod_limit = None
@@ -611,7 +611,7 @@ class PlotCurve(MainPlot, CommonCurveTools):
                 self.plot_fits_lines(
                     self.curve_retraction[0], self.fits_lines_conv)
 
-        # Plot vertical lines for the tilt/stretch limits
+        # Plot vertical lines for the tilt limits
         if self.curve_mod_limit_1 is not None:
             col = self.color_curve_mod_limit
             self.axes.axvline(

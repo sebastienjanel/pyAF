@@ -691,29 +691,16 @@ class SingleFile:
         self.tilt_limit_2 = 600
         self.tilt_applied = False
         self.check_tilt_option = "nbr_points"  # nbr_points or slopes
+        # Automatic tilt (default): baseline of each curve found, slope of
+        # the file (from all the baselines, deflection in volts per nm, see
+        # tilt_tools), None with the limits
+        self.tilt_auto = True
+        self.tilt_slope = None
         # Values applied
         self.used_tilt_limit_1 = None
         self.used_tilt_limit_2 = None
         self.used_tilt_applied = None
-
-        # Preview values for the stretch
-        self.stretch_app_lim1 = 100
-        self.stretch_app_lim2 = 500
-        self.stretch_ret_lim1 = 100
-        self.stretch_ret_lim2 = 500
-        self.stretch_len_app = 1000
-        self.stretch_len_ret = 1000
-        self.stretch_applied_app = False
-        self.stretch_applied_ret = False
-        # Values applied
-        self.used_stretch_app_lim1 = 100
-        self.used_stretch_app_lim2 = 500
-        self.used_stretch_ret_lim1 = 100
-        self.used_stretch_ret_lim2 = 500
-        self.used_stretch_len_app = 1000
-        self.used_stretch_len_ret = 1000
-        self.used_stretch_applied_app = False
-        self.used_stretch_applied_ret = False
+        self.used_tilt_slope = None
 
         # List of indentations to be displayed in the histogram tableview
         self.indentation_list = []

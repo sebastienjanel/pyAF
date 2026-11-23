@@ -83,6 +83,13 @@ class CheckTiltWidget(PYAFWidget):
     def update_widget(self):
         """Update the widget."""
         data = shared.exp.current_data
+        # Automatic correction: the baseline found on each curve
+        if data.tilt_slope is not None:
+            self.RBT_nbr_points.setText("Points of the baseline")
+            self.RBT_slopes.setText("Slopes of the baselines")
+        else:
+            self.RBT_nbr_points.setText("Nbr of points in fit")
+            self.RBT_slopes.setText("Fit slopes")
         if data.check_tilt_option == "nbr_points":
             self.RBT_nbr_points.setChecked(True)
         elif data.check_tilt_option == "slopes":

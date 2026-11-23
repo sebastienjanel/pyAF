@@ -63,9 +63,8 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
     # correction is returned. This is only used for the plots, in the
     # computations there is no need to correct the deflection to 0.
     zero = 0
-
-    stretch_applied_app = False
-    stretch_applied_ret = False
+    # Slope of the automatic tilt correction (None: with the limits)
+    tilt_slope = None
 
     curve_x_app = None
     curve_x_time_app = None
@@ -157,23 +156,11 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
         tilt_limit_1 = data.tilt_limit_1
         tilt_limit_2 = data.tilt_limit_2
         tilt_applied = data.tilt_applied
+        tilt_slope = data.tilt_slope
         sg_smoothing_enabled = data.sg_smoothing_enabled
         sg_smoothing_order = data.sg_smoothing_order
         sg_smoothing_width = data.sg_smoothing_width
         sg_smoothing_uniform = data.sg_smoothing_uniform
-
-        if not is_discarded:
-            stretch_applied_app = data.stretch_applied_app
-            stretch_applied_ret = data.stretch_applied_ret
-
-            if stretch_applied_app:
-                stretch_limit1 = data.stretch_app_lim1
-                stretch_limit2 = data.stretch_app_lim2
-                stretch_length = data.stretch_len_app
-            elif stretch_applied_ret:
-                stretch_limit1 = data.stretch_ret_lim1
-                stretch_limit2 = data.stretch_ret_lim2
-                stretch_length = data.stretch_len_ret
 
     elif mode == "curve_results" or mode == "details_widget" or \
             mode == "results_sorting" or mode == "compute_no_shared":
@@ -186,39 +173,17 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
         tilt_limit_1 = data.used_tilt_limit_1
         tilt_limit_2 = data.used_tilt_limit_2
         tilt_applied = data.used_tilt_applied
+        tilt_slope = data.used_tilt_slope
         sg_smoothing_enabled = data.used_sg_smoothing_enabled
         sg_smoothing_order = data.used_sg_smoothing_order
         sg_smoothing_width = data.used_sg_smoothing_width
         sg_smoothing_uniform = data.used_sg_smoothing_uniform
 
-        if is_discarded == 0:
-            stretch_applied_app = data.used_stretch_applied_app
-            stretch_applied_ret = data.used_stretch_applied_ret
-
-            if stretch_applied_app:
-                stretch_limit1 = data.used_stretch_app_lim1
-                stretch_limit2 = data.used_stretch_app_lim2
-                stretch_length = data.used_stretch_len_app
-            elif stretch_applied_ret:
-                stretch_limit1 = data.used_stretch_ret_lim1
-                stretch_limit2 = data.used_stretch_ret_lim2
-                stretch_length = data.used_stretch_len_ret
-
     elif mode == "compute":
         tilt_limit_1 = dt["tilt_limit_1"]
         tilt_limit_2 = dt["tilt_limit_2"]
         tilt_applied = dt["tilt_applied"]
-        stretch_applied_app = dt["stretch_applied_app"]
-        stretch_applied_ret = dt["stretch_applied_ret"]
-
-        if stretch_applied_app:
-            stretch_limit1 = dt["stretch_app_lim1"]
-            stretch_limit2 = dt["stretch_app_lim2"]
-            stretch_length = dt["stretch_len_app"]
-        elif stretch_applied_ret:
-            stretch_limit1 = dt["stretch_ret_lim1"]
-            stretch_limit2 = dt["stretch_ret_lim2"]
-            stretch_length = dt["stretch_len_ret"]
+        tilt_slope = dt["tilt_slope"]
 
         sg_smoothing_enabled = dt["sg_smoothing_enabled"]
         sg_smoothing_order = dt["sg_smoothing_order"]
@@ -317,22 +282,16 @@ def get_curve(data, pos, approach=None, retraction=None, pause=None, modulation=
             tilt_limit_2,
             tilt_applied,
             ind_offset_app,
-            ind_offset_ret)
+            ind_offset_ret,
+            # Slope of the file in the units of the deflection
+            None if tilt_slope is None
+            else tilt_slope * deflection_sensitivity)
         # Pause and modulation segments: with the deflection sensitivity,
         # without the tilt correction (fitted on the approach or the
         # retraction)
         pause, modulation = pau, mod
     else:
         approach, retraction, pause, modulation = app, ret, pau, mod
-
-    # Add stretch
-    if stretch_applied_app:
-        approach = apply_stretch(approach, stretch_limit1, stretch_limit2,
-                                 ind_offset_app[0], stretch_length)
-
-    if stretch_applied_ret:
-        retraction = apply_stretch(retraction, stretch_limit1, stretch_limit2,
-                                   ind_offset_ret[0], stretch_length)
 
     return approach, retraction, pause, modulation, zero, smoothing_error
 
@@ -409,53 +368,3 @@ def get_force_curves(curve_x, curve_y, center, spring_constant):
 
     return [numpy.array(curve_x - curve_y - center_force_x),
             numpy.array(curve_y * spring_constant - center_force_y)]
-
-
-def apply_stretch(curve, limit1, limit2, ind_offset, length):
-    """Add some values at the end of the curve.
-
-    Can be helpfull for fits where the flat part of the curve is not
-    long enough.
-    """
-    # The limits are garanteed to be > ind_offset (approach/retraction
-    # position). Because the apply stretch button checks for this before
-    # allowing the stretch to be applied.
-
-    # Find the indice
-    limit1_ind = 0
-    limit2_ind = 0
-    found1 = False
-
-    for i in range(ind_offset, len(curve[0]), 1):
-        if curve[0][i] > limit1 and found1 is False:
-            limit1_ind = int(i)
-            found1 = True
-        if curve[0][i] > limit2:
-            limit2_ind = int(i)
-            break
-
-    seg = slice(limit1_ind, limit2_ind)
-
-    coeffs, _ = math_tools.fit_linear(curve[0][seg], curve[1][seg])
-
-    # Get size :
-    xsize = abs(curve[0][seg][0] - curve[0][seg][-1]) / len(curve[0][seg])
-
-    # Replace
-    for i in range(limit1_ind, -1, -1):
-        curve[0][i] = xsize * i
-        curve[1][i] = numpy.polyval([coeffs[0], coeffs[1]], xsize * i)
-
-    # Add in front
-    indtoadd = length / xsize - limit1_ind
-
-    new_curve_x = []
-    new_curve_y = []
-    for i in range(int(indtoadd)):
-        new_curve_x.append(-xsize * i)
-        new_curve_y.append(numpy.polyval([coeffs[0], coeffs[1]], -xsize * i))
-
-    curve_x = numpy.concatenate((new_curve_x, curve[0]), axis=0)
-    curve_y = numpy.concatenate((new_curve_y, curve[1]), axis=0)
-
-    return [curve_x, curve_y]

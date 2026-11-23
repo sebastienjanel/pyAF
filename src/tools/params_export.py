@@ -134,8 +134,15 @@ def curve_processing(data):
                      "order": data.used_sg_smoothing_order,
                      "uniform": data.used_sg_smoothing_uniform}
     tilt = None
-    if data.used_tilt_applied:
-        tilt = {"limit_1_nm": data.used_tilt_limit_1,
+    if data.used_tilt_applied and data.used_tilt_slope is not None:
+        # Automatic: baseline of each curve, slope of the file
+        sensitivity = data.used_deflection_sensitivity or \
+            data.deflection_sensitivity
+        tilt = {"fitted_on": data.used_tilt_applied, "automatic": True,
+                "slope_nm_per_nm": data.used_tilt_slope * sensitivity}
+    elif data.used_tilt_applied:
+        tilt = {"fitted_on": data.used_tilt_applied,
+                "limit_1_nm": data.used_tilt_limit_1,
                 "limit_2_nm": data.used_tilt_limit_2}
     return {"savitzky_golay_smoothing": smoothing, "tilt_correction": tilt}
 
@@ -339,9 +346,7 @@ SETTINGS = {
     "curves": (
         "sg_smoothing_enabled", "sg_smoothing_order", "sg_smoothing_width",
         "sg_smoothing_uniform", "tilt_applied", "tilt_limit_1",
-        "tilt_limit_2", "stretch_app_lim1", "stretch_app_lim2",
-        "stretch_len_app", "stretch_ret_lim1", "stretch_ret_lim2",
-        "stretch_len_ret"),
+        "tilt_limit_2", "tilt_auto"),
     "calibration": ("spring_constant", "deflection_sensitivity"),
 }
 

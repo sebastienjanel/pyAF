@@ -261,7 +261,7 @@ def flatten_rows(data, order=1, inside=None):
 
 
 def correct_tilt(approach, retraction, limit_1, limit_2, mode,
-                 approach_pos, retraction_pos):
+                 approach_pos, retraction_pos, slope=None):
     """
     Corrects the tilt of force curves by fitting a linear segment between
     specified limits and subtracting the tilt.
@@ -273,6 +273,9 @@ def correct_tilt(approach, retraction, limit_1, limit_2, mode,
     - limit_1, limit_2: Bounds for the linear fit.
     - mode: "trace" (fit approach) or "retrace" (fit retraction).
     - approach_pos, retraction_pos: Starting positions for each curve.
+    - slope: slope of the file (automatic correction, see tilt_tools): the
+      baseline of the curve is found without the limits, only its offset
+      is fitted.
 
     Returns:
     - Corrected approach and retraction curves, along with fit information.
@@ -297,6 +300,20 @@ def correct_tilt(approach, retraction, limit_1, limit_2, mode,
         start_pos = retraction_pos[0]
     else:
         return default
+
+    if slope is not None:
+        from . import tilt_tools
+        corrected = tilt_tools.correct(curve_first, curve_second,
+                                       int(start_pos), slope)
+        if corrected is None:
+            return default
+        if mode == "trace":
+            result_curve_first, result_curve_second = corrected
+        else:
+            result_curve_second, result_curve_first = corrected
+        info["is_corrected"] = True
+        info["detected_slope"] = slope
+        return result_curve_first, result_curve_second, info
 
     xlimit1, xlimit2 = 0, 0
 

@@ -47,9 +47,7 @@ CURVE_PARAMS = (
     "tilt_limit_1", "tilt_limit_2", "deflection_sensitivity",
     "spring_constant", "tilt_applied", "sg_smoothing_enabled",
     "sg_smoothing_order", "sg_smoothing_width", "sg_smoothing_uniform",
-    "stretch_applied_app", "stretch_applied_ret", "stretch_app_lim1",
-    "stretch_app_lim2", "stretch_len_app", "stretch_ret_lim1",
-    "stretch_ret_lim2", "stretch_len_ret")
+    "tilt_slope")
 
 STIFFNESS_FIT_PARAMS = {
     "poc_skip_start": "poc_skip_start",
