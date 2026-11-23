@@ -56,13 +56,24 @@ class ResultsSelectorWidget(PYAFWidget):
         self.IN_curve_y.input.setValidator(validator("y"))
         self.IN_curve_x.changeValue(shared.exp.meshgrid_click_xpos + 1)
         self.IN_curve_y.changeValue(shared.exp.meshgrid_click_ypos + 1)
+        # As wide as their fields (no label, no gap after them)
+        fixed = QtWidgets.QSizePolicy.Fixed
+        for field in (self.IN_curve_x, self.IN_curve_y):
+            field.label.hide()
+            field.setSizePolicy(fixed, fixed)
 
         # As wide as their texts (compact rows)
         self.button_rand = PYAFButton(
-            self, "button_rand", "Random curve", size=0)
+            self, "button_rand", "Random", size=0)
 
         self.BT_back = PYAFButton(self, "back", "<", size=0)
         self.BT_forward = PYAFButton(self, "forward", ">", size=0)
+        # No side margins: the same gaps between the buttons as between the
+        # fields
+        for button in (self.button_rand, self.BT_back, self.BT_forward):
+            button.setStyleSheet("QPushButton { margin-left: 0px; "
+                                 "margin-right: 0px; }")
+            button.update_width()
 
         self.label_info = QtWidgets.QLabel()
 

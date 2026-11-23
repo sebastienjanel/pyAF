@@ -35,7 +35,6 @@
 from qtpy import QtCore, QtWidgets
 
 from ... import widgets_list
-from ...tools.gui_tools import PYAFButton
 from ...tools.gui_tools import PYAFComboBox
 from ...tools.gui_tools import PYAFToggle
 from ...tools.PYAFWidget import PYAFWidget
@@ -56,9 +55,6 @@ class PlotSelectorWidget(PYAFWidget):
                            "Deflection vs Time", "Z position vs Time")
         self.time_plots = (2, 3)
 
-        self.BT_back = PYAFButton(self, "back", "<", size=0)
-        self.BT_forward = PYAFButton(self, "forward", ">", size=0)
-
         self.list_plot_types = PYAFComboBox(self, None)
 
         for plot_type in self.plot_types:
@@ -67,8 +63,8 @@ class PlotSelectorWidget(PYAFWidget):
             1, "Force vs tip-sample distance (Z position - deflection). On a "
             "hard substrate\n(glass), the contact is vertical when the "
             "deflection sensitivity is right.", QtCore.Qt.ToolTipRole)
-        # Wide enough for the longest plot type
-        self.list_plot_types.fit_to_contents()
+        # Wide enough for the longest plot type (small margin)
+        self.list_plot_types.fit_to_contents(margin=22)
 
         self.list_plot_types.activated.connect(lambda: self.list_updated("plot_types"))
 
@@ -82,16 +78,13 @@ class PlotSelectorWidget(PYAFWidget):
                                         type=bool)
         self.TG_zoom.setChecked(zoom)
 
-        # One row, as the curve selector of the map next to it
+        # One row, after the curve selector of the map (navigation box)
         self.HL_select_curve = QtWidgets.QHBoxLayout()
         self.HL_select_curve.setContentsMargins(0, 0, 0, 0)
-        self.HL_select_curve.addStretch(1)
-        self.HL_select_curve.addWidget(self.BT_back)
+        self.HL_select_curve.setSpacing(4)
         self.HL_select_curve.addWidget(self.list_plot_types)
-        self.HL_select_curve.addWidget(self.BT_forward)
-        self.HL_select_curve.addSpacing(12)
+        self.HL_select_curve.addSpacing(4)
         self.HL_select_curve.addWidget(self.TG_zoom)
-        self.HL_select_curve.addStretch(1)
         self.setLayout(self.HL_select_curve)
 
         self.update_widget()
@@ -119,34 +112,9 @@ class PlotSelectorWidget(PYAFWidget):
 
     def update_widget(self):
         """Update the widget."""
-        available = self.available()
         index = self.list_plot_types.currentIndex()
         # The zoom is only for the force vs distance plot
         self.TG_zoom.setEnabled(index == 1)
-        self.BT_back.setEnabled(any(i < index for i in available))
-        self.BT_forward.setEnabled(any(i > index for i in available))
-
-    def button_clicked(self, button):
-        """Called when a button is clicked."""
-        index = self.list_plot_types.currentIndex()
-
-        available = self.available()
-        before = [i for i in available if i < index]
-        after = [i for i in available if i > index]
-        if (button == "back" and not before) or \
-                (button == "forward" and not after):
-            return
-        if button == "back":
-            new_index = max(before)
-            self.list_plot_types.setCurrentIndex(new_index)
-            self.parent_widget.canvas_stack.setCurrentIndex(new_index)
-            self.update_widget()
-
-        if button == "forward":
-            new_index = min(after)
-            self.list_plot_types.setCurrentIndex(new_index)
-            self.parent_widget.canvas_stack.setCurrentIndex(new_index)
-            self.update_widget()
 
     def list_updated(self, name):
         """Called when a list is updated."""

@@ -56,7 +56,7 @@ from ..widgets_main.subwidgets.curve_selector import ResultsSelectorWidget
 from ..widgets_main.subwidgets.plot_selector import PlotSelectorWidget
 from ..widgets_main.subwidgets.curve_sorting import CurveSortingWidget
 from ..tools.gui_tools import PYAFButton
-from ..plots.PYAFPlot import PYAFPlot
+from ..plots.PYAFPlot import PYAFPlot, fit_map_width
 from ..tools.PYAFWidget import PYAFWidget
 from ..widgets.progressbar import Progressbar
 
@@ -122,7 +122,7 @@ class DataWidget(PYAFWidget):
         self.box_info1 = QtWidgets.QGroupBox("File parameters")
         # At least 550 px wide, and as wide as possible: the calibration box
         # is on the right edge of the window
-        self.box_info1.setFixedHeight(250)
+        self.box_info1.setFixedHeight(229)
         self.box_info1.setMinimumWidth(550)
         self.box_info1.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                      QtWidgets.QSizePolicy.Fixed)
@@ -147,6 +147,11 @@ class DataWidget(PYAFWidget):
         self.VL_box_info1.addWidget(self.LB_ramp_size)
         self.VL_box_info1.addWidget(self.LB_nbr_points_approach)
         self.VL_box_info1.addWidget(self.LB_nbr_points_retraction)
+        # Setpoint in the first column: one line less in the second one
+        self.LB_trig_threshold = QtWidgets.QLabel()
+        self.VL_box_info1.addWidget(self.LB_trig_threshold)
+        self.LB_trig_threshold.mousePressEvent = lambda event: \
+            self.button_clicked("thresh_units")
 
         self.LB_scan_angle = QtWidgets.QLabel()
         self.LB_frame_direction = QtWidgets.QLabel()
@@ -156,7 +161,6 @@ class DataWidget(PYAFWidget):
         self.LB_scan_rate = QtWidgets.QLabel()
         self.LB_fwd_scan_velocity = QtWidgets.QLabel()
         self.LB_rev_scan_velocity = QtWidgets.QLabel()
-        self.LB_trig_threshold = QtWidgets.QLabel()
         self.LB_retracted_delay = QtWidgets.QLabel()
         self.LB_extended_delay = QtWidgets.QLabel()
         self.VL_box_info2.addWidget(self.LB_scan_angle)
@@ -166,10 +170,6 @@ class DataWidget(PYAFWidget):
         self.VL_box_info2.addWidget(self.LB_scan_rate)
         self.VL_box_info2.addWidget(self.LB_fwd_scan_velocity)
         self.VL_box_info2.addWidget(self.LB_rev_scan_velocity)
-        self.VL_box_info2.addWidget(self.LB_trig_threshold)
-        self.LB_trig_threshold.mousePressEvent = lambda event: \
-            self.button_clicked("thresh_units")
-
         self.VL_box_info2.addWidget(self.LB_retracted_delay)
         self.VL_box_info2.addWidget(self.LB_extended_delay)
 
@@ -185,7 +185,7 @@ class DataWidget(PYAFWidget):
 
         # Cantilever & Microscope ---------------------------------------------
         self.box_cantilever = QtWidgets.QGroupBox("Calibration")
-        self.box_cantilever.setFixedSize(350, 250)
+        self.box_cantilever.setFixedSize(350, 229)
 
         self.IN_spring_constant = PYAFInput(
             self, "spring_constant", "Spring constant [N/m]", 90)
@@ -275,7 +275,10 @@ class DataWidget(PYAFWidget):
         self.curve_3.setSizePolicy(sizePolicy)
         self.canvas_stack.setSizePolicy(sizePolicy)
         self.canvas_mesh.setSizePolicy(sizePolicy)
-        self.meshgrid.setSizePolicy(sizePolicy)
+        # The map takes the free width first, up to its maximum width (see
+        # fit_map_width)
+        self.meshgrid.setSizePolicy(QtWidgets.QSizePolicy.Expanding, pol)
+        self.meshgrid.setMaximumWidth(self.mesh_size[0])
 
         self.HL_box_infos = QtWidgets.QHBoxLayout()
         self.HL_box_infos.addWidget(self.box_info1)
@@ -284,12 +287,34 @@ class DataWidget(PYAFWidget):
         name = "widget_plot_selector_data"
         self.plot_selector = PlotSelectorWidget(self, name)
 
-        # Good and bad curves, below the plot selector
+        # Curve of the map (maps only) and plot displayed
+        self.box_navigation = QtWidgets.QGroupBox("Navigation")
+        self.HL_navigation = QtWidgets.QHBoxLayout()
+        self.HL_navigation.setContentsMargins(6, 2, 6, 4)
+        self.HL_navigation.setSpacing(22)
+        self.HL_navigation.addStretch(1)
+        self.HL_navigation.addWidget(self.plot_selector)
+        self.HL_navigation.addStretch(1)
+        self.box_navigation.setLayout(self.HL_navigation)
+        # As wide as the file parameters above
+        self.box_navigation.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                          QtWidgets.QSizePolicy.Fixed)
+
+        # Good and bad curves
         self.curve_sorting = CurveSortingWidget(self)
+        # Same height as the sorting box, also without the pixel fields and
+        # buttons (single curve)
+        self.box_navigation.setFixedHeight(
+            self.curve_sorting.sizeHint().height())
+
+        # Both boxes on one row, above the map and the curve, aligned with
+        # the file parameters and the calibration above
+        self.HL_controls = QtWidgets.QHBoxLayout()
+        self.HL_controls.addWidget(self.box_navigation)
+        self.HL_controls.addWidget(self.curve_sorting)
 
         self.GL_data.addLayout(self.HL_box_infos, 0, 0, 1, 0)
-        self.GL_data.addWidget(self.plot_selector, 1, 1)
-        self.GL_data.addWidget(self.curve_sorting, 2, 1)
+        self.GL_data.addLayout(self.HL_controls, 1, 0, 1, 2)
         self.GL_data.addWidget(self.meshgrid, 3, 0)
         self.GL_data.addWidget(self.canvas_stack, 3, 1)
 
@@ -357,7 +382,8 @@ class DataWidget(PYAFWidget):
         if data.is_single:
             self.curve_selector.setParent(None)
         else:
-            self.GL_data.addWidget(self.curve_selector, 1, 0)
+            if self.HL_navigation.indexOf(self.curve_selector) == -1:
+                self.HL_navigation.insertWidget(1, self.curve_selector)
             self.curve_selector.update_widget()
 
         # Update the labels
@@ -417,10 +443,13 @@ class DataWidget(PYAFWidget):
         if data.retracted_delay is not None:
             # JPK QI files don't have these values
             val = data.retracted_delay
-            text = "Retracted delay : " + str(val * 1000.0) + " ms"
+            text = "Retracted delay : {:.1f} ms".format(val * 1000.0)
             self.LB_retracted_delay.setText(text)
             val = data.extended_delay
-            text = "Extended delay : " + str(val * 1000.0) + " ms"
+            if val is None:
+                text = "Extended delay : None"
+            else:
+                text = "Extended delay : {:.1f} ms".format(val * 1000.0)
             self.LB_extended_delay.setText(text)
         else:
             self.LB_retracted_delay.setText("Retracted delay : None")
@@ -489,6 +518,17 @@ class DataWidget(PYAFWidget):
             return True
         return curve_tools.get_nanoscope_times(data, 2, 2) is not None
 
+    def resizeEvent(self, event):
+        """The map as wide as needed to be as tall as the curve (after the
+        layout of the new size)."""
+        super().resizeEvent(event)
+        QtCore.QTimer.singleShot(0, self.fit_map_width)
+
+    def fit_map_width(self):
+        """Width of the map (see PYAFPlot.fit_map_width)."""
+        if self.GL_data.indexOf(self.meshgrid) != -1:
+            fit_map_width(self.meshgrid, self.canvas_stack, self.mesh_size[0])
+
     def update_plot_selector(self):
         """Display the selected plot. The time plots are only available for
         the files with a time (JPK, Nanoscope)."""
@@ -517,6 +557,7 @@ class DataWidget(PYAFWidget):
                 self.meshgrid.setParent(None)
             else:
                 self.GL_data.addWidget(self.meshgrid, 3, 0)
+                QtCore.QTimer.singleShot(0, self.fit_map_width)
 
         if what == "info_selected" or what == "all":
             info = shared.exp.info_selected

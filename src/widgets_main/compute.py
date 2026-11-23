@@ -57,7 +57,7 @@ from ..widgets_main.subwidgets.stiffness_parameters import StiffnessParamsWidget
 from ..widgets_main.subwidgets.curve_selector import ResultsSelectorWidget
 from ..widgets_main.subwidgets.fit_parameters import FitParamsWidget
 from ..widgets.curve_modify import CurveModWidget
-from ..plots.PYAFPlot import PYAFPlot
+from ..plots.PYAFPlot import PYAFPlot, fit_map_width
 from ..compute_tools import breakthrough
 from ..compute_tools import plant
 from ..tools import plant_tools
@@ -213,6 +213,12 @@ class ComputeWidget(PYAFWidget):
         self.MPL_meshgrid.mpl_connect("button_press_event",
                                       self.mesh_canvas_press)
         self.MPL_meshgrid.tab_id = 1
+        # The map takes the free width first, up to its maximum width (see
+        # fit_map_width)
+        self.MPL_meshgrid.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                        self.MPL_meshgrid.sizePolicy()
+                                        .verticalPolicy())
+        self.MPL_meshgrid.setMaximumWidth(self.meshgrid_canvas_size[0])
 
         # Canvas curves
         sizes = [self.curve_canvas_size[0] // self.canvas_resolution,
@@ -520,7 +526,7 @@ class ComputeWidget(PYAFWidget):
             "Detection: signal of the detection (convolution or MSF) with "
             "the threshold (green line), to adjust the parameters:\nset "
             "the threshold just above the noise, so that only the jumps "
-            "cross it, and check a few curves (Random curve).\n"
+            "cross it, and check a few curves (Random).\n"
             "Loading rates: force vs distance with the fits of the loading "
             "rates (events computed).")
         for combo in (self.list_events_algorithm,
@@ -1207,10 +1213,8 @@ class ComputeWidget(PYAFWidget):
         self.GL_compute.addLayout(self.HL_top, 0, 0, 1, 0)
         self.GL_compute.addWidget(self.MPL_meshgrid, 1, 0)
         self.GL_compute.addWidget(self.MPL_curve, 1, 1)
-        # The map and the curve share the extra width and height (see
-        # update_GUI: the curve alone for a single file)
-        self.GL_compute.setColumnStretch(0, 2)
-        self.GL_compute.setColumnStretch(1, 3)
+        # The plots take the extra height; the map the extra width up to its
+        # maximum (see fit_map_width), the curve the rest
         self.GL_compute.setRowStretch(1, 1)
         self.GL_compute.addLayout(self.HL_options, 2, 0, 1, 0)
         self.GL_compute.addWidget(self.tabs, 3, 0, 1, 0)
@@ -1305,6 +1309,18 @@ class ComputeWidget(PYAFWidget):
             if not data.is_single:
                 self.MPL_meshgrid.update_plot()
 
+    def resizeEvent(self, event):
+        """The map as wide as needed to be as tall as the curve (after the
+        layout of the new size)."""
+        super().resizeEvent(event)
+        QtCore.QTimer.singleShot(0, self.fit_map_width)
+
+    def fit_map_width(self):
+        """Width of the map (see PYAFPlot.fit_map_width)."""
+        if self.GL_compute.indexOf(self.MPL_meshgrid) != -1:
+            fit_map_width(self.MPL_meshgrid, self.MPL_curve,
+                          self.meshgrid_canvas_size[0])
+
     def update_GUI(self, element):
         """Update GUI elements."""
         data = shared.exp.current_data
@@ -1316,8 +1332,7 @@ class ComputeWidget(PYAFWidget):
             else:
                 self.GL_compute.addWidget(self.MPL_meshgrid, 1, 0)
                 self.BT_clean_up.setEnabled(True)
-            # Width of the map column: none without map
-            self.GL_compute.setColumnStretch(0, 0 if data.is_single else 2)
+                QtCore.QTimer.singleShot(0, self.fit_map_width)
 
         if element == "apply_to_all" or element == "all":
             self.TG_apply_to_all.setChecked(shared.exp.apply_to_all_compute)

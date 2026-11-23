@@ -170,6 +170,9 @@ class MainPlot:
         axes = getattr(map_plot, "axes", None)
         if axes is None or axes.figure is self.fig:
             return False
+        # No map displayed (single curve): the curve as tall as its figure
+        if not axes.figure.canvas.isVisible():
+            return False
         # Only for figures of the same height, displayed side by side
         if abs(axes.figure.bbox.height - self.fig.bbox.height) > 1:
             return False
@@ -291,12 +294,19 @@ class MainPlot:
             elif p_type in ("meshgrid_data", "small_meshgrid_compute"):
                 # Small map: leave room on the right for the colour bar
                 # (ticks and label)
-                self.fig.subplots_adjust(right=0.78)
-                if p_type == "meshgrid_data":
-                    # Close to the buttons above (room for the label of the
-                    # top tick only), the curve next to it aligned on it
-                    self.fig.subplots_adjust(
-                        top=1 - 14 / self.fig.bbox.height)
+                # Close to the buttons above (room for the label of the
+                # top tick only), the curve next to it aligned on it.
+                # Margins in pixels of the screen (the width of the map
+                # changes with the window): the ticks and labels only, the
+                # colour bar on the right. The figure is in pixels of the
+                # display (twice as many on a Retina screen)
+                ratio = getattr(self.fig.canvas, "device_pixel_ratio", 1)
+                width = self.fig.bbox.width / ratio
+                height = self.fig.bbox.height / ratio
+                self.fig.subplots_adjust(
+                    left=SMALL_MAP_LEFT / width,
+                    right=1 - SMALL_MAP_RIGHT / width,
+                    top=1 - 14 / height)
 
             elif p_type == "meshgrid":
                 # Results map: small vertical margins, to be as tall as
@@ -341,6 +351,13 @@ class MainPlot:
 
 # Maps and the curves displayed next to them: (widget, map attribute,
 # curve attributes)
+# Margins of the maps of the data and compute tabs (pixels): ticks and label
+# of the y axis on the left; colour bar ticks and label on the right
+SMALL_MAP_LEFT = 50
+SMALL_MAP_RIGHT = 62
+# Share of the width of the map and the curve given to the map at most
+SMALL_MAP_SHARE = 0.5
+
 MAPS_AND_CURVES = {
     "meshgrid_data": ("widget_data", "meshgrid",
                       ("curve", "curve_1", "curve_2")),

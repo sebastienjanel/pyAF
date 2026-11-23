@@ -44,45 +44,49 @@ from ...tools.gui_tools import PYAFButton
 from ...widgets.progressbar import Progressbar
 
 
-class CurveSortingWidget(QtWidgets.QWidget):
-    """Good and Bad (marks of the curve displayed), Complete (the curves
+class CurveSortingWidget(QtWidgets.QGroupBox):
+    """Good and Bad (marks of the curve displayed), Sort all (the curves
     of all the files sorted, the bad ones discarded) and Undo."""
 
     def __init__(self, parent):
-        super().__init__()
+        super().__init__("Curve sorting")
         self.parent = parent
         self.logger = logging.getLogger()
         # Marks, for the session: (unique id of the file, i, j) -> True if
         # bad, False if good
         self.marks = {}
-        # Curves discarded by Complete: unique id of the file -> [(i, j)]
+        # Curves discarded by Sort all: unique id of the file -> [(i, j)]
         self.discarded = {}
         # Measures of the curves of the files: unique id -> measures
         self.measures = {}
 
-        self.BT_good = PYAFButton(self, "good", "Good", size=90)
+        self.BT_good = PYAFButton(self, "good", "Good", size=72)
         self.BT_good.setToolTip(
             "Mark the curve displayed as good (G), again to remove the mark")
-        self.BT_bad = PYAFButton(self, "bad", "Bad", size=90)
+        self.BT_bad = PYAFButton(self, "bad", "Bad", size=72)
         self.BT_bad.setToolTip(
             "Mark the curve displayed as bad (B), again to remove the mark")
         for button in (self.BT_good, self.BT_bad):
             button.setCheckable(True)
-        self.BT_complete = PYAFButton(self, "complete", "Complete", size=90)
-        self.BT_undo = PYAFButton(self, "undo", "Undo", size=90)
+        self.BT_complete = PYAFButton(self, "complete", "Sort all", size=0)
+        self.BT_undo = PYAFButton(self, "undo", "Undo", size=0)
         self.BT_undo.setToolTip(
-            "Keep again the curves discarded by Complete")
+            "Keep again the curves discarded by Sort all")
 
+        # Compact: small gaps between the buttons
         layout = QtWidgets.QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(6, 2, 6, 4)
+        layout.setSpacing(4)
         layout.addStretch(1)
         layout.addWidget(self.BT_good)
         layout.addWidget(self.BT_bad)
-        layout.addSpacing(12)
+        layout.addSpacing(8)
         layout.addWidget(self.BT_complete)
         layout.addWidget(self.BT_undo)
         layout.addStretch(1)
         self.setLayout(layout)
+        # As wide as the calibration above
+        self.setFixedWidth(350)
 
         self.update_widget()
 
@@ -113,8 +117,8 @@ class CurveSortingWidget(QtWidgets.QWidget):
         tip = "Sort the curves of all the files from the curves marked\n" \
             "Good and Bad (in any file): the bad ones are discarded.\n" \
             "Mark 5 to 10 curves of each kind (the good ones, and each\n" \
-            "kind of bad curve), then Complete; mark the curves sorted\n" \
-            "wrongly, and Complete again."
+            "kind of bad curve), then Sort all; mark the curves sorted\n" \
+            "wrongly, and Sort all again."
         if not curve_sorting.available():
             tip = "Needs scikit-learn (not installed)"
         self.BT_complete.setToolTip(tip)
@@ -162,7 +166,7 @@ class CurveSortingWidget(QtWidgets.QWidget):
 
     def complete(self):
         """The curves of all the files sorted from the marks, the bad ones
-        discarded (and the ones discarded by the last Complete kept
+        discarded (and the ones discarded by the last Sort all kept
         again)."""
         self.forget_removed_files()
         files = list(shared.exp.list)
@@ -224,7 +228,7 @@ class CurveSortingWidget(QtWidgets.QWidget):
                "s" if number != 1 else ""))
 
     def undo(self):
-        """The curves discarded by the last Complete kept again (not the
+        """The curves discarded by the last Sort all kept again (not the
         ones kept or discarded otherwise since)."""
         files = {data.unique_id: data for data in shared.exp.list}
         for uid, curves in self.discarded.items():

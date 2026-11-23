@@ -161,9 +161,6 @@ class BoxData(QtWidgets.QWidget):
             # (transparent: the color of the item, selected or not)
             self.number.setStyleSheet("font-size: 26px; font-weight: bold; "
                                       "background-color: transparent;")
-            self.number.setToolTip(
-                "Number of the file, shown on the map at the position of "
-                "the curve")
 
         self.VL_canvas.addWidget(self.canvas)
         self.VL_canvas.addStretch(1)
@@ -618,8 +615,9 @@ class PYAFComboBox(QtWidgets.QComboBox):
         """Redefine wheelEvent. It will be disabled."""
         pass
 
-    def fit_to_contents(self):
-        """Make the list wide enough for its longest item.
+    def fit_to_contents(self, margin=30):
+        """Make the list wide enough for its longest item (and margin px
+        for the arrow).
 
         The style sheets define a min-width, which overrides
         setMinimumWidth, so the width is set with a style sheet.
@@ -631,7 +629,7 @@ class PYAFComboBox(QtWidgets.QComboBox):
         longest = max((metrics.horizontalAdvance(self.itemText(i))
                        for i in range(self.count())), default=0)
         self.setStyleSheet(
-            "QComboBox { min-width: " + str(longest + 30) + "px; }")
+            "QComboBox { min-width: " + str(longest + margin) + "px; }")
 
 
 class ToggleSwitch(QtWidgets.QCheckBox):

@@ -40,6 +40,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib
 from .plot_main import CURVE_MAP_TYPES, get_map_next_to_curve
+from .plot_main import SMALL_MAP_LEFT, SMALL_MAP_RIGHT, SMALL_MAP_SHARE
 from .meshgrids.piezo_meshgrid import PlotPiezoMeshGrid
 from .meshgrids.topo_meshgrid import PlotTopoMeshGrid
 from .meshgrids.stiffness_meshgrid import PlotStiffnessMeshGrid
@@ -509,6 +510,31 @@ class PYAFPlot(FigureCanvasQTAgg):
             self.timer_is_running = True
             return
         self.update_plot()
+
+
+def fit_map_width(map_plot, curve, minimum):
+    """Maximum width of a small map (data and compute tabs) next to a
+    curve: square and as tall as the plots, at most SMALL_MAP_SHARE of the
+    width of the map and the curve, at least minimum. The map widget takes
+    the free width first, up to this maximum; the curve, aligned on the
+    map, gets the rest."""
+    total = map_plot.width() + curve.width()
+    params = map_plot.canvas.fig.subplotpars \
+        if hasattr(map_plot.canvas, "fig") else None
+    if params is None or total <= 0:
+        return
+    # Height of the map, then its width with the colour bar (5% of the
+    # map and a pad of 3%, see plot_meshgrid) and the margins
+    height = (params.top - params.bottom) * curve.height()
+    width = height * 1.08 + SMALL_MAP_LEFT + SMALL_MAP_RIGHT
+    width = int(max(minimum, min(width, SMALL_MAP_SHARE * total)))
+    if abs(width - map_plot.maximumWidth()) > 2:
+        # A maximum, not a fixed width: the window can still shrink
+        map_plot.setMaximumWidth(width)
+        # Plotted again at its new size (margins in pixels), also before
+        # its first resize replot (see PYAFPlot.resizeEvent)
+        map_plot.timer_is_running = True
+        map_plot.resize_timer.start(map_plot.timeout)
 
 
 def data_file_open():

@@ -283,7 +283,7 @@ class PlotMeshGrid(MainPlot):
             # http://matplotlib.sourceforge.net/users/tight_layout_guide.html
             # (part on the colorbar caveat)
             divider = make_axes_locatable(self.fig.gca())
-            if self.plot_type == "meshgrid_data":
+            if self.plot_type in ("meshgrid_data", "small_meshgrid_compute"):
                 # Map at the top of its canvas (the curve next to it is
                 # aligned on it): the free height below the plots, not
                 # between them and the buttons above
