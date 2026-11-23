@@ -167,10 +167,10 @@ class LoaderJPK:
                 self.data.microscope_name = extract_str(line)
             if line.find(prefix + ".description.source-software") != -1:
                 self.data.version = extract_str(line)
-            path = prefix + ".settings.force-settings.retracted-pause-time"
+            path = prefix + pre_header + ".force-settings.retracted-pause-time"
             if line.find(path) != -1:
                 self.data.retracted_delay = extract_float(line)
-            path = prefix + ".settings.force-settings.extended-pause-time"
+            path = prefix + pre_header + ".force-settings.extended-pause-time"
             if line.find(path) != -1:
                 self.data.extended_delay = extract_float(line)
             if line.find(prefix + ".start-time") != -1:
@@ -189,7 +189,7 @@ class LoaderJPK:
                 self.data.scan_size_x = extract_float(line) * pow(10, 9)
             if line.find(prefix + ".position-pattern.grid.vlength") != -1:
                 self.data.scan_size_y = extract_float(line) * pow(10, 9)
-            path = prefix + ".settings.force-settings.closed-loop"
+            path = prefix + pre_header + ".force-settings.closed-loop"
             if line.find(path) != -1:
                 if extract_str(line) == "true":
                     self.data.z_closed_loop = "On"
@@ -200,7 +200,7 @@ class LoaderJPK:
                 # number of pixels is max + 1, because the counting of the
                 # pixels starts at 0.
                 self.data.real_nbr_pixels = extract_int(line) + 1
-            path = prefix + ".settings.force-settings.extended-pause-time"
+            path = prefix + pre_header + ".force-settings.extended-pause-time"
             if line.find(path) != -1:
                 self.data.pause_duration = extract_float(line)
 
@@ -212,7 +212,7 @@ class LoaderJPK:
             # other cases, like multiple extended pauses or retracted pause,
             # are currently not supported.
 
-            path = prefix + ".settings.force-settings.segment.1.duration"
+            path = prefix + pre_header + ".force-settings.segment.1.duration"
             if line.find(path) != -1:
                 self.data.pause_duration = extract_float(line)
 
