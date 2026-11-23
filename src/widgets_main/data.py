@@ -302,6 +302,12 @@ class DataWidget(PYAFWidget):
 
         # Good and bad curves
         self.curve_sorting = CurveSortingWidget(self)
+        # As wide as the calibration above, both wider if the buttons need
+        # it (larger fonts)
+        width = max(self.box_cantilever.width(),
+                    self.curve_sorting.sizeHint().width())
+        self.box_cantilever.setFixedWidth(width)
+        self.curve_sorting.setFixedWidth(width)
         # Same height as the sorting box, also without the pixel fields and
         # buttons (single curve)
         self.box_navigation.setFixedHeight(
