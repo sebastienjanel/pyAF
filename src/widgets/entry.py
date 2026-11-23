@@ -209,13 +209,14 @@ class EntryWidget(QtWidgets.QDialog):
         # Article to cite, below the image
         doi = "https://doi.org/10.1039/C8NR08955H"
         label_cite = QtWidgets.QLabel(
-            "When using the program, cite the original article: "
+            "When using the program, cite the original article:<br>"
             "<i>Stiffness tomography of eukaryotic intracellular "
-            "compartments by atomic force microscopy</i> (Nanoscale, 2019, "
-            "11, 10320-10328).<br>DOI <a style=\"color: " +
+            "compartments by atomic force microscopy</i><br>(Nanoscale, "
+            "2019, 11, 10320-10328) DOI <a style=\"color: " +
             LINK_COLORS.get(theme_handler.current_theme, "#7fb6f5") +
             ";\" href=\"" + doi + "\">" + doi + "</a>")
         label_cite.setWordWrap(True)
+        label_cite.setAlignment(QtCore.Qt.AlignHCenter)
         label_cite.setOpenExternalLinks(True)
         label_cite.setFixedWidth(self.image_width)
         self.VL_entry.addWidget(label_cite)
@@ -441,10 +442,12 @@ class EntryWidget(QtWidgets.QDialog):
         self.tableWidget.horizontalHeader().setSortIndicator(column, order)
 
     def center(self):
-        """Called by main.py to center the Widget in the middle of the screen."""
+        """Center the window on the screen of the mouse (once shown: its
+        final size, with the title bar)."""
+        screen = QtGui.QGuiApplication.screenAt(QtGui.QCursor.pos()) or \
+            QtGui.QGuiApplication.primaryScreen()
         geometry = self.frameGeometry()
-        wcenter = QtGui.QGuiApplication.primaryScreen().availableGeometry().center()
-        geometry.moveCenter(wcenter)
+        geometry.moveCenter(screen.availableGeometry().center())
         self.move(geometry.topLeft())
 
     def button_clicked(self, name):

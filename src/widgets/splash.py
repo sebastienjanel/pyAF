@@ -102,6 +102,14 @@ class Showcase(QtWidgets.QWidget):
         if len(self.pixmaps) > 1:
             self.timer.start()
 
+    def fitted_width(self, height):
+        """Width needed to show the widest image at this height (with the
+        margins)."""
+        inner = height - 2 * SHOWCASE_MARGIN
+        widths = [pixmap.width() * inner / pixmap.height()
+                  for pixmap in self.pixmaps]
+        return int(max(widths, default=inner)) + 2 * SHOWCASE_MARGIN
+
     def set_blend(self, value):
         self._blend = float(value)
         self.update()
@@ -221,12 +229,17 @@ class SplashBanner(QtWidgets.QFrame):
 
         self.showcase = Showcase(showcase_images(theme),
                                  colors["background"])
+        # As wide as the widest image at the height of the banner: the text
+        # and the showcase centered together in the banner
+        self.showcase.setFixedWidth(self.showcase.fitted_width(BANNER_HEIGHT))
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.addStretch(1)
         layout.addLayout(text)
-        layout.addWidget(self.showcase, 1)
+        layout.addWidget(self.showcase)
+        layout.addStretch(1)
 
     def stop(self):
         """Stop the showcase (window closed)."""

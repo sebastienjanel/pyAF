@@ -1066,11 +1066,12 @@ def open_entry_widget(mode, files, new_tmp_path=None):
 
     entry_window = EntryWidget(
         files=files, mode=mode, new_tmp_path=new_tmp_path)
-    entry_window.center()
     entry_window.resize(800, 300)
     entry_window.setWindowTitle(window_title)
     entry_window.activateWindow()
     entry_window.show()
+    # Centered once shown: its final size, with the title bar
+    entry_window.center()
     # PyQt specific problem in OS X
     # Application window is not automatically brought to the front on
     # launch
