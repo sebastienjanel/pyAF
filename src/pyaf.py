@@ -165,7 +165,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update_results = False
 
         # Tabs
-        self.tabs = QtWidgets.QTabWidget()
+        self.tabs = gui_tools.PYAFTabWidget()
         # Styled as a segmented control by the stylesheets
         self.tabs.setObjectName("mainTabs")
 

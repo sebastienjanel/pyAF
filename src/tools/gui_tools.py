@@ -576,6 +576,36 @@ class PYAFCheckBox(QtWidgets.QCheckBox):
         self.parent.checkbox_clicked(self.name)
 
 
+class PYAFTabWidget(QtWidgets.QTabWidget):
+    """Tabs whose minimum height includes the padding of their pane (style
+    sheets): Qt does not count it, and the tabs could be made shorter than
+    their pages, which are then squeezed (boxes cut at the bottom)."""
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        stack = self.findChild(QtWidgets.QStackedWidget,
+                               options=QtCore.Qt.FindDirectChildrenOnly)
+        if stack is not None and stack.y() > 0:
+            # Above the pages: the tab bar, then the padding of the pane,
+            # also below them (the pages lag behind the tabs while they are
+            # resized: not their bottom)
+            padding = max(stack.y() - self.tabBar().height(), 0)
+            around = stack.y() + padding
+            hint.setHeight(max(hint.height(),
+                               stack.minimumSizeHint().height() + around))
+        return hint
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # The minimum height is known once the pages are placed
+        if not self._placed and \
+                self.findChild(QtWidgets.QStackedWidget).y() > 0:
+            self._placed = True
+            self.updateGeometry()
+
+    _placed = False
+
+
 class PYAFComboBox(QtWidgets.QComboBox):
     """Reimplementation of the PyQT QComboBox.
 

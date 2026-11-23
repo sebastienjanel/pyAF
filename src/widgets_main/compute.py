@@ -46,6 +46,7 @@ from ..tools import apply_to_all
 from ..tools import stat_tools
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFComboBox
+from ..tools.gui_tools import PYAFTabWidget
 from ..tools.gui_tools import PYAFToggle
 from ..widgets.load_parameters import load_parameters
 from ..widgets.roi_manager import open_roi_manager
@@ -295,7 +296,7 @@ class ComputeWidget(PYAFWidget):
         widgets_list.widget_progressbar.update()
 
         # Tabs
-        self.tabs = QtWidgets.QTabWidget()
+        self.tabs = PYAFTabWidget()
         # Styled as pills by the stylesheets
         self.tabs.setObjectName("subTabs")
         self.tabs.currentChanged.connect(self.tabs_changed)
