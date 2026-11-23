@@ -4,15 +4,16 @@ pyAF is a Python software to analyze force curves & force maps acquired by atomi
 Developed at CMPI lab (https://cmpi.cnrs.fr).
 
 It computes:
-- Elasticity with several models and bottom effect correction (BEC)
+- Elasticity with several models and bottom effect correction
 - Stiffness tomography
-- Viscoelasticity (Ting, Garcia)
-- Microrheology (Alcaraz)
+- Viscoelasticity
+- Microrheology
 - Work of detachment and rupture force
 - Unbinding events and loading rates (SMFS)
-- Plant cells: cell wall modulus and turgor pressure (Yamasaki, Beauzamy)
-- Zero-force topography, flattening (with the z motor steps of Smart Mapping), plane fitting
-- Regions of interest (ROI manager) for substrate definition, cell geometry and stats
+- Plant cells: cell wall modulus and turgor pressure
+- Zero-force topography, flattening, plane fitting
+- Regions of interest for substrate definition, cell geometry and stats, with ROI assistance
+- Curve sorting: good and bad curves learned from a few marked curves
 - Curve tilt correction and smoothing
 - 3D map rendering
 - Text and JSON export
