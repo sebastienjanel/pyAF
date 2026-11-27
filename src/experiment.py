@@ -96,7 +96,10 @@ class Experiment:
         # Defines if options in pyAF are applied to all the files or a single
         # one. Find out more in the src/tools/apply_to_all.py module.
         self.apply_to_all_data = True
-        self.apply_to_all_compute = True
+        # Computing parameters: apply to all the files of the same kind,
+        # maps or single curves (see apply_to_all_compute)
+        self.apply_to_all_compute_maps = True
+        self.apply_to_all_compute_curves = True
         self.discard_corrupted_curves_applied_all = False
 
         # List containg Results and Groups objects (see class definitions
@@ -302,6 +305,56 @@ class Experiment:
     def current_data(self):
         """Getter whichs return the currently selected file."""
         return self.list[self.id_selected]
+
+    def apply_to_all_compute_of(self, data):
+        """Apply to all of the computing parameters for the kind of this
+        file (maps or single curves)."""
+        if data is not None and data.is_single:
+            return self.apply_to_all_compute_curves
+        return self.apply_to_all_compute_maps
+
+    @property
+    def apply_to_all_compute(self):
+        """Apply to all of the computing parameters, for the kind of the
+        selected file: the parameters go to the files of the same kind
+        (plant cells: other parameters for the maps and the curves)."""
+        data = self.current_data if self.list else None
+        return self.apply_to_all_compute_of(data)
+
+    @apply_to_all_compute.setter
+    def apply_to_all_compute(self, value):
+        if self.list and self.current_data.is_single:
+            self.apply_to_all_compute_curves = bool(value)
+        else:
+            self.apply_to_all_compute_maps = bool(value)
+
+    def same_kind(self, data=None):
+        """Files of the same kind as data (the selected file by default):
+        the maps, or the single curves."""
+        if data is None:
+            data = self.current_data
+        return [dt for dt in self.list if dt.is_single == data.is_single]
+
+    def mixed_kinds(self):
+        """True if maps and single curves are loaded."""
+        kinds = {dt.is_single for dt in self.list}
+        return len(kinds) > 1
+
+    def compute_targets(self):
+        """Files given the computing parameters of the selected file: the
+        files of its kind with apply to all, else the selected file."""
+        if self.apply_to_all_compute:
+            return self.same_kind()
+        return [self.current_data]
+
+    def calc_ids(self):
+        """Ids of the files computed: the files of the kind of the selected
+        file with Compute all, else the selected file."""
+        if not self.calc_all:
+            return [self.id_selected]
+        single = self.current_data.is_single
+        return [i for i, dt in enumerate(self.list)
+                if dt.is_single == single]
 
     def addData(self, filename, unique_id):
         """Will create a SingleFile object and add it to the list of files."""

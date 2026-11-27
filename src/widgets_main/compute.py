@@ -1338,6 +1338,13 @@ class ComputeWidget(PYAFWidget):
 
         if element == "apply_to_all" or element == "all":
             self.TG_apply_to_all.setChecked(shared.exp.apply_to_all_compute)
+            # Maps and single curves loaded: the parameters and the
+            # computations go to the files of the kind of the selected one
+            kind = ""
+            if shared.exp.mixed_kinds():
+                kind = " curves" if data.is_single else " maps"
+            self.TG_apply_to_all.setText("Apply to all" + kind)
+            self.TG_compute_all.setText("Compute all" + kind)
 
         if element == "stiffness_model_selected" or element == "all":
             # Tomography: Slope model only. Fitting: the other models (files
@@ -1755,9 +1762,8 @@ class ComputeWidget(PYAFWidget):
             if field == "plant_wall_thickness":
                 # Applied to the computed values (all the files with apply
                 # to all): new maps and results
-                if shared.exp.apply_to_all_compute:
-                    for dt in shared.exp.list:
-                        dt.plant_wall_thickness = data.plant_wall_thickness
+                for dt in shared.exp.compute_targets():
+                    dt.plant_wall_thickness = data.plant_wall_thickness
                 plant.refresh_results()
 
         elif field == "breakthrough_n_sigma":
@@ -1798,7 +1804,8 @@ class ComputeWidget(PYAFWidget):
                 # frequency (the others keep theirs)
                 files = [data]
                 if shared.exp.apply_to_all_compute:
-                    files += [dt for dt in shared.exp.list if dt is not data
+                    files += [dt for dt in shared.exp.same_kind(data)
+                              if dt is not data
                               and visco_main.clamp_frequency(dt, value) ==
                               value]
                 for dt in files:
@@ -1830,8 +1837,7 @@ class ComputeWidget(PYAFWidget):
             return
         dialog = PiezoCharacterizationDialog(self, result)
         if dialog.exec_():
-            files = shared.exp.list if shared.exp.apply_to_all_compute \
-                else [data]
+            files = shared.exp.compute_targets()
             for dt in files:
                 dt.microrheo_piezo = dict(result)
             self.update_GUI("microrheo")
@@ -1865,8 +1871,7 @@ class ComputeWidget(PYAFWidget):
         dialog = ViscousDragDialog(self, data, result, sample=sample)
         if dialog.exec_() and numpy.isfinite(result["b0"]):
             value = float("%.4g" % (result["b0"] * 1e6))
-            files = shared.exp.list if shared.exp.apply_to_all_compute \
-                else [shared.exp.current_data]
+            files = shared.exp.compute_targets()
             for dt in files:
                 dt.microrheo_drag = value
             self.update_GUI("microrheo")
@@ -2184,12 +2189,7 @@ class ComputeWidget(PYAFWidget):
             refit_disabled = []
 
             # Make a list of data to treat
-            calc_list = []
-            if shared.exp.calc_all:
-                for i in range(len(shared.exp.list)):
-                    calc_list.append(i)
-            else:
-                calc_list.append(shared.exp.id_selected)
+            calc_list = shared.exp.calc_ids()
 
             # Overwrite calc_list with a list defined externally
             if shared.force_calc_list is not None:
@@ -2305,12 +2305,7 @@ class ComputeWidget(PYAFWidget):
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
 
-            calc_list = []
-            if shared.exp.calc_all:
-                for i in range(len(shared.exp.list)):
-                    calc_list.append(i)
-            else:
-                calc_list.append(shared.exp.id_selected)
+            calc_list = shared.exp.calc_ids()
 
             # Overwrite calc_list with a list defined externally
             if shared.force_calc_list is not None:
@@ -2336,12 +2331,7 @@ class ComputeWidget(PYAFWidget):
             apply_to_all.apply_to_all("calc_options")
 
             # Create a list of the datasets
-            calc_list = []
-            if shared.exp.calc_all:
-                for i in range(len(shared.exp.list)):
-                    calc_list.append(i)
-            else:
-                calc_list.append(shared.exp.id_selected)
+            calc_list = shared.exp.calc_ids()
 
             # Overwrite calc_list with a list defined externally
             if shared.force_calc_list is not None:
@@ -2372,12 +2362,7 @@ class ComputeWidget(PYAFWidget):
 
             else:
                 # Make a list of data to treat
-                calc_list = []
-                if shared.exp.calc_all:
-                    for i in range(len(shared.exp.list)):
-                        calc_list.append(i)
-                else:
-                    calc_list.append(shared.exp.id_selected)
+                calc_list = shared.exp.calc_ids()
 
                 # Overwrite calc_list with a list defined externally
                 if shared.force_calc_list is not None:
@@ -2395,8 +2380,7 @@ class ComputeWidget(PYAFWidget):
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
 
-            calc_list = list(range(len(shared.exp.list))) \
-                if shared.exp.calc_all else [shared.exp.id_selected]
+            calc_list = shared.exp.calc_ids()
             # Overwrite calc_list with a list defined externally
             if shared.force_calc_list is not None:
                 calc_list = shared.force_calc_list
@@ -2434,8 +2418,7 @@ class ComputeWidget(PYAFWidget):
             self.piezo_from_curve()
 
         elif button == "microrheo_piezo_clear":
-            files = shared.exp.list if shared.exp.apply_to_all_compute \
-                else [data]
+            files = shared.exp.compute_targets()
             for dt in files:
                 dt.microrheo_piezo = None
             self.update_GUI("microrheo")
@@ -2445,8 +2428,7 @@ class ComputeWidget(PYAFWidget):
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
 
-            calc_list = list(range(len(shared.exp.list))) \
-                if shared.exp.calc_all else [shared.exp.id_selected]
+            calc_list = shared.exp.calc_ids()
             # Overwrite calc_list with a list defined externally
             if shared.force_calc_list is not None:
                 calc_list = shared.force_calc_list
@@ -2514,8 +2496,7 @@ class ComputeWidget(PYAFWidget):
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
 
-            calc_list = list(range(len(shared.exp.list))) \
-                if shared.exp.calc_all else [shared.exp.id_selected]
+            calc_list = shared.exp.calc_ids()
             # Overwrite calc_list with a list defined externally
             if shared.force_calc_list is not None:
                 calc_list = shared.force_calc_list
@@ -2570,8 +2551,7 @@ class ComputeWidget(PYAFWidget):
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
 
-            calc_list = list(range(len(shared.exp.list))) \
-                if shared.exp.calc_all else [shared.exp.id_selected]
+            calc_list = shared.exp.calc_ids()
             # Overwrite calc_list with a list defined externally
             if shared.force_calc_list is not None:
                 calc_list = shared.force_calc_list
@@ -2602,13 +2582,10 @@ class ComputeWidget(PYAFWidget):
             # Update all the parameters if needed
             apply_to_all.apply_to_all("calc_options")
 
-            calc_list = []
+            calc_list = shared.exp.calc_ids()
             if shared.exp.calc_all:
-                for i in range(len(shared.exp.list)):
-                    if shared.exp.list[i].events_calculated:
-                        calc_list.append(i)
-            else:
-                calc_list.append(shared.exp.id_selected)
+                calc_list = [i for i in calc_list
+                             if shared.exp.list[i].events_calculated]
 
             # Overwrite calc_list with a list defined externally
             if shared.force_calc_list is not None:
@@ -2720,8 +2697,13 @@ class ComputeWidget(PYAFWidget):
             do = True
             value = self.TG_apply_to_all.isChecked()
             if value:
-                text = "Are you sure you want to overwrite all the parameters \
-                        with the current ones ?"
+                kind = ""
+                if shared.exp.mixed_kinds():
+                    kind = " single curves" if data.is_single else " maps"
+                text = "Are you sure you want to overwrite the parameters " \
+                    "of all the" + kind + " files with the current ones ?" \
+                    if kind else "Are you sure you want to overwrite all " \
+                    "the parameters with the current ones ?"
                 msg = QtWidgets.QMessageBox()
                 msg.setText("Apply parameters to all ?")
                 msg.setInformativeText(text)

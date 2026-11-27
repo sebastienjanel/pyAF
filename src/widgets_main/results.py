@@ -59,6 +59,7 @@ from ..plots.PYAFPlot import PYAFPlot, curve_type_available
 from ..tools.PYAFWidget import PYAFWidget
 from ..tools import events_refresher
 from ..widgets import plot_options
+from ..tools import plant_tools
 from ..compute_tools import microrheology
 
 if consts.ALLOW_VTK:
@@ -570,6 +571,16 @@ class ResultsWidget(PYAFWidget):
         self.update_MPL("MPL_canvas2")
 
     @staticmethod
+    def map_shown(data):
+        """File of the displayed map: the file, or for a single curve the
+        loaded map on which it was recorded (plant cells)."""
+        if data.is_single:
+            on_map = plant_tools.map_of_curve(data)
+            if on_map is not None:
+                return on_map[1]
+        return data
+
+    @staticmethod
     def match_curve_to_map(data):
         """Displays the curve corresponding to the map type, with its
         options: the approach force curve with the point of contact and the
@@ -643,7 +654,9 @@ class ResultsWidget(PYAFWidget):
         data = shared.exp.list[shared.exp.id_selected]
 
         if element == "BTG_meshgrid_type" or element == "all":
-            # Maps computed for the file (the others are greyed out)
+            # Maps computed for the file (the others are greyed out); for
+            # a single curve on a map, the maps of the map
+            data = self.map_shown(data)
             stiff = data.stiffness_calculated
             corr = data.stiffness_corrected
             slices = (stiff or corr) and data.get_used_indentation()[1] != 0
@@ -680,6 +693,7 @@ class ResultsWidget(PYAFWidget):
                 self.map_items[data.meshgrid_type])
 
             self.update_microrheo_frequency()
+            data = shared.exp.list[shared.exp.id_selected]
 
         if element == "apply_to_all" or element == "all":
             self.TG_app_to_all.setChecked(shared.exp.apply_to_all_data)
@@ -962,12 +976,16 @@ class ResultsWidget(PYAFWidget):
             self.update_GUI("bts_back_forward")
 
         elif button == "BTG_meshgrid_type":
-            # Get the data :
-            data.meshgrid_type = self.list_maps.currentData()
-            self.logger.debug("Changing meshgrid type, %s", data.meshgrid_type)
+            # Map displayed: the one of the file, or the one on which the
+            # single curve is
+            shown = self.map_shown(data)
+            shown.meshgrid_type = self.list_maps.currentData()
+            self.logger.debug("Changing meshgrid type, %s", shown.meshgrid_type)
             # The curve corresponding to the map
-            curve_changed = self.match_curve_to_map(data)
-            apply_to_all.apply_to_all("display_options")
+            curve_changed = shown is data and self.match_curve_to_map(data)
+            apply_to_all.apply_to_all(
+                "display_options", oldid=next(
+                    i for i, d in enumerate(shared.exp.list) if d is shown))
             self.update_microrheo_frequency()
             # Update the GUI elements
             self.update_MPL("MPL_canvas1")
@@ -1267,6 +1285,18 @@ class ResultsWidget(PYAFWidget):
 
         # ev.button == 1 = left click
         axes = widgets_list.widget_results.MPL_canvas1.canvas.axes
+        if data.is_single and \
+                self.MPL_canvas1.canvas.data is not data:
+            # Map of the selected single curve: a click goes to the map,
+            # at this pixel
+            if ev.button == 1 and ev.inaxes == axes:
+                xpos, ypos = misc_tools.get_position_on_meshgrid(ev)
+                shared.exp.id_selected = next(
+                    i for i, d in enumerate(shared.exp.list)
+                    if d is self.MPL_canvas1.canvas.data)
+                widgets_list.widget_data.parent.file_changed("box")
+                widgets_list.widget_main.change_curve(xpos, ypos)
+            return
         if ev.button == 1 and ev.inaxes == axes:
             xpos, ypos = misc_tools.get_position_on_meshgrid(ev)
 

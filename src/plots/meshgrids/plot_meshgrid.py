@@ -443,6 +443,9 @@ class PlotMeshGrid(MainPlot):
     def draw_red_square(self):
         """Draws a red square for the selected curve."""
         pos = [shared.exp.meshgrid_click_xpos, shared.exp.meshgrid_click_ypos]
+        if getattr(self.parent, "highlight_id", None) is not None:
+            # Map of a single curve: its position is the white disk
+            return
         if (shared.exp.meshgrid_display_red_square or
                 self.plot_type == "small_meshgrid_compute"):
             x1 = pos[0] * self.x_size + self.x_size
@@ -649,13 +652,20 @@ class PlotMeshGrid(MainPlot):
             key = (round(position["x"]), round(position["y"]))
             positions.setdefault(key, []).append(index + 1)
         unit = self.scan_size_x / self.data.scan_size_x
+        # Selected single curve (results tab): white disk
+        highlight = getattr(self.parent, "highlight_id", None)
         for (x, y), numbers in positions.items():
-            self.axes.plot(x * unit, y * unit, "o", markersize=7,
-                           markerfacecolor="none", markeredgecolor="w",
-                           markeredgewidth=1.5)
-            self.axes.plot(x * unit, y * unit, "o", markersize=9,
+            selected = highlight is not None and highlight + 1 in numbers
+            self.axes.plot(x * unit, y * unit, "o",
+                           markersize=10 if selected else 7,
+                           markerfacecolor="w" if selected else "none",
+                           markeredgecolor="w", markeredgewidth=1.5,
+                           zorder=4 if selected else 3)
+            self.axes.plot(x * unit, y * unit, "o",
+                           markersize=12 if selected else 9,
                            markerfacecolor="none", markeredgecolor="k",
-                           markeredgewidth=0.6)
+                           markeredgewidth=0.6,
+                           zorder=4 if selected else 3)
             if len(numbers) > 1 and numbers == list(
                     range(numbers[0], numbers[-1] + 1)):
                 label = str(numbers[0]) + "-" + str(numbers[-1])

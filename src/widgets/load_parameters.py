@@ -64,10 +64,7 @@ def load_parameters(parent):
     if not parts:
         return False
 
-    if shared.exp.apply_to_all_compute:
-        targets = list(shared.exp.list)
-    else:
-        targets = [shared.exp.current_data]
+    targets = shared.exp.compute_targets()
     changes = {}
     for data in targets:
         for name, old, new in params_import.apply(data, file_settings,
@@ -137,7 +134,11 @@ class LoadParametersDialog(QtWidgets.QDialog):
         box.setLayout(GL)
         VL.addWidget(box)
 
-        target = "all the files (Apply to all)" \
+        kind = ""
+        if shared.exp.mixed_kinds():
+            kind = " single curves" if shared.exp.current_data.is_single \
+                else " maps"
+        target = "all the" + kind + " files (Apply to all)" \
             if shared.exp.apply_to_all_compute else "the current file (" + \
             os.path.basename(str(shared.exp.current_data.filename)) + ")"
         info = QtWidgets.QLabel(

@@ -48,7 +48,8 @@ class FlattenWidget(PYAFWidget):
     def __init__(self, parent):
         super().__init__(parent, "widget_flatten")
 
-        if shared.exp.current_data.applied_flatten_order is not None:
+        # Order None: no flatten (only the z motor steps levelled)
+        if shared.exp.current_data.flatten_applied:
             flatten_order = shared.exp.current_data.applied_flatten_order
         else:
             flatten_order = 1
@@ -102,7 +103,8 @@ class FlattenWidget(PYAFWidget):
         self.flatten_buttons_HL = QtWidgets.QHBoxLayout()
         self.BT_apply_flatten = PYAFButton(self, "apply_flatten", "Apply")
         self.BT_remove_flatten = \
-            PYAFButton(self, "remove_flatten", "Go back to original")
+            PYAFButton(self, "remove_flatten", "Reset")
+        self.BT_remove_flatten.setToolTip("Back to the original heights")
         self.update_GUI("buttons_flatten")
 
         self.TG_apply_flatten_on_all = \
@@ -123,36 +125,42 @@ class FlattenWidget(PYAFWidget):
 
         self.label_radiobuttons_order = QtWidgets.QLabel()
         self.label_radiobuttons_order.setText("Order : ")
-        self.RV_flatten_order0 = QtWidgets.QRadioButton()
-        self.RV_flatten_order1 = QtWidgets.QRadioButton()
-        self.RV_flatten_order2 = QtWidgets.QRadioButton()
-        self.RV_flatten_order0.setText("0")
-        self.RV_flatten_order1.setText("1")
-        self.RV_flatten_order2.setText("2")
+        self.RV_flatten_none = QtWidgets.QRadioButton("None")
+        self.RV_flatten_order0 = QtWidgets.QRadioButton("0")
+        self.RV_flatten_order1 = QtWidgets.QRadioButton("1")
+        self.RV_flatten_order2 = QtWidgets.QRadioButton("2")
+        self.RV_flatten_none.setToolTip(
+            "No flatten of the lines (e.g. only the z motor steps levelled)")
         self.RV_flatten_order0.setToolTip("Offset of each line")
         self.RV_flatten_order1.setToolTip("Offset and slope of each line")
         self.RV_flatten_order2.setToolTip("Offset, slope and curvature of each line")
         self.update_GUI("radiobuttons_flatten_order")
-        self.RV_flatten_order0.clicked.connect(
-            lambda: self.button_clicked("radiobutton_flatten_order0"))
-        self.RV_flatten_order1.clicked.connect(
-            lambda: self.button_clicked("radiobutton_flatten_order1"))
-        self.RV_flatten_order2.clicked.connect(
-            lambda: self.button_clicked("radiobutton_flatten_order2"))
+        for name, button in (("none", self.RV_flatten_none),
+                             ("order0", self.RV_flatten_order0),
+                             ("order1", self.RV_flatten_order1),
+                             ("order2", self.RV_flatten_order2)):
+            button.clicked.connect(
+                lambda _=False, name=name:
+                self.button_clicked("radiobutton_flatten_" + name))
 
+        # Order and rectangles; z motor steps; apply
+        HL_order = QtWidgets.QHBoxLayout()
+        HL_order.addWidget(self.label_radiobuttons_order)
+        for button in (self.RV_flatten_none, self.RV_flatten_order0,
+                       self.RV_flatten_order1, self.RV_flatten_order2):
+            HL_order.addWidget(button)
+        HL_order.addStretch(1)
+        HL_order.addWidget(self.BT_clear_excluded)
+
+        self.flatten_buttons_HL.addWidget(self.TG_apply_flatten_on_all)
+        self.flatten_buttons_HL.addStretch(1)
         self.flatten_buttons_HL.addWidget(self.BT_apply_flatten)
         self.flatten_buttons_HL.addWidget(self.BT_remove_flatten)
-        self.flatten_buttons_HL.addWidget(self.label_radiobuttons_order)
-        self.flatten_buttons_HL.addWidget(self.RV_flatten_order0)
-        self.flatten_buttons_HL.addWidget(self.RV_flatten_order1)
-        self.flatten_buttons_HL.addWidget(self.RV_flatten_order2)
-        self.flatten_buttons_HL.addStretch(1)
-        self.flatten_buttons_HL.addWidget(self.BT_clear_excluded)
 
         self.VL_box_flatten.addLayout(self.HL_flatten_canvas, 1)
-        self.VL_box_flatten.addLayout(self.flatten_buttons_HL)
+        self.VL_box_flatten.addLayout(HL_order)
         self.VL_box_flatten.addWidget(self.TG_flatten_motor)
-        self.VL_box_flatten.addWidget(self.TG_apply_flatten_on_all)
+        self.VL_box_flatten.addLayout(self.flatten_buttons_HL)
         self.box_flatten.setLayout(self.VL_box_flatten)
 
         self.gridLayout = QtWidgets.QGridLayout()
@@ -220,6 +228,10 @@ class FlattenWidget(PYAFWidget):
             data.flatten_excluded = []
             self.update_MPL("MPL_canvas_flatten")
             self.update_GUI("buttons_flatten")
+
+        elif name == "radiobutton_flatten_none":
+            shared.exp.selected_flatten_order = None
+            self.update_MPL("MPL_canvas_flatten")
 
         elif name == "radiobutton_flatten_order0":
             shared.exp.selected_flatten_order = 0
@@ -329,12 +341,15 @@ class FlattenWidget(PYAFWidget):
 
     def update_GUI(self, what):
         """Update the GUI."""
-        order = shared.exp.current_data.applied_flatten_order
-        if order is None:
+        if shared.exp.current_data.flatten_applied:
+            order = shared.exp.current_data.applied_flatten_order
+        else:
             order = shared.exp.selected_flatten_order
 
         if what == "radiobuttons_flatten_order":
-            if order == 0:
+            if order is None:
+                self.RV_flatten_none.setChecked(True)
+            elif order == 0:
                 self.RV_flatten_order0.setChecked(True)
             elif order == 2:
                 self.RV_flatten_order2.setChecked(True)

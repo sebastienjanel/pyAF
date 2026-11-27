@@ -75,7 +75,8 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
             dt = exp.list[i]
             cur = exp.list[oldid]
 
-            mt = cur.meshgrid_type
+            # A single curve has no map: the maps keep their types
+            mt = "" if cur.is_single else cur.meshgrid_type
             st_calc = dt.stiffness_calculated
             dct = cur.display_curve_type
             wf_calc = dt.work_and_rupture_force1_calculated
@@ -215,139 +216,18 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
 
             dt.nan_color_transparent = cur.nan_color_transparent
 
-    if exp.apply_to_all_compute and (mode == "calc_options" or mode == "all"):
-        for i in range(len(exp.list)):
-            dt = exp.list[i]
-            cur = exp.list[oldid]
-
-            dt.check_tilt_option = cur.check_tilt_option
-
-        if exp.compute_type == "stiffness" or mode == "all":
-            for i in range(len(exp.list)):
-                dt = exp.list[i]
-                cur = exp.list[oldid]
-                st_calc = dt.stiffness_calculated
-
-                dt.stiffness_model_selected = cur.stiffness_model_selected
-                dt.tomography = cur.tomography
-                dt.tip_radius = cur.tip_radius
-                dt.tip_radii = dict(cur.tip_radii)
-                dt.tip_angle = cur.tip_angle
-                dt.tip_angles = dict(cur.tip_angles)
-                dt.shell_thickness = cur.shell_thickness
-                dt.poisson_ratio = cur.poisson_ratio
-                dt.brush_model = cur.brush_model
-                dt.brush_threshold_pct = cur.brush_threshold_pct
-                # Sample height of the B.E.C. (box of the elasticity tab)
-                dt.user_h = cur.user_h
-                # Tomography or Fitting (perform_fit follows)
-                dt.stiffness_mode = cur.stiffness_mode
-                dt.fit_range_type = cur.fit_range_type
-                # All the ranges (the indentation ones are also used by
-                # Tomography, whatever the fit range type)
-                dt.indentation_start = cur.indentation_start
-                dt.indentation_stop = cur.indentation_stop
-                dt.indentation_step = cur.indentation_step
-                dt.force_start = cur.force_start
-                dt.force_stop = cur.force_stop
-                dt.fit_min_indentation = cur.fit_min_indentation
-                dt.fit_poc_window = cur.fit_poc_window
-                dt.fitparam_poc_skip_start = cur.fitparam_poc_skip_start
-                dt.fitparam_poc_fit_length = cur.fitparam_poc_fit_length
-                dt.fitparam_poc_refit_option = cur.fitparam_poc_refit_option
-                dt.fitparam_poc_noise_multiplicator = \
-                    cur.fitparam_poc_noise_multiplicator
-                dt.fitparam_poc_refit_times = cur.fitparam_poc_refit_times
-
-        if exp.compute_type == "viscoelasticity" or mode == "all":
-            cur = exp.list[oldid]
-            for dt in exp.list:
-                # Not the frequency of E' and E'': each file has its own,
-                # within the time scales of its curves (see the input)
-                for name in ("solver", "bec", "contact_offset", "nbr_points",
-                             "beta_auto", "beta_init", "drag_correction"):
-                    setattr(dt, "visco_" + name,
-                            getattr(cur, "visco_" + name))
-
-        if exp.compute_type == "microrheology" or mode == "all":
-            cur = exp.list[oldid]
-            for dt in exp.list:
-                # Not the frequency of the maps: one of the frequencies of
-                # each file (see the compute tab)
-                dt.microrheo_method = cur.microrheo_method
-                dt.microrheo_drag = cur.microrheo_drag
-                dt.microrheo_max_freq = cur.microrheo_max_freq
-                dt.microrheo_piezo_amplitude = cur.microrheo_piezo_amplitude
-                dt.microrheo_piezo = None if cur.microrheo_piezo is None \
-                    else dict(cur.microrheo_piezo)
-
-        if exp.compute_type == "plant" or mode == "all":
-            cur = exp.list[oldid]
-            for dt in exp.list:
-                for name in ("method", "smoothing", "force_start",
-                             "force_stop", "wall_thickness"):
-                    setattr(dt, "plant_" + name, getattr(cur, "plant_" + name))
-
-        if exp.compute_type == "breakthrough" or mode == "all":
-            cur = exp.list[oldid]
-            for dt in exp.list:
-                for name in ("n_sigma", "min_thickness", "min_force",
-                             "max_events"):
-                    setattr(dt, "breakthrough_" + name,
-                            getattr(cur, "breakthrough_" + name))
-
-        if exp.compute_type == "work_and_rupture_force" or mode == "all":
-            for i in range(len(exp.list)):
-                dt = exp.list[i]
-                cur = exp.list[oldid]
-
-                dt.fitparam_joc_skip_start = cur.fitparam_joc_skip_start
-                dt.fitparam_joc_fit_length = cur.fitparam_joc_fit_length
-                dt.fitparam_joc_refit_option = cur.fitparam_joc_refit_option
-                dt.fitparam_joc_noise_multiplicator = \
-                    cur.fitparam_joc_noise_multiplicator
-                dt.fitparam_joc_refit_times = cur.fitparam_joc_refit_times
-
-        if exp.compute_type == "events" or mode == "all":
-            for i in range(len(exp.list)):
-                dt = exp.list[i]
-                cur = exp.list[oldid]
-
-                dt.events_algorithm = cur.events_algorithm
-                dt.events_curve_type = cur.events_curve_type
-                dt.fitparam_events_joc_skip_start = \
-                    cur.fitparam_events_joc_skip_start
-                dt.fitparam_events_joc_fit_length = \
-                    cur.fitparam_events_joc_fit_length
-                dt.fitparam_events_joc_refit_option = \
-                    cur.fitparam_events_joc_refit_option
-                dt.fitparam_events_joc_noise_multiplicator = \
-                    cur.fitparam_events_joc_noise_multiplicator
-                dt.fitparam_events_joc_refit_times = \
-                    cur.fitparam_events_joc_refit_times
-                dt.display_fit_events_joc2_preview = \
-                    cur.display_fit_events_joc2_preview
-
-                dt.events_kernel_detection_threshold = \
-                    cur.events_kernel_detection_threshold
-                dt.events_msf_detection_threshold = \
-                    cur.events_msf_detection_threshold
-                dt.events_fit_size = cur.events_fit_size
-                dt.events_msf_window_size = cur.events_msf_window_size
-                dt.kernel_size = cur.kernel_size
-                dt.adaptive_threshold_option = \
-                    cur.adaptive_threshold_option
-                dt.events_kernel_adaptive_threshold = \
-                    cur.events_kernel_adaptive_threshold
-                dt.adaptive_smoothing_window = \
-                    cur.adaptive_smoothing_window
-                dt.adaptive_smoothing_order = cur.adaptive_smoothing_order
-
-                dt.display_fit_event = cur.display_fit_event
-                dt.display_fit_event_seg = cur.display_fit_event_seg
-                # Loading rates (box of the events tab)
-                dt.lr_coef = cur.lr_coef
-
+    # Computing parameters: to the files of the same kind (maps or single
+    # curves) as the file they come from. Files added (load more): from the
+    # first file of each kind
+    if mode in ("calc_options", "all") and exp.list:
+        if option == "load_more":
+            sources = [exp.same_kind(dt)[0] for dt in
+                       {dt.is_single: dt for dt in exp.list}.values()]
+        else:
+            sources = [exp.list[oldid]]
+        for cur in sources:
+            if exp.apply_to_all_compute_of(cur):
+                copy_calc_options(exp, cur, exp.same_kind(cur), mode)
 
     if exp.tilt_correction_all and (mode == "tilt_all" or mode == "all"):
         for i in range(len(exp.list)):
@@ -371,3 +251,124 @@ def apply_to_all(mode, option=None, oldid=None, from_color_options=False):
             setChecked(exp.apply_to_all_data)
 
     return True
+
+
+def copy_calc_options(exp, cur, targets, mode):
+    """Copies the computing parameters of the file cur to the files
+    targets (see apply_to_all)."""
+    for dt in targets:
+        dt.check_tilt_option = cur.check_tilt_option
+
+    if exp.compute_type == "stiffness" or mode == "all":
+        for dt in targets:
+            dt.stiffness_model_selected = cur.stiffness_model_selected
+            dt.tomography = cur.tomography
+            dt.tip_radius = cur.tip_radius
+            dt.tip_radii = dict(cur.tip_radii)
+            dt.tip_angle = cur.tip_angle
+            dt.tip_angles = dict(cur.tip_angles)
+            dt.shell_thickness = cur.shell_thickness
+            dt.poisson_ratio = cur.poisson_ratio
+            dt.brush_model = cur.brush_model
+            dt.brush_threshold_pct = cur.brush_threshold_pct
+            # Sample height of the B.E.C. (box of the elasticity tab)
+            dt.user_h = cur.user_h
+            # Tomography or Fitting (perform_fit follows)
+            dt.stiffness_mode = cur.stiffness_mode
+            dt.fit_range_type = cur.fit_range_type
+            # All the ranges (the indentation ones are also used by
+            # Tomography, whatever the fit range type)
+            dt.indentation_start = cur.indentation_start
+            dt.indentation_stop = cur.indentation_stop
+            dt.indentation_step = cur.indentation_step
+            dt.force_start = cur.force_start
+            dt.force_stop = cur.force_stop
+            dt.fit_min_indentation = cur.fit_min_indentation
+            dt.fit_poc_window = cur.fit_poc_window
+            dt.fitparam_poc_skip_start = cur.fitparam_poc_skip_start
+            dt.fitparam_poc_fit_length = cur.fitparam_poc_fit_length
+            dt.fitparam_poc_refit_option = cur.fitparam_poc_refit_option
+            dt.fitparam_poc_noise_multiplicator = \
+                cur.fitparam_poc_noise_multiplicator
+            dt.fitparam_poc_refit_times = cur.fitparam_poc_refit_times
+
+    if exp.compute_type == "viscoelasticity" or mode == "all":
+        for dt in targets:
+            # Not the frequency of E' and E'': each file has its own,
+            # within the time scales of its curves (see the input)
+            for name in ("solver", "bec", "contact_offset", "nbr_points",
+                         "beta_auto", "beta_init", "drag_correction"):
+                setattr(dt, "visco_" + name,
+                        getattr(cur, "visco_" + name))
+
+    if exp.compute_type == "microrheology" or mode == "all":
+        for dt in targets:
+            # Not the frequency of the maps: one of the frequencies of
+            # each file (see the compute tab)
+            dt.microrheo_method = cur.microrheo_method
+            dt.microrheo_drag = cur.microrheo_drag
+            dt.microrheo_max_freq = cur.microrheo_max_freq
+            dt.microrheo_piezo_amplitude = cur.microrheo_piezo_amplitude
+            dt.microrheo_piezo = None if cur.microrheo_piezo is None \
+                else dict(cur.microrheo_piezo)
+
+    if exp.compute_type == "plant" or mode == "all":
+        for dt in targets:
+            for name in ("method", "smoothing", "force_start",
+                         "force_stop", "wall_thickness"):
+                setattr(dt, "plant_" + name, getattr(cur, "plant_" + name))
+
+    if exp.compute_type == "breakthrough" or mode == "all":
+        for dt in targets:
+            for name in ("n_sigma", "min_thickness", "min_force",
+                         "max_events"):
+                setattr(dt, "breakthrough_" + name,
+                        getattr(cur, "breakthrough_" + name))
+
+    if exp.compute_type == "work_and_rupture_force" or mode == "all":
+        for dt in targets:
+
+            dt.fitparam_joc_skip_start = cur.fitparam_joc_skip_start
+            dt.fitparam_joc_fit_length = cur.fitparam_joc_fit_length
+            dt.fitparam_joc_refit_option = cur.fitparam_joc_refit_option
+            dt.fitparam_joc_noise_multiplicator = \
+                cur.fitparam_joc_noise_multiplicator
+            dt.fitparam_joc_refit_times = cur.fitparam_joc_refit_times
+
+    if exp.compute_type == "events" or mode == "all":
+        for dt in targets:
+
+            dt.events_algorithm = cur.events_algorithm
+            dt.events_curve_type = cur.events_curve_type
+            dt.fitparam_events_joc_skip_start = \
+                cur.fitparam_events_joc_skip_start
+            dt.fitparam_events_joc_fit_length = \
+                cur.fitparam_events_joc_fit_length
+            dt.fitparam_events_joc_refit_option = \
+                cur.fitparam_events_joc_refit_option
+            dt.fitparam_events_joc_noise_multiplicator = \
+                cur.fitparam_events_joc_noise_multiplicator
+            dt.fitparam_events_joc_refit_times = \
+                cur.fitparam_events_joc_refit_times
+            dt.display_fit_events_joc2_preview = \
+                cur.display_fit_events_joc2_preview
+
+            dt.events_kernel_detection_threshold = \
+                cur.events_kernel_detection_threshold
+            dt.events_msf_detection_threshold = \
+                cur.events_msf_detection_threshold
+            dt.events_fit_size = cur.events_fit_size
+            dt.events_msf_window_size = cur.events_msf_window_size
+            dt.kernel_size = cur.kernel_size
+            dt.adaptive_threshold_option = \
+                cur.adaptive_threshold_option
+            dt.events_kernel_adaptive_threshold = \
+                cur.events_kernel_adaptive_threshold
+            dt.adaptive_smoothing_window = \
+                cur.adaptive_smoothing_window
+            dt.adaptive_smoothing_order = cur.adaptive_smoothing_order
+
+            dt.display_fit_event = cur.display_fit_event
+            dt.display_fit_event_seg = cur.display_fit_event_seg
+            # Loading rates (box of the events tab)
+            dt.lr_coef = cur.lr_coef

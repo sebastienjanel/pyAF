@@ -46,10 +46,11 @@ class PlotFlattenMeshGrid(PlotMeshGrid):
 
         if self.plot_type == "small_meshgrid_for_correction":
             self.title = "Flattened"
-            self.temp_array[:] = self.data.flattened_piezo_image(
+            # Order None: only the z motor steps levelled
+            self.temp_array[:] = self.data.piezo_for((
                 shared.exp.selected_flatten_order,
-                shared.exp.selected_flatten_motor,
-                tuple(self.data.flatten_excluded))
+                bool(shared.exp.selected_flatten_motor),
+                tuple(self.data.flatten_excluded)))
         elif self.plot_type == "small_meshgrid_for_correction_original":
             self.title = "Original"
             self.temp_array[:] = self.data.piezo_image

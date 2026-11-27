@@ -755,6 +755,10 @@ class PYAFToggle(QtWidgets.QWidget):
         self.setSizePolicy(QtWidgets.QSizePolicy.Maximum,
                            QtWidgets.QSizePolicy.Fixed)
 
+    def setText(self, text):
+        """Changes the text of the label."""
+        self.label.setText(text + "  ")
+
     def isChecked(self):
         """State of the toggle."""
         return self.toggle.isChecked()

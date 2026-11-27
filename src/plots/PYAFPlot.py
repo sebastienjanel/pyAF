@@ -35,6 +35,7 @@
 from .. import shared
 from .. import widgets_list
 from ..tools import map_values
+from ..tools import plant_tools
 from qtpy import QtCore, QtWidgets
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
@@ -217,6 +218,16 @@ class PYAFPlot(FigureCanvasQTAgg):
         pt = self.plot_type
         if pt == "fit_preview":
             self.curve_type = "defl_ext"
+
+        # Results tab, single curve recorded on a loaded map (plant cells):
+        # the map, with its map type, and the curve highlighted on it
+        self.highlight_id = None
+        if self.plot_type == "meshgrid" and dt.is_single:
+            on_map = plant_tools.map_of_curve(dt)
+            if on_map is not None:
+                self.highlight_id = next(
+                    i for i, d in enumerate(shared.exp.list) if d is dt)
+                dt = on_map[1]
 
         self.data = dt
 
