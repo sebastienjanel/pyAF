@@ -43,7 +43,7 @@ from ..tools.colortables import ColorTables
 from ..tools.gui_tools import PYAFComboBox
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFInput
-from ..tools.gui_tools import PYAFCheckBox
+from ..tools.gui_tools import PYAFToggle
 from .. import widgets_list
 from .. import shared
 from ..tools.PYAFWidget import PYAFWidget
@@ -80,52 +80,78 @@ class PlotOptionsWidget(PYAFWidget):
         for name in self.colortables.colortables_list:
             self.LS_colortable.addItem(name)
 
-        self.input_max = PYAFInput(self, "input_max", "Max", 150)
+        self.input_max = PYAFInput(self, "input_max", "Max", 100)
         self.input_max.input.setValidator(misc_tools.validator("UF"))
-        self.input_middle = PYAFInput(self, "input_middle", "Middle", 150)
+        self.input_middle = PYAFInput(self, "input_middle", "Middle", 100)
         self.input_middle.input.setValidator(misc_tools.validator("UF"))
-        self.input_min = PYAFInput(self, "input_min", "Min", 150)
+        self.input_min = PYAFInput(self, "input_min", "Min", 100)
         self.input_min.input.setValidator(misc_tools.validator("UF"))
+        # Each field as wide as its input and label (side by side)
+        fixed = QtWidgets.QSizePolicy.Fixed
+        for field in (self.input_max, self.input_middle, self.input_min):
+            field.setSizePolicy(fixed, fixed)
 
-        BT_autoscale = PYAFButton(self, "autoscale", "Autoscale")
-        BT_sat_color = PYAFButton(self, "sat_color", "Saturation color")
-        BT_neg_color = PYAFButton(self, "neg_color", "Negative color")
-        BT_nan_color = PYAFButton(self, "nan_color", "NaN color")
+        BT_autoscale = PYAFButton(self, "autoscale", "Autoscale", size=0)
+        BT_sat_color = PYAFButton(self, "sat_color", "Saturation color",
+                                  size=0)
+        BT_neg_color = PYAFButton(self, "neg_color", "Negative color", size=0)
+        BT_nan_color = PYAFButton(self, "nan_color", "NaN color", size=0)
 
         # Will be hidden for normal meshgrids; and displayed only in vtk
         # See update_widget method
-        label = "Transparent Nan values"
-        self.CB_nan_transp = PYAFCheckBox(self, "nan_transp", label)
+        self.CB_nan_transp = PYAFToggle(self, "nan_transp", "Transparent")
+        self.CB_nan_transp.setToolTip("Pixels without value transparent")
 
         # Log color scale (elasticity maps)
-        self.CB_log = PYAFCheckBox(self, "log_scale", "Log scale")
+        self.CB_log = PYAFToggle(self, "log_scale", "Log scale")
         self.CB_log.setToolTip(
             "Logarithmic color scale for the elasticity maps (from the "
             "lowest positive value\nwhen the minimum is 0): soft and stiff "
             "regions are both visible (e.g. a cell on glass).")
 
-        BT_apply = PYAFButton(self, "button_apply", "Apply")
+        BT_apply = PYAFButton(self, "button_apply", "Apply", size=0)
+        # Buttons two by two in columns, all as wide as the widest, without
+        # side margins (aligned on the fields and the toggles)
+        buttons = (BT_autoscale, BT_apply, BT_sat_color, BT_neg_color,
+                   BT_nan_color)
+        for button in buttons:
+            button.setStyleSheet("QPushButton { margin-left: 0px; "
+                                 "margin-right: 0px; }")
+            button.update_width()
+        width = max(button.width() for button in buttons)
+        for button in buttons:
+            button.setFixedWidth(width)
+
+        # Compact: min and max on a line, the buttons two by two in
+        # columns (the toggles in the second column)
+        HL_limits = QtWidgets.QHBoxLayout()
+        HL_limits.addWidget(self.input_min)
+        HL_limits.addWidget(self.input_max)
+        HL_limits.addStretch(1)
+        GL_buttons = QtWidgets.QGridLayout()
+        GL_buttons.setHorizontalSpacing(8)
+        GL_buttons.addWidget(BT_autoscale, 0, 0)
+        GL_buttons.addWidget(self.CB_log, 0, 1)
+        GL_buttons.addWidget(BT_sat_color, 1, 0)
+        GL_buttons.addWidget(BT_neg_color, 1, 1)
+        GL_buttons.addWidget(BT_nan_color, 2, 0)
+        if self.mode == "vtk":
+            GL_buttons.addWidget(self.CB_nan_transp, 2, 1)
+        GL_buttons.addWidget(BT_apply, 3, 0)
+        GL_buttons.setColumnStretch(2, 1)
 
         self.gridlayout_box_colors.addWidget(self.LS_colortable, 0, 0)
         self.gridlayout_box_colors.addWidget(self.label_max, 1, 0)
-        self.gridlayout_box_colors.addWidget(self.input_max, 2, 0)
+        self.gridlayout_box_colors.addLayout(HL_limits, 2, 0)
         self.gridlayout_box_colors.addWidget(self.input_middle, 3, 0)
-        self.gridlayout_box_colors.addWidget(self.input_min, 4, 0)
-        self.gridlayout_box_colors.addWidget(self.CB_log, 5, 0)
-        self.gridlayout_box_colors.addWidget(BT_autoscale, 6, 0)
-        self.gridlayout_box_colors.addWidget(BT_sat_color, 7, 0)
-        self.gridlayout_box_colors.addWidget(BT_neg_color, 8, 0)
-        self.gridlayout_box_colors.addWidget(BT_nan_color, 9, 0)
-        if self.mode == "vtk":
-            self.gridlayout_box_colors.addWidget(self.CB_nan_transp, 10, 0)
-        self.gridlayout_box_colors.addWidget(BT_apply, 11, 0)
+        self.gridlayout_box_colors.addLayout(GL_buttons, 4, 0)
 
         self.box_colors.setLayout(self.gridlayout_box_colors)
 
         # Checkbox apply options on all ---------------------------------------
 
         name = "checkbox_apply_to_all"
-        self.CB_apply_to_all = PYAFCheckBox(self, name, "Apply to all")
+        self.CB_apply_to_all = PYAFToggle(self, name, "Apply to all")
 
         # Set up layout -------------------------------------------------------
 
@@ -439,7 +465,7 @@ class PlotOptionsWidget(PYAFWidget):
             if data.used_stiffness_model_selected == 3:
                 name, unit, factor = "Max. slope", "N/m", 1
             else:
-                name, unit, factor = "Max. stiffness", "kPa", 1e-3
+                name, unit, factor = "Max. elasticity", "kPa", 1e-3
             val, val_all = data.max_stiffness, exp.global_max_stiffness
         elif mt == "piezo":
             name, unit, factor = "Max. piezo height", "nm", 1
@@ -544,11 +570,14 @@ class PlotOptionsWidget(PYAFWidget):
                 return str(round(float(value) * factor, 3))
             if mt == "fit_poc_fixed":
                 return str(round(float(value) * factor, 1))
-            return str(round(float(value) * factor, 2))
+            # 4 significant digits, scientific for the large and small
+            # values (short line)
+            return format(float(value) * factor, ".4g")
 
         text = (name + " : " + fmt(val) + " " + unit).rstrip()
         if exp.apply_to_all_data and val_all is not None:
-            text += " (all files : " + fmt(val_all) + " " + unit + ")"
+            # Below (short lines)
+            text += "\n(all files : " + fmt(val_all) + " " + unit + ")"
 
         self.label_max.setText(text)
 
@@ -589,6 +618,11 @@ class PlotOptionsWidget(PYAFWidget):
         # Update the plots in the main GUI
         widgets_list.widget_data.meshgrid.update_plot()
         widgets_list.widget_results.update_MPL("MPL_canvas1")
+        # Piezo height map of the compute tab
+        if widgets_list.widget_compute is not None:
+            widgets_list.widget_compute.update_MPL("MPL_meshgrid")
+        if widgets_list.widget_flatten is not None:
+            widgets_list.widget_flatten.update_MPL("MPL_canvas_flatten")
         # Update the slices widget if needed
         if widgets_list.widget_slices is not None:
             widgets_list.widget_slices.update_MPL()

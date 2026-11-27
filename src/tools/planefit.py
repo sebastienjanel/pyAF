@@ -184,15 +184,24 @@ def reset_color_scales(data):
             opts[1], opts[2], opts[3] = low, high, (low + high) / 2.0
     else:
         # Piezo height as displayed (flatten)
-        piezo = numpy.asarray(piezo_map(data), dtype=float)
-        if data.inside_region() is not None:
-            piezo = piezo[data.inside_region()]
-        high = numpy.median(piezo) + 3 * numpy.std(piezo)
+        high = piezo_scale_max(data, piezo_map(data))
         opts = data.color_opts_piezo
         opts[1], opts[2], opts[3] = 0, high, high / 2.0
         if data.stiffness_calculated and data.max_topo is not None:
             opts = data.color_opts_topo
             opts[1], opts[2], opts[3] = 0, data.max_topo, data.max_topo / 2.0
+
+
+def piezo_scale_max(data, piezo):
+    """Top of the default color scale of a (flattened) piezo height: median
+    + 3 S.D. of the pixels of the map region."""
+    piezo = numpy.asarray(piezo, dtype=float)
+    if data.inside_region() is not None:
+        piezo = piezo[data.inside_region()]
+    piezo = piezo[numpy.isfinite(piezo)]
+    if not piezo.size:
+        return 1.0
+    return float(numpy.median(piezo) + 3 * numpy.std(piezo))
 
 
 def get_volume(data, roi):

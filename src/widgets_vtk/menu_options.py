@@ -32,6 +32,8 @@
 
 """Menu for the 3D widget."""
 
+import math
+
 from qtpy import QtCore, QtGui, QtWidgets
 from ..tools.gui_tools import PYAFButton
 from ..tools.gui_tools import PYAFInput
@@ -702,6 +704,21 @@ class WidgetGlass(QtWidgets.QWidget):
         self.TG_bind.setChecked(layer.bind)
 
 
+# Steps of the z ratio slider per decade
+Z_RATIO_STEPS = 50
+
+
+def z_ratio_of(position):
+    """Z ratio of a position of the slider (0: 1, one decade per
+    Z_RATIO_STEPS)."""
+    return round(10.0 ** (position / Z_RATIO_STEPS), 3)
+
+
+def z_ratio_position(ratio):
+    """Position of the slider of a z ratio."""
+    return int(round(Z_RATIO_STEPS * math.log10(max(ratio, 1e-3))))
+
+
 class WidgetAFM(QtWidgets.QWidget):
     """Boxes of the AFM layers: Display (map, height, 3D or flat view,
     smoothing, slicing) and Colors (color options, apply to all,
@@ -757,12 +774,30 @@ class WidgetAFM(QtWidgets.QWidget):
         self.BT_slicing = PYAFButton(self, "slicing", "Slicing")
         self.BT_slicing.setToolTip("Part of the map displayed (in x and y)")
 
+        # Ratio of the heights, from 0.1 to 100 (log slider, 1 in the
+        # middle of the first two decades)
+        HL_ratio = QtWidgets.QHBoxLayout()
+        self.SL_z_ratio = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.SL_z_ratio.setRange(-Z_RATIO_STEPS, 2 * Z_RATIO_STEPS)
+        self.SL_z_ratio.setToolTip(
+            "Heights multiplied by this ratio (0.1 to 100), to see the "
+            "relief of flat samples.\nThe z axis keeps the real heights.")
+        self.SL_z_ratio.valueChanged.connect(self.z_ratio_moved)
+        self.SL_z_ratio.sliderReleased.connect(self.z_ratio_changed)
+        self.LB_z_ratio = QtWidgets.QLabel()
+        self.LB_z_ratio.setMinimumWidth(
+            self.LB_z_ratio.fontMetrics().horizontalAdvance("100.0") + 4)
+        HL_ratio.addWidget(self.SL_z_ratio, 1)
+        HL_ratio.addWidget(self.LB_z_ratio)
+
         GL.addWidget(QtWidgets.QLabel("Map"), 0, 0)
         GL.addWidget(self.list_maps, 0, 1)
         GL.addWidget(QtWidgets.QLabel("Height"), 1, 0)
         GL.addWidget(self.list_height, 1, 1)
         GL.addLayout(HL_mode, 2, 0, 1, 2)
-        GL.addWidget(self.BT_slicing, 3, 0, 1, 2)
+        GL.addWidget(QtWidgets.QLabel("Z ratio"), 3, 0)
+        GL.addLayout(HL_ratio, 3, 1)
+        GL.addWidget(self.BT_slicing, 4, 0, 1, 2)
         GL.setColumnStretch(1, 1)
         box_display.setLayout(GL)
 
@@ -878,6 +913,24 @@ class WidgetAFM(QtWidgets.QWidget):
                 widgets_list.widget_slicing.activateWindow()
                 widgets_list.widget_slicing.raise_()
 
+    def z_ratio_moved(self, position):
+        """Value of the z ratio shown while the slider moves; applied at
+        once with the keyboard or a click (not while dragging)."""
+        ratio = z_ratio_of(position)
+        self.LB_z_ratio.setText(format(ratio, ".3g"))
+        if not self.SL_z_ratio.isSliderDown():
+            self.z_ratio_changed()
+
+    def z_ratio_changed(self):
+        """Heights of the AFM layers multiplied by the z ratio (scale of
+        the surface: nothing computed again)."""
+        layer, _ = self.current()
+        ratio = z_ratio_of(self.SL_z_ratio.value())
+        for lay in self.afm_layers(layer):
+            shared.exp.list[lay.afm_id].opengl_z_ratio = ratio
+            if lay.actor is not None:
+                lay.translate(0, 0, 0)
+
     def toggle_clicked(self, name):
         """Called when a toggle is clicked."""
         layer, data = self.current()
@@ -924,6 +977,13 @@ class WidgetAFM(QtWidgets.QWidget):
         (self.RBT_2D if flat else self.RBT_3D).setChecked(True)
         self.TG_smoothing.setChecked(data.vtk_smoothing_type is not None)
         self.TG_apply_to_all.setChecked(shared.exp.apply_to_all_data)
+        ratio = getattr(data, "opengl_z_ratio", 1.0)
+        self.SL_z_ratio.blockSignals(True)
+        self.SL_z_ratio.setValue(z_ratio_position(ratio))
+        self.SL_z_ratio.blockSignals(False)
+        self.LB_z_ratio.setText(format(ratio, ".3g"))
+        # No heights in the flat view
+        self.SL_z_ratio.setEnabled(not flat)
 
         # Indentation segment: only for the elasticity volume (Tomography)
         self.afm_indentation_widget.update_widget(data_id=layer.afm_id)

@@ -119,7 +119,7 @@ def compute_noises(curve_x, curve_y):
     return rms, std, determination, sem
 
 
-def flatten(data, order=1, inside=None, parts=None):
+def flatten(data, order=1, inside=None, parts=None, excluded=None):
     """Flatten a meshgrid ([x][y]) along its scan lines (along x, for each
     y).
 
@@ -130,13 +130,17 @@ def flatten(data, order=1, inside=None, parts=None):
     the pixels. The other pixels are set to the minimum.
     parts: parts of the map between the steps of the z motor (see
     level_steps), None to keep the offsets at the steps of the motor.
+    excluded: pixels left out of the fits (boolean array, e.g. a high
+    feature which would bias the lines), still flattened with their line.
     """
     data = numpy.asarray(data, dtype=float)
     if parts is not None:
         data = level_steps(data, parts, inside)
     if inside is not None:
         inside = numpy.asarray(inside, dtype=bool).T
-    return flatten_rows(data.T, order, inside).T
+    if excluded is not None:
+        excluded = numpy.asarray(excluded, dtype=bool).T
+    return flatten_rows(data.T, order, inside, excluded).T
 
 
 # Weight in the fit of the offsets of the pairs of pixels without slope of
@@ -233,17 +237,23 @@ def level_steps(data, parts, inside=None):
     return new_data
 
 
-def flatten_rows(data, order=1, inside=None):
+def flatten_rows(data, order=1, inside=None, excluded=None):
     """Flatten a meshgrid along its rows (see flatten): each row minus its
     median (order 0) or minus its own polynomial fit (orders 1 and 2), on
-    the pixels inside. The rows with too few pixels for the fit only lose
-    their median."""
+    the pixels inside and not excluded (a row with all its pixels
+    excluded: on all its pixels inside). The rows with too few pixels for
+    the fit only lose their median."""
     vect_x = numpy.arange(data.shape[1])
     if inside is None:
         inside = numpy.ones(data.shape, bool)
     inside = numpy.asarray(inside, dtype=bool)
+    fitted = inside.copy()
+    if excluded is not None:
+        fitted &= ~numpy.asarray(excluded, dtype=bool)
     new_data = data.copy()
-    for k, (line, used) in enumerate(zip(data, inside)):
+    for k, (line, used) in enumerate(zip(data, fitted)):
+        if not used.any():
+            used = inside[k]
         if not used.any():
             continue
         if order > 0 and numpy.count_nonzero(used) > order:

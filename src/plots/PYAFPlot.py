@@ -228,9 +228,11 @@ class PYAFPlot(FigureCanvasQTAgg):
             self.mesh_type = shared.exp.roi_meshgrid_type
             if self.mesh_type not in map_values.available_maps(dt):
                 self.mesh_type = "piezo"
-        elif self.plot_type == "meshgrid_data":
-            # The map on the data tab is always the piezo height, whatever
-            # the type of map selected on the results tab
+        elif self.plot_type in ("meshgrid_data", "small_meshgrid_compute",
+                                "small_meshgrid_for_correction",
+                                "small_meshgrid_for_correction_original"):
+            # The maps on the data and compute tabs are always the piezo
+            # height, whatever the type of map selected on the results tab
             self.mesh_type = "piezo"
         else:
             self.mesh_type = dt.meshgrid_type

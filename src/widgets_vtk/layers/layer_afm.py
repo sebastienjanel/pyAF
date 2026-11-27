@@ -131,6 +131,15 @@ class LayerAFM(Layer):
         self.actor = self.get_smoothed_actor()
 
         self.z_scale = [z_min, z_max]
+        # Base of the surface, from which the z ratio stretches the heights,
+        # and its lowest point (bottom of the axes of a surface), from the
+        # pixels with a height
+        heights = numpy.asarray(vtk_afm.get_topography_for_geometry(dt),
+                                dtype=float)
+        heights = heights[map_values.has_height(dt) & numpy.isfinite(heights)]
+        self.surface_base = float(numpy.percentile(heights, 2)) \
+            if heights.size else 0.0
+        self.surface_min = float(heights.min()) if heights.size else 0.0
 
         self.finish_update_tomography()
 

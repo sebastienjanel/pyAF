@@ -35,7 +35,8 @@ Positions (JPK files). The microscope records the position of the tip
 scanner, of the sample scanner and of the motorized stage. The position of a
 curve on the sample is
 
-    position = tip scanner - stage - sample scanner
+    position = tip scanner + base of the tip scanner + scanner motor
+               - stage - sample scanner
 
 (missing terms are 0, e.g. without motorized stage), so that single curves
 recorded after a map can be placed on it, as long as the stage did not move.
@@ -91,6 +92,13 @@ def frame_from_header(header):
                        "sample-scanner.scanner-displacement.y"),
         "stage": pair("motor-stage-moved.parameters.transform.translatex",
                       "motor-stage-moved.parameters.transform.translatey"),
+        # Base of the tip scanner on the scanner motor, and position of the
+        # scanner motor (e.g. 125 um with the HybridStage)
+        "tip_base": pair("tip-scanner-base.parameters.transform.translatex",
+                         "tip-scanner-base.parameters.transform.translatey"),
+        "scanner_motor": pair(
+            "scanner-motor-moved.parameters.transform.translatex",
+            "scanner-motor-moved.parameters.transform.translatey"),
         "z_motor": None, "coordinates": None}
     for key, value in header.items():
         if frame["z_motor"] is None and \
@@ -106,6 +114,10 @@ def sample_position(tip, frame):
     """Position [x, y] (m) on the sample of a point at the position tip of
     the tip scanner (see the module)."""
     x, y = tip
+    for name in ("tip_base", "scanner_motor"):
+        if frame.get(name) is not None:
+            x += frame[name][0]
+            y += frame[name][1]
     for name in ("stage", "sample"):
         if frame.get(name) is not None:
             x -= frame[name][0]

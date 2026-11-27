@@ -34,6 +34,7 @@
 
 from .. import vtk_api as vtk
 import numpy
+from matplotlib.colors import LogNorm
 from ... import widgets_list
 from ...tools.colortables import ColorTables
 from .common import center_data
@@ -63,12 +64,34 @@ def is_volume(data):
     return not data.used_perform_fit or bool(tomography and step)
 
 
-def get_colortable(data, mt):
-    """Color table of a map (its color options, as in the results tab)."""
+def get_colortable(data, mt, values=None):
+    """Color table of a map (its color options, as in the results tab),
+    with the log scale of the moduli if asked (values: those of the map,
+    for the bottom of the log scale, see map_values.log_limits)."""
     opts = data.get_color_opts(mt)
-    return ColorTables(opts[0], data.color_saturation, data.color_negative,
-                       opts[2], opts[3], mode="scalarMap",
-                       color_nan=data.color_nan, min_value=opts[1])
+    colortable = ColorTables(opts[0], data.color_saturation,
+                             data.color_negative, opts[2], opts[3],
+                             mode="scalarMap", color_nan=data.color_nan,
+                             min_value=opts[1])
+    if values is None:
+        values = map_values.values(data, mt)
+    limits = map_values.log_limits(data, mt, values)
+    if limits is not None:
+        colortable.scalarMap.set_norm(LogNorm(vmin=limits[0],
+                                              vmax=limits[1]))
+    colortable.log_limits = limits
+    return colortable
+
+
+def rgba(colortable, vals):
+    """RGBA colors (uint8) of values with a color table. With the log
+    scale, as the 2D maps: the positive values below its bottom have its
+    first color (the negative ones keep theirs)."""
+    vals = numpy.asarray(vals, dtype=float)
+    if colortable.log_limits is not None:
+        low = colortable.log_limits[0]
+        vals = numpy.where((vals >= 0) & (vals < low), low, vals)
+    return numpy.array(colortable.scalarMap.to_rgba(vals, bytes=True))
 
 
 def get_colors(data, mt, vals):
@@ -76,9 +99,8 @@ def get_colors(data, mt, vals):
     the nan color (or transparent)."""
     vals = numpy.asarray(vals, dtype=float)
     nans = ~numpy.isfinite(vals)
-    colortable = get_colortable(data, mt)
-    carray = numpy.array(colortable.scalarMap.to_rgba(
-        numpy.where(nans, 0.0, vals), bytes=True))
+    colortable = get_colortable(data, mt, vals)
+    carray = rgba(colortable, numpy.where(nans, 0.0, vals))
     if data.nan_color_transparent:
         color = [0, 0, 0, 0]
     else:
@@ -403,7 +425,7 @@ def get_side(data, side):
 
     # Fill the color_array with values. Matplotlib is used to fill in the
     # values, which is the fastest solution I found for the moment.
-    carray = numpy.array(colortable.scalarMap.to_rgba(vals, bytes=True))
+    carray = rgba(colortable, vals)
 
     widgets_list.widget_progressbar.set_label("Create vertices (" + side + ")")
 

@@ -35,32 +35,28 @@
 import numpy
 
 from .plot_meshgrid import PlotMeshGrid
+from ...tools import planefit
 
 
 class PlotSmallMeshGridCompute(PlotMeshGrid):
     """Plots a small meshgrid on the compute tab.
 
-    If needed the data is flattened.
+    The piezo height with the flatten and the planefit, with the color scale
+    of the piezo height map of the results tab (the raw piezo height is on
+    the data tab).
     """
 
     def __init__(self, parent):
         super().__init__(parent)
 
-        if self.data.flatten_applied:
-            self.temp_array[:] = self.data.flattened_piezo_image()
-        else:
-            self.temp_array[:] = self.data.piezo_image
+        self.temp_array[:] = planefit.piezo_map(self.data)
+        # Pixels without height: the nan color
+        self.temp_array = numpy.ma.masked_where(
+            numpy.isnan(self.temp_array), self.temp_array)
 
         # Axes and colour bar, as for the map of the data tab
         self.factor = 1.0
         self.colorbarlabel = "Piezo height [nm]"
         self.title = None
-
-        # Overwrite colormap to have always a copper colormap for
-        #  these meshgrids
-        self.colormap = self.colortables.colortables_mpl_list[0]
-        # Range of the displayed (flattened) heights
-        self.colortable_max_value = numpy.amax(self.temp_array)
-        self.colortable_min_value = 0
 
         self.plot_fig()

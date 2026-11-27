@@ -119,6 +119,24 @@ class Flatten(unittest.TestCase):
         flat = math_tools.flatten(numpy.zeros((NX, NY)) + offsets, 0)
         self.assertLess(numpy.ptp(flat), 1e-9)
 
+    def test_excluded_feature(self):
+        # A high feature (cell) on a tilted substrate: left out of the fits,
+        # the substrate is flat; in the fits, it tilts the lines
+        x, y = grids()
+        data = 3.0 * x + 50.0 * y + 7.0
+        cell = (x < NX // 2) & (y > NY // 4) & (y < 3 * NY // 4)
+        data = data + numpy.where(cell, 2000.0, 0.0)
+        excluded = numpy.zeros((NX, NY), bool)
+        excluded[:NX // 2 + 2, NY // 4 - 1:3 * NY // 4 + 2] = True
+        substrate = ~excluded
+        flat = math_tools.flatten(data, 1, excluded=excluded)
+        self.assertLess(numpy.ptp(flat[substrate]), 1e-6)
+        # The excluded pixels are flattened with their line
+        self.assertAlmostEqual(float(numpy.median(flat[cell])), 2000.0,
+                               delta=1e-6)
+        biased = math_tools.flatten(data, 1)
+        self.assertGreater(numpy.ptp(biased[substrate]), 100)
+
     def test_order_1_removes_the_tilt_of_each_line(self):
         x, y = grids()
         data = (2.0 + 0.1 * y) * x + 50.0 * y + 7.0
@@ -189,6 +207,7 @@ class FakeFile:
 
     flatten_state = SingleFile.flatten_state
     piezo_for = SingleFile.piezo_for
+    excluded_mask = SingleFile.excluded_mask
     topography_state = SingleFile.topography_state
     sync_topography = SingleFile.sync_topography
 
@@ -198,6 +217,7 @@ class FakeFile:
         self.flatten_applied = False
         self.applied_flatten_order = None
         self.applied_flatten_motor = False
+        self.applied_flatten_excluded = ()
         self.stiffness_calculated = False
         self.topography = None
         self.topography_flatten = UNKNOWN_FLATTEN
@@ -267,7 +287,7 @@ class TopographyFollowsTheFlatten(unittest.TestCase):
         self.file.compute_topography(self.contact)
         self.file.topography_flatten = UNKNOWN_FLATTEN
         self.assertFalse(self.file.sync_topography())
-        self.assertEqual(self.file.topography_flatten, (0, False))
+        self.assertEqual(self.file.topography_flatten, (0, False, ()))
 
 
 class ContactModels(unittest.TestCase):
@@ -436,6 +456,26 @@ class CantileverOfTheBEC(unittest.TestCase):
     def test_not_computed(self):
         self.assertFalse(bec.cantilever_changed(
             self.file(5e-11, None, 10.0, None)))
+
+
+class CurvesOnMaps(unittest.TestCase):
+    """Position on the sample of a single curve (plant_tools)."""
+
+    def test_base_of_the_tip_scanner(self):
+        # HybridStage: the base of the tip scanner is offset on the scanner
+        # motor (JPK file of a Smart Mapping map and its single curves)
+        tip_base = "tip-scanner-base.parameters.transform.translate"
+        stage = "motor-stage-moved.parameters.transform.translate"
+        scanner = "xy-scanner.tip-scanner.scanner-displacement."
+        sample = "xy-scanner.sample-scanner.scanner-displacement."
+        header = {tip_base + "x": "-9.7e-6", tip_base + "y": "124.8e-6",
+                  stage + "x": "217.3e-6", stage + "y": "2344.6e-6",
+                  scanner + "x": "43.6e-6", scanner + "y": "-2.0e-6",
+                  sample + "x": "10.6e-6", sample + "y": "-5.5e-6"}
+        frame = plant_tools.frame_from_header(header)
+        x, y = plant_tools.sample_position(frame["tip"], frame)
+        self.assertAlmostEqual(x, -194.0e-6, places=10)
+        self.assertAlmostEqual(y, -2216.3e-6, places=10)
 
 
 class PlantCells(unittest.TestCase):

@@ -32,6 +32,7 @@
 
 """Main VTK widget."""
 
+import numpy
 from qtpy import QtCore, QtWidgets
 from .menu_options import MenuOptionsWidget
 from .menu_layer_list import MenuLayerListWidget
@@ -233,12 +234,18 @@ def get_color_bar():
     themax = opts[2]
     if themax <= themin:
         themax = themin + 1
-    lut.SetTableRange(themin * fac, themax * fac)
     colortable = vtk_afm.get_colortable(data, mt)
-    step = (themax - themin) / 512.0
+    if colortable.log_limits is not None:
+        # Log scale (as the surface): colors at log-spaced values
+        themin, themax = colortable.log_limits
+        lut.SetScaleToLog10()
+        values = numpy.geomspace(themin, themax, 512)
+    else:
+        values = themin + numpy.arange(512) * (themax - themin) / 512.0
+    lut.SetTableRange(themin * fac, themax * fac)
 
-    for i in range(512):
-        color_st = colortable.get_color_as_list(themin + i * step)
+    for i, value in enumerate(values):
+        color_st = colortable.get_color_as_list(value)
         lut.SetTableValue(i, [color_st[0], color_st[1], color_st[2], 1.0])
     lut.Build()
 

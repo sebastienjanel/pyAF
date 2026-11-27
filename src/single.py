@@ -668,6 +668,8 @@ class SingleFile:
         # the surface ("topo" or "piezo")
         self.opengl_map_type = "stiffness"
         self.opengl_height = "topo"
+        # 3D view: heights multiplied by this ratio (flat samples)
+        self.opengl_z_ratio = 1.0
 
         # Smoothing of vtk tomographies (off by default)
         # Type : None or "loop"
@@ -678,6 +680,11 @@ class SingleFile:
         # If the user has flattened the data in pyAF
         self.applied_flatten_order = None
         self.flatten_applied = False
+        # Rectangles left out of the fits of the flatten (high features),
+        # in pixels (x first, x last, y first, y last): drawn in the flatten
+        # window, and applied
+        self.flatten_excluded = []
+        self.applied_flatten_excluded = ()
         # Offsets at the steps of the z motor removed with the flatten
         self.applied_flatten_motor = False
         # Flatten of the piezo height in the zero-force topography (see
@@ -1219,24 +1226,38 @@ class SingleFile:
         return self.outside_region is not None and \
             bool(self.outside_region[i][j])
 
-    def flattened_piezo_image(self, order=None, motor=None):
+    def flattened_piezo_image(self, order=None, motor=None, excluded=None):
         """Piezo image flattened with this order (the applied one by
         default), without the offsets at the steps of the z motor when motor
-        is True (applied_flatten_motor by default)."""
+        is True (applied_flatten_motor by default), the rectangles excluded
+        left out of the fits (applied_flatten_excluded by default)."""
         if order is None:
             order = self.applied_flatten_order
         if motor is None:
             motor = self.applied_flatten_motor
-        return self.piezo_for((order, bool(motor)))
+        if excluded is None:
+            excluded = self.applied_flatten_excluded
+        return self.piezo_for((order, bool(motor), tuple(excluded)))
+
+    def excluded_mask(self, rectangles):
+        """Pixels of rectangles (x first, x last, y first, y last), as a
+        boolean array [x][y]; None without rectangle."""
+        if not rectangles:
+            return None
+        mask = numpy.zeros((self.nbr_pixels_x, self.nbr_pixels_y), bool)
+        for i0, i1, j0, j1 in rectangles:
+            mask[i0:i1 + 1, j0:j1 + 1] = True
+        return mask
 
     def flatten_state(self):
         """Flatten applied to the piezo height: None, or (order, motor
-        steps levelled)."""
+        steps levelled, rectangles excluded from the fits)."""
         if not self.flatten_applied:
             return None
         return (self.applied_flatten_order,
                 bool(self.applied_flatten_motor and
-                     self.motor_parts is not None))
+                     self.motor_parts is not None),
+                tuple(self.applied_flatten_excluded))
 
     def piezo_for(self, state):
         """Piezo height with a flatten state (see flatten_state); order None:
@@ -1244,13 +1265,16 @@ class SingleFile:
         piezo = numpy.array(self.piezo_image, dtype=float)
         if state is None:
             return piezo
-        order, motor = state
+        # (order, motor steps levelled, rectangles excluded from the fits)
+        order, motor = state[:2]
+        excluded = state[2] if len(state) > 2 else ()
         parts = self.motor_parts if motor else None
         if order is None:
             if parts is None:
                 return piezo
             return math_tools.level_steps(piezo, parts, self.inside_region())
-        return math_tools.flatten(piezo, order, self.inside_region(), parts)
+        return math_tools.flatten(piezo, order, self.inside_region(), parts,
+                                  self.excluded_mask(excluded))
 
     def topography_state(self):
         """Flatten of the piezo height in the zero-force topography (see

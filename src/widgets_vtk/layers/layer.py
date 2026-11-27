@@ -33,10 +33,8 @@
 """Main vtk layer."""
 
 from .. import vtk_api as vtk
-import numpy
 from ... import shared
 from ... import widgets_list
-from ...tools import planefit
 from ..utils.common import use_app_font
 
 
@@ -187,14 +185,16 @@ class Layer:
             self.actor_axes.SetZAxisVisibility(False)
         else:
             # Disable z axis if asked
-            if self.display_z_scale:
-                top = numpy.nanmax(planefit.topo_map(self.data))
-                self.actor_axes.SetZAxisRange(0, top / 1000.0)
+            if self.display_z_scale and self.z_scale is not None:
+                # Real heights at the ends of the axis (also with the z
+                # ratio)
+                low, high = self.z_range()
+                self.actor_axes.SetZAxisRange(low / 1000.0, high / 1000.0)
                 # Only the bottom and the top (the axis is short, the
                 # automatic labels overlap)
                 labels = vtk.vtkStringArray()
-                labels.InsertNextValue("0")
-                labels.InsertNextValue("%.3g" % (top / 1000.0))
+                labels.InsertNextValue("%.3g" % (low / 1000.0))
+                labels.InsertNextValue("%.3g" % (high / 1000.0))
                 self.actor_axes.SetAxisLabels(2, labels)
             else:
                 self.actor_axes.SetZAxisRange(0, 0)
@@ -244,8 +244,13 @@ class Layer:
             y2 = y2 - (diffy) * self.res_y
 
             if self.z_scale is not None:
-                z1 = self.z_scale[0] + self.pos_z
-                z2 = self.z_scale[1] + self.pos_z
+                # Axis along the stretched surface (labels: the real
+                # heights, see z_range), from the bottom of the volume or
+                # the lowest point of the surface
+                base, ratio = self.z_base(), self.z_ratio()
+                low, high = self.z_range()
+                z1 = base + (low - base) * ratio + self.pos_z
+                z2 = base + (high - base) * ratio + self.pos_z
             else:
                 # During initialisation we have no values
                 z1 = 0
@@ -299,6 +304,31 @@ class Layer:
         if shared.VTK_first is False:
             self.parent.interactor.GetRenderWindow().Render()
 
+    def z_ratio(self):
+        """Ratio of the heights (AFM layers: z ratio of the 3D view of
+        their file, 1 for the other layers)."""
+        if self.type != "afm":
+            return 1.0
+        return float(getattr(self.data, "opengl_z_ratio", 1.0))
+
+    def z_range(self):
+        """Real heights at the bottom and the top of the z axis of an AFM
+        layer [nm]: from the bottom of the volume (Tomography) or the lowest
+        point of the surface, to its top."""
+        low, high = self.z_scale
+        surface_min = getattr(self, "surface_min", None)
+        if surface_min is not None and low < surface_min:
+            from ..utils import vtk_afm
+            if not vtk_afm.is_volume(self.data):
+                low = surface_min
+        return low, high
+
+    def z_base(self):
+        """Height from which the z ratio stretches an AFM layer: base of
+        its surface (2nd percentile of the heights, not moved by a few
+        outliers); 0 for the other layers."""
+        return float(getattr(self, "surface_base", 0.0) or 0.0)
+
     def translate(self, x, y, z):
         """Method used to translate the layer in the z plane."""
         # Store the position of the layer
@@ -306,14 +336,19 @@ class Layer:
         self.pos_y = self.pos_y + y
         self.pos_z = self.pos_z + z
 
-        # Translate the actor
+        # Translate the actor, the heights of the AFM layers multiplied by
+        # their z ratio from the base of the surface (it stays in place)
         self.actor.SetPosition(self.pos_x, self.pos_y, self.pos_z)
+        self.actor.SetOrigin(0, 0, self.z_base())
+        self.actor.SetScale(1, 1, self.z_ratio())
 
         # For AFM layers, we can have profiles to move
         if self.type == "afm":
             if self.actor_profiles:
                 for actor in self.actor_profiles:
                     actor.SetPosition(self.pos_x, self.pos_y, self.pos_z)
+                    actor.SetOrigin(0, 0, self.z_base())
+                    actor.SetScale(1, 1, self.z_ratio())
 
         # Update the values in the inputs
         widgets_list.widget_vtk.menu_options.tab_options.update_widget()

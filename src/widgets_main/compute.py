@@ -39,7 +39,7 @@ from .. import widgets_list
 from .. import experiment
 import logging
 from .. import consts
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from ..tools import misc_tools
 from ..tools import gui_tools
 from ..tools import apply_to_all
@@ -74,6 +74,7 @@ from ..widgets.piezo_characterization import PiezoCharacterizationDialog
 from ..compute_tools.stiffness import contact_models
 from ..compute_tools.stiffness import bec
 from ..widgets import plot_options
+from ..utils import meshgrid_menu
 from ..compute_tools.loading_rates import GetLoadingRate
 from ..compute_tools.events import GetEvents
 from ..tools.PYAFWidget import PYAFWidget
@@ -2810,3 +2811,23 @@ class ComputeWidget(PYAFWidget):
             xpos, ypos = misc_tools.get_position_on_meshgrid(event)
 
             widgets_list.widget_main.change_curve(xpos, ypos)
+
+        elif event.button == 3 and \
+                event.inaxes == self.MPL_meshgrid.canvas.axes:
+            # Color options of the piezo height (position of the mouse on
+            # screen: the matplotlib position is in physical pixels)
+            menu = QtWidgets.QMenu()
+            action = QtWidgets.QAction("Color Options", self)
+            action.triggered.connect(self.open_color_options)
+            menu.addAction(action)
+            menu.exec_(QtGui.QCursor.pos())
+
+    def open_color_options(self):
+        """Color options of the piezo height map, shared with the results
+        tab (which displays the piezo height map, as for the 3D view)."""
+        data = shared.exp.current_data
+        data.meshgrid_type = "piezo"
+        results = widgets_list.widget_results
+        if results is not None and "piezo" in results.map_items:
+            results.select_map("piezo")
+        meshgrid_menu.open_color_options(self)

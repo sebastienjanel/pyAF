@@ -184,3 +184,36 @@ def has_height(data):
     if inside is not None:
         finite &= inside
     return finite
+
+
+# Maps with the log color scale option (moduli)
+LOG_MAPS = ("stiffness", "stiffness_slice", "stiffness_corr",
+            "stiffness_corr_slice", "visco_e0", "visco_storage", "visco_loss",
+            "microrheo_storage", "microrheo_loss")
+# Bottom of a log scale starting at 0 or below: this percentile of the
+# positive values (as the automatic scale of the elasticity)
+LOG_BOTTOM_PERCENTILE = 2
+
+
+def log_limits(data, map_type, values):
+    """Limits (min, max) of the log color scale of a map, in the units of
+    the values and of the color options, or None (linear scale: option off,
+    not a modulus map, Rainbow 1 and Cool-Warm, no positive value). A log
+    scale can not start at 0: the minimum is then the 2nd percentile of
+    the positive values (the lowest value would let a noisy pixel squeeze
+    the colors). Same scale in the 2D maps and the 3D view."""
+    if not data.stiffness_color_log or map_type not in LOG_MAPS:
+        return None
+    opts = data.get_color_opts(map_type)
+    if opts[0] in (1, 6):
+        return None
+    vmin, vmax = float(opts[1]), float(opts[2])
+    if vmin <= 0:
+        values = numpy.asarray(values, dtype=float)
+        values = values[numpy.isfinite(values) & (values > 0)]
+        if values.size == 0:
+            return None
+        vmin = float(numpy.percentile(values, LOG_BOTTOM_PERCENTILE))
+    if vmax <= vmin:
+        return None
+    return vmin, vmax

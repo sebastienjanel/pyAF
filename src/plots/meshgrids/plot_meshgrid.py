@@ -45,7 +45,7 @@ from matplotlib.image import AxesImage
 from ...tools.colortables import ColorTables
 from ...tools import misc_tools
 from ...tools import plant_tools
-from ...single import ELASTICITY_PERCENTILES
+from ...tools import map_values
 
 # Viscoelastic moduli maps (log scale and first color below the scale, as
 # the elasticity)
@@ -75,9 +75,12 @@ class PlotMeshGrid(MainPlot):
 
         # Colormap
         self.colortables = ColorTables()
-        if self.plot_type in ("multimeshgrid", "meshgrid_roi"):
+        if self.plot_type in ("multimeshgrid", "meshgrid_roi",
+                              "small_meshgrid_compute",
+                              "small_meshgrid_for_correction",
+                              "small_meshgrid_for_correction_original"):
             # Scale of the map type of these maps (not the one of the
-            # results tab)
+            # results tab; piezo height on the compute tab)
             colors = misc_tools.get_color_opts_by_meshgrid_type(
                 self.data, self.mesh_type)
             self.colormap = self.colortables.colortables_mpl_list[colors[0]]
@@ -361,28 +364,17 @@ class PlotMeshGrid(MainPlot):
         self.start_plot()
 
     def get_log_norm(self):
-        """Log color scale of the elasticity maps (None if not asked). A log
-        scale can not start at 0: the minimum is then the 2nd percentile of
-        the positive values of the map (the lowest value would let a noisy
-        pixel squeeze the colors)."""
-        mesh = self.mesh_type
-        if mesh is None or not (str(mesh).startswith("stiffness") or
-                                mesh in MODULUS_MAPS) or \
-                not self.data.stiffness_color_log or \
-                self.data_meshgrid is None:
+        """Log color scale of the elasticity maps (None if not asked), as in
+        the 3D view (see map_values.log_limits)."""
+        if self.mesh_type is None or self.data_meshgrid is None or \
+                not self.factor:
             return None
-        vmax = self.colortable_max_value * self.factor
-        vmin = self.colortable_min_value * self.factor
-        if vmin <= 0:
-            values = numpy.asarray(self.data_meshgrid, dtype=float)
-            values = values[numpy.isfinite(values) & (values > 0)]
-            if values.size == 0:
-                return None
-            vmin = float(numpy.percentile(values,
-                                          ELASTICITY_PERCENTILES[0]))
-        if vmax <= vmin:
+        values = numpy.asarray(self.data_meshgrid, dtype=float) / self.factor
+        limits = map_values.log_limits(self.data, self.mesh_type, values)
+        if limits is None:
             return None
-        return LogNorm(vmin=vmin, vmax=vmax)
+        return LogNorm(vmin=limits[0] * self.factor,
+                       vmax=limits[1] * self.factor)
 
     def get_events_colorscale(self, colormap):
         """Returns a discrete colorscale for the number of events.

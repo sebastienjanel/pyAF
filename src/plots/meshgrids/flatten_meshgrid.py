@@ -31,10 +31,11 @@
 
 """Plots a piezo extension meshgrid, flattened or not."""
 
-import numpy
+from matplotlib.patches import Rectangle
 
 from ... import shared
 from .plot_meshgrid import PlotMeshGrid
+from ...tools import planefit
 
 
 class PlotFlattenMeshGrid(PlotMeshGrid):
@@ -47,7 +48,8 @@ class PlotFlattenMeshGrid(PlotMeshGrid):
             self.title = "Flattened"
             self.temp_array[:] = self.data.flattened_piezo_image(
                 shared.exp.selected_flatten_order,
-                shared.exp.selected_flatten_motor)
+                shared.exp.selected_flatten_motor,
+                tuple(self.data.flatten_excluded))
         elif self.plot_type == "small_meshgrid_for_correction_original":
             self.title = "Original"
             self.temp_array[:] = self.data.piezo_image
@@ -62,11 +64,39 @@ class PlotFlattenMeshGrid(PlotMeshGrid):
         self.axes.get_xaxis().set_visible(False)
         self.axes.get_yaxis().set_visible(False)
 
-        # Overwrite colormap to have always a copper colormap fot these
-        # meshgrids
-        self.colormap = self.colortables.colortables_mpl_list[0]
-        # Range of the displayed (flattened) heights
-        self.colortable_max_value = numpy.amax(self.temp_array)
-        self.colortable_min_value = 0
+        # Color scale of the piezo height map (compute and results tabs) for
+        # the map showing the same heights as the compute tab: the
+        # flattened one once a flatten is applied, the original one before.
+        # The other one: the scale the flatten will set (flattened), or the
+        # range of the data tab (original)
+        flattened = self.plot_type == "small_meshgrid_for_correction"
+        if flattened != bool(self.data.flatten_applied):
+            self.colortable_min_value = 0
+            if flattened:
+                self.colortable_max_value = planefit.piezo_scale_max(
+                    self.data, self.temp_array)
+            else:
+                self.colortable_max_value = self.data.max_piezo
+            self.colortable_middle_value = self.colortable_max_value / 2.0
 
         self.plot_fig()
+        self.draw_excluded()
+
+    def draw_excluded(self, extra=None):
+        """Outlines of the rectangles left out of the fits of the flatten
+        (and of the rectangle being drawn, extra)."""
+        rectangles = list(self.data.flatten_excluded)
+        if extra is not None:
+            rectangles.append(extra)
+        for patch in getattr(self, "excluded_patches", []):
+            patch.remove()
+        self.excluded_patches = []
+        for i0, i1, j0, j1 in rectangles:
+            patch = Rectangle((i0 * self.x_size, j0 * self.y_size),
+                              (i1 - i0 + 1) * self.x_size,
+                              (j1 - j0 + 1) * self.y_size, fill=False,
+                              edgecolor="#d62728", linewidth=1.5,
+                              linestyle="--")
+            self.axes.add_patch(patch)
+            self.excluded_patches.append(patch)
+        self.fig.canvas.draw_idle()
